@@ -939,39 +939,51 @@ struct umbra_shader* umbra_shader_supersample(struct umbra_shader *inner, int sa
     return &s->base;
 }
 
-struct coverage_rect {
-    struct umbra_coverage base;
-    umbra_rect            rect;
-};
-
-static umbra_val32 rect_build(struct umbra_coverage *s, struct umbra_builder *builder,
-                               umbra_ptr32 uniforms,
-                               umbra_val32 x, umbra_val32 y) {
-    struct coverage_rect *self = (struct coverage_rect *)s;
-    umbra_val32 const l = umbra_uniform_32(builder, uniforms, SLOT(rect.l));
-    umbra_val32 const t = umbra_uniform_32(builder, uniforms, SLOT(rect.t));
-    umbra_val32 const r = umbra_uniform_32(builder, uniforms, SLOT(rect.r));
-    umbra_val32 const b = umbra_uniform_32(builder, uniforms, SLOT(rect.b));
-    umbra_val32 const inside = umbra_and_32(builder,
-                                           umbra_and_32(builder, umbra_le_f32(builder, l, x),
-                                                         umbra_lt_f32(builder, x, r)),
-                                           umbra_and_32(builder, umbra_le_f32(builder, t, y),
-                                                         umbra_lt_f32(builder, y, b)));
-    umbra_val32 const one_f = umbra_imm_f32(builder, 1.0f);
-    umbra_val32 const zero_f = umbra_imm_f32(builder, 0.0f);
-    return umbra_sel_32(builder, inside, one_f, zero_f);
+umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
+                                 umbra_val32 x, umbra_val32 y) {
+    umbra_rect const *self = ctx;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_val32 const l = umbra_uniform_32(b, u, 0),
+                      t = umbra_uniform_32(b, u, 1),
+                      r = umbra_uniform_32(b, u, 2),
+                      bot = umbra_uniform_32(b, u, 3);
+    umbra_val32 const inside = umbra_and_32(b,
+                                    umbra_and_32(b, umbra_le_f32(b, l, x),
+                                                     umbra_lt_f32(b, x, r)),
+                                    umbra_and_32(b, umbra_le_f32(b, t, y),
+                                                     umbra_lt_f32(b, y, bot)));
+    umbra_val32 const one_f  = umbra_imm_f32(b, 1.0f),
+                      zero_f = umbra_imm_f32(b, 0.0f);
+    return umbra_sel_32(b, inside, one_f, zero_f);
 }
-static void rect_free(struct umbra_coverage *s) { free(s); }
 
-struct umbra_coverage* umbra_coverage_rect(umbra_rect rect) {
-    struct coverage_rect *c = malloc(sizeof *c);
-    *c = (struct coverage_rect){
-        .base = {.build          = rect_build,
-                 .free           = rect_free,
-                 .uniforms = UMBRA_UNIFORMS_OF(c)},
-        .rect = rect,
+// Bridge: wrap a flat coverage fn into a struct umbra_coverage* for
+// old-middleware composers (umbra_draw_builder) until they migrate.  Same
+// shape as umbra_shader_wrap.
+struct coverage_wrap {
+    struct umbra_coverage  base;
+    umbra_coverage         fn;
+    void                  *ctx;
+};
+static umbra_val32 coverage_wrap_build(struct umbra_coverage *s, struct umbra_builder *b,
+                                        umbra_ptr32 uniforms,
+                                        umbra_val32 x, umbra_val32 y) {
+    struct coverage_wrap *self = (struct coverage_wrap *)s;
+    (void)uniforms;
+    return self->fn(self->ctx, b, x, y);
+}
+static void coverage_wrap_free(struct umbra_coverage *s) { free(s); }
+
+struct umbra_coverage* umbra_coverage_wrap(umbra_coverage fn, void *ctx) {
+    struct coverage_wrap *w = malloc(sizeof *w);
+    *w = (struct coverage_wrap){
+        .base = {.build    = coverage_wrap_build,
+                 .free     = coverage_wrap_free,
+                 .uniforms = (struct umbra_buf){0}},
+        .fn   = fn,
+        .ctx  = ctx,
     };
-    return &c->base;
+    return &w->base;
 }
 
 struct sdf_rect {

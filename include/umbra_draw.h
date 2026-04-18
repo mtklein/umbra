@@ -205,7 +205,16 @@ struct umbra_shader* umbra_shader_gradient(struct umbra_gradient_coords*,
 
 struct umbra_shader* umbra_shader_supersample(struct umbra_shader *inner, int samples);
 
-struct umbra_coverage* umbra_coverage_rect(umbra_rect);
+// Flat coverage: caller owns an umbra_rect; pass &rect as coverage_ctx to
+// umbra_draw_builder2 (or wrap via umbra_coverage_wrap for old-middleware
+// composers).  Mutation between queue() calls is reflected on next dispatch.
+umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder*,
+                                 umbra_val32 x, umbra_val32 y);
+
+// Wrap any flat coverage (fn, ctx) into a struct umbra_coverage* for composers
+// that haven't migrated yet.  Caller retains ownership of ctx storage until
+// the returned wrapper is freed via umbra_coverage_free().
+struct umbra_coverage* umbra_coverage_wrap(umbra_coverage fn, void *ctx);
 
 struct umbra_sdf* umbra_sdf_rect(umbra_rect);
 
