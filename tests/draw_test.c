@@ -1240,66 +1240,74 @@ TEST(test_page_aligned_buffer) {
 }
 
 TEST(test_565_round_trip) {
+    enum { W565 = 35 };
+    uint16_t src[W565], dst[W565];
+    for (int i = 0; i < W565; i++) { src[i] = (uint16_t)(0x1234u + (unsigned)i * 0x1111u); }
+    struct umbra_buf src_buf = {.ptr=src, .count=W565},
+                     dst_buf = {.ptr=dst, .count=W565};
+
     struct umbra_builder *b = umbra_builder();
-    umbra_color_val32 c = umbra_load_565(b, (umbra_ptr16){0});
-    umbra_store_565(b, (umbra_ptr16){.ix=1}, c);
+    umbra_ptr16 const sp = umbra_bind_buf16(b, &src_buf),
+                      dp = umbra_bind_buf16(b, &dst_buf);
+    umbra_color_val32 c = umbra_load_565(b, sp);
+    umbra_store_565(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(ir);
     umbra_flat_ir_free(ir);
-    enum { W565 = 35 };
-    uint16_t src[W565], dst[W565];
-    for (int i = 0; i < W565; i++) { src[i] = (uint16_t)(0x1234u + (unsigned)i * 0x1111u); }
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!test_backends_run(&B, bi, W565, 1, (struct umbra_buf[]){
-            {.ptr=src, .count=W565}, {.ptr=dst, .count=W565},
-        })) { continue; }
+        if (!test_backends_run(&B, bi, W565, 1, (struct umbra_buf[]){{0}})) { continue; }
         for (int i = 0; i < W565; i++) { dst[i] == src[i] here; }
     }
     test_backends_free(&B);
 }
 
 TEST(test_1010102_round_trip) {
-    struct umbra_builder *b = umbra_builder();
-    umbra_color_val32 c = umbra_load_1010102(b, (umbra_ptr32){0});
-    umbra_store_1010102(b, (umbra_ptr32){.ix=1}, c);
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    struct test_backends B = test_backends_make(ir);
-    umbra_flat_ir_free(ir);
     uint32_t src[7], dst[7];
     for (int i = 0; i < 7; i++) {
         src[i] = ((unsigned)i * 73u) | ((unsigned)i * 37u << 10)
                | ((unsigned)i * 19u << 20) | (2u << 30);
     }
+    struct umbra_buf src_buf = {.ptr=src, .count=7},
+                     dst_buf = {.ptr=dst, .count=7};
+
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const sp = umbra_bind_buf32(b, &src_buf),
+                      dp = umbra_bind_buf32(b, &dst_buf);
+    umbra_color_val32 c = umbra_load_1010102(b, sp);
+    umbra_store_1010102(b, dp, c);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    struct test_backends B = test_backends_make(ir);
+    umbra_flat_ir_free(ir);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!test_backends_run(&B, bi, 7, 1, (struct umbra_buf[]){
-            {.ptr=src, .count=7}, {.ptr=dst, .count=7},
-        })) { continue; }
+        if (!test_backends_run(&B, bi, 7, 1, (struct umbra_buf[]){{0}})) { continue; }
         for (int i = 0; i < 7; i++) { dst[i] == src[i] here; }
     }
     test_backends_free(&B);
 }
 
 TEST(test_fp16_planar_round_trip) {
+    enum { WP = 8 };
+    __fp16 src[WP * 4], dst[WP * 4];
+    for (int i = 0; i < WP * 4; i++) { src[i] = (__fp16)(1.0f + (float)i * 0.1f); }
+    struct umbra_buf src_buf = {.ptr=src, .count=WP * 4, .stride=WP},
+                     dst_buf = {.ptr=dst, .count=WP * 4, .stride=WP};
+
     struct umbra_builder *b = umbra_builder();
-    umbra_color_val32 c = umbra_load_fp16_planar(b, (umbra_ptr16){0});
-    umbra_store_fp16_planar(b, (umbra_ptr16){.ix=1}, c);
+    umbra_ptr16 const sp = umbra_bind_buf16(b, &src_buf),
+                      dp = umbra_bind_buf16(b, &dst_buf);
+    umbra_color_val32 c = umbra_load_fp16_planar(b, sp);
+    umbra_store_fp16_planar(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     struct test_backends B = test_backends_make(ir);
     umbra_flat_ir_free(ir);
-    enum { WP = 8 };
-    __fp16 src[WP * 4], dst[WP * 4];
-    for (int i = 0; i < WP * 4; i++) { src[i] = (__fp16)(1.0f + (float)i * 0.1f); }
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!test_backends_run(&B, bi, WP, 1, (struct umbra_buf[]){
-            {.ptr=src, .count=WP * 4, .stride=WP},
-            {.ptr=dst, .count=WP * 4, .stride=WP},
-        })) { continue; }
+        if (!test_backends_run(&B, bi, WP, 1, (struct umbra_buf[]){{0}})) { continue; }
         for (int i = 0; i < WP * 4; i++) { equiv((float)dst[i], (float)src[i]) here; }
     }
     test_backends_free(&B);
