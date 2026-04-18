@@ -44,7 +44,7 @@ struct umbra_program {
     void (*queue)(struct umbra_program*, int l, int t, int r, int b, struct umbra_buf[]);
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
-    struct umbra_backend *backend;  // used by program->free (jit) + dispatch (metal)
+    struct umbra_backend *backend;
     _Bool                 queue_is_threadsafe, pad[7];
 };
 void umbra_program_free(struct umbra_program*);
