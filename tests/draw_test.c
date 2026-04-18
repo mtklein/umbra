@@ -1,4 +1,5 @@
 #include "../include/umbra_draw.h"
+#include "../slides/coverage.h"
 #include "../slides/gradient.h"
 #include "../src/count.h"
 #include "test.h"
@@ -665,7 +666,7 @@ TEST(test_coverage_bitmap) {
     uint16_t cov_data[8] = {0, 128, 255, 0, 0, 0, 0, 0};
     struct umbra_buf buf = {.ptr=cov_data, .count=8};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        umbra_coverage_bitmap, &buf,
+        coverage_bitmap, &buf,
         umbra_shader_color,    &color,
         umbra_blend_srcover,   NULL,
         umbra_fmt_8888));
@@ -690,7 +691,7 @@ TEST(test_coverage_bitmap_565) {
     for (int i = 0; i < 16; i++) { cov_data[i] = 255; }
     struct umbra_buf buf = {.ptr=cov_data, .count=16};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        umbra_coverage_bitmap, &buf,
+        coverage_bitmap, &buf,
         umbra_shader_color,    &color,
         umbra_blend_srcover,   NULL,
         umbra_fmt_565));
@@ -712,7 +713,7 @@ TEST(test_coverage_sdf) {
     uint16_t cov_data[8] = {0, 100, 128, 200, 255, 0, 0, 0};
     struct umbra_buf buf = {.ptr=cov_data, .count=8};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        umbra_coverage_sdf,  &buf,
+        coverage_sdf,  &buf,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888));

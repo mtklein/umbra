@@ -120,13 +120,6 @@ umbra_interval umbra_sdf_rect(void *umbra_rect, struct umbra_builder*,
                               umbra_interval x, umbra_interval y);
 
 // TODO: move to slides
-// 8-bit and SDF bitmap coverage, ctx is an umbra_buf*.
-umbra_val32 umbra_coverage_bitmap(void *umbra_buf, struct umbra_builder*,
-                                  umbra_val32 x, umbra_val32 y);
-umbra_val32 umbra_coverage_sdf   (void *umbra_buf, struct umbra_builder*,
-                                  umbra_val32 x, umbra_val32 y);
-
-// TODO: move to slides
 // Coverage from winding count buffer used by 2-pass Slug, ctx is an umbra_buf*.
 umbra_val32 umbra_coverage_winding(void *umbra_buf, struct umbra_builder*,
                                    umbra_val32 x, umbra_val32 y);

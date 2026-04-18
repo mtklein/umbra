@@ -1,4 +1,5 @@
 #include "slide.h"
+#include "coverage.h"
 #include "text.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,6 +8,35 @@
 #pragma clang diagnostic ignored "-Weverything"
 #include "../third_party/stb/stb_truetype.h"
 #pragma clang diagnostic pop
+
+umbra_val32 coverage_bitmap(void *ctx, struct umbra_builder *b,
+                            umbra_val32 x, umbra_val32 y) {
+    struct umbra_buf const *self = ctx;
+    (void)x; (void)y;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr16 const bmp = umbra_deref_ptr16(b, u, 0);
+    umbra_val32 const val = umbra_i32_from_s16(b, umbra_load_16(b, bmp));
+    umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
+    return umbra_mul_f32(b, umbra_f32_from_i32(b, val), inv255);
+}
+
+umbra_val32 coverage_sdf(void *ctx, struct umbra_builder *b,
+                         umbra_val32 x, umbra_val32 y) {
+    struct umbra_buf const *self = ctx;
+    (void)x; (void)y;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr16 const bmp = umbra_deref_ptr16(b, u, 0);
+    umbra_val32 const raw = umbra_i32_from_s16(b, umbra_load_16(b, bmp));
+    umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
+    umbra_val32 const dist = umbra_mul_f32(b, umbra_f32_from_i32(b, raw), inv255);
+    umbra_val32 const lo = umbra_imm_f32(b, 0.4375f);
+    umbra_val32 const scale = umbra_imm_f32(b, 8.0f);
+    umbra_val32 const shifted = umbra_sub_f32(b, dist, lo);
+    umbra_val32 const scaled = umbra_mul_f32(b, shifted, scale);
+    umbra_val32 const zero = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const one = umbra_imm_f32(b, 1.0f);
+    return umbra_min_f32(b, umbra_max_f32(b, scaled, zero), one);
+}
 
 static unsigned char* text_load_font(char const *path) {
     FILE *f = fopen(path, "rb");
@@ -192,7 +222,7 @@ SLIDE(slide_coverage_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->tc          = text_shared_bitmap();
     st->color       = (umbra_color){1.0f, 1.0f, 1.0f, 1.0f};
-    st->coverage_fn = umbra_coverage_bitmap;
+    st->coverage_fn = coverage_bitmap;
     st->base = (struct slide){
         .title = "Coverage (8-bit bitmap)",
         .bg = {0.18f, 0.1f, 0.1f, 1},
@@ -209,7 +239,7 @@ SLIDE(slide_coverage_sdf_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->tc          = text_shared_sdf();
     st->color       = (umbra_color){0.2f, 0.8f, 1.0f, 1.0f};
-    st->coverage_fn = umbra_coverage_sdf;
+    st->coverage_fn = coverage_sdf;
     st->base = (struct slide){
         .title = "Coverage (SDF bitmap)",
         .bg = {0.18f, 0.1f, 0.1f, 1},

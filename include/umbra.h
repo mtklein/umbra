@@ -63,7 +63,7 @@ typedef struct { int ix:31, deref:1; } umbra_ptr64;
 
 // Read a pointer value out of a uniform slot, giving a new ptr handle that
 // addresses the memory it points at.  Used to reach through struct umbra_buf
-// fields like .ptr (e.g. umbra_coverage_bitmap's 8-bit glyph mask).
+// fields like .ptr (e.g. coverage_bitmap's 8-bit glyph mask).
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, int slot);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, int slot);
 
