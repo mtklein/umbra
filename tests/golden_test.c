@@ -126,7 +126,7 @@ TEST(test_slug_rect) {
     float wind_buf[W * H];
     __builtin_memset(wind_buf, 0, sizeof wind_buf);
 
-    struct umbra_shader *shader = umbra_shader_solid(color);
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
     struct umbra_coverage *cov = umbra_coverage_winding(
         (struct umbra_buf){.ptr=wind_buf, .count=count(wind_buf),
                            .stride=W});
@@ -196,7 +196,7 @@ TEST(test_perspective_text) {
 
     umbra_color color = {1,1,1,1};
 
-    struct umbra_shader *shader = umbra_shader_solid(color);
+    struct umbra_shader *shader = umbra_shader_wrap(umbra_shader_solid, &color);
     struct umbra_coverage *cov = umbra_coverage_bitmap_matrix(
         (struct umbra_matrix){1,0,0, 0,1,0, 0,0,1},
         (struct umbra_bitmap){.buf={.ptr=bmp, .count=BW * BH}, .w=BW, .h=BH});
@@ -235,7 +235,7 @@ TEST(test_perspective_text) {
     slide_perspective_matrix(&mat2, 1.0f, W, H, tc.w, tc.h);
     umbra_color hc2 = {1,0.8f,0.2f,1};
 
-    struct umbra_shader *shader2 = umbra_shader_solid(hc2);
+    struct umbra_shader *shader2 = umbra_shader_wrap(umbra_shader_solid, &hc2);
     struct umbra_coverage *cov2 = umbra_coverage_bitmap_matrix(mat2,
         (struct umbra_bitmap){
             .buf = {.ptr=tc.data, .count=tc.w * tc.h},

@@ -53,6 +53,7 @@ struct csg_slide {
     enum csg_op op;
     int pad;
 
+    umbra_color               color;
     struct umbra_shader      *shader;
     struct two_circle_sdf     sdf;
 
@@ -167,8 +168,8 @@ static struct slide* make_csg(char const *title, float const bg[4], float const 
 
     struct csg_slide *st = calloc(1, sizeof *st);
     st->op      = op;
-    umbra_color const c = {color[0], color[1], color[2], color[3]};
-    st->shader  = umbra_shader_solid(c);
+    st->color   = (umbra_color){color[0], color[1], color[2], color[3]};
+    st->shader  = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->sdf.base = (struct umbra_sdf){
         .build          = build
     };
@@ -208,6 +209,7 @@ struct circle_slide {
     float cx0, cy0, vx, vy, r;
     int   w, h, pad;
 
+    umbra_color               color;
     struct umbra_shader      *shader;
     struct circle_sdf         sdf;
 
@@ -281,7 +283,8 @@ static void circle_free(struct slide *s) {
 
 SLIDE(slide_sdf_circle) {
     struct circle_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){0.95f, 0.45f, 0.10f, 1.0f});
+    st->color  = (umbra_color){0.95f, 0.45f, 0.10f, 1.0f};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->sdf = (struct circle_sdf){.base = {.build = circle_build}};
     st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
@@ -331,6 +334,7 @@ struct ring_slide {
     struct slide base;
     int w, h;
 
+    umbra_color               color;
     struct umbra_shader      *shader;
     struct ring_sdf           sdf;
 
@@ -388,7 +392,8 @@ static void ring_free(struct slide *s) {
 
 SLIDE(slide_sdf_ring) {
     struct ring_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){1.0f, 0.6f, 0.1f, 1});
+    st->color  = (umbra_color){1.0f, 0.6f, 0.1f, 1};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->sdf.base = (struct umbra_sdf){
         .build          = ring_build
     };
@@ -442,6 +447,7 @@ struct rounded_rect_slide {
     struct slide base;
     int w, h;
 
+    umbra_color               color;
     struct umbra_shader      *shader;
     struct rounded_rect_sdf   sdf;
 
@@ -506,7 +512,8 @@ static void rounded_rect_free(struct slide *s) {
 
 SLIDE(slide_sdf_rounded_rect) {
     struct rounded_rect_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){0.1f, 0.5f, 0.9f, 1});
+    st->color  = (umbra_color){0.1f, 0.5f, 0.9f, 1};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->sdf.base = (struct umbra_sdf){
         .build          = rounded_rect_build
     };
@@ -571,6 +578,7 @@ struct capsule_slide {
     struct slide base;
     int w, h;
 
+    umbra_color               color;
     struct umbra_shader      *shader;
     struct capsule_sdf        sdf;
 
@@ -629,7 +637,8 @@ static void capsule_free(struct slide *s) {
 
 SLIDE(slide_sdf_capsule) {
     struct capsule_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){0.9f, 0.3f, 0.6f, 1});
+    st->color  = (umbra_color){0.9f, 0.3f, 0.6f, 1};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->sdf.base = (struct umbra_sdf){
         .build          = capsule_build
     };
@@ -671,6 +680,7 @@ struct halfplane_slide {
     struct slide base;
     int w, h;
 
+    umbra_color               color;
     struct umbra_shader      *shader;
     struct halfplane_sdf      sdf;
 
@@ -731,7 +741,8 @@ static void halfplane_free(struct slide *s) {
 
 SLIDE(slide_sdf_halfplane) {
     struct halfplane_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){0.3f, 0.7f, 0.9f, 1});
+    st->color  = (umbra_color){0.3f, 0.7f, 0.9f, 1};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->sdf.base = (struct umbra_sdf){
         .build          = halfplane_build
     };
@@ -866,6 +877,7 @@ struct sdf_text_slide {
     int w, h;
 
     struct slug_curves        slug;
+    umbra_color               color;
     struct umbra_shader      *shader;
     struct sdf_text_sdf       sdf;
 
@@ -938,7 +950,8 @@ static void sdf_text_free(struct slide *s) {
 
 SLIDE(slide_sdf_text) {
     struct sdf_text_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){0.95f, 0.9f, 0.8f, 1});
+    st->color  = (umbra_color){0.95f, 0.9f, 0.8f, 1};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->sdf.base = (struct umbra_sdf){
         .build          = sdf_text_build
     };
@@ -1003,6 +1016,7 @@ struct ngon_slide {
     float cx, cy, r, angle;
     float *hp_data;
 
+    umbra_color               color;
     struct umbra_shader      *shader;
     struct ngon_sdf           sdf;
 
@@ -1080,7 +1094,8 @@ static void ngon_free(struct slide *s) {
 
 SLIDE(slide_sdf_ngon) {
     struct ngon_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){0.8f, 0.8f, 0.2f, 1});
+    st->color  = (umbra_color){0.8f, 0.8f, 0.2f, 1};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->hp_data = malloc(3 * NGON_SIDES * sizeof(float));
     st->sdf.base = (struct umbra_sdf){
         .build          = ngon_build

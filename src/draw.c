@@ -634,19 +634,11 @@ static umbra_color_val32 walk_stops(struct umbra_builder *b, umbra_val32 t,
     };
 }
 
-struct shader_solid {
-    struct umbra_shader base;
-    umbra_color color;
-};
-
-static umbra_color_val32 solid_build(struct umbra_shader *s, struct umbra_builder *b,
-                                umbra_ptr32 uniforms,
-                                umbra_val32 x, umbra_val32 y) {
-    struct shader_solid *self = (struct shader_solid *)s;
-    (void)uniforms;
-    (void)x;
-    (void)y;
-    umbra_ptr32 const u = umbra_uniforms(b, &self->color, sizeof self->color / 4);
+umbra_color_val32 umbra_shader_solid(void *ctx, struct umbra_builder *b,
+                                     umbra_val32 x, umbra_val32 y) {
+    umbra_color const *self = ctx;
+    (void)x; (void)y;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
     return (umbra_color_val32){
         umbra_uniform_32(b, u, 0),
         umbra_uniform_32(b, u, 1),
@@ -654,21 +646,37 @@ static umbra_color_val32 solid_build(struct umbra_shader *s, struct umbra_builde
         umbra_uniform_32(b, u, 3),
     };
 }
-static void solid_free(struct umbra_shader *s) { free(s); }
 
-struct umbra_shader* umbra_shader_solid(umbra_color color) {
-    struct shader_solid *s = malloc(sizeof *s);
-    *s = (struct shader_solid){
-        .base  = {.build          = solid_build,
-                  .free           = solid_free,
-                  .uniforms = UMBRA_UNIFORMS_OF(s)},
-        .color = color,
-    };
-    return &s->base;
+// Bridge: wrap a flat umbra_shader fn + caller-owned ctx into a
+// struct umbra_shader* so it can be fed to old-middleware composers
+// (umbra_draw_builder, umbra_shader_supersample, umbra_sdf_draw ...).  The
+// caller retains ownership of ctx storage and must keep it alive until the
+// wrapper is freed via umbra_shader_free().  Removed once all composers
+// are migrated to the flat shape.
+struct shader_wrap {
+    struct umbra_shader  base;
+    umbra_shader         fn;
+    void                *ctx;
+};
+static umbra_color_val32 wrap_build(struct umbra_shader *s, struct umbra_builder *b,
+                                     umbra_ptr32 uniforms,
+                                     umbra_val32 x, umbra_val32 y) {
+    struct shader_wrap *self = (struct shader_wrap *)s;
+    (void)uniforms;
+    return self->fn(self->ctx, b, x, y);
 }
+static void wrap_free(struct umbra_shader *s) { free(s); }
 
-void umbra_shader_solid_set_color(struct umbra_shader *s, umbra_color color) {
-    ((struct shader_solid *)s)->color = color;
+struct umbra_shader* umbra_shader_wrap(umbra_shader fn, void *ctx) {
+    struct shader_wrap *w = malloc(sizeof *w);
+    *w = (struct shader_wrap){
+        .base = {.build    = wrap_build,
+                 .free     = wrap_free,
+                 .uniforms = (struct umbra_buf){0}},
+        .fn   = fn,
+        .ctx  = ctx,
+    };
+    return &w->base;
 }
 
 struct shader_gradient_two_stops {

@@ -9,6 +9,7 @@ struct blend_slide {
     float rect_w, rect_h;
     int   w, h;
 
+    umbra_color              color;
     struct umbra_shader     *shader;
     struct umbra_sdf        *sdf;
     umbra_blend_fn           blend;
@@ -84,8 +85,8 @@ static void blend_free(struct slide *s) {
 static struct slide* make_blend(char const *title, float const bg[4], float const color[4],
                                 umbra_blend_fn blend) {
     struct blend_slide *st = calloc(1, sizeof *st);
-    umbra_color const c = {color[0], color[1], color[2], color[3]};
-    st->shader = umbra_shader_solid(c);
+    st->color  = (umbra_color){color[0], color[1], color[2], color[3]};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->sdf    = umbra_sdf_rect((umbra_rect){0, 0, 0, 0});
     st->blend  = blend;
     st->base = (struct slide){

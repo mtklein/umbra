@@ -125,6 +125,7 @@ struct text_slide {
     int              w, h;
     int              is_sdf, :32;
 
+    umbra_color                color;
     struct umbra_shader       *shader;
     struct umbra_coverage     *cov;
 
@@ -192,7 +193,8 @@ SLIDE(slide_coverage_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->tc     = text_shared_bitmap();
     st->is_sdf = 0;
-    st->shader = umbra_shader_solid((umbra_color){1.0f, 1.0f, 1.0f, 1.0f});
+    st->color  = (umbra_color){1.0f, 1.0f, 1.0f, 1.0f};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->cov    = umbra_coverage_bitmap((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Coverage (8-bit bitmap)",
@@ -210,7 +212,8 @@ SLIDE(slide_coverage_sdf_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->tc     = text_shared_sdf();
     st->is_sdf = 1;
-    st->shader = umbra_shader_solid((umbra_color){0.2f, 0.8f, 1.0f, 1.0f});
+    st->color  = (umbra_color){0.2f, 0.8f, 1.0f, 1.0f};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->cov    = umbra_coverage_sdf((struct umbra_buf){0});
     st->base = (struct slide){
         .title = "Coverage (SDF bitmap)",
@@ -232,6 +235,7 @@ struct persp_slide {
     struct text_cov *bitmap;
     int              w, h;
 
+    umbra_color                 color;
     struct umbra_shader        *shader;
     struct umbra_coverage      *cov;
 
@@ -306,7 +310,8 @@ static void persp_free(struct slide *s) {
 SLIDE(slide_coverage_bitmap_matrix) {
     struct persp_slide *st = calloc(1, sizeof *st);
     st->bitmap = text_shared_bitmap();
-    st->shader = umbra_shader_solid((umbra_color){1.0f, 0.8f, 0.2f, 1.0f});
+    st->color  = (umbra_color){1.0f, 0.8f, 0.2f, 1.0f};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->cov    = umbra_coverage_bitmap_matrix((struct umbra_matrix){0}, (struct umbra_bitmap){0});
     st->base = (struct slide){
         .title = "Coverage (8-bit bitmap + matrix)",
@@ -327,6 +332,7 @@ struct cov_null_slide {
 
     int w, h;
 
+    umbra_color           color;
     struct umbra_shader  *shader;
     struct umbra_fmt      fmt;
     struct umbra_flat_ir *ir;
@@ -384,7 +390,8 @@ static void cov_null_free(struct slide *s) {
 
 SLIDE(slide_coverage_null) {
     struct cov_null_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){0.15f, 0.0f, 0.3f, 0.3f});
+    st->color  = (umbra_color){0.15f, 0.0f, 0.3f, 0.3f};
+    st->shader = umbra_shader_wrap(umbra_shader_solid, &st->color);
     st->base = (struct slide){
         .title = "Coverage NULL",
         .bg = {1, 1, 1, 1},

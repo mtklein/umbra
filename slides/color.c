@@ -7,7 +7,7 @@ struct swatch_slide {
 
     int w, h;
 
-    struct umbra_shader       *shader;
+    umbra_color                color;
     struct umbra_fmt           fmt;
     struct umbra_flat_ir      *ir;
     struct umbra_program      *prog;
@@ -24,7 +24,11 @@ static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umb
     if (st->fmt.name != fmt.name || !st->ir) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->ir);
-        struct umbra_builder *b = umbra_draw_builder(NULL, st->shader, NULL, fmt);
+        struct umbra_builder *b = umbra_draw_builder2(
+            NULL,               NULL,
+            umbra_shader_solid, &st->color,
+            NULL,               NULL,
+            fmt);
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
@@ -66,11 +70,9 @@ static void swatch_draw(struct slide *s, double secs, int l, int t, int r, int b
         int const xr = x1 < r ? x1 : r;
         if (xr <= xl) { continue; }
 
-        umbra_shader_solid_set_color(st->shader, swatches[i]);
+        st->color = swatches[i];
         struct umbra_buf ubuf[] = {
             {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-            {0},
-            st->shader->uniforms,
         };
         st->prog->queue(st->prog, xl, yt, xr, yb, ubuf);
     }
@@ -80,7 +82,11 @@ static int swatch_get_builders(struct slide *s, struct umbra_fmt fmt,
                                struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     struct swatch_slide *st = (struct swatch_slide *)s;
-    out[0] = umbra_draw_builder(NULL, st->shader, NULL, fmt);
+    out[0] = umbra_draw_builder2(
+        NULL,               NULL,
+        umbra_shader_solid, &st->color,
+        NULL,               NULL,
+        fmt);
     return out[0] ? 1 : 0;
 }
 
@@ -88,13 +94,12 @@ static void swatch_free(struct slide *s) {
     struct swatch_slide *st = (struct swatch_slide *)s;
     umbra_program_free(st->prog);
     umbra_flat_ir_free(st->ir);
-    umbra_shader_free(st->shader);
     free(st);
 }
 
 SLIDE(slide_swatch) {
     struct swatch_slide *st = calloc(1, sizeof *st);
-    st->shader = umbra_shader_solid((umbra_color){0, 0, 0, 1});
+    st->color = (umbra_color){0, 0, 0, 1};
     st->base = (struct slide){
         .title   = "Color Swatches",
         .bg      = {0, 0, 0, 1},

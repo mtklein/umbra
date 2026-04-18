@@ -69,19 +69,21 @@ void slides_cleanup(void) {
 
 static struct umbra_flat_ir    *bg_ir;
 static struct umbra_program    *bg_prog;
-static struct umbra_shader     *bg_shader;
+static umbra_color              bg_color;
 static struct umbra_fmt         bg_fmt;
 static int                      bg_w, bg_h;
 
 void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h) {
     if (bg_fmt.name != fmt.name || !bg_ir || bg_w != w || bg_h != h) {
         umbra_flat_ir_free(bg_ir);
-        umbra_shader_free(bg_shader);
         bg_fmt = fmt;
         bg_w   = w;
         bg_h   = h;
-        bg_shader = umbra_shader_solid((umbra_color){0,0,0,0});
-        struct umbra_builder *b = umbra_draw_builder(NULL, bg_shader, NULL, fmt);
+        struct umbra_builder *b = umbra_draw_builder2(
+            NULL,               NULL,
+            umbra_shader_solid, &bg_color,
+            NULL,               NULL,
+            fmt);
         bg_ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
@@ -90,12 +92,9 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
 }
 
 void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
-    umbra_color const c = {bg[0], bg[1], bg[2], bg[3]};
-    umbra_shader_solid_set_color(bg_shader, c);
+    bg_color = (umbra_color){bg[0], bg[1], bg[2], bg[3]};
     struct umbra_buf ubuf[] = {
         {.ptr=buf, .count=bg_w * bg_h * bg_fmt.planes, .stride=bg_w},
-        {0},
-        bg_shader->uniforms,
     };
     bg_prog->queue(bg_prog, l, t, r, b, ubuf);
 }
@@ -103,7 +102,6 @@ void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
 void slide_bg_cleanup(void) {
     if (bg_prog) { umbra_program_free(bg_prog); bg_prog = NULL; }
     umbra_flat_ir_free(bg_ir); bg_ir = NULL;
-    umbra_shader_free(bg_shader); bg_shader = NULL;
     bg_fmt = (struct umbra_fmt){0};
     bg_w = bg_h = 0;
 }

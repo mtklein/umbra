@@ -148,8 +148,17 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw const*,
                               int l, int t, int r, int b, struct umbra_buf[]);
 void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
-struct umbra_shader* umbra_shader_solid          (umbra_color);
-void                 umbra_shader_solid_set_color(struct umbra_shader*, umbra_color);
+// Flat shader: caller owns an umbra_color; pass &color as the shader_ctx to
+// umbra_draw_builder2 (or wrap via umbra_shader_wrap for old-middleware
+// composers).  Mutating *color between queue() calls is reflected on next
+// dispatch.
+umbra_color_val32 umbra_shader_solid(void *ctx, struct umbra_builder*,
+                                     umbra_val32 x, umbra_val32 y);
+
+// Wrap any flat shader (fn, ctx) into a struct umbra_shader* for composers
+// that haven't migrated yet.  Caller retains ownership of ctx storage until
+// the returned wrapper is freed via umbra_shader_free().
+struct umbra_shader* umbra_shader_wrap(umbra_shader fn, void *ctx);
 
 // A gradient is (x,y) -> t -> color.  umbra_gradient_coords is the first leg,
 // a first-class effect in the same shape as umbra_shader / umbra_coverage /
