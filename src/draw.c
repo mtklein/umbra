@@ -102,35 +102,35 @@ void umbra_store_fp16_planar(struct umbra_builder *b, umbra_ptr16 dst, umbra_col
                                     umbra_f16_from_f32(b, c.b), umbra_f16_from_f32(b, c.a));
 }
 
-static umbra_color_val32 load_8888(struct umbra_builder *b, void *p) {
-    return umbra_load_8888(b, *(umbra_ptr32*)p);
+static umbra_color_val32 load_8888(struct umbra_builder *b, void const *p) {
+    return umbra_load_8888(b, *(umbra_ptr32 const*)p);
 }
-static umbra_color_val32 load_565(struct umbra_builder *b, void *p) {
-    return umbra_load_565(b, *(umbra_ptr16*)p);
+static umbra_color_val32 load_565(struct umbra_builder *b, void const *p) {
+    return umbra_load_565(b, *(umbra_ptr16 const*)p);
 }
-static umbra_color_val32 load_1010102(struct umbra_builder *b, void *p) {
-    return umbra_load_1010102(b, *(umbra_ptr32*)p);
+static umbra_color_val32 load_1010102(struct umbra_builder *b, void const *p) {
+    return umbra_load_1010102(b, *(umbra_ptr32 const*)p);
 }
-static umbra_color_val32 load_fp16(struct umbra_builder *b, void *p) {
-    return umbra_load_fp16(b, *(umbra_ptr64*)p);
+static umbra_color_val32 load_fp16(struct umbra_builder *b, void const *p) {
+    return umbra_load_fp16(b, *(umbra_ptr64 const*)p);
 }
-static umbra_color_val32 load_fp16p(struct umbra_builder *b, void *p) {
-    return umbra_load_fp16_planar(b, *(umbra_ptr16*)p);
+static umbra_color_val32 load_fp16p(struct umbra_builder *b, void const *p) {
+    return umbra_load_fp16_planar(b, *(umbra_ptr16 const*)p);
 }
-static void store_8888(struct umbra_builder *b, void *p, umbra_color_val32 c) {
-    umbra_store_8888(b, *(umbra_ptr32*)p, c);
+static void store_8888(struct umbra_builder *b, void const *p, umbra_color_val32 c) {
+    umbra_store_8888(b, *(umbra_ptr32 const*)p, c);
 }
-static void store_565(struct umbra_builder *b, void *p, umbra_color_val32 c) {
-    umbra_store_565(b, *(umbra_ptr16*)p, c);
+static void store_565(struct umbra_builder *b, void const *p, umbra_color_val32 c) {
+    umbra_store_565(b, *(umbra_ptr16 const*)p, c);
 }
-static void store_1010102(struct umbra_builder *b, void *p, umbra_color_val32 c) {
-    umbra_store_1010102(b, *(umbra_ptr32*)p, c);
+static void store_1010102(struct umbra_builder *b, void const *p, umbra_color_val32 c) {
+    umbra_store_1010102(b, *(umbra_ptr32 const*)p, c);
 }
-static void store_fp16(struct umbra_builder *b, void *p, umbra_color_val32 c) {
-    umbra_store_fp16(b, *(umbra_ptr64*)p, c);
+static void store_fp16(struct umbra_builder *b, void const *p, umbra_color_val32 c) {
+    umbra_store_fp16(b, *(umbra_ptr64 const*)p, c);
 }
-static void store_fp16p(struct umbra_builder *b, void *p, umbra_color_val32 c) {
-    umbra_store_fp16_planar(b, *(umbra_ptr16*)p, c);
+static void store_fp16p(struct umbra_builder *b, void const *p, umbra_color_val32 c) {
+    umbra_store_fp16_planar(b, *(umbra_ptr16 const*)p, c);
 }
 
 struct umbra_fmt const umbra_fmt_8888 = {

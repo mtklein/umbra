@@ -14,6 +14,7 @@ struct overview_slide {
     struct umbra_backend *be;
     struct umbra_fmt       fmt, out_fmt;
     struct umbra_program *cvt;
+    struct umbra_buf      fb_buf, out_buf;
 };
 
 static void draw_digit(uint32_t *fb, int stride, int ox, int oy, int digit, uint32_t color) {
@@ -108,11 +109,12 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     render_thumbnails(st);
 
     umbra_program_free(st->cvt);
+    st->fb_buf = (struct umbra_buf){.ptr = st->fb, .count = st->w * st->h, .stride = st->w};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 src_ptr = {.ix = 0};
-    umbra_ptr32 dst_ptr = {.ix = 1};
-    umbra_color_val32 c = umbra_fmt_8888.load(b, &src_ptr);
-    fmt.store(b, &dst_ptr, c);
+    umbra_ptr32 const sp = umbra_bind_buf32(b, &st->fb_buf),
+                      dp = umbra_bind_buf32(b, &st->out_buf);
+    umbra_color_val32 c = umbra_fmt_8888.load(b, &sp);
+    fmt.store(b, &dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     st->cvt = be->compile(be, ir);
@@ -124,21 +126,23 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
     (void)secs; (void)l; (void)r;
     int const w = st->w,
               h = st->h;
-    st->cvt->queue(st->cvt, 0, t, w, b, (struct umbra_buf[]){
-        {.ptr = st->fb, .count = w * h,                       .stride = w},
-        {.ptr = buf,    .count = w * h * st->out_fmt.planes,  .stride = w},
-    });
+    st->out_buf = (struct umbra_buf){
+        .ptr    = buf,
+        .count  = w * h * st->out_fmt.planes,
+        .stride = w,
+    };
+    st->cvt->queue(st->cvt, 0, t, w, b, (struct umbra_buf[]){{0}});
 }
 
 static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
                                  struct umbra_builder **out, int max) {
-    (void)s;
+    struct overview_slide *st = (struct overview_slide *)s;
     if (max < 1) { return 0; }
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 src_ptr = {.ix = 0};
-    umbra_ptr32 dst_ptr = {.ix = 1};
-    umbra_color_val32 c = umbra_fmt_8888.load(b, &src_ptr);
-    fmt.store(b, &dst_ptr, c);
+    umbra_ptr32 const sp = umbra_bind_buf32(b, &st->fb_buf),
+                      dp = umbra_bind_buf32(b, &st->out_buf);
+    umbra_color_val32 c = umbra_fmt_8888.load(b, &sp);
+    fmt.store(b, &dp, c);
     out[0] = b;
     return 1;
 }
