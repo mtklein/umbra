@@ -2459,7 +2459,7 @@ TEST(test_umbra_uniforms_interp) {
     uint32_t u[4] = {0};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const reg = umbra_uniforms(b, u, 4);
+    umbra_ptr32 const reg = umbra_uniforms(b, u, count(u));
     umbra_store_32(b, (umbra_ptr32){0}, umbra_uniform_32(b, reg, 2));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
