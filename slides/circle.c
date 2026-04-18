@@ -111,7 +111,7 @@ SLIDE(slide_circle_coverage) {
     st->sdf = (struct circle_sdf){.base = {.build = circle_build}};
     st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
-        .title = "Circle Coverage (interval-ready)",
+        .title = "SDF Circle",
         .bg = {0.08f, 0.10f, 0.14f, 1.0f},
         .init = circle_init,
         .prepare = circle_prepare,

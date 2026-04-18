@@ -285,7 +285,7 @@ SLIDE(slide_sdf_ring) {
 
     st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
-        .title = "SDF Ring (shell)",
+        .title = "SDF Ring",
         .bg = {0.08f, 0.10f, 0.14f, 1},
         .init = ring_init,
         .prepare = ring_prepare,
@@ -835,7 +835,7 @@ SLIDE(slide_sdf_text) {
 
     st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
-        .title = "SDF Text (analytic)",
+        .title = "SDF Text",
         .bg = {0.08f, 0.10f, 0.14f, 1},
         .init = sdf_text_init,
         .prepare = sdf_text_prepare,
@@ -978,7 +978,7 @@ SLIDE(slide_sdf_ngon) {
 
     st->sdf.base.uniforms = UMBRA_UNIFORMS_OF(&st->sdf);
     st->base = (struct slide){
-        .title = "SDF Hexagon (n-gon)",
+        .title = "SDF N-Gon",
         .bg = {0.08f, 0.10f, 0.14f, 1},
         .init = ngon_init,
         .prepare = ngon_prepare,

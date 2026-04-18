@@ -85,7 +85,7 @@ SLIDE(slide_persp) {
     st->shader = umbra_shader_solid((umbra_color){1.0f, 0.8f, 0.2f, 1.0f});
     st->cov    = umbra_coverage_bitmap_matrix((struct umbra_matrix){0}, (struct umbra_bitmap){0});
     st->base = (struct slide){
-        .title = "Perspective Text",
+        .title = "Coverage (8-bit bitmap + matrix)",
         .bg = {0.12f, 0.04f, 0.04f, 1},
         .init = persp_init,
         .prepare = persp_prepare,
