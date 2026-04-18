@@ -129,9 +129,9 @@ typedef umbra_color_val32 (*umbra_blend)   (void *ctx, struct umbra_builder*,
                                             umbra_color_val32 dst);
 
 struct umbra_builder* umbra_draw_builder2(
-    umbra_coverage cov, void *cov_ctx,
-    umbra_shader   sh,  void *sh_ctx,
-    umbra_blend    bl,  void *bl_ctx,
+    umbra_coverage cov_fn, void *cov_ctx,
+    umbra_shader   sh_fn,  void *sh_ctx,
+    umbra_blend    bl_fn,  void *bl_ctx,
     struct umbra_fmt);
 
 struct umbra_sdf_draw_config {

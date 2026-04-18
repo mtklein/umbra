@@ -229,36 +229,36 @@ struct umbra_builder* umbra_draw_builder(struct umbra_coverage *coverage,
 // register their own uniforms via umbra_uniforms() and ignore any inbound
 // ptr32 handle (there isn't one -- the flat fn signature doesn't carry one).
 struct umbra_builder* umbra_draw_builder2(
-    umbra_coverage cov, void *cov_ctx,
-    umbra_shader   sh,  void *sh_ctx,
-    umbra_blend    bl,  void *bl_ctx,
+    umbra_coverage cov_fn, void *cov_ctx,
+    umbra_shader   sh_fn,  void *sh_ctx,
+    umbra_blend    bl_fn,  void *bl_ctx,
     struct umbra_fmt fmt)
 {
     struct umbra_builder *b = umbra_builder();
     umbra_val32 const xf = umbra_f32_from_i32(b, umbra_x(b)),
                       yf = umbra_f32_from_i32(b, umbra_y(b));
 
-    umbra_val32 cov_val = {0};
-    if (cov) { cov_val = cov(cov_ctx, b, xf, yf); }
+    umbra_val32 cov = {0};
+    if (cov_fn) { cov = cov_fn(cov_ctx, b, xf, yf); }
 
     umbra_val32 const zero = umbra_imm_f32(b, 0.0f);
     umbra_color_val32 src = {zero, zero, zero, zero};
-    if (sh) { src = sh(sh_ctx, b, xf, yf); }
+    if (sh_fn) { src = sh_fn(sh_ctx, b, xf, yf); }
 
     umbra_color_val32 dst = {zero, zero, zero, zero};
-    if (bl || cov) { dst = fmt.load(b, DRAW_DST_IX); }
+    if (bl_fn || cov_fn) { dst = fmt.load(b, DRAW_DST_IX); }
 
-    umbra_color_val32 out = bl ? bl(bl_ctx, b, src, dst) : src;
+    umbra_color_val32 out = bl_fn ? bl_fn(bl_ctx, b, src, dst) : src;
 
-    if (cov) {
+    if (cov_fn) {
         out.r = umbra_add_f32(b, dst.r,
-                              umbra_mul_f32(b, umbra_sub_f32(b, out.r, dst.r), cov_val));
+                              umbra_mul_f32(b, umbra_sub_f32(b, out.r, dst.r), cov));
         out.g = umbra_add_f32(b, dst.g,
-                              umbra_mul_f32(b, umbra_sub_f32(b, out.g, dst.g), cov_val));
+                              umbra_mul_f32(b, umbra_sub_f32(b, out.g, dst.g), cov));
         out.b = umbra_add_f32(b, dst.b,
-                              umbra_mul_f32(b, umbra_sub_f32(b, out.b, dst.b), cov_val));
+                              umbra_mul_f32(b, umbra_sub_f32(b, out.b, dst.b), cov));
         out.a = umbra_add_f32(b, dst.a,
-                              umbra_mul_f32(b, umbra_sub_f32(b, out.a, dst.a), cov_val));
+                              umbra_mul_f32(b, umbra_sub_f32(b, out.a, dst.a), cov));
     }
 
     fmt.store(b, DRAW_DST_IX, out);

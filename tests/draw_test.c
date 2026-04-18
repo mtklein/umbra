@@ -47,9 +47,9 @@ static umbra_color_val32 solid_fn(void *ctx, struct umbra_builder *b,
 TEST(test_draw_builder2_flat_solid) {
     umbra_color color = {1, 0, 0, 1};
     struct umbra_builder *builder = umbra_draw_builder2(
-        NULL,      NULL,
-        solid_fn,  &color,
-        NULL,      NULL,
+        NULL,     NULL,
+        solid_fn, &color,
+        NULL,     NULL,
         umbra_fmt_8888);
     struct draw_backends B = make_draw(builder);
 
