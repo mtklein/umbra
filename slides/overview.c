@@ -109,8 +109,10 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 
     umbra_program_free(st->cvt);
     struct umbra_builder *b = umbra_builder();
-    umbra_color_val32 c = umbra_fmt_8888.load(b, 0);
-    fmt.store(b, 1, c);
+    umbra_ptr32 src_ptr = {.ix = 0};
+    umbra_ptr32 dst_ptr = {.ix = 1};
+    umbra_color_val32 c = umbra_fmt_8888.load(b, &src_ptr);
+    fmt.store(b, &dst_ptr, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     st->cvt = be->compile(be, ir);
@@ -133,8 +135,10 @@ static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
     (void)s;
     if (max < 1) { return 0; }
     struct umbra_builder *b = umbra_builder();
-    umbra_color_val32 c = umbra_fmt_8888.load(b, 0);
-    fmt.store(b, 1, c);
+    umbra_ptr32 src_ptr = {.ix = 0};
+    umbra_ptr32 dst_ptr = {.ix = 1};
+    umbra_color_val32 c = umbra_fmt_8888.load(b, &src_ptr);
+    fmt.store(b, &dst_ptr, c);
     out[0] = b;
     return 1;
 }

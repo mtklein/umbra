@@ -122,9 +122,12 @@ TEST(resolve_compaction_renumbers) {
 }
 
 TEST(resolve_preserves_channels) {
+    struct umbra_buf src = {0}, dst = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_color_val32 c = umbra_fmt_fp16.load(b, 0);
-    umbra_fmt_fp16.store(b, 1, c);
+    umbra_ptr64 sp = umbra_bind_buf64(b, &src),
+                dp = umbra_bind_buf64(b, &dst);
+    umbra_color_val32 c = umbra_fmt_fp16.load(b, &sp);
+    umbra_fmt_fp16.store(b, &dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 

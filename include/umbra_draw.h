@@ -27,8 +27,8 @@ struct umbra_fmt {
     char const *name;
     size_t      bpp;
     int         planes, :32;
-    umbra_color_val32 (*load) (struct umbra_builder*, int ptr_ix);
-    void              (*store)(struct umbra_builder*, int ptr_ix, umbra_color_val32);
+    umbra_color_val32 (*load) (struct umbra_builder*, void *umbra_ptr);
+    void              (*store)(struct umbra_builder*, void *umbra_ptr, umbra_color_val32);
 };
 extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_565,

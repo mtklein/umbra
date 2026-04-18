@@ -102,35 +102,35 @@ void umbra_store_fp16_planar(struct umbra_builder *b, umbra_ptr16 dst, umbra_col
                                     umbra_f16_from_f32(b, c.b), umbra_f16_from_f32(b, c.a));
 }
 
-static umbra_color_val32 load_8888(struct umbra_builder *b, int p) {
-    return umbra_load_8888(b, (umbra_ptr32){.ix=p});
+static umbra_color_val32 load_8888(struct umbra_builder *b, void *p) {
+    return umbra_load_8888(b, *(umbra_ptr32*)p);
 }
-static umbra_color_val32 load_565(struct umbra_builder *b, int p) {
-    return umbra_load_565(b, (umbra_ptr16){.ix=p});
+static umbra_color_val32 load_565(struct umbra_builder *b, void *p) {
+    return umbra_load_565(b, *(umbra_ptr16*)p);
 }
-static umbra_color_val32 load_1010102(struct umbra_builder *b, int p) {
-    return umbra_load_1010102(b, (umbra_ptr32){.ix=p});
+static umbra_color_val32 load_1010102(struct umbra_builder *b, void *p) {
+    return umbra_load_1010102(b, *(umbra_ptr32*)p);
 }
-static umbra_color_val32 load_fp16(struct umbra_builder *b, int p) {
-    return umbra_load_fp16(b, (umbra_ptr64){.ix=p});
+static umbra_color_val32 load_fp16(struct umbra_builder *b, void *p) {
+    return umbra_load_fp16(b, *(umbra_ptr64*)p);
 }
-static umbra_color_val32 load_fp16p(struct umbra_builder *b, int p) {
-    return umbra_load_fp16_planar(b, (umbra_ptr16){.ix=p});
+static umbra_color_val32 load_fp16p(struct umbra_builder *b, void *p) {
+    return umbra_load_fp16_planar(b, *(umbra_ptr16*)p);
 }
-static void store_8888(struct umbra_builder *b, int p, umbra_color_val32 c) {
-    umbra_store_8888(b, (umbra_ptr32){.ix=p}, c);
+static void store_8888(struct umbra_builder *b, void *p, umbra_color_val32 c) {
+    umbra_store_8888(b, *(umbra_ptr32*)p, c);
 }
-static void store_565(struct umbra_builder *b, int p, umbra_color_val32 c) {
-    umbra_store_565(b, (umbra_ptr16){.ix=p}, c);
+static void store_565(struct umbra_builder *b, void *p, umbra_color_val32 c) {
+    umbra_store_565(b, *(umbra_ptr16*)p, c);
 }
-static void store_1010102(struct umbra_builder *b, int p, umbra_color_val32 c) {
-    umbra_store_1010102(b, (umbra_ptr32){.ix=p}, c);
+static void store_1010102(struct umbra_builder *b, void *p, umbra_color_val32 c) {
+    umbra_store_1010102(b, *(umbra_ptr32*)p, c);
 }
-static void store_fp16(struct umbra_builder *b, int p, umbra_color_val32 c) {
-    umbra_store_fp16(b, (umbra_ptr64){.ix=p}, c);
+static void store_fp16(struct umbra_builder *b, void *p, umbra_color_val32 c) {
+    umbra_store_fp16(b, *(umbra_ptr64*)p, c);
 }
-static void store_fp16p(struct umbra_builder *b, int p, umbra_color_val32 c) {
-    umbra_store_fp16_planar(b, (umbra_ptr16){.ix=p}, c);
+static void store_fp16p(struct umbra_builder *b, void *p, umbra_color_val32 c) {
+    umbra_store_fp16_planar(b, *(umbra_ptr16*)p, c);
 }
 
 struct umbra_fmt const umbra_fmt_8888 = {
@@ -170,8 +170,9 @@ struct umbra_builder* umbra_draw_builder(
     umbra_color_val32 src = {zero, zero, zero, zero};
     if (shader_fn) { src = shader_fn(shader_ctx, b, xf, yf); }
 
+    umbra_ptr32 dst_ptr = {.ix = DRAW_DST_IX};
     umbra_color_val32 dst = {zero, zero, zero, zero};
-    if (blend_fn || coverage_fn) { dst = fmt.load(b, DRAW_DST_IX); }
+    if (blend_fn || coverage_fn) { dst = fmt.load(b, &dst_ptr); }
 
     umbra_color_val32 out = blend_fn ? blend_fn(blend_ctx, b, src, dst) : src;
 
@@ -186,7 +187,7 @@ struct umbra_builder* umbra_draw_builder(
                               umbra_mul_f32(b, umbra_sub_f32(b, out.a, dst.a), coverage));
     }
 
-    fmt.store(b, DRAW_DST_IX, out);
+    fmt.store(b, &dst_ptr, out);
     return b;
 }
 

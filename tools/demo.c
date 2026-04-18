@@ -60,8 +60,10 @@ static void finish_pipe(struct pipe *p, struct umbra_builder *builder) {
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     struct umbra_builder *builder = umbra_builder();
-    umbra_color_val32 c = fmt_enums[fmt]->load(builder, 1);
-    umbra_fmt_fp16.store(builder, 2, c);
+    umbra_ptr32 src_ptr = {.ix = 1};
+    umbra_ptr32 dst_ptr = {.ix = 2};
+    umbra_color_val32 c = fmt_enums[fmt]->load(builder, &src_ptr);
+    umbra_fmt_fp16.store(builder, &dst_ptr, c);
     readback_pipe.out_ptr = 2;
     finish_pipe(&readback_pipe, builder);
 }
@@ -69,9 +71,11 @@ static void build_readback(int fmt) {
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     struct umbra_builder *builder = umbra_builder();
-    umbra_color_val32 c = fmt_enums[fmt]->load(builder, 1);
+    umbra_ptr32 src_ptr = {.ix = 1};
+    umbra_ptr32 dst_ptr = {.ix = 2};
+    umbra_color_val32 c = fmt_enums[fmt]->load(builder, &src_ptr);
     hdr_pipe.out_ptr = 2;
-    umbra_fmt_fp16.store(builder, 2, c);
+    umbra_fmt_fp16.store(builder, &dst_ptr, c);
     finish_pipe(&hdr_pipe, builder);
 }
 
