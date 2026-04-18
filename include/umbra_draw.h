@@ -6,6 +6,8 @@ typedef struct {
     float x, y;
 } umbra_point;
 
+typedef struct { umbra_val32 x, y; } umbra_point_val32;
+
 typedef struct {
     float l, t, r, b;
 } umbra_rect;
@@ -129,16 +131,13 @@ void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 struct umbra_shader* umbra_shader_solid(umbra_color color);
 
 // A gradient is (x,y) -> t -> color.  umbra_gradient_coords supplies the
-// first leg: a host-side callback `t` that emits IR computing t from (x,y)
-// and three float uniform parameters, paired with the concrete parameter
-// values.  Colorizers below compose with any coords to produce a shader.
-//
-// The `t` callback should return t clamped to [0, 1].  `params` is uploaded
-// as three contiguous uniform slots at `params_slot`; the callback reads
-// params_slot+0, +1, +2.
+// first leg: a pure builder-primitive callback that takes a val32 point
+// and three val32 coefficients and emits IR for t, clamped to [0, 1].
+// Built-in linear and radial geometries carry their coefficients as host
+// floats; they're baked in as immediates when the shader is built.
 typedef umbra_val32 (*umbra_gradient_t_fn)(struct umbra_builder*,
-                                           umbra_ptr32 uniforms, int params_slot,
-                                           umbra_val32 x, umbra_val32 y);
+                                           umbra_point_val32 xy,
+                                           umbra_val32 p0, umbra_val32 p1, umbra_val32 p2);
 
 typedef struct {
     umbra_gradient_t_fn t;

@@ -440,25 +440,19 @@ static umbra_val32 lerp_f(struct umbra_builder *builder, umbra_val32 p, umbra_va
                          umbra_mul_f32(builder, umbra_sub_f32(builder, q, p), t));
 }
 
-static umbra_val32 gradient_linear_t(struct umbra_builder *b, umbra_ptr32 uniforms,
-                                     int params_slot, umbra_val32 x, umbra_val32 y) {
-    umbra_val32 const a = umbra_uniform_32(b, uniforms, params_slot + 0),
-                      c1 = umbra_uniform_32(b, uniforms, params_slot + 1),
-                      c = umbra_uniform_32(b, uniforms, params_slot + 2);
+static umbra_val32 gradient_linear_t(struct umbra_builder *b, umbra_point_val32 xy,
+                                     umbra_val32 a, umbra_val32 bb, umbra_val32 c) {
     umbra_val32 const t = umbra_add_f32(b,
-                                      umbra_add_f32(b, umbra_mul_f32(b, a, x),
-                                                    umbra_mul_f32(b, c1, y)),
+                                      umbra_add_f32(b, umbra_mul_f32(b, a, xy.x),
+                                                    umbra_mul_f32(b, bb, xy.y)),
                                       c);
     return clamp01(b, t);
 }
 
-static umbra_val32 gradient_radial_t(struct umbra_builder *b, umbra_ptr32 uniforms,
-                                     int params_slot, umbra_val32 x, umbra_val32 y) {
-    umbra_val32 const cx    = umbra_uniform_32(b, uniforms, params_slot + 0),
-                      cy    = umbra_uniform_32(b, uniforms, params_slot + 1),
-                      inv_r = umbra_uniform_32(b, uniforms, params_slot + 2);
-    umbra_val32 const dx = umbra_sub_f32(b, x, cx),
-                      dy = umbra_sub_f32(b, y, cy);
+static umbra_val32 gradient_radial_t(struct umbra_builder *b, umbra_point_val32 xy,
+                                     umbra_val32 cx, umbra_val32 cy, umbra_val32 inv_r) {
+    umbra_val32 const dx = umbra_sub_f32(b, xy.x, cx),
+                      dy = umbra_sub_f32(b, xy.y, cy);
     umbra_val32 const d2 = umbra_add_f32(b, umbra_mul_f32(b, dx, dx),
                                        umbra_mul_f32(b, dy, dy));
     return clamp01(b, umbra_mul_f32(b, umbra_sqrt_f32(b, d2), inv_r));
@@ -482,6 +476,15 @@ umbra_gradient_coords umbra_gradient_radial(umbra_point center, float radius) {
         .t      = gradient_radial_t,
         .params = {center.x, center.y, 1.0f / radius},
     };
+}
+
+static umbra_val32 apply_gradient_coords(struct umbra_builder *b,
+                                         umbra_gradient_coords const *coords,
+                                         umbra_val32 x, umbra_val32 y) {
+    umbra_val32 const p0 = umbra_imm_f32(b, coords->params[0]),
+                      p1 = umbra_imm_f32(b, coords->params[1]),
+                      p2 = umbra_imm_f32(b, coords->params[2]);
+    return coords->t(b, (umbra_point_val32){x, y}, p0, p1, p2);
 }
 
 static umbra_color_val32 sample_lut(struct umbra_builder *b, umbra_val32 t,
@@ -606,7 +609,7 @@ static umbra_color_val32 gradient_two_stops_build(struct umbra_shader *s,
                                                   umbra_ptr32 uniforms,
                                                   umbra_val32 x, umbra_val32 y) {
     struct shader_gradient_two_stops *self = (struct shader_gradient_two_stops *)s;
-    umbra_val32 const t = self->coords.t(b, uniforms, SLOT(coords.params), x, y);
+    umbra_val32 const t = apply_gradient_coords(b, &self->coords, x, y);
     umbra_val32 const r0 = umbra_uniform_32(b, uniforms, SLOT(c0.r)),
                       g0 = umbra_uniform_32(b, uniforms, SLOT(c0.g)),
                       b0 = umbra_uniform_32(b, uniforms, SLOT(c0.b)),
@@ -650,7 +653,7 @@ static umbra_color_val32 gradient_lut_build(struct umbra_shader *s, struct umbra
                                             umbra_val32 x, umbra_val32 y) {
     struct shader_gradient_lut *self = (struct shader_gradient_lut *)s;
     umbra_ptr32 const lut = umbra_deref_ptr32(b, uniforms, SLOT(lut));
-    umbra_val32 const t = self->coords.t(b, uniforms, SLOT(coords.params), x, y);
+    umbra_val32 const t = apply_gradient_coords(b, &self->coords, x, y);
     return sample_lut(b, t, uniforms, SLOT(N), lut);
 }
 static void gradient_lut_free(struct umbra_shader *s) { free(s); }
@@ -717,7 +720,7 @@ static umbra_color_val32 gradient_evenly_spaced_stops_build(struct umbra_shader 
     struct shader_gradient_evenly_spaced_stops *self =
         (struct shader_gradient_evenly_spaced_stops *)s;
     umbra_ptr32 const colors = umbra_deref_ptr32(b, uniforms, SLOT(colors));
-    umbra_val32 const t = self->coords.t(b, uniforms, SLOT(coords.params), x, y);
+    umbra_val32 const t = apply_gradient_coords(b, &self->coords, x, y);
     return gather_even_stops(b, t, uniforms, SLOT(N), colors);
 }
 static void gradient_evenly_spaced_stops_free(struct umbra_shader *s) { free(s); }
@@ -750,7 +753,7 @@ static umbra_color_val32 gradient_build(struct umbra_shader *s, struct umbra_bui
     struct shader_gradient *self = (struct shader_gradient *)s;
     umbra_ptr32 const colors = umbra_deref_ptr32(b, uniforms, SLOT(colors));
     umbra_ptr32 const pos    = umbra_deref_ptr32(b, uniforms, SLOT(pos));
-    umbra_val32 const t = self->coords.t(b, uniforms, SLOT(coords.params), x, y);
+    umbra_val32 const t = apply_gradient_coords(b, &self->coords, x, y);
     return walk_stops(b, t, uniforms, SLOT(N), colors, pos);
 }
 static void gradient_free(struct umbra_shader *s) { free(s); }
