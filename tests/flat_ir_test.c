@@ -2454,7 +2454,9 @@ TEST(test_program_threadsafe) {
 }
 
 TEST(test_umbra_uniforms_interp) {
-    uint32_t u[4] = {42, 100, 200, 300};
+    // umbra_uniforms() captures only the pointer at IR-build time; the bytes
+    // can be filled (and later mutated) any time before a queue() call.
+    uint32_t u[4] = {0};
 
     struct umbra_builder *b = umbra_builder();
     umbra_ptr32 const reg = umbra_uniforms(b, u, 4);
@@ -2465,6 +2467,7 @@ TEST(test_umbra_uniforms_interp) {
     struct umbra_backend *be = umbra_backend_interp();
     struct umbra_program *p  = be->compile(be, ir);
 
+    u[0] = 42; u[1] = 100; u[2] = 200; u[3] = 300;
     int32_t dst[1] = {0};
     p->queue(p, 0, 0, 1, 1, (struct umbra_buf[]){{.ptr=dst, .count=1}});
     dst[0] == 200 here;
