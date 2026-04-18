@@ -1401,7 +1401,7 @@ TEST(test_sdf_dispatch_rect) {
 
         struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi],
             umbra_sdf_rect, &rect,
-            (struct umbra_sdf_draw_config){.hard_edge = 1},
+            1,
             umbra_shader_color,  &color,
             umbra_blend_srcover, NULL,
             umbra_fmt_8888);
@@ -1468,7 +1468,7 @@ TEST(test_sdf_dispatch_tiling) {
     // Tiled dispatch.
     struct umbra_sdf_draw *disp = umbra_sdf_draw(be,
         test_circle_fn, &sdf,
-        (struct umbra_sdf_draw_config){.hard_edge = 1},
+        1,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888);

@@ -247,7 +247,7 @@ struct grid_params {
 
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                       umbra_sdf sdf_fn, void *sdf_ctx,
-                                      struct umbra_sdf_draw_config cfg,
+                                      _Bool hard_edge,
                                       umbra_shader shader_fn, void *shader_ctx,
                                       umbra_blend blend_fn, void *blend_ctx,
                                       struct umbra_fmt fmt) {
@@ -255,7 +255,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     d->cov_state = (struct umbra_coverage_from_sdf){
         .sdf_fn    = sdf_fn,
         .sdf_ctx   = sdf_ctx,
-        .hard_edge = cfg.hard_edge,
+        .hard_edge = hard_edge,
     };
 
     // Build the draw program (shader + SDF coverage + blend).

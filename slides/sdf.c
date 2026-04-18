@@ -117,7 +117,7 @@ static void csg_prepare(struct slide *s, struct umbra_backend *be, struct umbra_
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be,
                               st->sdf_fn,         &st->sdf,
-                              (struct umbra_sdf_draw_config){.hard_edge = 0},
+                              0,
                               umbra_shader_color, &st->color,
                               umbra_blend_srcover, NULL,
                               fmt);
@@ -231,7 +231,7 @@ static void circle_prepare(struct slide *s, struct umbra_backend *be, struct umb
     st->fmt = fmt;
     st->qt  = umbra_sdf_draw(be,
                              circle_build,       &st->sdf,
-                             (struct umbra_sdf_draw_config){.hard_edge = 0},
+                             0,
                              umbra_shader_color, &st->color,
                              umbra_blend_srcover, NULL,
                              fmt);
@@ -344,7 +344,7 @@ static void ring_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be,
                               ring_build,         &st->sdf,
-                              (struct umbra_sdf_draw_config){.hard_edge = 0},
+                              0,
                               umbra_shader_color, &st->color,
                               umbra_blend_srcover, NULL,
                               fmt);
@@ -456,7 +456,7 @@ static void rounded_rect_prepare(struct slide *s, struct umbra_backend *be,
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be,
                               rounded_rect_build, &st->sdf,
-                              (struct umbra_sdf_draw_config){.hard_edge = 0},
+                              0,
                               umbra_shader_color, &st->color,
                               umbra_blend_srcover, NULL,
                               fmt);
@@ -583,7 +583,7 @@ static void capsule_prepare(struct slide *s, struct umbra_backend *be, struct um
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be,
                               capsule_build,      &st->sdf,
-                              (struct umbra_sdf_draw_config){.hard_edge = 0},
+                              0,
                               umbra_shader_color, &st->color,
                               umbra_blend_srcover, NULL,
                               fmt);
@@ -683,7 +683,7 @@ static void halfplane_prepare(struct slide *s, struct umbra_backend *be, struct 
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be,
                               halfplane_build,    &st->sdf,
-                              (struct umbra_sdf_draw_config){.hard_edge = 0},
+                              0,
                               umbra_shader_color, &st->color,
                               umbra_blend_srcover, NULL,
                               fmt);
@@ -894,7 +894,7 @@ static void sdf_text_prepare(struct slide *s, struct umbra_backend *be, struct u
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be,
                               sdf_text_build,     &st->sdf,
-                              (struct umbra_sdf_draw_config){.hard_edge = 0},
+                              0,
                               umbra_shader_color, &st->color,
                               umbra_blend_srcover, NULL,
                               fmt);
@@ -1014,7 +1014,7 @@ static void ngon_prepare(struct slide *s, struct umbra_backend *be, struct umbra
     st->fmt  = fmt;
     st->disp = umbra_sdf_draw(be,
                               ngon_build,         &st->sdf,
-                              (struct umbra_sdf_draw_config){.hard_edge = 0},
+                              0,
                               umbra_shader_color, &st->color,
                               umbra_blend_srcover, NULL,
                               fmt);

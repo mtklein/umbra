@@ -83,17 +83,12 @@ struct umbra_builder* umbra_draw_builder(umbra_coverage, void *coverage_ctx,
                                          umbra_blend   , void *blend_ctx,
                                          struct umbra_fmt dst_fmt);
 
-// TODO: forget this struct, pass hard_edge directly into umbra_sdf_draw(),
-//       but preserve this next TODO about generalizing to a quality param
+// Draw using an umbra_sdf as coverage.  hard_edge=1 gives a binary mask;
+// hard_edge=0 clamps -sdf into [0, 1] for a 1px AA ramp.
 // TODO: _Bool hard_edge -> int quality
-struct umbra_sdf_draw_config {
-    _Bool hard_edge;
-};
-
-// Draw using an umbra_sdf as coverage.
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
                                       umbra_sdf, void *sdf_ctx,
-                                      struct umbra_sdf_draw_config,
+                                      _Bool hard_edge,
                                       umbra_shader, void *shader_ctx,
                                       umbra_blend,  void *blend_ctx,
                                       struct umbra_fmt);

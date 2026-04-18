@@ -43,7 +43,7 @@ static void blend_prepare(struct slide *s, struct umbra_backend *be,
     st->fmt = fmt;
     st->qt = umbra_sdf_draw(be,
                             umbra_sdf_rect,     &st->rect,
-                            (struct umbra_sdf_draw_config){.hard_edge = 1},
+                            1,
                             umbra_shader_color, &st->color,
                             st->blend_fn,       NULL,
                             fmt);
