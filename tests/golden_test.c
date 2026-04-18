@@ -130,7 +130,7 @@ TEST(test_slug_rect) {
 
     struct umbra_builder *bld = umbra_draw_builder(
         umbra_coverage_winding, &wind_uniform,
-        umbra_shader_solid,     &color,
+        umbra_shader_color,     &color,
         umbra_blend_srcover,    NULL,
         umbra_fmt_8888);
     struct umbra_flat_ir *ir =
@@ -198,7 +198,7 @@ TEST(test_perspective_text) {
 
     struct umbra_builder *bld = umbra_draw_builder(
         umbra_coverage_bitmap_matrix, &state,
-        umbra_shader_solid,           &color,
+        umbra_shader_color,           &color,
         umbra_blend_srcover,          NULL,
         umbra_fmt_8888);
     struct umbra_flat_ir *ir =
@@ -241,7 +241,7 @@ TEST(test_perspective_text) {
 
     bld = umbra_draw_builder(
         umbra_coverage_bitmap_matrix, &state2,
-        umbra_shader_solid,           &hc2,
+        umbra_shader_color,           &hc2,
         umbra_blend_srcover,          NULL,
         umbra_fmt_8888);
     ir = umbra_flat_ir(bld);

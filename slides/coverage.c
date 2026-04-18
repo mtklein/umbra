@@ -150,7 +150,7 @@ static void text_prepare(struct slide *s, struct umbra_backend *be,
     st->fmt = fmt;
     struct umbra_builder *b = umbra_draw_builder(
         st->coverage_fn,    &st->buf,
-        umbra_shader_solid, &st->color,
+        umbra_shader_color, &st->color,
         umbra_blend_srcover, NULL,
         fmt);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -176,7 +176,7 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct text_slide *st = (struct text_slide *)s;
     out[0] = umbra_draw_builder(
         st->coverage_fn,    &st->buf,
-        umbra_shader_solid, &st->color,
+        umbra_shader_color, &st->color,
         umbra_blend_srcover, NULL,
         fmt);
     return out[0] ? 1 : 0;
@@ -255,7 +255,7 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
     st->fmt = fmt;
     struct umbra_builder *b = umbra_draw_builder(
         umbra_coverage_bitmap_matrix, &st->state,
-        umbra_shader_solid,           &st->color,
+        umbra_shader_color,           &st->color,
         umbra_blend_srcover,          NULL,
         fmt);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -282,7 +282,7 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct persp_slide *st = (struct persp_slide *)s;
     out[0] = umbra_draw_builder(
         umbra_coverage_bitmap_matrix, &st->state,
-        umbra_shader_solid,           &st->color,
+        umbra_shader_color,           &st->color,
         umbra_blend_srcover,          NULL,
         fmt);
     return out[0] ? 1 : 0;
@@ -336,7 +336,7 @@ static void cov_null_prepare(struct slide *s, struct umbra_backend *be, struct u
         umbra_flat_ir_free(st->ir);
         struct umbra_builder *b = umbra_draw_builder(
             NULL,                NULL,
-            umbra_shader_solid,  &st->color,
+            umbra_shader_color,  &st->color,
             umbra_blend_srcover, NULL,
             fmt);
         st->ir = umbra_flat_ir(b);
@@ -363,7 +363,7 @@ static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct cov_null_slide *st = (struct cov_null_slide *)s;
     out[0] = umbra_draw_builder(
         NULL,                NULL,
-        umbra_shader_solid,  &st->color,
+        umbra_shader_color,  &st->color,
         umbra_blend_srcover, NULL,
         fmt);
     return out[0] ? 1 : 0;

@@ -26,7 +26,7 @@ static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umb
         umbra_flat_ir_free(st->ir);
         struct umbra_builder *b = umbra_draw_builder(
             NULL,               NULL,
-            umbra_shader_solid, &st->color,
+            umbra_shader_color, &st->color,
             NULL,               NULL,
             fmt);
         st->ir = umbra_flat_ir(b);
@@ -84,7 +84,7 @@ static int swatch_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct swatch_slide *st = (struct swatch_slide *)s;
     out[0] = umbra_draw_builder(
         NULL,               NULL,
-        umbra_shader_solid, &st->color,
+        umbra_shader_color, &st->color,
         NULL,               NULL,
         fmt);
     return out[0] ? 1 : 0;

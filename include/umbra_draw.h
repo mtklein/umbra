@@ -62,9 +62,8 @@ typedef umbra_color_val32 (*umbra_blend)   (void *ctx, struct umbra_builder*,
                                             umbra_color_val32 src,
                                             umbra_color_val32 dst);
 
-// TODO: rename umbra_shader_color()?
 // Shade a single color; ctx is an umbra_color*.
-umbra_color_val32 umbra_shader_solid(void *umbra_color, struct umbra_builder*,
+umbra_color_val32 umbra_shader_color(void *umbra_color, struct umbra_builder*,
                                      umbra_val32 x, umbra_val32 y);
 
 umbra_color_val32 umbra_blend_src     (void*, struct umbra_builder*,

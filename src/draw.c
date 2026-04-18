@@ -6,7 +6,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// Slot index (in 4-byte units) of `field` within an effect struct's own
 // Slot offset (in 32-bit units) of a field within the flat ctx struct
 // pointed at by `self`.  Used after umbra_uniforms(b, self, sizeof *self / 4)
 // to address named fields as uniform slots.
@@ -510,7 +509,7 @@ static umbra_color_val32 walk_stops(struct umbra_builder *b, umbra_val32 t,
     };
 }
 
-umbra_color_val32 umbra_shader_solid(void *ctx, struct umbra_builder *b,
+umbra_color_val32 umbra_shader_color(void *ctx, struct umbra_builder *b,
                                      umbra_val32 x, umbra_val32 y) {
     umbra_color const *self = ctx;
     (void)x; (void)y;
