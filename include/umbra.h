@@ -44,7 +44,7 @@ struct umbra_program {
     void (*queue)(struct umbra_program*, int l, int t, int r, int b, struct umbra_buf[]);
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
-    struct umbra_backend *backend;  // TODO: where do we still use this backpointer?
+    struct umbra_backend *backend;  // used by program->free (jit) + dispatch (metal)
     _Bool                 queue_is_threadsafe, pad[7];
 };
 void umbra_program_free(struct umbra_program*);
@@ -52,12 +52,16 @@ void umbra_program_free(struct umbra_program*);
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 
-// TODO: can these be int ix?  do we still need deref:1?
+// Pointer handles.  `ix` indexes into the caller's buf[] at dispatch time;
+// `deref` marks pointers returned by umbra_deref_ptr16/32 as one-level
+// indirections, resolved per-backend at code gen.
 typedef struct { int ix:31, deref:1; } umbra_ptr16;
 typedef struct { int ix:31, deref:1; } umbra_ptr32;
 typedef struct { int ix:31, deref:1; } umbra_ptr64;
 
-// TODO: are these deref calls still needed?
+// Read a pointer value out of a uniform slot, giving a new ptr handle that
+// addresses the memory it points at.  Used to reach through struct umbra_buf
+// fields like .ptr (e.g. umbra_coverage_bitmap's 8-bit glyph mask).
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, int slot);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, int slot);
 
