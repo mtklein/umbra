@@ -290,14 +290,20 @@ TEST(test_golden_slides) {
 
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (be) {
+        float    color[4] = {0, 0, 0, 1};
+        uint32_t pixel    = 0;
+        struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
+
         struct umbra_builder *bld = umbra_builder();
+        umbra_ptr32 const cu = umbra_uniforms  (bld, color, count(color)),
+                          pp = umbra_bind_buf32(bld, &pixel_buf);
         umbra_color_val32 c = {
-            umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
-            umbra_uniform_32(bld, (umbra_ptr32){0}, 1),
-            umbra_uniform_32(bld, (umbra_ptr32){0}, 2),
-            umbra_uniform_32(bld, (umbra_ptr32){0}, 3),
+            umbra_uniform_32(bld, cu, 0),
+            umbra_uniform_32(bld, cu, 1),
+            umbra_uniform_32(bld, cu, 2),
+            umbra_uniform_32(bld, cu, 3),
         };
-        umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
+        umbra_store_8888(bld, pp, c);
         struct umbra_flat_ir *ir = umbra_flat_ir(bld);
         umbra_builder_free(bld);
 
@@ -307,16 +313,10 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
 
         int rotations_before = be->stats(be).uniform_ring_rotations;
 
-        float    color[4] = {0, 0, 0, 1};
-        uint32_t pixel    = 0;
-        struct umbra_buf bufs[] = {
-            {.ptr=color, .count=count(color)},
-            {.ptr=&pixel, .count=1, .stride=1},
-        };
         int const N = 12000;
         for (int i = 0; i < N; i++) {
             color[0] = (float)((i & 0xff) / 255.0f);
-            p->queue(p, 0, 0, 1, 1, bufs);
+            p->queue(p, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
         }
         be->flush(be);
 
@@ -348,10 +348,19 @@ TEST(test_wgpu_long_batch_no_oom) {
 static void run_tiled_writable_sync(struct umbra_backend *be) {
     if (!be) { return; }
 
+    enum { BW = 128, BH = 128 };
+    size_t buf_sz  = BW * BH * sizeof(float),
+           half_sz = buf_sz / 2;
+    float *data = NULL;
+    posix_memalign((void **)&data, (size_t)getpagesize(), buf_sz);
+    data != NULL here;
+    struct umbra_buf data_buf = {.ptr=data, .count=BW * BH, .stride=BW};
+
     struct umbra_builder *b = umbra_builder();
-    umbra_val32 v   = umbra_load_32(b, (umbra_ptr32){.ix=0});
+    umbra_ptr32 const dp = umbra_bind_buf32(b, &data_buf);
+    umbra_val32 v   = umbra_load_32(b, dp);
     umbra_val32 one = umbra_imm_f32(b, 1.0f);
-    umbra_store_32(b, (umbra_ptr32){.ix=0}, umbra_add_f32(b, v, one));
+    umbra_store_32(b, dp, umbra_add_f32(b, v, one));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
@@ -359,27 +368,16 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
     umbra_flat_ir_free(ir);
     p != 0 here;
 
-    enum { BW = 128, BH = 128 };
-    size_t buf_sz  = BW * BH * sizeof(float),
-           half_sz = buf_sz / 2;
-    float *data = NULL;
-    posix_memalign((void **)&data, (size_t)getpagesize(), buf_sz);
-    data != NULL here;
-
-    struct umbra_buf bufs[] = {
-        {.ptr=data, .count=BW * BH, .stride=BW},
-    };
-
     for (int frame = 0; frame < 3; frame++) {
         float sentinel = (float)(frame + 2) * 10.0f;
         for (int i = 0; i < BW * BH; i++) { data[i] = sentinel; }
 
         __builtin_memset(data, 0, half_sz);
-        p->queue(p, 0, 0, BW, BH / 2, bufs);
+        p->queue(p, 0, 0, BW, BH / 2, (struct umbra_buf[]){{0}});
         be->flush(be);
 
         __builtin_memset((char *)data + half_sz, 0, half_sz);
-        p->queue(p, 0, BH / 2, BW, BH, bufs);
+        p->queue(p, 0, BH / 2, BW, BH, (struct umbra_buf[]){{0}});
         be->flush(be);
 
         for (int i = 0; i < BW * BH; i++) {
@@ -408,14 +406,20 @@ TEST(test_wgpu_misc) {
     struct umbra_backend *be = umbra_backend_wgpu();
     if (!be) { return; }
 
+    float    uniform_data[2] = {1.0f, 0.0f};
+    uint32_t pixel           = 0;
+    struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
+
     struct umbra_builder *bld = umbra_builder();
+    umbra_ptr32 const cu = umbra_uniforms  (bld, uniform_data, count(uniform_data)),
+                      pp = umbra_bind_buf32(bld, &pixel_buf);
     umbra_color_val32 c = {
-        umbra_uniform_32(bld, (umbra_ptr32){0}, 0),
+        umbra_uniform_32(bld, cu, 0),
         umbra_imm_f32(bld, 0.0f),
         umbra_imm_f32(bld, 0.0f),
         umbra_imm_f32(bld, 1.0f),
     };
-    umbra_store_8888(bld, (umbra_ptr32){.ix=1}, c);
+    umbra_store_8888(bld, pp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
 
@@ -427,13 +431,7 @@ TEST(test_wgpu_misc) {
     p->dump(p, devnull);
     fclose(devnull);
 
-    float uniform_data[2] = {1.0f, 0.0f};
-    uint32_t pixel = 0;
-    struct umbra_buf bufs[] = {
-        {.ptr=uniform_data, .count=7 / 4},
-        {.ptr=&pixel, .count=1, .stride=1},
-    };
-    p->queue(p, 0, 0, 1, 1, bufs);
+    p->queue(p, 0, 0, 1, 1, (struct umbra_buf[]){{0}});
     be->flush(be);
 
     (pixel & 0xff)   == 0xff here;
