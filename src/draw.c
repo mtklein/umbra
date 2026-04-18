@@ -224,6 +224,47 @@ struct umbra_builder* umbra_draw_builder(struct umbra_coverage *coverage,
     return builder;
 }
 
+// New middleware: identical composition to umbra_draw_builder above, but
+// takes flat (fn, self) pairs instead of struct-based effects.  Effects
+// register their own uniforms via umbra_uniforms() and ignore any inbound
+// ptr32 handle (there isn't one -- the flat fn signature doesn't carry one).
+struct umbra_builder* umbra_draw_builder2(
+    umbra_coverage cov, void *cov_self,
+    umbra_shader   sh,  void *sh_self,
+    umbra_blend    bl,  void *bl_self,
+    struct umbra_fmt fmt)
+{
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const xf = umbra_f32_from_i32(b, umbra_x(b)),
+                      yf = umbra_f32_from_i32(b, umbra_y(b));
+
+    umbra_val32 cov_val = {0};
+    if (cov) { cov_val = cov(cov_self, b, xf, yf); }
+
+    umbra_val32 const zero = umbra_imm_f32(b, 0.0f);
+    umbra_color_val32 src = {zero, zero, zero, zero};
+    if (sh) { src = sh(sh_self, b, xf, yf); }
+
+    umbra_color_val32 dst = {zero, zero, zero, zero};
+    if (bl || cov) { dst = fmt.load(b, DRAW_DST_IX); }
+
+    umbra_color_val32 out = bl ? bl(bl_self, b, src, dst) : src;
+
+    if (cov) {
+        out.r = umbra_add_f32(b, dst.r,
+                              umbra_mul_f32(b, umbra_sub_f32(b, out.r, dst.r), cov_val));
+        out.g = umbra_add_f32(b, dst.g,
+                              umbra_mul_f32(b, umbra_sub_f32(b, out.g, dst.g), cov_val));
+        out.b = umbra_add_f32(b, dst.b,
+                              umbra_mul_f32(b, umbra_sub_f32(b, out.b, dst.b), cov_val));
+        out.a = umbra_add_f32(b, dst.a,
+                              umbra_mul_f32(b, umbra_sub_f32(b, out.a, dst.a), cov_val));
+    }
+
+    fmt.store(b, DRAW_DST_IX, out);
+    return b;
+}
+
 struct sdf_coverage {
     struct umbra_coverage base;
     struct umbra_sdf     *sdf;

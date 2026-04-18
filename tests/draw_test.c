@@ -28,6 +28,55 @@ static struct umbra_buf sh_u(struct umbra_shader const *s) {
     return s ? s->uniforms : (struct umbra_buf){0};
 }
 
+// Flat-fn-style shader: the caller's state is the umbra_color pointed at by
+// self.  Registers the color with umbra_uniforms() so the program captures
+// the host pointer, and reads the four floats via umbra_uniform_32.
+static umbra_color_val32 solid_fn(void *self, struct umbra_builder *b,
+                                   umbra_val32 x, umbra_val32 y) {
+    (void)x; (void)y;
+    umbra_color const *c = self;
+    umbra_ptr32 const u = umbra_uniforms(b, c, 4);
+    return (umbra_color_val32){
+        umbra_uniform_32(b, u, 0),
+        umbra_uniform_32(b, u, 1),
+        umbra_uniform_32(b, u, 2),
+        umbra_uniform_32(b, u, 3),
+    };
+}
+
+TEST(test_draw_builder2_flat_solid) {
+    umbra_color color = {1, 0, 0, 1};
+    struct umbra_builder *builder = umbra_draw_builder2(
+        NULL,      NULL,
+        solid_fn,  &color,
+        NULL,      NULL,
+        umbra_fmt_8888);
+    struct draw_backends B = make_draw(builder);
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t dst[4] = {0};
+        if (run_draw(&B, bi, 4, 1,
+                      (struct umbra_buf[]){ {.ptr=dst, .count=4} })) {
+            for (int i = 0; i < 4; i++) {
+                dst[i] == 0xFF0000FFu here;
+            }
+        }
+    }
+
+    // Mutate between dispatches -- program reads the new bytes.
+    color = (umbra_color){0, 1, 0, 1};
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t dst[4] = {0};
+        if (run_draw(&B, bi, 4, 1,
+                      (struct umbra_buf[]){ {.ptr=dst, .count=4} })) {
+            for (int i = 0; i < 4; i++) {
+                dst[i] == 0xFF00FF00u here;
+            }
+        }
+    }
+    cleanup_draw(&B);
+}
+
 TEST(test_solid_src) {
     struct umbra_shader *shader = umbra_shader_solid((umbra_color){1, 0, 0, 1});
     struct draw_backends B = make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
