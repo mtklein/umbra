@@ -1,8 +1,6 @@
 #include "slide.h"
 #include <stdlib.h>
 
-enum { COLS = 4, ROWS = 4 };
-
 static uint8_t const font3x5[10][5] = {
     {7, 5, 5, 5, 7}, {2, 6, 2, 2, 7}, {7, 1, 7, 4, 7}, {7, 1, 7, 1, 7}, {5, 5, 7, 1, 1},
     {7, 4, 7, 1, 7}, {7, 4, 7, 5, 7}, {7, 1, 1, 1, 1}, {7, 5, 7, 5, 7}, {7, 5, 7, 1, 7},
@@ -11,8 +9,7 @@ static uint8_t const font3x5[10][5] = {
 struct overview_slide {
     struct slide base;
 
-    int                   w, h, cw, ch;
-    int                   n_real, :32;
+    int                   w, h;
     uint32_t             *fb, *tmp;
     struct umbra_backend *be;
     struct umbra_fmt       fmt, out_fmt;
@@ -52,20 +49,28 @@ static void draw_xbox(uint32_t *fb, int stride, int x0, int y0, int cw, int ch,
 }
 
 static void render_thumbnails(struct overview_slide *st) {
-    int w = st->w, h = st->h;
-    for (int idx = 0; idx < ROWS * COLS; idx++) {
-        int col = idx % COLS;
-        int row = idx / COLS;
-        int x0 = col * st->cw;
-        int y0 = row * st->ch;
+    int const w      = st->w,
+              h      = st->h,
+              n_real = slide_count() - 1;
+    if (n_real <= 0) { return; }
+    int cols = 1;
+    while (cols * cols < n_real) { cols++; }
+    int const rows = (n_real + cols - 1) / cols,
+              cw   = w / cols,
+              ch   = h / rows;
+    for (int idx = 0; idx < rows * cols; idx++) {
+        int col = idx % cols;
+        int row = idx / cols;
+        int x0 = col * cw;
+        int y0 = row * ch;
 
-        if (idx >= st->n_real) {
-            for (int y = 0; y < st->ch; y++) {
-                for (int x = 0; x < st->cw; x++) {
+        if (idx >= n_real) {
+            for (int y = 0; y < ch; y++) {
+                for (int x = 0; x < cw; x++) {
                     st->fb[(y0 + y) * w + x0 + x] = 0xff181818;
                 }
             }
-            draw_xbox(st->fb, w, x0, y0, st->cw, st->ch, 0xff404040);
+            draw_xbox(st->fb, w, x0, y0, cw, ch, 0xff404040);
             continue;
         }
 
@@ -74,10 +79,10 @@ static void render_thumbnails(struct overview_slide *st) {
         sub->draw(sub, 0.0, 0, 0, w, h, st->tmp);
         st->be->flush(st->be);
 
-        for (int cy = 0; cy < st->ch; cy++) {
-            for (int cx = 0; cx < st->cw; cx++) {
-                int sx = cx * w / st->cw;
-                int sy = cy * h / st->ch;
+        for (int cy = 0; cy < ch; cy++) {
+            for (int cx = 0; cx < cw; cx++) {
+                int sx = cx * w / cw;
+                int sy = cy * h / ch;
                 st->fb[(y0 + cy) * w + x0 + cx] = st->tmp[sy * w + sx];
             }
         }
@@ -91,11 +96,8 @@ static void overview_init(struct slide *s, int w, int h) {
     struct overview_slide *st = (struct overview_slide *)s;
     st->w = w;
     st->h = h;
-    st->cw = w / COLS;
-    st->ch = h / ROWS;
     st->fb = calloc((size_t)(w * h), 4);
     st->tmp = calloc((size_t)(w * h), 4);
-    st->n_real = slide_count() - 1;
 }
 
 static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
