@@ -15,8 +15,7 @@ struct umbra_backend_stats {
     double gpu_sec;
     double encode_sec;
     double submit_sec;
-    size_t upload_bytes;
-    size_t pad;
+    size_t upload_bytes, pad;
     int    uniform_ring_rotations;
     int    dispatches;
     int    submits, :32;
@@ -45,7 +44,7 @@ struct umbra_program {
     void (*queue)(struct umbra_program*, int l, int t, int r, int b, struct umbra_buf[]);
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
-    struct umbra_backend *backend;
+    struct umbra_backend *backend;  // TODO: where do we still use this backpointer?
     _Bool                 queue_is_threadsafe, pad[7];
 };
 void umbra_program_free(struct umbra_program*);
@@ -53,23 +52,23 @@ void umbra_program_free(struct umbra_program*);
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 
+// TODO: can these be int ix?  do we still need deref:1?
 typedef struct { int ix:31, deref:1; } umbra_ptr16;
 typedef struct { int ix:31, deref:1; } umbra_ptr32;
 typedef struct { int ix:31, deref:1; } umbra_ptr64;
 
-struct umbra_var32 { int id; };
-
+// TODO: are these deref calls still needed?
 umbra_ptr16 umbra_deref_ptr16(struct umbra_builder*, umbra_ptr32 buf, int slot);
 umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, int slot);
-umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, int slot);
 
-// Register a region of uniform storage with the builder and get back a ptr
-// handle the emitted IR can read from via umbra_uniform_32 / umbra_gather_32.
-// The captured `slot` pointer must stay valid (and 4-byte aligned) until the
-// compiled program is freed; its contents may be mutated freely between queue()
-// calls and the next dispatch will see the updated bytes.  `slots` counts 4-byte
-// units.
+// Register a span of uniform data, returning a ptr handle for use with
+// umbra_uniform_32() and/or umbra_gather_32().  The uniforms are not retained
+// and must outlive this umbra_builder and any derived umbra_flat_ir or
+// umbra_programs.
+//
+// `slot` should be 4-byte aligned, and `slots` counts those 4-byte slots.
 umbra_ptr32 umbra_uniforms(struct umbra_builder*, void const *slot, int slots);
+umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, int slot);
 
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);
@@ -157,6 +156,8 @@ void        umbra_end_loop(struct umbra_builder*);
 void        umbra_if    (struct umbra_builder*, umbra_val32 cond);
 void        umbra_end_if(struct umbra_builder*);
 
+// TODO: typedef this struct to just umbra_var32, umbra_var32() -> umbra_declare_var32().
+struct umbra_var32 { int id; };
 struct umbra_var32 umbra_var32      (struct umbra_builder*);
 umbra_val32        umbra_load_var32 (struct umbra_builder*, struct umbra_var32);
 void               umbra_store_var32(struct umbra_builder*, struct umbra_var32, umbra_val32);

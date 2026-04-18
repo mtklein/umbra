@@ -2,10 +2,7 @@
 #include "umbra.h"
 #include "umbra_interval.h"
 
-typedef struct {
-    float x, y;
-} umbra_point;
-
+typedef struct { float       x, y; } umbra_point;
 typedef struct { umbra_val32 x, y; } umbra_point_val32;
 
 typedef struct {
@@ -50,10 +47,11 @@ void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, um
 umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
-// Flat effect fn pointers.  Each takes a caller-owned context pointer as first
-// arg and emits IR to compute its output; effects register any live uniforms
-// via umbra_uniforms() so the program captures host pointers, and the caller
-// retains ownership of that storage until the program is freed.
+// TODO: typedef the effect function type, not the function pointer type?
+//       allows declaring blends as umbra_blend umbra_blend_src, umbra_blend_srcover, ...
+
+// Effects emit IR into a builder.  Any uniforms registered with
+// umbra_uniforms() must outlive the builder, flat_ir, and program.
 typedef umbra_color_val32 (*umbra_shader)  (void *ctx, struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
 typedef umbra_val32       (*umbra_coverage)(void *ctx, struct umbra_builder*,
@@ -64,49 +62,48 @@ typedef umbra_color_val32 (*umbra_blend)   (void *ctx, struct umbra_builder*,
                                             umbra_color_val32 src,
                                             umbra_color_val32 dst);
 
-umbra_color_val32 umbra_blend_src     (void *ctx, struct umbra_builder*,
+// TODO: rename umbra_shader_color()?
+// Shade a single color; ctx is an umbra_color*.
+umbra_color_val32 umbra_shader_solid(void *umbra_color, struct umbra_builder*,
+                                     umbra_val32 x, umbra_val32 y);
+
+umbra_color_val32 umbra_blend_src     (void*, struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_srcover (void *ctx, struct umbra_builder*,
+umbra_color_val32 umbra_blend_srcover (void*, struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_dstover (void *ctx, struct umbra_builder*,
+umbra_color_val32 umbra_blend_dstover (void*, struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
-umbra_color_val32 umbra_blend_multiply(void *ctx, struct umbra_builder*,
+umbra_color_val32 umbra_blend_multiply(void*, struct umbra_builder*,
                                        umbra_color_val32 src, umbra_color_val32 dst);
 
-// Compose a (coverage, shader, blend) triple into an IR builder that stores
-// into the dst pointer at ptr.ix = 0.  Any of the three may be NULL to skip
-// that stage.  Each non-NULL pair (fn, ctx) is passed through to the emitted
-// IR; the caller retains ownership of each ctx.
-struct umbra_builder* umbra_draw_builder(
-    umbra_coverage coverage_fn, void *coverage_ctx,
-    umbra_shader   shader_fn,   void *shader_ctx,
-    umbra_blend    blend_fn,    void *blend_ctx,
-    struct umbra_fmt);
+// Compose coverage, shader, and blend into an IR builder that reads and writes
+// dst_fmt at ptr.ix=0.  Any of the effects may be NULL for default behavior:
+// coverage=1, shader={0,0,0,0}, blend=src.
+struct umbra_builder* umbra_draw_builder(umbra_coverage, void *coverage_ctx,
+                                         umbra_shader  , void *shader_ctx,
+                                         umbra_blend   , void *blend_ctx,
+                                         struct umbra_fmt dst_fmt);
 
+// TODO: forget this struct, pass hard_edge directly into umbra_sdf_draw(),
+//       but preserve this next TODO about generalizing to a quality param
 // TODO: _Bool hard_edge -> int quality
 struct umbra_sdf_draw_config {
     _Bool hard_edge;
 };
 
+// Draw using an umbra_sdf as coverage.
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
-                                      umbra_sdf sdf_fn,    void *sdf_ctx,
+                                      umbra_sdf, void *sdf_ctx,
                                       struct umbra_sdf_draw_config,
-                                      umbra_shader shader_fn, void *shader_ctx,
-                                      umbra_blend blend_fn,   void *blend_ctx,
+                                      umbra_shader, void *shader_ctx,
+                                      umbra_blend,  void *blend_ctx,
                                       struct umbra_fmt);
 void umbra_sdf_draw_queue(struct umbra_sdf_draw const*,
-                              int l, int t, int r, int b, struct umbra_buf[]);
+                          int l, int t, int r, int b, struct umbra_buf[]);
 void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
-// Flat shader: caller owns an umbra_color; pass &color as shader_ctx.
-// Mutating *color between queue() calls is reflected on next dispatch.
-umbra_color_val32 umbra_shader_solid(void *ctx, struct umbra_builder*,
-                                     umbra_val32 x, umbra_val32 y);
 
-// Flat coverage: caller owns a struct umbra_coverage_from_sdf holding the
-// underlying sdf (fn + ctx) plus a hard_edge flag.  hard_edge = 1 gives a
-// binary mask (cov = sdf < 0 ? 1 : 0); hard_edge = 0 clamps -sdf into [0, 1]
-// for a 1px AA ramp.  sdf_fn / sdf_ctx / hard_edge are baked at IR-emit time.
+// Adapt an umbra_sdf as umbra_coverage.
 struct umbra_coverage_from_sdf {
     umbra_sdf  sdf_fn;
     void      *sdf_ctx;
@@ -114,6 +111,10 @@ struct umbra_coverage_from_sdf {
 };
 umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder*,
                                      umbra_val32 x, umbra_val32 y);
+
+// TODO: move gradient shaders out into slides/gradient.c
+// TODO: name all these gradient ctx parameters after the expected type,
+//       e.g. void *ctx -> void *umbra_gradient_linear for umbra_gradient_linear().
 
 // A gradient is (x,y) -> t -> color.  umbra_gradient_coords is the first leg,
 // a first-class effect in the same shape as umbra_shader / umbra_coverage /
@@ -182,52 +183,48 @@ struct umbra_shader_gradient {
     int                    :32;
     struct umbra_buf       colors, pos;
 };
-umbra_color_val32 umbra_shader_gradient(void *ctx, struct umbra_builder*,
+umbra_color_val32 umbra_shader_gradient(void *umbra_shader_gradient, struct umbra_builder*,
                                          umbra_val32 x, umbra_val32 y);
 
-// Flat composer: supersamples an inner flat shader.  Caller owns the state;
-// pass &state as shader_ctx.  All three fields (samples, inner_fn, inner_ctx)
-// are read once at IR-emit time and baked into the compiled program --
-// mutating them afterwards has no effect on already-compiled dispatches.
-// To change them, free the program and rebuild.  inner_ctx's *bytes* still
-// mutate freely via umbra_uniforms, as usual.
+// Supersample a wrapped shader.
 struct umbra_supersample {
     umbra_shader  inner_fn;
     void         *inner_ctx;
     int           samples, :32;
 };
-umbra_color_val32 umbra_shader_supersample(void *ctx, struct umbra_builder*,
+umbra_color_val32 umbra_shader_supersample(void *umbra_supersample, struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
 
-// Flat coverage: caller owns an umbra_rect; pass &rect as coverage_ctx.
-// Mutation between queue() calls is reflected on next dispatch.
-umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder*,
+// Cover a rectangle, ctx is an umbra_rect*.
+umbra_val32 umbra_coverage_rect(void *umbra_rect, struct umbra_builder*,
                                  umbra_val32 x, umbra_val32 y);
 
-// Flat SDF: caller owns an umbra_rect; pass &rect as sdf_ctx.  Mutation
-// between queue() calls is reflected on next dispatch.
-umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder*,
+// A rectangle SDF, ctx is an umbra_rect*.
+umbra_interval umbra_sdf_rect(void *umbra_rect, struct umbra_builder*,
                               umbra_interval x, umbra_interval y);
 
-// Flat coverage samplers: caller owns a struct umbra_buf and passes &buf as
-// coverage_ctx.  Mutating *buf between queue() calls is reflected on next
-// dispatch (the ptr/count/stride live in the caller's storage).
-umbra_val32 umbra_coverage_bitmap (void *ctx, struct umbra_builder*,
-                                    umbra_val32 x, umbra_val32 y);
-umbra_val32 umbra_coverage_sdf    (void *ctx, struct umbra_builder*,
-                                    umbra_val32 x, umbra_val32 y);
-umbra_val32 umbra_coverage_winding(void *ctx, struct umbra_builder*,
-                                    umbra_val32 x, umbra_val32 y);
+// TODO: move to slides
+// 8-bit and SDF bitmap coverage, ctx is an umbra_buf*.
+umbra_val32 umbra_coverage_bitmap(void *umbra_buf, struct umbra_builder*,
+                                  umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_sdf   (void *umbra_buf, struct umbra_builder*,
+                                  umbra_val32 x, umbra_val32 y);
 
-// Flat coverage: sample a bitmap through a 3x3 perspective matrix.  Caller
-// owns a struct umbra_coverage_bitmap_matrix and passes &state as coverage_ctx.
+// TODO: move to slides
+// Coverage from winding count buffer used by 2-pass Slug, ctx is an umbra_buf*.
+umbra_val32 umbra_coverage_winding(void *umbra_buf, struct umbra_builder*,
+                                   umbra_val32 x, umbra_val32 y);
+
+// TODO: split this apart into a bitmap shader and a matrix shader combinator.
 struct umbra_coverage_bitmap_matrix {
     struct umbra_matrix mat; int :32;
     struct umbra_bitmap bmp;
 };
-umbra_val32 umbra_coverage_bitmap_matrix(void *ctx, struct umbra_builder*,
-                                          umbra_val32 x, umbra_val32 y);
+umbra_val32 umbra_coverage_bitmap_matrix(void *umbra_coverage_bitmap_matrix,
+                                         struct umbra_builder*,
+                                         umbra_val32 x, umbra_val32 y);
 
+// TODO: move _lut() to slides, drop _lut_even().
 void umbra_gradient_lut_even(float *out, int lut_n, int n_stops, umbra_color const *colors);
 void umbra_gradient_lut(float *out, int lut_n, int n_stops, float const positions[],
                         umbra_color const *colors);
