@@ -26,9 +26,17 @@ static void atomic_close(FILE *f, char const *path) {
 }
 
 static struct umbra_builder* build_srcover(void) {
+    static struct umbra_buf src = {0},
+                             dr_buf = {0}, dg_buf = {0}, db_buf = {0}, da_buf = {0};
     struct umbra_builder *b = umbra_builder();
 
-    umbra_val32 px = umbra_load_32(b, (umbra_ptr32){0}), mask = umbra_imm_i32(b, 0xFF);
+    umbra_ptr32 const sp = umbra_bind_buf32(b, &src);
+    umbra_ptr16 const drp = umbra_bind_buf16(b, &dr_buf),
+                      dgp = umbra_bind_buf16(b, &dg_buf),
+                      dbp = umbra_bind_buf16(b, &db_buf),
+                      dap = umbra_bind_buf16(b, &da_buf);
+
+    umbra_val32 px = umbra_load_32(b, sp), mask = umbra_imm_i32(b, 0xFF);
     umbra_val32 rgba[4] = {
         umbra_and_32(b, px, mask),
         umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 8)), mask),
@@ -41,19 +49,19 @@ static struct umbra_builder* build_srcover(void) {
               sg = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[1]), inv255),
               sb = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[2]), inv255),
               sa = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[3]), inv255),
-              dr = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){.ix=1})),
-              dg = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){.ix=2})),
-              db = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){.ix=3})),
-              da = umbra_f32_from_f16(b, umbra_load_16(b, (umbra_ptr16){.ix=4})),
+              dr = umbra_f32_from_f16(b, umbra_load_16(b, drp)),
+              dg = umbra_f32_from_f16(b, umbra_load_16(b, dgp)),
+              db = umbra_f32_from_f16(b, umbra_load_16(b, dbp)),
+              da = umbra_f32_from_f16(b, umbra_load_16(b, dap)),
               one = umbra_imm_f32(b, 1.0f), inv_a = umbra_sub_f32(b, one, sa),
               rout = umbra_add_f32(b, sr, umbra_mul_f32(b, dr, inv_a)),
               gout = umbra_add_f32(b, sg, umbra_mul_f32(b, dg, inv_a)),
               bout = umbra_add_f32(b, sb, umbra_mul_f32(b, db, inv_a)),
               aout = umbra_add_f32(b, sa, umbra_mul_f32(b, da, inv_a));
-    umbra_store_16(b, (umbra_ptr16){.ix=1}, umbra_f16_from_f32(b, rout));
-    umbra_store_16(b, (umbra_ptr16){.ix=2}, umbra_f16_from_f32(b, gout));
-    umbra_store_16(b, (umbra_ptr16){.ix=3}, umbra_f16_from_f32(b, bout));
-    umbra_store_16(b, (umbra_ptr16){.ix=4}, umbra_f16_from_f32(b, aout));
+    umbra_store_16(b, drp, umbra_f16_from_f32(b, rout));
+    umbra_store_16(b, dgp, umbra_f16_from_f32(b, gout));
+    umbra_store_16(b, dbp, umbra_f16_from_f32(b, bout));
+    umbra_store_16(b, dap, umbra_f16_from_f32(b, aout));
     return b;
 }
 
