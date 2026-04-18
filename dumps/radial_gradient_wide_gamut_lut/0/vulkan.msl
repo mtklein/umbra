@@ -24,26 +24,27 @@ kernel void main0(constant _22& _38 [[buffer(0)]], device _17& _34 [[buffer(1)]]
     {
         uint _53 = _38._m0[1u] + gl_GlobalInvocationID.x;
         uint _54 = _38._m0[2u] + gl_GlobalInvocationID.y;
-        float _71 = as_type<float>(_36._m0[3u]) + as_type<float>(_36._m0[3u]);
+        uint _71 = uint(int(as_type<float>(_36._m0[3u])));
+        uint _72 = _71 + _71;
+        uint _73 = _71 + _72;
         float _77 = float(int(_53)) - as_type<float>(_36._m0[0u]);
         float _81 = float(int(_54)) - as_type<float>(_36._m0[1u]);
-        float _90 = fast::min(as_type<float>(_36._m0[3u]) - 2.0, fast::min(fast::max(as_type<float>(_36._m0[2u]) * precise::sqrt(fma(_77, _77, _81 * _81)), 0.0), 1.0) * (as_type<float>(_36._m0[3u]) - 1.0));
-        float _91 = _90 + (as_type<float>(_36._m0[3u]) + _71);
-        float _93 = as_type<float>(_36._m0[3u]) + _90;
-        float _94 = _90 + _71;
-        uint _97 = uint(int(floor(_90)));
-        uint _98 = _97 + 1u;
-        uint _101 = uint(int(floor(_93)));
-        uint _102 = _101 + 1u;
-        uint _105 = uint(int(floor(_94)));
-        uint _106 = _105 + 1u;
-        uint _109 = uint(int(floor(_91)));
-        uint _110 = _109 + 1u;
-        uint _140 = _37._m0[min(_97, (_38._m0[6u] - 1u))] & ((_97 < _38._m0[6u]) ? 4294967295u : 0u);
-        uint _165 = _37._m0[min(_101, (_38._m0[6u] - 1u))] & ((_101 < _38._m0[6u]) ? 4294967295u : 0u);
-        uint _190 = _37._m0[min(_105, (_38._m0[6u] - 1u))] & ((_105 < _38._m0[6u]) ? 4294967295u : 0u);
-        uint _206 = _37._m0[min(_109, (_38._m0[6u] - 1u))] & ((_109 < _38._m0[6u]) ? 4294967295u : 0u);
-        _34._m0[(_54 * _38._m0[7u]) + _53] = uint2(as_type<uint>(half2(float2(fma(_90 - floor(_90), as_type<float>(_37._m0[min(_98, (_38._m0[6u] - 1u))] & ((_98 < _38._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_140), as_type<float>(_140)), 0.0))) | (as_type<uint>(half2(float2(fma(_93 - floor(_93), as_type<float>(_37._m0[min(_102, (_38._m0[6u] - 1u))] & ((_102 < _38._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_165), as_type<float>(_165)), 0.0))) << 16u), as_type<uint>(half2(float2(fma(_94 - floor(_94), as_type<float>(_37._m0[min(_106, (_38._m0[6u] - 1u))] & ((_106 < _38._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_190), as_type<float>(_190)), 0.0))) | (as_type<uint>(half2(float2(fma(_91 - floor(_91), as_type<float>(_37._m0[min(_110, (_38._m0[6u] - 1u))] & ((_110 < _38._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_206), as_type<float>(_206)), 0.0))) << 16u));
+        float _89 = fast::min(fast::max(as_type<float>(_36._m0[2u]) * precise::sqrt(fma(_77, _77, _81 * _81)), 0.0), 1.0) * (as_type<float>(_36._m0[3u]) - 1.0);
+        float _90 = fast::min(as_type<float>(_36._m0[3u]) - 2.0, _89);
+        float _92 = _89 - floor(_90);
+        uint _95 = uint(int(floor(_90)));
+        uint _96 = _95 + _73;
+        uint _106 = _37._m0[min(_96, (_38._m0[6u] - 1u))] & ((_96 < _38._m0[6u]) ? 4294967295u : 0u);
+        uint _107 = _95 + 1u;
+        uint _108 = _107 + _73;
+        uint _109 = _107 + _71;
+        uint _110 = _107 + _72;
+        uint _143 = _95 + _71;
+        uint _152 = _37._m0[min(_143, (_38._m0[6u] - 1u))] & ((_143 < _38._m0[6u]) ? 4294967295u : 0u);
+        uint _158 = _95 + _72;
+        uint _167 = _37._m0[min(_158, (_38._m0[6u] - 1u))] & ((_158 < _38._m0[6u]) ? 4294967295u : 0u);
+        uint _190 = _37._m0[min(_95, (_38._m0[6u] - 1u))] & ((_95 < _38._m0[6u]) ? 4294967295u : 0u);
+        _34._m0[(_54 * _38._m0[7u]) + _53] = uint2(as_type<uint>(half2(float2(fma(_92, as_type<float>(_37._m0[min(_107, (_38._m0[6u] - 1u))] & ((_107 < _38._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_190), as_type<float>(_190)), 0.0))) | (as_type<uint>(half2(float2(fma(_92, as_type<float>(_37._m0[min(_109, (_38._m0[6u] - 1u))] & ((_109 < _38._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_152), as_type<float>(_152)), 0.0))) << 16u), as_type<uint>(half2(float2(fma(_92, as_type<float>(_37._m0[min(_110, (_38._m0[6u] - 1u))] & ((_110 < _38._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_167), as_type<float>(_167)), 0.0))) | (as_type<uint>(half2(float2(fma(_92, as_type<float>(_37._m0[min(_108, (_38._m0[6u] - 1u))] & ((_108 < _38._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_106), as_type<float>(_106)), 0.0))) << 16u));
         return;
     }
 }

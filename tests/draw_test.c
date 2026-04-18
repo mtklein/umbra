@@ -1053,6 +1053,39 @@ TEST(test_radial_grad) {
     umbra_shader_free(shader);
 }
 
+TEST(test_lut_grad_last_pixel) {
+    float lut[3 * 4] = {
+        1, 0, 0,
+        0, 1, 0,
+        0, 0, 1,
+        1, 1, 1,
+    };
+
+    struct umbra_shader *shader =
+        umbra_shader_gradient_linear_lut((umbra_point){0, 0}, (umbra_point){7, 0},
+                                 (struct umbra_buf){.ptr=lut, .count=3 * 4});
+    struct draw_backends B =
+        make_draw(umbra_draw_builder(NULL, shader, umbra_blend_src,
+                                   umbra_fmt_8888));
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t  dst[8] = {0};
+        if (run_draw(&B, bi, 8, 1,
+                      (struct umbra_buf[]){
+                          {.ptr=dst, .count=8},
+                          cov_u(NULL),
+                          sh_u(shader),
+                      })) {
+            (dst[0] & 0xff) == 0xFF here;
+            ((dst[7] >> 16) & 0xff) == 0xFF here;
+            ((dst[7] >>  8) & 0xff) ==    0 here;
+            ( dst[7]        & 0xff) ==    0 here;
+        }
+    }
+    cleanup_draw(&B);
+    umbra_shader_free(shader);
+}
+
 TEST(test_linear_grad_evenly_spaced) {
     float planar[3 * 4] = {
         1, 0, 0,
