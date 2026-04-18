@@ -63,6 +63,14 @@ typedef struct { int ix; } umbra_ptr64;
 // umbra_programs.
 //
 // `slot` should be 4-byte aligned, and `slots` counts those 4-byte slots.
+//
+// TODO: consider removing this sugar now that umbra_bind_buf32() exists.
+// It's implemented in src/builder.c as reserve_uniform() + setting .storage
+// = {slot, slots, 0}; callers could do the same themselves by owning a
+// struct umbra_buf and calling umbra_bind_buf32(b, &buf).  The main loss
+// is ergonomics -- callers who just want to register a plain state struct
+// would have to carry a side-by-side umbra_buf descriptor.  Worth checking
+// how many call sites this would uglify before removing.
 umbra_ptr32 umbra_uniforms(struct umbra_builder*, void const *slot, int slots);
 umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, int slot);
 
