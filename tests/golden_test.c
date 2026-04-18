@@ -129,7 +129,7 @@ TEST(test_slug_rect) {
     struct umbra_buf wind_uniform = {.ptr=wind_buf, .count=count(wind_buf), .stride=W};
 
     struct umbra_builder *bld = umbra_draw_builder(
-        umbra_coverage_winding, &wind_uniform,
+        coverage_winding,       &wind_uniform,
         umbra_shader_color,     &color,
         umbra_blend_srcover,    NULL,
         umbra_fmt_8888);

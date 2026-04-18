@@ -8,6 +8,16 @@
 #include "../third_party/stb/stb_truetype.h"
 #pragma clang diagnostic pop
 
+umbra_val32 coverage_winding(void *ctx, struct umbra_builder *b,
+                             umbra_val32 x, umbra_val32 y) {
+    struct umbra_buf const *self = ctx;
+    (void)x; (void)y;
+    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr32 const w = umbra_deref_ptr32(b, u, 0);
+    umbra_val32 const raw = umbra_load_32(b, w);
+    return umbra_min_f32(b, umbra_abs_f32(b, raw), umbra_imm_f32(b, 1.0f));
+}
+
 struct slug_curves slug_extract(char const *text, float font_size) {
     struct slug_curves sc = {0};
 
@@ -451,7 +461,7 @@ static void slug_two_pass_prepare(struct slide *s,
     st->fmt = fmt;
     {
         struct umbra_builder *b = umbra_draw_builder(
-            umbra_coverage_winding, &st->wind_uniform,
+            coverage_winding,       &st->wind_uniform,
             umbra_shader_color,     &st->color,
             umbra_blend_srcover,    NULL,
             fmt);
@@ -502,7 +512,7 @@ static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
     out[0] = slug_build_acc();
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     out[1] = umbra_draw_builder(
-        umbra_coverage_winding, &st->wind_uniform,
+        coverage_winding,       &st->wind_uniform,
         umbra_shader_color,     &st->color,
         umbra_blend_srcover,    NULL,
         fmt);
@@ -573,7 +583,7 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
     st->fmt = fmt;
     {
         struct umbra_builder *b = umbra_draw_builder(
-            umbra_coverage_winding, &st->wind_uniform,
+            coverage_winding,       &st->wind_uniform,
             umbra_shader_color,     &st->color,
             umbra_blend_srcover,    NULL,
             fmt);

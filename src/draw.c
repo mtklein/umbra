@@ -450,16 +450,6 @@ umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder *b,
                                                               umbra_interval_sub_f32(b, y, bo)));
 }
 
-umbra_val32 umbra_coverage_winding(void *ctx, struct umbra_builder *b,
-                                    umbra_val32 x, umbra_val32 y) {
-    struct umbra_buf const *self = ctx;
-    (void)x; (void)y;
-    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr32 const w = umbra_deref_ptr32(b, u, 0);
-    umbra_val32 const raw = umbra_load_32(b, w);
-    return umbra_min_f32(b, umbra_abs_f32(b, raw), umbra_imm_f32(b, 1.0f));
-}
-
 umbra_val32 umbra_coverage_bitmap_matrix(void *ctx, struct umbra_builder *b,
                                           umbra_val32 x, umbra_val32 y) {
     struct umbra_coverage_bitmap_matrix const *self = ctx;

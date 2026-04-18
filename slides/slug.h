@@ -28,3 +28,7 @@ struct slug_curves    slug_extract  (char const *text, float font_size);
 void                  slug_free     (struct slug_curves *sc);
 struct umbra_builder* slug_build_acc(void);
 struct umbra_builder* slug_build    (void);
+
+// Coverage from winding count buffer used by 2-pass Slug, ctx is an umbra_buf*.
+umbra_val32 coverage_winding(void *umbra_buf, struct umbra_builder*,
+                             umbra_val32 x, umbra_val32 y);
