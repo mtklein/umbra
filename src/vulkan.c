@@ -275,10 +275,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     struct umbra_buf buf[32];
     for (int i = 0; i < vp->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < vp->n_reg; i++) {
-        buf[vp->reg[i].ix] = (struct umbra_buf){
-            .ptr   = (void*)(uintptr_t)vp->reg[i].ptr,
-            .count = vp->reg[i].slots,
-        };
+        buf[vp->reg[i].ix] = vp->reg[i].buf ? *vp->reg[i].buf : vp->reg[i].storage;
     }
 
     double const encode_t0 = now();

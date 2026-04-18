@@ -35,12 +35,15 @@ struct ir_inst {
 // backends only ever see a single flat ix-space.
 #define REG_BASE (1 << 24)
 
-// A region of caller-managed uniform storage that umbra_uniforms() registered,
-// pinned to a specific ptr handle (.ix).  Programs auto-populate buf[.ix] with
-// .ptr at dispatch time so callers don't thread these through queue() args.
+// A caller-owned buf registration pinned to a specific ptr handle (.ix).
+// Programs auto-populate buf[.ix] at dispatch time so callers don't thread
+// these through queue() args.  If buf != NULL, the dispatch reads the current
+// contents of *buf (fully mutable between dispatches).  Otherwise the dispatch
+// uses the fixed `storage` snapshot captured when registered.
 struct umbra_uniform_reg {
-    void const *ptr;
-    int         slots, ix;
+    struct umbra_buf const *buf;
+    struct umbra_buf        storage;
+    int                     ix, pad;
 };
 
 struct umbra_builder {

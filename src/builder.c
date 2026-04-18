@@ -115,19 +115,41 @@ void umbra_builder_free(builder *b) {
 // caller-provided bufs at queue time; umbra_uniforms() assigns ixes starting
 // at REG_BASE so flat_ir_bind_uniforms() can cheaply distinguish the two
 // when remapping.
-umbra_ptr32 umbra_uniforms(builder *b, void const *slot, int slots) {
-    assume(((uintptr_t)slot & 3u) == 0);
-    assume(slots >= 0);
+static int reserve_uniform(builder *b) {
     if (b->n_uniforms == b->cap_uniforms) {
         b->cap_uniforms = b->cap_uniforms ? 2 * b->cap_uniforms : 4;
         b->uniforms = realloc(b->uniforms,
                               (size_t)b->cap_uniforms * sizeof *b->uniforms);
     }
-    int const ix = REG_BASE + b->n_uniforms;
+    return REG_BASE + b->n_uniforms;
+}
+
+umbra_ptr32 umbra_uniforms(builder *b, void const *slot, int slots) {
+    assume(((uintptr_t)slot & 3u) == 0);
+    assume(slots >= 0);
+    int const ix = reserve_uniform(b);
     b->uniforms[b->n_uniforms++] = (struct umbra_uniform_reg){
-        .ptr = slot, .slots = slots, .ix = ix,
+        .buf     = NULL,
+        .storage = {.ptr = (void*)(uintptr_t)slot, .count = slots, .stride = 0},
+        .ix      = ix,
     };
     return (umbra_ptr32){.ix = ix};
+}
+
+umbra_ptr32 umbra_bind_buf32(builder *b, struct umbra_buf const *buf) {
+    int const ix = reserve_uniform(b);
+    b->uniforms[b->n_uniforms++] = (struct umbra_uniform_reg){.buf = buf, .ix = ix};
+    return (umbra_ptr32){.ix = ix};
+}
+umbra_ptr16 umbra_bind_buf16(builder *b, struct umbra_buf const *buf) {
+    int const ix = reserve_uniform(b);
+    b->uniforms[b->n_uniforms++] = (struct umbra_uniform_reg){.buf = buf, .ix = ix};
+    return (umbra_ptr16){.ix = ix};
+}
+umbra_ptr64 umbra_bind_buf64(builder *b, struct umbra_buf const *buf) {
+    int const ix = reserve_uniform(b);
+    b->uniforms[b->n_uniforms++] = (struct umbra_uniform_reg){.buf = buf, .ix = ix};
+    return (umbra_ptr64){.ix = ix};
 }
 
 umbra_val32 umbra_x(builder *b) { return push32(b, op_x); }

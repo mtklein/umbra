@@ -76,6 +76,16 @@ umbra_ptr32 umbra_deref_ptr32(struct umbra_builder*, umbra_ptr32 buf, int slot);
 umbra_ptr32 umbra_uniforms(struct umbra_builder*, void const *slot, int slots);
 umbra_val32 umbra_uniform_32(struct umbra_builder*, umbra_ptr32, int slot);
 
+// Bind a caller-owned `struct umbra_buf` to a ptr handle.  At each dispatch
+// the backend reads the current contents of *buf, so callers may mutate
+// .ptr / .count / .stride between dispatches without rebuilding the program.
+// Unlike umbra_uniforms() (which captures a fixed ptr/slots pair), the buf
+// itself is the source of truth.  The buf must outlive the builder and any
+// derived umbra_flat_ir or umbra_programs.
+umbra_ptr16 umbra_bind_buf16(struct umbra_builder*, struct umbra_buf const*);
+umbra_ptr32 umbra_bind_buf32(struct umbra_builder*, struct umbra_buf const*);
+umbra_ptr64 umbra_bind_buf64(struct umbra_builder*, struct umbra_buf const*);
+
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);
 

@@ -518,10 +518,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     struct umbra_buf buf[64];
     for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < p->n_reg; i++) {
-        buf[p->reg[i].ix] = (struct umbra_buf){
-            .ptr   = (void*)(uintptr_t)p->reg[i].ptr,
-            .count = p->reg[i].slots,
-        };
+        buf[p->reg[i].ix] = p->reg[i].buf ? *p->reg[i].buf : p->reg[i].storage;
     }
     for (int i = p->nptr; i < nall; i++) { buf[i] = (struct umbra_buf){0}; }
 

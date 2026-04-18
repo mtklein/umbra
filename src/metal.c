@@ -1327,10 +1327,7 @@ static void metal_program_queue(
     struct umbra_buf buf[32];
     for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < p->n_reg; i++) {
-        buf[p->reg[i].ix] = (struct umbra_buf){
-            .ptr   = (void*)(uintptr_t)p->reg[i].ptr,
-            .count = p->reg[i].slots,
-        };
+        buf[p->reg[i].ix] = p->reg[i].buf ? *p->reg[i].buf : p->reg[i].storage;
     }
 
     void *pool = objc_autoreleasePoolPush();
