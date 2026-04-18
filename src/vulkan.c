@@ -96,6 +96,9 @@ struct vk_program {
     int total_bufs;
     int n_deref;
     int push_words;
+    int caller_nptr, n_reg;
+    struct umbra_uniform_reg *reg;
+    struct umbra_buf         *scratch;
 
     struct deref_info *deref;
     uint8_t          *buf_rw;
@@ -260,12 +263,23 @@ static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
 
 static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
-                              struct umbra_buf buf[]) {
+                              struct umbra_buf caller_buf[]) {
     struct vk_program *vp = (struct vk_program *)p;
     struct vk_backend *be = vp->be;
 
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
+
+    // Overlay registered uniforms into the per-program scratch; caller_buf
+    // only covers [0, caller_nptr).
+    struct umbra_buf *buf = vp->scratch;
+    for (int i = 0; i < vp->caller_nptr; i++) { buf[i] = caller_buf[i]; }
+    for (int i = 0; i < vp->n_reg; i++) {
+        buf[vp->reg[i].ix] = (struct umbra_buf){
+            .ptr   = (void*)(uintptr_t)vp->reg[i].ptr,
+            .count = vp->reg[i].slots,
+        };
+    }
 
     double const encode_t0 = now();
     begin_batch(be);
@@ -450,6 +464,8 @@ static void vk_program_free(struct umbra_program *p) {
     free(vp->deref);
     free(vp->buf_rw);
     free(vp->buf_shift);
+    free(vp->reg);
+    free(vp->scratch);
     free(vp->spirv);
     free(vp);
 }
@@ -548,6 +564,15 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
+
+    p->n_reg       = ir->n_uniforms;
+    p->caller_nptr = p->n_reg ? ir->uniforms[0].ix : p->max_ptr + 1;
+    if (p->n_reg) {
+        size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
+        p->reg = malloc(sz);
+        __builtin_memcpy(p->reg, ir->uniforms, sz);
+    }
+    p->scratch = calloc((size_t)(p->max_ptr + 1), sizeof *p->scratch);
 
     p->base.queue   = vk_program_queue;
     p->base.dump    = vk_program_dump;

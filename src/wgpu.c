@@ -93,6 +93,9 @@ struct wgpu_program {
     int total_bufs;
     int n_deref;
     int push_words;
+    int caller_nptr, n_reg;
+    struct umbra_uniform_reg *reg;
+    struct umbra_buf         *scratch;
 
     struct deref_info *deref;
     uint8_t          *buf_rw;
@@ -392,15 +395,36 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
+
+    p->n_reg       = ir->n_uniforms;
+    p->caller_nptr = p->n_reg ? ir->uniforms[0].ix : p->max_ptr + 1;
+    if (p->n_reg) {
+        size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
+        p->reg = malloc(sz);
+        __builtin_memcpy(p->reg, ir->uniforms, sz);
+    }
+    p->scratch = calloc((size_t)(p->max_ptr + 1), sizeof *p->scratch);
+
     return &p->base;
 }
 
 static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
-                               int r, int b, struct umbra_buf buf[]) {
+                               int r, int b, struct umbra_buf caller_buf[]) {
     struct wgpu_program *p  = (struct wgpu_program *)prog;
     struct wgpu_backend *be = p->be;
 
     int w = r - l, h = b - t;
+
+    // Overlay registered uniforms into the per-program scratch; caller_buf
+    // only covers [0, caller_nptr).
+    struct umbra_buf *buf = p->scratch;
+    for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
+    for (int i = 0; i < p->n_reg; i++) {
+        buf[p->reg[i].ix] = (struct umbra_buf){
+            .ptr   = (void*)(uintptr_t)p->reg[i].ptr,
+            .count = p->reg[i].slots,
+        };
+    }
 
     begin_batch(be);
 
@@ -579,6 +603,8 @@ static void wgpu_program_free(struct umbra_program *prog) {
     free(p->deref);
     free(p->buf_rw);
     free(p->buf_shift);
+    free(p->reg);
+    free(p->scratch);
     free(p);
 }
 
