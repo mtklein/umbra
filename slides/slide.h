@@ -2,23 +2,30 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
-// TODO: I want to invert the control flow here somewhat,
-//       less introspective of the slides and more feed-forward.
-//       The driver program (bench, demo, dump, golden tests)
-//       should be able to remain oblivious of slide internals.
+// The endgame for this interface is for drivers (bench, demo, dump, golden
+// tests, overview) to stop knowing anything about slide internals and just
+// drive the slide through .build_draw + .animate.  Each driver creates a
+// builder, binds its chosen dst, initializes (x, y) from the dispatch,
+// optionally pre-applies a viewport transform, calls build_draw, and takes
+// it from there (compile, dispatch, dump, time, pairwise-compare).
 //
-//       Maybe the driver sets up a builder with prepared dst
-//       binding and passes that, dst's fmt, w,h, and a transform
-//       matrix to the slide, and if the slide has another draw
-//       to make it fills out the builder.  The driver then does
-//       its dumps, compiles, draws, timing, whatever.
+// Partially landed:
+//   * build_draw exists and lives alongside prepare/draw/get_builders.
+//   * persp_slide, cov_null_slide, and all 8 gradient variants implement it.
+//   * The overview consumes it.
 //
-//       Most slides would fill out only one builder and generate
-//       one program, but slides like two-pass slug would make
-//       more than one, and the driver would compile those into
-//       a program each, and dispatch them in order.
-//
-//       Unsure quite yet how to square this with SDF dispatch.
+// Still ahead:
+//   * Migrate the remaining slides.  Today-blockers: text_slide (golden-test
+//     disagreement the move surfaced -- see TODO in slides/coverage.c);
+//     sdf / blend slides (need a tile-culled sibling path -- see TODO in
+//     slides/overview.c); slug (two-pass, needs multi-program support);
+//     swatch (multi-dispatch per frame).
+//   * Extend build_draw (or add a sibling) to let a slide produce more than
+//     one program so the two-pass slug accumulator fits.  The driver would
+//     compile each in sequence and dispatch them in order.
+//   * Once every slide has a build_draw (or equivalent), retire prepare /
+//     draw / get_builders and have every driver just loop over
+//     slide->build_draw.
 
 struct slide {
     char const     *title;
