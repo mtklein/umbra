@@ -98,7 +98,7 @@ struct metal_program {
     int    max_ptr;
     int    total_bufs;
     int    n_reg, pad;
-    struct umbra_uniform_reg *reg;
+    struct buffer_binding *reg;
 };
 
 typedef struct {

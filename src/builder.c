@@ -122,7 +122,7 @@ static int reserve_uniform(builder *b) {
 
 static int bind_buf(builder *b, struct umbra_buf const *buf) {
     int const ix = reserve_uniform(b);
-    b->uniforms[ix] = (struct umbra_uniform_reg){.buf = buf, .ix = ix};
+    b->uniforms[ix] = (struct buffer_binding){.buf = buf, .ix = ix};
     return ix;
 }
 
@@ -130,7 +130,7 @@ umbra_ptr32 umbra_bind_uniforms32(builder *b, void const *slot, int slots) {
     assume(((uintptr_t)slot & 3u) == 0);
     assume(slots >= 0);
     int const ix = reserve_uniform(b);
-    b->uniforms[ix] = (struct umbra_uniform_reg){
+    b->uniforms[ix] = (struct buffer_binding){
         .buf     = NULL,
         .storage = {.ptr = (void*)(uintptr_t)slot, .count = slots, .stride = 0},
         .ix      = ix,

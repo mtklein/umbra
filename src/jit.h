@@ -13,7 +13,7 @@ struct jit_program {
     void (*entry)(int, int, int, int, struct umbra_buf*);
     int loop_start, loop_end;
     int n_reg, pad;
-    struct umbra_uniform_reg *reg;
+    struct buffer_binding *reg;
 };
 struct jit_program* jit_program(struct jit_backend*, struct umbra_flat_ir const*);
 void   jit_program_run (struct jit_program*, int,int,int,int, struct umbra_buf[]);

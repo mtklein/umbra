@@ -86,7 +86,7 @@ struct wgpu_program {
     int max_ptr;
     int total_bufs;
     int push_words, n_reg;
-    struct umbra_uniform_reg *reg;
+    struct buffer_binding *reg;
 
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;

@@ -179,7 +179,7 @@ struct interp_program {
     ival           *v;
     ival           *vars;
     int             preamble, nptr, n_reg, n_vars;
-    struct umbra_uniform_reg *reg;
+    struct buffer_binding *reg;
 };
 
 static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {

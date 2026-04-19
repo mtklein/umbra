@@ -38,7 +38,7 @@ struct ir_inst {
 // rederive it by scanning ops.  Needs a rethink of umbra_fmt first: callers
 // like umbra_draw_builder, overview, and demo bind ptr32 then reinterpret via
 // fmt.load/fmt.store, so bind-time element size doesn't always match use-time.
-struct umbra_uniform_reg {
+struct buffer_binding {
     struct umbra_buf const *buf;
     struct umbra_buf        storage;
     int                     ix, pad;
@@ -54,7 +54,7 @@ struct umbra_builder {
     umbra_val32               loop_trip;
     umbra_var32        loop_var;
     int                       if_depth, pad1;
-    struct umbra_uniform_reg *uniforms;
+    struct buffer_binding *uniforms;
     int                       n_uniforms, cap_uniforms;
 };
 
@@ -65,7 +65,7 @@ struct umbra_flat_ir {
     int                       loop_begin, // Instruction index of op_loop_begin, or -1.
                               loop_end;   // Instruction index of op_loop_end,   or -1.
     int                       n_vars, pad;
-    struct umbra_uniform_reg *uniforms;
+    struct buffer_binding *uniforms;
     int                       n_uniforms, pad2;
 };
 
