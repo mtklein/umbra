@@ -32,10 +32,6 @@ struct ir_inst {
 // these through queue() args.  If buf != NULL, the dispatch reads the current
 // contents of *buf (fully mutable between dispatches).  Otherwise the dispatch
 // uses the fixed `storage` snapshot captured when registered.
-// TODO: capture the element size at bind time so backends don't have to
-// rederive it by scanning ops.  Needs a rethink of umbra_fmt first: callers
-// like umbra_draw_builder, overview, and demo bind ptr32 then reinterpret via
-// fmt.load/fmt.store, so bind-time element size doesn't always match use-time.
 struct buffer_binding {
     struct umbra_buf const *buf;
     struct umbra_buf        storage;
