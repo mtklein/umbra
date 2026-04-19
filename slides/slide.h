@@ -12,14 +12,14 @@
 // Partially landed:
 //   * build_draw exists and lives alongside prepare/draw/get_builders.
 //   * persp_slide, cov_null_slide, text_slide (bitmap and SDF bitmap), all 5
-//     blend variants, and all 8 gradient variants implement it.
-//   * The overview consumes it.
+//     blend variants, all 8 gradient variants, and the swatch grid implement
+//     it.  Swatch is the first multi-program user (10 programs).
+//   * The overview consumes it (loops build_draw(i) until it returns 0).
 //
 // Still ahead:
 //   * Migrate the remaining slides.  Today-blockers: sdf slides (need a
 //     tile-culled sibling path -- see TODO in slides/overview.c); slug
-//     (two-pass, needs multi-program support); swatch (multi-dispatch per
-//     frame).
+//     (two-pass, now buildable on multi-program build_draw).
 //   * Extend build_draw (or add a sibling) to let a slide produce more than
 //     one program so the two-pass slug accumulator fits.  The driver would
 //     compile each in sequence and dispatch them in order.

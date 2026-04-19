@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "../include/umbra_draw.h"
 #include "../slides/slide.h"
+#include "../src/count.h"
 #include <dirent.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -263,9 +264,9 @@ int main(void) {
         // (e.g. overview's per-cell programs) during prepare.
         if (s->prepare) { s->prepare(s, be, umbra_fmt_fp16); }
 
-        struct umbra_builder *builders[8];
+        struct umbra_builder *builders[16];
         int nb = s->get_builders
-               ? s->get_builders(s, umbra_fmt_fp16, builders, 8)
+               ? s->get_builders(s, umbra_fmt_fp16, builders, count(builders))
                : 0;
         for (int j = 0; j < nb; j++) {
             if (!builders[j]) { continue; }

@@ -120,8 +120,8 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
 
 static void compile_all_builders(struct slide *s, struct umbra_fmt fmt,
                                  struct umbra_backend *be) {
-    struct umbra_builder *builders[8];
-    int nb = s->get_builders ? s->get_builders(s, fmt, builders, 8) : 0;
+    struct umbra_builder *builders[16];
+    int nb = s->get_builders ? s->get_builders(s, fmt, builders, count(builders)) : 0;
     for (int j = 0; j < nb; j++) {
         if (!builders[j]) { continue; }
         struct umbra_flat_ir *ir = umbra_flat_ir(builders[j]);
