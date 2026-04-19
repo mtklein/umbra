@@ -1,5 +1,42 @@
 #include "jit.h"
 
+// TODO: JIT subrect-dispatch + coverage bug.  Seen rendering the overview
+// slide through the dump tool: the overview.hdr is wrong only on the JIT
+// backend (interp, metal, vulkan, wgpu are all correct).  Minimal repro:
+//
+//   build a draw with fmt=fp16_planar, coverage=umbra_coverage_rect over
+//   rect (160,128,480,368), shader_color, blend=srcover (or NULL).  Bind a
+//   1024x768 dst buf and dispatch (0,0,170,153).
+//
+//   expected: 10 cols x 25 rows = 250 pixels changed.
+//   interp/metal/vulkan/wgpu: 250 (correct).
+//   jit (arm64 and x86): wrong.  srcover path: 50 (only the tail at cols
+//   168-169 writes; the SIMD block at XCOL=160 covering cols 160-167 does
+//   not land).  noblend path: 1242, with spurious writes on rows where Y
+//   coverage is false (the LO lanes of the XCOL=0 SIMD iter and the HI
+//   lanes of the XCOL=160 SIMD iter look "stuck" with some earlier mask).
+//
+// Reproduces only when dispatch width is not a multiple of K=8, i.e. only
+// when the tail loop is actually needed.  Width 168 (aligned) is correct
+// on JIT; 170 is wrong.  Bug reproduces across arm64 and x86 JITs with
+// different symptoms, so the root cause is likely in shared code (flat_ir
+// resolve/schedule, ra, or run_jit's binding setup), not backend-specific
+// codegen.
+//
+// Disassembling the arm64 SIMD body looks correct on paper -- fcmgt/fcmge/
+// and/bsl for the rect mask, fmla for the lerp, 4+4 lane stores to the
+// planar dst.  Pencil-tracing says coverage should be 0 for the "bad"
+// lanes, so fmla leaves dst unchanged.  Runtime disagrees.  Either the
+// generated code differs from what objdump shows, or a register is
+// clobbered between the bsl and the fmla in a way I missed.  Next step is
+// lldb breakpoint at j->entry, single-step the SIMD iter at XCOL=0 row 1,
+// and watch the coverage-mask register.
+//
+// Overview.prepare works around this today by rendering every cell program
+// through the SIMD-aligned full-frame dispatch only when the demo drives
+// it (user confirms demo looks fine); the dump tool and any driver that
+// queues cell-sized subrects on JIT will render garbage until this lands.
+
 #if !defined(__aarch64__) && !defined(__AVX2__)
 
 struct umbra_backend* umbra_backend_jit(void) {
