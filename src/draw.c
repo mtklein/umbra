@@ -224,39 +224,30 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
     return umbra_apply_matrix(b, m, x, y);
 }
 
-// Interval perspective transform, used only by umbra_sdf_draw's bounds
-// program.  NOT safe when the runtime w-interval straddles zero (see TODO
-// near umbra_interval_div_f32 in src/interval.c); umbra_sdf_draw gates this
-// to build-time-affine matrices only.  Kept private because we can't offer
-// a sound general-purpose interval perspective today.
-static void transform_perspective_interval(struct umbra_matrix const *mat,
-                                           struct umbra_builder *b,
-                                           umbra_interval *x, umbra_interval *y) {
+// Interval affine transform, used only by umbra_sdf_draw's bounds program.
+// Interval perspective is unavailable by design: umbra_interval_div_f32 is
+// unsound when w straddles zero (see TODO near it in src/interval.c), so
+// callers that want a transform applied to intervals must first verify the
+// matrix is affine (p0 == p1 == 0 && p2 == 1) -- at which point the divide
+// collapses to 1 and we just emit the six-parameter affine form here.
+static void transform_affine_interval(struct umbra_matrix const *mat,
+                                      struct umbra_builder *b,
+                                      umbra_interval *x, umbra_interval *y) {
     umbra_ptr32 const u = umbra_bind_uniforms32(b, mat, (int)(sizeof *mat / 4));
     umbra_interval const sx = umbra_interval_exact(umbra_uniform_32(b, u, M_SX)),
                          kx = umbra_interval_exact(umbra_uniform_32(b, u, M_KX)),
                          tx = umbra_interval_exact(umbra_uniform_32(b, u, M_TX)),
                          ky = umbra_interval_exact(umbra_uniform_32(b, u, M_KY)),
                          sy = umbra_interval_exact(umbra_uniform_32(b, u, M_SY)),
-                         ty = umbra_interval_exact(umbra_uniform_32(b, u, M_TY)),
-                         p0 = umbra_interval_exact(umbra_uniform_32(b, u, M_P0)),
-                         p1 = umbra_interval_exact(umbra_uniform_32(b, u, M_P1)),
-                         p2 = umbra_interval_exact(umbra_uniform_32(b, u, M_P2));
-
-    umbra_interval const w =
-        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, p0, *x),
-                                                            umbra_interval_mul_f32(b, p1, *y)),
-                                  p2);
-    umbra_interval const xp = umbra_interval_div_f32(b,
+                         ty = umbra_interval_exact(umbra_uniform_32(b, u, M_TY));
+    umbra_interval const xp =
         umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, sx, *x),
                                                             umbra_interval_mul_f32(b, kx, *y)),
-                                  tx),
-        w);
-    umbra_interval const yp = umbra_interval_div_f32(b,
+                                  tx);
+    umbra_interval const yp =
         umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, ky, *x),
                                                             umbra_interval_mul_f32(b, sy, *y)),
-                                  ty),
-        w);
+                                  ty);
     *x = xp;
     *y = yp;
 }
@@ -405,7 +396,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                         umbra_add_f32(bb, base_y,
                             umbra_mul_f32(bb, umbra_add_f32(bb, yf,
                                 umbra_imm_f32(bb, 1.0f)), tile_h))};
-    if (transform_mat) { transform_perspective_interval(transform_mat, bb, &x, &y); }
+    if (transform_mat) { transform_affine_interval(transform_mat, bb, &x, &y); }
 
     umbra_interval const f = sdf_fn(sdf_ctx, bb, x, y);
 
