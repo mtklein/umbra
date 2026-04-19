@@ -188,6 +188,25 @@ struct umbra_builder* umbra_draw_builder(
     return b;
 }
 
+umbra_point_val32 umbra_apply_matrix(struct umbra_builder *b, umbra_matrix_val32 m,
+                                      umbra_val32 x, umbra_val32 y) {
+    umbra_val32 const w =
+        umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, m.p0, x),
+                                          umbra_mul_f32(b, m.p1, y)),
+                         m.p2);
+    umbra_val32 const xp =
+        umbra_div_f32(b, umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, m.sx, x),
+                                                           umbra_mul_f32(b, m.kx, y)),
+                                          m.tx),
+                         w);
+    umbra_val32 const yp =
+        umbra_div_f32(b, umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, m.ky, x),
+                                                           umbra_mul_f32(b, m.sy, y)),
+                                          m.ty),
+                         w);
+    return (umbra_point_val32){xp, yp};
+}
+
 umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder *b,
                                      umbra_val32 x, umbra_val32 y) {
     struct umbra_coverage_from_sdf const *self = ctx;

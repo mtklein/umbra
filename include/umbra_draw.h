@@ -18,6 +18,20 @@ struct umbra_matrix {
           p0, p1, p2;
 };
 
+typedef struct {
+    umbra_val32 sx, kx, tx,
+                ky, sy, ty,
+                p0, p1, p2;
+} umbra_matrix_val32;
+
+// Apply a 3x3 perspective matrix to (x, y), emitting the usual
+// w = p0*x + p1*y + p2; x' = (sx*x + kx*y + tx) / w; y' = (ky*x + sy*y + ty) / w.
+// Ad-hoc shared helper used by perspective-transformed shaders/coverage today;
+// will become the body of the affine/perspective umbra_transform impls once
+// that framework lands.
+umbra_point_val32 umbra_apply_matrix(struct umbra_builder*, umbra_matrix_val32,
+                                      umbra_val32 x, umbra_val32 y);
+
 struct umbra_bitmap {
     struct umbra_buf buf;
     int              w,h;

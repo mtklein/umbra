@@ -89,36 +89,20 @@ umbra_val32 coverage_matrix(void *ctx, struct umbra_builder *b,
         M_P2 = (int)(__builtin_offsetof(struct umbra_matrix, p2) / 4),
     };
 
-    umbra_val32 const sx = umbra_uniform_32(b, u, M_SX),
-                      kx = umbra_uniform_32(b, u, M_KX),
-                      tx = umbra_uniform_32(b, u, M_TX),
-                      ky = umbra_uniform_32(b, u, M_KY),
-                      sy = umbra_uniform_32(b, u, M_SY),
-                      ty = umbra_uniform_32(b, u, M_TY),
-                      p0 = umbra_uniform_32(b, u, M_P0),
-                      p1 = umbra_uniform_32(b, u, M_P1),
-                      p2 = umbra_uniform_32(b, u, M_P2);
+    umbra_matrix_val32 const m = {
+        .sx = umbra_uniform_32(b, u, M_SX),
+        .kx = umbra_uniform_32(b, u, M_KX),
+        .tx = umbra_uniform_32(b, u, M_TX),
+        .ky = umbra_uniform_32(b, u, M_KY),
+        .sy = umbra_uniform_32(b, u, M_SY),
+        .ty = umbra_uniform_32(b, u, M_TY),
+        .p0 = umbra_uniform_32(b, u, M_P0),
+        .p1 = umbra_uniform_32(b, u, M_P1),
+        .p2 = umbra_uniform_32(b, u, M_P2),
+    };
 
-    umbra_val32 const w = umbra_add_f32(b,
-                                        umbra_add_f32(b, umbra_mul_f32(b, p0, x),
-                                                         umbra_mul_f32(b, p1, y)),
-                                        p2);
-    umbra_val32 const xp =
-        umbra_div_f32(b,
-                      umbra_add_f32(b,
-                                    umbra_add_f32(b, umbra_mul_f32(b, sx, x),
-                                                     umbra_mul_f32(b, kx, y)),
-                                    tx),
-                      w);
-    umbra_val32 const yp =
-        umbra_div_f32(b,
-                      umbra_add_f32(b,
-                                    umbra_add_f32(b, umbra_mul_f32(b, ky, x),
-                                                     umbra_mul_f32(b, sy, y)),
-                                    ty),
-                      w);
-
-    return self->inner_fn(self->inner_ctx, b, xp, yp);
+    umbra_point_val32 const p = umbra_apply_matrix(b, m, x, y);
+    return self->inner_fn(self->inner_ctx, b, p.x, p.y);
 }
 
 static unsigned char* text_load_font(char const *path) {
