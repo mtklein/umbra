@@ -540,20 +540,6 @@ umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
     return umbra_sel_32(b, inside, one_f, zero_f);
 }
 
-umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder *b,
-                              umbra_interval x, umbra_interval y) {
-    umbra_rect const *self = ctx;
-    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_interval const l  = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
-                         t  = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
-                         r  = umbra_interval_exact(umbra_uniform_32(b, u, 2)),
-                         bo = umbra_interval_exact(umbra_uniform_32(b, u, 3));
-    return umbra_interval_max_f32(b, umbra_interval_max_f32(b, umbra_interval_sub_f32(b, l, x),
-                                                               umbra_interval_sub_f32(b, x, r)),
-                                    umbra_interval_max_f32(b, umbra_interval_sub_f32(b, t, y),
-                                                              umbra_interval_sub_f32(b, y, bo)));
-}
-
 umbra_color_val32 umbra_blend_src(void *ctx, struct umbra_builder *builder,
                                   umbra_color_val32 src, umbra_color_val32 dst) {
     (void)ctx;

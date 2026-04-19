@@ -1415,6 +1415,20 @@ TEST(test_srcover_fp16_planar) {
     cleanup_draw(&B);
 }
 
+static umbra_interval test_rect_fn(void *ctx, struct umbra_builder *b,
+                                    umbra_interval x, umbra_interval y) {
+    umbra_rect const *self = ctx;
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_interval const l  = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
+                         t  = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
+                         r  = umbra_interval_exact(umbra_uniform_32(b, u, 2)),
+                         bo = umbra_interval_exact(umbra_uniform_32(b, u, 3));
+    return umbra_interval_max_f32(b, umbra_interval_max_f32(b, umbra_interval_sub_f32(b, l, x),
+                                                               umbra_interval_sub_f32(b, x, r)),
+                                    umbra_interval_max_f32(b, umbra_interval_sub_f32(b, t, y),
+                                                              umbra_interval_sub_f32(b, y, bo)));
+}
+
 TEST(test_sdf_dispatch_rect) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {1.0f, 1.0f, 7.0f, 3.0f};
@@ -1428,7 +1442,7 @@ TEST(test_sdf_dispatch_rect) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
 
-        struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi], NULL,            umbra_sdf_rect, &rect,
+        struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi], NULL,            test_rect_fn, &rect,
             1,
             umbra_shader_color,  &color,
             umbra_blend_srcover, NULL,

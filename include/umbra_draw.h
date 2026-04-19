@@ -194,7 +194,3 @@ umbra_color_val32 umbra_shader_supersample(void *umbra_supersample, struct umbra
 umbra_val32 umbra_coverage_rect(void *umbra_rect, struct umbra_builder*,
                                  umbra_val32 x, umbra_val32 y);
 
-// A rectangle SDF, ctx is an umbra_rect*.
-umbra_interval umbra_sdf_rect(void *umbra_rect, struct umbra_builder*,
-                              umbra_interval x, umbra_interval y);
-
