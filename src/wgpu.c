@@ -57,7 +57,8 @@ struct wgpu_backend {
     WGPUCommandEncoder        batch_enc;
     WGPUComputePassEncoder    batch_pass;
 
-    uint32_t                  max_dyn_storage, :32;
+    uint32_t                  max_dyn_storage;
+    uint32_t                  max_dyn_uniform;
 
     WGPUSubmissionIndex       frame_submitted[WGPU_N_FRAMES];
     _Bool                     frame_has_work [WGPU_N_FRAMES]; int :16, :32;
@@ -65,6 +66,7 @@ struct wgpu_backend {
     struct gpu_buf_cache          cache;
 
     struct uniform_ring_pool  uni_pool;
+    struct uniform_ring_pool  uni_pool_uniform;
     int                       total_dispatches; int :32;
     size_t                    total_upload_bytes;
 
@@ -90,6 +92,7 @@ struct wgpu_program {
 
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
+    uint8_t          *buf_is_uniform;
 
     // When true, every read-only binding uses a dynamic offset so the
     // bind group survives across dispatches whose offsets differ.  When
@@ -117,12 +120,13 @@ struct wgpu_ring_chunk {
     void      *mapped;
 };
 
-static struct uniform_ring_chunk wgpu_ring_new_chunk(size_t min_bytes, void *ctx) {
+static struct uniform_ring_chunk wgpu_ring_new_chunk_inner(size_t min_bytes, void *ctx,
+                                                           WGPUBufferUsage extra_usage) {
     struct wgpu_backend *be = ctx;
     size_t cap = min_bytes > WGPU_RING_HIGH_WATER ? min_bytes : WGPU_RING_HIGH_WATER;
     struct wgpu_ring_chunk *chunk = calloc(1, sizeof *chunk);
     chunk->buf = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
-        .usage = WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+        .usage = extra_usage | WGPUBufferUsage_CopyDst,
         .size  = cap,
     });
     chunk->mapped = malloc(cap);
@@ -133,6 +137,14 @@ static struct uniform_ring_chunk wgpu_ring_new_chunk(size_t min_bytes, void *ctx
         .cap    = cap,
         .used   = 0,
     };
+}
+
+static struct uniform_ring_chunk wgpu_ring_new_chunk(size_t min_bytes, void *ctx) {
+    return wgpu_ring_new_chunk_inner(min_bytes, ctx, WGPUBufferUsage_Storage);
+}
+
+static struct uniform_ring_chunk wgpu_ring_new_chunk_uniform(size_t min_bytes, void *ctx) {
+    return wgpu_ring_new_chunk_inner(min_bytes, ctx, WGPUBufferUsage_Uniform);
 }
 
 static void wgpu_ring_free_chunk(void *handle, void *ctx) {
@@ -244,6 +256,8 @@ static void wgpu_cache_release(gpu_buf buf, void *ctx) {
     wgpuBufferRelease(buf.ptr);
 }
 
+static void wgpu_wait_frame_noop(int frame, void *ctx) { (void)frame; (void)ctx; }
+
 static void wgpu_wait_frame(int frame, void *ctx) {
     struct wgpu_backend *be = ctx;
     if (be->frame_has_work[frame]) {
@@ -286,13 +300,19 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
     // Ring alloc copies into the chunk's shadow buffer; one QueueWriteBuffer
     // per chunk replaces the N per-dispatch uploads that were here before.
     {
-        struct uniform_ring *ring = &be->uni_pool.rings[be->uni_pool.cur];
-        for (int i = 0; i < ring->n; i++) {
-            if (ring->chunks[i].used) {
-                struct wgpu_ring_chunk *wc = ring->chunks[i].handle;
-                wgpuQueueWriteBuffer(be->queue, wc->buf, 0,
-                                     ring->chunks[i].mapped, ring->chunks[i].used);
-                be->total_upload_bytes += ring->chunks[i].used;
+        struct uniform_ring *rings[2] = {
+            &be->uni_pool        .rings[be->uni_pool        .cur],
+            &be->uni_pool_uniform.rings[be->uni_pool_uniform.cur],
+        };
+        for (int r = 0; r < 2; r++) {
+            struct uniform_ring *ring = rings[r];
+            for (int i = 0; i < ring->n; i++) {
+                if (ring->chunks[i].used) {
+                    struct wgpu_ring_chunk *wc = ring->chunks[i].handle;
+                    wgpuQueueWriteBuffer(be->queue, wc->buf, 0,
+                                         ring->chunks[i].mapped, ring->chunks[i].used);
+                    be->total_upload_bytes += ring->chunks[i].used;
+                }
             }
         }
     }
@@ -304,6 +324,7 @@ static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
     be->frame_has_work[cur] = 1;
 
     uniform_ring_pool_rotate(&be->uni_pool);
+    uniform_ring_pool_rotate(&be->uni_pool_uniform);
 }
 
 static void wgpu_flush(struct umbra_backend *base) {
@@ -311,6 +332,7 @@ static void wgpu_flush(struct umbra_backend *base) {
 
     wgpu_submit_cmdbuf(be);
     uniform_ring_pool_drain_all(&be->uni_pool);
+    uniform_ring_pool_drain_all(&be->uni_pool_uniform);
     gpu_buf_cache_copyback (&be->cache);
     gpu_buf_cache_end_batch(&be->cache);
 }
@@ -338,17 +360,21 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     WGPUBindGroupLayoutEntry *entries =
         calloc((size_t)n_desc, sizeof *entries);
 
-    // Count the read-only bindings.  If they plus the always-dynamic push
-    // binding all fit within the adapter's max dynamic storage budget,
-    // mark every read-only binding as hasDynamicOffset=true -- the bind
-    // group cache then survives across dispatches whose offsets change.
-    // If the budget is too tight, fall back to only-push-is-dynamic; bg
-    // cache thrashes on this program but we stay within limits.
-    int n_ro = 0;
+    // Count read-only bindings split by descriptor type.  If both classes
+    // (storage RO + push, uniform RO) fit within their respective dynamic
+    // budgets, mark every RO binding hasDynamicOffset=true so the bind group
+    // cache survives across dispatches whose offsets change.  Otherwise fall
+    // back to only-push-is-dynamic; bg cache thrashes but we stay within
+    // limits.
+    int n_ro_storage = 0, n_ro_uniform = 0;
     for (int i = 0; i < n_desc - 1; i++) {
-        if (!(sr.buf_rw[i] & BUF_WRITTEN)) { n_ro++; }
+        if (sr.buf_rw[i] & BUF_WRITTEN) { continue; }
+        if (sr.buf_is_uniform[i]) { n_ro_uniform++; }
+        else                      { n_ro_storage++; }
     }
-    _Bool const dynamic_offset_bindings = (uint32_t)(n_ro + 1) <= be->max_dyn_storage;
+    _Bool const dynamic_offset_bindings =
+        (uint32_t)(n_ro_storage + 1) <= be->max_dyn_storage
+     && (uint32_t) n_ro_uniform      <= be->max_dyn_uniform;
 
     for (int i = 0; i < n_desc - 1; i++) {
         _Bool const is_ring = dynamic_offset_bindings && !(sr.buf_rw[i] & BUF_WRITTEN);
@@ -356,7 +382,8 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
             .binding    = (uint32_t)i,
             .visibility = WGPUShaderStage_Compute,
             .buffer = {
-                .type             = WGPUBufferBindingType_Storage,
+                .type             = sr.buf_is_uniform[i] ? WGPUBufferBindingType_Uniform
+                                                         : WGPUBufferBindingType_Storage,
                 .hasDynamicOffset = is_ring,
             },
         };
@@ -408,8 +435,9 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
     p->push_words  = sr.push_words;
-    p->buf_rw      = sr.buf_rw;
-    p->buf_shift   = sr.buf_shift;
+    p->buf_rw         = sr.buf_rw;
+    p->buf_shift      = sr.buf_shift;
+    p->buf_is_uniform = sr.buf_is_uniform;
     p->dynamic_offset_bindings = dynamic_offset_bindings;
     free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
@@ -463,12 +491,18 @@ static void wgpu_program_queue(struct umbra_program *prog,
             uint8_t const rw = p->buf_rw[i];
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 // Ring alloc copies data into chunk buffer; bulk-uploaded at submit.
+                // Uniform-class bindings come from a dedicated pool whose chunks
+                // carry only the Uniform usage; mixing usage classes within a
+                // single dispatch on the same WGPU buffer is a validation error.
+                struct uniform_ring_pool *pool = p->buf_is_uniform[i] ? &be->uni_pool_uniform
+                                                                      : &be->uni_pool;
                 struct uniform_ring_loc loc =
-                    uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
+                    uniform_ring_pool_alloc(pool, buf[i].ptr, bytes);
                 struct wgpu_ring_chunk *chunk = loc.handle;
+                size_t const align = p->buf_is_uniform[i] ? (size_t)16 : (size_t)4;
                 bind_buf   [i] = chunk->buf;
                 bind_offset[i] = loc.offset;
-                bind_size  [i] = (bytes + 3) & ~(size_t)3;
+                bind_size  [i] = (bytes + align - 1) & ~(align - 1);
             } else {
                 int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw);
                 bind_buf [i] = be->cache.entry[idx].buf.ptr;
@@ -575,7 +609,8 @@ static void wgpu_program_queue(struct umbra_program *prog,
     wgpuComputePassEncoderDispatchWorkgroups(be->batch_pass, gx, (uint32_t)h, 1);
     be->total_dispatches++;
 
-    if (uniform_ring_pool_should_rotate(&be->uni_pool)) {
+    if (uniform_ring_pool_should_rotate(&be->uni_pool)
+     || uniform_ring_pool_should_rotate(&be->uni_pool_uniform)) {
         wgpu_submit_cmdbuf(be);
     }
 }
@@ -614,6 +649,7 @@ static void wgpu_program_free(struct umbra_program *prog) {
     free(p->spirv);
     free(p->buf_rw);
     free(p->buf_shift);
+    free(p->buf_is_uniform);
     free(p->binding);
     free(p);
 }
@@ -632,6 +668,7 @@ static void wgpu_free(struct umbra_backend *base) {
     wgpu_flush(base);
     struct wgpu_backend *be = (struct wgpu_backend *)base;
     uniform_ring_pool_free(&be->uni_pool);
+    uniform_ring_pool_free(&be->uni_pool_uniform);
     gpu_buf_cache_free(&be->cache);
     wgpuQuerySetRelease(be->ts_query);
     wgpuBufferRelease(be->ts_resolve);
@@ -715,6 +752,7 @@ struct umbra_backend* umbra_backend_wgpu(void) {
     be->device   = dev;
     be->queue    = queue;
     be->max_dyn_storage = adapter_limits.maxDynamicStorageBuffersPerPipelineLayout;
+    be->max_dyn_uniform = adapter_limits.maxDynamicUniformBuffersPerPipelineLayout;
     be->ts_query = wgpuDeviceCreateQuerySet(dev, &(WGPUQuerySetDescriptor){
         .type  = WGPUQueryType_Timestamp,
         .count = WGPU_N_FRAMES * 2,
@@ -746,11 +784,23 @@ struct umbra_backend* umbra_backend_wgpu(void) {
         .ctx        = be,
         .wait_frame = wgpu_wait_frame,
     };
+    be->uni_pool_uniform = (struct uniform_ring_pool){
+        .n          = WGPU_N_FRAMES,
+        .high_water = WGPU_RING_HIGH_WATER,
+        .ctx        = be,
+        .wait_frame = wgpu_wait_frame_noop,
+    };
     for (int i = 0; i < WGPU_N_FRAMES; i++) {
         be->uni_pool.rings[i] = (struct uniform_ring){
             .align      = 256,
             .ctx        = be,
             .new_chunk  = wgpu_ring_new_chunk,
+            .free_chunk = wgpu_ring_free_chunk,
+        };
+        be->uni_pool_uniform.rings[i] = (struct uniform_ring){
+            .align      = 256,
+            .ctx        = be,
+            .new_chunk  = wgpu_ring_new_chunk_uniform,
             .free_chunk = wgpu_ring_free_chunk,
         };
     }

@@ -1,7 +1,7 @@
 ; SPIR-V
 ; Version: 1.0
 ; Generator: Khronos; 0
-; Bound: 145
+; Bound: 150
 ; Schema: 0
                OpCapability Shader
                OpCapability Float16
@@ -10,29 +10,32 @@
                OpExtension "SPV_KHR_16bit_storage"
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
-               OpEntryPoint GLCompute %43 "main" %gl_GlobalInvocationID
-               OpExecutionMode %43 LocalSize 64 1 1
+               OpEntryPoint GLCompute %48 "main" %gl_GlobalInvocationID
+               OpExecutionMode %48 LocalSize 64 1 1
                OpDecorate %_runtimearr_uint ArrayStride 4
-               OpDecorate %_struct_14 Block
-               OpMemberDecorate %_struct_14 0 Offset 0
+               OpDecorate %_struct_15 Block
+               OpMemberDecorate %_struct_15 0 Offset 0
                OpDecorate %_runtimearr_v2uint ArrayStride 8
-               OpDecorate %_struct_18 Block
-               OpMemberDecorate %_struct_18 0 Offset 0
+               OpDecorate %_struct_19 Block
+               OpMemberDecorate %_struct_19 0 Offset 0
+               OpDecorate %_arr_v4uint_uint_1 ArrayStride 16
+               OpDecorate %_struct_24 Block
+               OpMemberDecorate %_struct_24 0 Offset 0
                OpDecorate %_runtimearr_half ArrayStride 2
-               OpDecorate %_struct_22 Block
-               OpMemberDecorate %_struct_22 0 Offset 0
+               OpDecorate %_struct_28 Block
+               OpMemberDecorate %_struct_28 0 Offset 0
                OpDecorate %_arr_uint_uint_9 ArrayStride 4
-               OpDecorate %_struct_27 Block
-               OpMemberDecorate %_struct_27 0 Offset 0
+               OpDecorate %_struct_33 Block
+               OpMemberDecorate %_struct_33 0 Offset 0
                OpDecorate %gl_GlobalInvocationID BuiltIn GlobalInvocationId
-               OpDecorate %39 DescriptorSet 0
-               OpDecorate %39 Binding 0
-               OpDecorate %40 DescriptorSet 0
-               OpDecorate %40 Binding 1
-               OpDecorate %41 DescriptorSet 0
-               OpDecorate %41 Binding 2
-               OpDecorate %42 DescriptorSet 0
-               OpDecorate %42 Binding 3
+               OpDecorate %44 DescriptorSet 0
+               OpDecorate %44 Binding 0
+               OpDecorate %45 DescriptorSet 0
+               OpDecorate %45 Binding 1
+               OpDecorate %46 DescriptorSet 0
+               OpDecorate %46 Binding 2
+               OpDecorate %47 DescriptorSet 0
+               OpDecorate %47 Binding 3
        %void = OpTypeVoid
        %bool = OpTypeBool
        %uint = OpTypeInt 32 0
@@ -41,28 +44,33 @@
        %half = OpTypeFloat 16
      %v2uint = OpTypeVector %uint 2
      %v3uint = OpTypeVector %uint 3
+     %v4uint = OpTypeVector %uint 4
     %v2float = OpTypeVector %float 2
-         %11 = OpTypeFunction %void
+         %12 = OpTypeFunction %void
 %_ptr_Input_v3uint = OpTypePointer Input %v3uint
 %_runtimearr_uint = OpTypeRuntimeArray %uint
- %_struct_14 = OpTypeStruct %_runtimearr_uint
-%_ptr_StorageBuffer__struct_14 = OpTypePointer StorageBuffer %_struct_14
+ %_struct_15 = OpTypeStruct %_runtimearr_uint
+%_ptr_StorageBuffer__struct_15 = OpTypePointer StorageBuffer %_struct_15
 %_ptr_StorageBuffer_uint = OpTypePointer StorageBuffer %uint
 %_runtimearr_v2uint = OpTypeRuntimeArray %v2uint
- %_struct_18 = OpTypeStruct %_runtimearr_v2uint
-%_ptr_StorageBuffer__struct_18 = OpTypePointer StorageBuffer %_struct_18
+ %_struct_19 = OpTypeStruct %_runtimearr_v2uint
+%_ptr_StorageBuffer__struct_19 = OpTypePointer StorageBuffer %_struct_19
 %_ptr_StorageBuffer_v2uint = OpTypePointer StorageBuffer %v2uint
+     %uint_1 = OpConstant %uint 1
+%_arr_v4uint_uint_1 = OpTypeArray %v4uint %uint_1
+ %_struct_24 = OpTypeStruct %_arr_v4uint_uint_1
+%_ptr_Uniform__struct_24 = OpTypePointer Uniform %_struct_24
+%_ptr_Uniform_uint = OpTypePointer Uniform %uint
 %_runtimearr_half = OpTypeRuntimeArray %half
- %_struct_22 = OpTypeStruct %_runtimearr_half
-%_ptr_StorageBuffer__struct_22 = OpTypePointer StorageBuffer %_struct_22
+ %_struct_28 = OpTypeStruct %_runtimearr_half
+%_ptr_StorageBuffer__struct_28 = OpTypePointer StorageBuffer %_struct_28
 %_ptr_StorageBuffer_half = OpTypePointer StorageBuffer %half
      %uint_9 = OpConstant %uint 9
 %_arr_uint_uint_9 = OpTypeArray %uint %uint_9
- %_struct_27 = OpTypeStruct %_arr_uint_uint_9
-%_ptr_StorageBuffer__struct_27 = OpTypePointer StorageBuffer %_struct_27
+ %_struct_33 = OpTypeStruct %_arr_uint_uint_9
+%_ptr_StorageBuffer__struct_33 = OpTypePointer StorageBuffer %_struct_33
 %_ptr_StorageBuffer_uint_0 = OpTypePointer StorageBuffer %uint
      %uint_0 = OpConstant %uint 0
-     %uint_1 = OpConstant %uint 1
      %uint_2 = OpConstant %uint 2
      %uint_3 = OpConstant %uint 3
      %uint_8 = OpConstant %uint 8
@@ -75,110 +83,110 @@
      %uint_6 = OpConstant %uint 6
  %uint_65535 = OpConstant %uint 65535
 %gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
-         %39 = OpVariable %_ptr_StorageBuffer__struct_18 StorageBuffer
-         %40 = OpVariable %_ptr_StorageBuffer__struct_22 StorageBuffer
-         %41 = OpVariable %_ptr_StorageBuffer__struct_14 StorageBuffer
-         %42 = OpVariable %_ptr_StorageBuffer__struct_27 StorageBuffer
-         %43 = OpFunction %void None %11
-         %44 = OpLabel
-         %45 = OpLoad %v3uint %gl_GlobalInvocationID
-         %46 = OpCompositeExtract %uint %45 0
-         %47 = OpCompositeExtract %uint %45 1
-         %48 = OpAccessChain %_ptr_StorageBuffer_uint_0 %42 %uint_0 %uint_0
-         %49 = OpLoad %uint %48
-         %50 = OpUGreaterThanEqual %bool %46 %49
-               OpSelectionMerge %52 None
-               OpBranchConditional %50 %52 %51
-         %51 = OpLabel
-         %53 = OpAccessChain %_ptr_StorageBuffer_uint_0 %42 %uint_0 %uint_1
+         %44 = OpVariable %_ptr_StorageBuffer__struct_19 StorageBuffer
+         %45 = OpVariable %_ptr_StorageBuffer__struct_28 StorageBuffer
+         %46 = OpVariable %_ptr_Uniform__struct_24 Uniform
+         %47 = OpVariable %_ptr_StorageBuffer__struct_33 StorageBuffer
+         %48 = OpFunction %void None %12
+         %49 = OpLabel
+         %50 = OpLoad %v3uint %gl_GlobalInvocationID
+         %51 = OpCompositeExtract %uint %50 0
+         %52 = OpCompositeExtract %uint %50 1
+         %53 = OpAccessChain %_ptr_StorageBuffer_uint_0 %47 %uint_0 %uint_0
          %54 = OpLoad %uint %53
-         %55 = OpAccessChain %_ptr_StorageBuffer_uint_0 %42 %uint_0 %uint_2
-         %56 = OpLoad %uint %55
-         %57 = OpIAdd %uint %54 %46
-         %58 = OpIAdd %uint %56 %47
-         %59 = OpAccessChain %_ptr_StorageBuffer_uint %41 %uint_0 %uint_0
-         %60 = OpLoad %uint %59
-         %61 = OpAccessChain %_ptr_StorageBuffer_uint %41 %uint_0 %uint_1
-         %62 = OpLoad %uint %61
-         %63 = OpAccessChain %_ptr_StorageBuffer_uint %41 %uint_0 %uint_2
-         %64 = OpLoad %uint %63
-         %65 = OpAccessChain %_ptr_StorageBuffer_uint %41 %uint_0 %uint_3
-         %66 = OpLoad %uint %65
-         %68 = OpBitcast %float %uint_1065353216
-         %69 = OpBitcast %float %66
-         %70 = OpFSub %float %68 %69
-         %72 = OpAccessChain %_ptr_StorageBuffer_uint_0 %42 %uint_0 %uint_7
-         %73 = OpLoad %uint %72
-         %74 = OpIMul %uint %58 %73
-         %75 = OpIAdd %uint %74 %57
-         %76 = OpAccessChain %_ptr_StorageBuffer_half %40 %uint_0 %75
-         %77 = OpLoad %half %76
-         %78 = OpFConvert %float %77
-         %79 = OpCompositeConstruct %v2float %78 %float_0
-         %80 = OpExtInst %uint %1 PackHalf2x16 %79
-         %81 = OpShiftLeftLogical %uint %80 %uint_16
-         %82 = OpBitcast %int %81
-         %83 = OpShiftRightArithmetic %int %82 %uint_16
-         %84 = OpBitcast %uint %83
-         %85 = OpBitcast %int %84
-         %86 = OpConvertSToF %float %85
-         %88 = OpFMul %float %86 %float_0_00392156886
-         %90 = OpAccessChain %_ptr_StorageBuffer_uint_0 %42 %uint_0 %uint_6
-         %91 = OpLoad %uint %90
-         %92 = OpIMul %uint %58 %91
-         %93 = OpIAdd %uint %92 %57
-         %94 = OpAccessChain %_ptr_StorageBuffer_v2uint %39 %uint_0 %93
-         %95 = OpLoad %v2uint %94
-         %96 = OpCompositeExtract %uint %95 0
-         %97 = OpCompositeExtract %uint %95 1
-         %99 = OpBitwiseAnd %uint %96 %uint_65535
-        %100 = OpShiftRightLogical %uint %96 %uint_16
-        %101 = OpBitwiseAnd %uint %97 %uint_65535
-        %102 = OpShiftRightLogical %uint %97 %uint_16
-        %103 = OpExtInst %v2float %1 UnpackHalf2x16 %99
-        %104 = OpCompositeExtract %float %103 0
-        %105 = OpBitcast %float %60
-        %106 = OpExtInst %float %1 Fma %104 %70 %105
-        %107 = OpFSub %float %106 %104
-        %108 = OpExtInst %float %1 Fma %88 %107 %104
-        %109 = OpExtInst %v2float %1 UnpackHalf2x16 %100
-        %110 = OpCompositeExtract %float %109 0
-        %111 = OpBitcast %float %62
-        %112 = OpExtInst %float %1 Fma %110 %70 %111
-        %113 = OpFSub %float %112 %110
-        %114 = OpExtInst %float %1 Fma %88 %113 %110
-        %115 = OpExtInst %v2float %1 UnpackHalf2x16 %101
-        %116 = OpCompositeExtract %float %115 0
-        %117 = OpBitcast %float %64
-        %118 = OpExtInst %float %1 Fma %116 %70 %117
-        %119 = OpFSub %float %118 %116
-        %120 = OpExtInst %float %1 Fma %88 %119 %116
-        %121 = OpExtInst %v2float %1 UnpackHalf2x16 %102
-        %122 = OpCompositeExtract %float %121 0
-        %123 = OpBitcast %float %66
-        %124 = OpExtInst %float %1 Fma %122 %70 %123
-        %125 = OpFSub %float %124 %122
-        %126 = OpExtInst %float %1 Fma %88 %125 %122
-        %127 = OpAccessChain %_ptr_StorageBuffer_uint_0 %42 %uint_0 %uint_6
-        %128 = OpLoad %uint %127
-        %129 = OpIMul %uint %58 %128
-        %130 = OpIAdd %uint %129 %57
-        %131 = OpCompositeConstruct %v2float %108 %float_0
-        %132 = OpExtInst %uint %1 PackHalf2x16 %131
-        %133 = OpCompositeConstruct %v2float %114 %float_0
-        %134 = OpExtInst %uint %1 PackHalf2x16 %133
-        %135 = OpCompositeConstruct %v2float %120 %float_0
-        %136 = OpExtInst %uint %1 PackHalf2x16 %135
-        %137 = OpCompositeConstruct %v2float %126 %float_0
-        %138 = OpExtInst %uint %1 PackHalf2x16 %137
-        %139 = OpShiftLeftLogical %uint %134 %uint_16
-        %140 = OpBitwiseOr %uint %132 %139
-        %141 = OpShiftLeftLogical %uint %138 %uint_16
-        %142 = OpBitwiseOr %uint %136 %141
-        %143 = OpCompositeConstruct %v2uint %140 %142
-        %144 = OpAccessChain %_ptr_StorageBuffer_v2uint %39 %uint_0 %130
-               OpStore %144 %143
+         %55 = OpUGreaterThanEqual %bool %51 %54
+               OpSelectionMerge %57 None
+               OpBranchConditional %55 %57 %56
+         %56 = OpLabel
+         %58 = OpAccessChain %_ptr_StorageBuffer_uint_0 %47 %uint_0 %uint_1
+         %59 = OpLoad %uint %58
+         %60 = OpAccessChain %_ptr_StorageBuffer_uint_0 %47 %uint_0 %uint_2
+         %61 = OpLoad %uint %60
+         %62 = OpIAdd %uint %59 %51
+         %63 = OpIAdd %uint %61 %52
+         %64 = OpAccessChain %_ptr_Uniform_uint %46 %uint_0 %uint_0 %uint_0
+         %65 = OpLoad %uint %64
+         %66 = OpAccessChain %_ptr_Uniform_uint %46 %uint_0 %uint_0 %uint_1
+         %67 = OpLoad %uint %66
+         %68 = OpAccessChain %_ptr_Uniform_uint %46 %uint_0 %uint_0 %uint_2
+         %69 = OpLoad %uint %68
+         %70 = OpAccessChain %_ptr_Uniform_uint %46 %uint_0 %uint_0 %uint_3
+         %71 = OpLoad %uint %70
+         %73 = OpBitcast %float %uint_1065353216
+         %74 = OpBitcast %float %71
+         %75 = OpFSub %float %73 %74
+         %77 = OpAccessChain %_ptr_StorageBuffer_uint_0 %47 %uint_0 %uint_7
+         %78 = OpLoad %uint %77
+         %79 = OpIMul %uint %63 %78
+         %80 = OpIAdd %uint %79 %62
+         %81 = OpAccessChain %_ptr_StorageBuffer_half %45 %uint_0 %80
+         %82 = OpLoad %half %81
+         %83 = OpFConvert %float %82
+         %84 = OpCompositeConstruct %v2float %83 %float_0
+         %85 = OpExtInst %uint %1 PackHalf2x16 %84
+         %86 = OpShiftLeftLogical %uint %85 %uint_16
+         %87 = OpBitcast %int %86
+         %88 = OpShiftRightArithmetic %int %87 %uint_16
+         %89 = OpBitcast %uint %88
+         %90 = OpBitcast %int %89
+         %91 = OpConvertSToF %float %90
+         %93 = OpFMul %float %91 %float_0_00392156886
+         %95 = OpAccessChain %_ptr_StorageBuffer_uint_0 %47 %uint_0 %uint_6
+         %96 = OpLoad %uint %95
+         %97 = OpIMul %uint %63 %96
+         %98 = OpIAdd %uint %97 %62
+         %99 = OpAccessChain %_ptr_StorageBuffer_v2uint %44 %uint_0 %98
+        %100 = OpLoad %v2uint %99
+        %101 = OpCompositeExtract %uint %100 0
+        %102 = OpCompositeExtract %uint %100 1
+        %104 = OpBitwiseAnd %uint %101 %uint_65535
+        %105 = OpShiftRightLogical %uint %101 %uint_16
+        %106 = OpBitwiseAnd %uint %102 %uint_65535
+        %107 = OpShiftRightLogical %uint %102 %uint_16
+        %108 = OpExtInst %v2float %1 UnpackHalf2x16 %104
+        %109 = OpCompositeExtract %float %108 0
+        %110 = OpBitcast %float %65
+        %111 = OpExtInst %float %1 Fma %109 %75 %110
+        %112 = OpFSub %float %111 %109
+        %113 = OpExtInst %float %1 Fma %93 %112 %109
+        %114 = OpExtInst %v2float %1 UnpackHalf2x16 %105
+        %115 = OpCompositeExtract %float %114 0
+        %116 = OpBitcast %float %67
+        %117 = OpExtInst %float %1 Fma %115 %75 %116
+        %118 = OpFSub %float %117 %115
+        %119 = OpExtInst %float %1 Fma %93 %118 %115
+        %120 = OpExtInst %v2float %1 UnpackHalf2x16 %106
+        %121 = OpCompositeExtract %float %120 0
+        %122 = OpBitcast %float %69
+        %123 = OpExtInst %float %1 Fma %121 %75 %122
+        %124 = OpFSub %float %123 %121
+        %125 = OpExtInst %float %1 Fma %93 %124 %121
+        %126 = OpExtInst %v2float %1 UnpackHalf2x16 %107
+        %127 = OpCompositeExtract %float %126 0
+        %128 = OpBitcast %float %71
+        %129 = OpExtInst %float %1 Fma %127 %75 %128
+        %130 = OpFSub %float %129 %127
+        %131 = OpExtInst %float %1 Fma %93 %130 %127
+        %132 = OpAccessChain %_ptr_StorageBuffer_uint_0 %47 %uint_0 %uint_6
+        %133 = OpLoad %uint %132
+        %134 = OpIMul %uint %63 %133
+        %135 = OpIAdd %uint %134 %62
+        %136 = OpCompositeConstruct %v2float %113 %float_0
+        %137 = OpExtInst %uint %1 PackHalf2x16 %136
+        %138 = OpCompositeConstruct %v2float %119 %float_0
+        %139 = OpExtInst %uint %1 PackHalf2x16 %138
+        %140 = OpCompositeConstruct %v2float %125 %float_0
+        %141 = OpExtInst %uint %1 PackHalf2x16 %140
+        %142 = OpCompositeConstruct %v2float %131 %float_0
+        %143 = OpExtInst %uint %1 PackHalf2x16 %142
+        %144 = OpShiftLeftLogical %uint %139 %uint_16
+        %145 = OpBitwiseOr %uint %137 %144
+        %146 = OpShiftLeftLogical %uint %143 %uint_16
+        %147 = OpBitwiseOr %uint %141 %146
+        %148 = OpCompositeConstruct %v2uint %145 %147
+        %149 = OpAccessChain %_ptr_StorageBuffer_v2uint %44 %uint_0 %135
+               OpStore %149 %148
                OpReturn
-         %52 = OpLabel
+         %57 = OpLabel
                OpReturn
                OpFunctionEnd

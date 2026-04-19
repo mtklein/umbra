@@ -15,6 +15,7 @@ struct spirv_result {
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
     uint8_t          *buf_row_shift;
+    uint8_t          *buf_is_uniform;
     int               spirv_words;
     int               max_ptr;
     int               total_bufs;

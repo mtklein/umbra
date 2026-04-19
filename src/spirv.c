@@ -197,12 +197,14 @@ typedef struct {
     uint32_t t_void, t_bool, t_u32, t_i32, t_f32, t_f16;
     uint32_t t_uvec2;
     uint32_t t_uvec3;
+    uint32_t t_uvec4;
     uint32_t t_fvec2;
     uint32_t t_fn_void;
     uint32_t t_ptr_input_uvec3;
     uint32_t t_ptr_ssbo_u32;
     uint32_t t_ptr_ssbo_uvec2;
     uint32_t t_ptr_ssbo_f16;
+    uint32_t t_ptr_uniform_u32;     // pointer (Uniform SC) to u32, leaf of vec4-packed uniform
     uint32_t t_ptr_push_u32;
     uint32_t t_rta_u32;              // RuntimeArray of u32
     uint32_t t_rta_uvec2;           // RuntimeArray of uvec2
@@ -247,6 +249,14 @@ typedef struct {
     _Bool *buf_is_16;
     _Bool *buf_is_16x4;
     int    has_16, has_16x4;
+
+    // Per-buffer flag: true if the buffer is a umbra_bind_uniforms32 binding
+    // (NULL .buf, fixed slot count known at IR build time).  Such bindings are
+    // emitted as Uniform-storage blocks with vec4<u32>-packed arrays
+    // (std140-compatible) instead of StorageBuffer + RuntimeArray.
+    _Bool    *buf_is_uniform;
+    int      *buf_uniform_slots;        // u32 slot count per uniform binding
+    uint32_t *t_ptr_uniform_struct;     // per-binding pointer-to-struct type ID
 
     // Constant deduplication cache.
     struct { uint32_t type, value, id; } *const_cache;
@@ -477,7 +487,60 @@ static uint32_t load_meta_u32(SpvBuilder *b, uint32_t offset_id) {
     return spv_load(b, b->t_u32, ptr);
 }
 
-// Load from SSBO[buf_idx] at element_index.
+static uint32_t spv_access_chain_3(SpvBuilder *b, uint32_t ptr_type,
+                                    uint32_t base, uint32_t ix0, uint32_t ix1,
+                                    uint32_t ix2) {
+    uint32_t id = spv_id(b);
+    spv_op(&b->func, SpvOpAccessChain, 7);
+    spv_word(&b->func, ptr_type);
+    spv_word(&b->func, id);
+    spv_word(&b->func, base);
+    spv_word(&b->func, ix0);
+    spv_word(&b->func, ix1);
+    spv_word(&b->func, ix2);
+    return id;
+}
+
+// Load a u32 element by *flat slot index* (0-based, ignoring vec4 packing).
+// For SSBO bindings the access is direct; for Uniform bindings the slot
+// is split into (slot/4, slot%4) and indexed through the vec4<u32> array.
+static uint32_t load_buf_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
+    if (b->buf_is_uniform[buf_idx]) {
+        uint32_t const vec_ix = spv_binop(b, SpvOpShiftRightLogical, b->t_u32,
+                                          elem_idx, b->c_2);
+        uint32_t const lane   = spv_binop(b, SpvOpBitwiseAnd, b->t_u32,
+                                          elem_idx, b->c_3);
+        uint32_t const ptr    = spv_access_chain_3(b, b->t_ptr_uniform_u32,
+                                                   b->v_ssbo[buf_idx],
+                                                   b->c_0, vec_ix, lane);
+        return spv_load(b, b->t_u32, ptr);
+    }
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u32,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, elem_idx);
+    return spv_load(b, b->t_u32, ptr);
+}
+
+// Load by a slot index known at emit time.  When the binding is a uniform
+// block we split (slot/4, slot%4) into constants here so the access chain
+// stays fully constant-indexed.
+static uint32_t load_buf_u32_const_slot(SpvBuilder *b, int buf_idx, int slot) {
+    if (b->buf_is_uniform[buf_idx]) {
+        uint32_t const vec_ix = spv_const_u32(b, (uint32_t)(slot >> 2));
+        uint32_t const lane   = spv_const_u32(b, (uint32_t)(slot & 3));
+        uint32_t const ptr    = spv_access_chain_3(b, b->t_ptr_uniform_u32,
+                                                   b->v_ssbo[buf_idx],
+                                                   b->c_0, vec_ix, lane);
+        return spv_load(b, b->t_u32, ptr);
+    }
+    uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u32,
+                                            b->v_ssbo[buf_idx],
+                                            b->c_0, spv_const_u32(b, (uint32_t)slot));
+    return spv_load(b, b->t_u32, ptr);
+}
+
+// Load a u32 element from an SSBO binding.  Use load_buf_u32 when the binding
+// might be a uniform-class binding (op_uniform_32, op_gather_uniform_32).
 static uint32_t load_ssbo_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
     uint32_t const ptr = spv_access_chain_2(b, b->t_ptr_ssbo_u32,
                                             b->v_ssbo[buf_idx],
@@ -625,6 +688,18 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         }
     }
 
+    // Classify umbra_bind_uniforms32 bindings: NULL .buf, fixed slot count.
+    B.buf_is_uniform    = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_uniform);
+    B.buf_uniform_slots = calloc((size_t)(total_bufs + 1), sizeof *B.buf_uniform_slots);
+    for (int i = 0; i < ir->bindings; i++) {
+        int const p = ir->binding[i].ix;
+        if (p < 0 || p >= total_bufs) { continue; }
+        if (ir->binding[i].buf == NULL) {
+            B.buf_is_uniform   [p] = 1;
+            B.buf_uniform_slots[p] = ir->binding[i].storage.count;
+        }
+    }
+
     uint8_t *buf_rw        = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
     uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
     uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
@@ -641,9 +716,15 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
               || ir->inst[i].op == op_store_16)          { buf_shift[p] = 1; buf_row_shift[p] = 1; }
         else                                             { buf_shift[p] = 2; buf_row_shift[p] = 2; }
     }
-    result.buf_rw        = buf_rw;
-    result.buf_shift     = buf_shift;
-    result.buf_row_shift = buf_row_shift;
+    uint8_t *buf_is_uniform_out = calloc((size_t)(total_bufs + 1),
+                                         sizeof *buf_is_uniform_out);
+    for (int p = 0; p < total_bufs; p++) {
+        buf_is_uniform_out[p] = (uint8_t)B.buf_is_uniform[p];
+    }
+    result.buf_rw         = buf_rw;
+    result.buf_shift      = buf_shift;
+    result.buf_row_shift  = buf_row_shift;
+    result.buf_is_uniform = buf_is_uniform_out;
 
     // Push constant layout: w, x0, y0, buf_count[total_bufs], buf_stride[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a
@@ -778,6 +859,12 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     spv_word(&B.types, B.t_u32);
     spv_word(&B.types, 3);
 
+    B.t_uvec4 = spv_id(&B);
+    spv_op(&B.types, SpvOpTypeVector, 4);
+    spv_word(&B.types, B.t_uvec4);
+    spv_word(&B.types, B.t_u32);
+    spv_word(&B.types, 4);
+
     B.t_fvec2 = spv_id(&B);
     spv_op(&B.types, SpvOpTypeVector, 4);
     spv_word(&B.types, B.t_fvec2);
@@ -807,41 +894,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     spv_word(&B.decor, B.t_rta_u32);
     spv_word(&B.decor, SpvDecorationArrayStride);
     spv_word(&B.decor, 4);
-
-    // TODO: use uniform buffers for small read-only bindings.
-    //
-    // Today every binding is StorageBuffer SC with a RuntimeArray, because
-    // that's the only way to carry a dispatch-time-sized array.  But small
-    // read-only bindings (the umbra_bind_uniforms32 sugar path, where slots is
-    // known at IR build time) could be uniform-buffer bindings instead, and
-    // WebGPU's max_dynamic_uniform_buffers_per_pipeline_layout (default 8)
-    // is roomier than max_dynamic_storage_buffers (default 4).  That's what
-    // triggered the all-or-nothing dynamic_offset_bindings fallback in src/wgpu.c.
-    //
-    // Classification rule at SPIR-V build time, using ir->binding[]:
-    //   reg in ir->binding with reg.buf == NULL
-    //      → umbra_bind_uniforms32 sugar, slots = reg.storage.count is fixed
-    //      → emit Uniform SC with a bounded array[slots]
-    //   anything else (bind_buf, caller-provided bufs, cache-path)
-    //      → keep StorageBuffer SC + RuntimeArray as today
-    //
-    // Also flip the push-via-SSBO block to Uniform SC -- its size
-    // (push_words) is known at build time.
-    //
-    // Non-obvious gotcha: std140 uniform layout pads u32 array members to
-    // 16 bytes each.  Opt into SPV_EXT_scalar_block_layout (decorate the
-    // uniform block) so arrays stay tightly packed and match our
-    // (offset*4)-byte addressing.
-    //
-    // Backend knock-on work:
-    //   src/wgpu.c: .type = Uniform in the bind group layout entry for
-    //     those bindings; add Uniform usage flag to ring chunks; check
-    //     minUniformBufferOffsetAlignment (default 256) against the ring
-    //     alloc .align or use two ring pools.
-    //   src/vulkan.c: matching VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER; buffer
-    //     usage flag.
-    //   src/metal.c: its own shader path, mirror the classification for
-    //     parity if it simplifies argument-buffer layout.
 
     // struct { RuntimeArray<u32> } — one per buffer
     B.t_struct_rta_u32 = spv_id(&B);
@@ -912,6 +964,58 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         spv_word(&B.types, B.t_ptr_ssbo_uvec2);
         spv_word(&B.types, SpvStorageClassStorageBuffer);
         spv_word(&B.types, B.t_uvec2);
+    }
+
+    // Per-binding Uniform-storage types for umbra_bind_uniforms32 bindings.
+    // Layout is std140-compatible: struct { uvec4 arr[ceil(slots/4)]; }, with
+    // ArrayStride 16.  Element s is addressed as arr[s>>2][s&3].
+    B.t_ptr_uniform_struct = calloc((size_t)total_bufs, sizeof *B.t_ptr_uniform_struct);
+    _Bool any_uniform = 0;
+    for (int p = 0; p < total_bufs; p++) {
+        if (!B.buf_is_uniform[p]) { continue; }
+        any_uniform = 1;
+        int      const slots     = B.buf_uniform_slots[p];
+        int      const vec_count = (slots + 3) / 4;
+        uint32_t const c_count   = spv_const_u32(&B, (uint32_t)vec_count);
+
+        uint32_t const t_arr = spv_id(&B);
+        spv_op(&B.types, SpvOpTypeArray, 4);
+        spv_word(&B.types, t_arr);
+        spv_word(&B.types, B.t_uvec4);
+        spv_word(&B.types, c_count);
+
+        spv_op(&B.decor, SpvOpDecorate, 4);
+        spv_word(&B.decor, t_arr);
+        spv_word(&B.decor, SpvDecorationArrayStride);
+        spv_word(&B.decor, 16);
+
+        uint32_t const t_struct = spv_id(&B);
+        spv_op(&B.types, SpvOpTypeStruct, 3);
+        spv_word(&B.types, t_struct);
+        spv_word(&B.types, t_arr);
+
+        spv_op(&B.decor, SpvOpDecorate, 3);
+        spv_word(&B.decor, t_struct);
+        spv_word(&B.decor, SpvDecorationBlock);
+
+        spv_op(&B.decor, SpvOpMemberDecorate, 5);
+        spv_word(&B.decor, t_struct);
+        spv_word(&B.decor, 0);
+        spv_word(&B.decor, SpvDecorationOffset);
+        spv_word(&B.decor, 0);
+
+        B.t_ptr_uniform_struct[p] = spv_id(&B);
+        spv_op(&B.types, SpvOpTypePointer, 4);
+        spv_word(&B.types, B.t_ptr_uniform_struct[p]);
+        spv_word(&B.types, SpvStorageClassUniform);
+        spv_word(&B.types, t_struct);
+    }
+    if (any_uniform) {
+        B.t_ptr_uniform_u32 = spv_id(&B);
+        spv_op(&B.types, SpvOpTypePointer, 4);
+        spv_word(&B.types, B.t_ptr_uniform_u32);
+        spv_word(&B.types, SpvStorageClassUniform);
+        spv_word(&B.types, B.t_u32);
     }
 
     if (B.has_16) {
@@ -1028,17 +1132,20 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     spv_word(&B.decor, SpvDecorationBuiltIn);
     spv_word(&B.decor, SpvBuiltInGlobalInvocationId);
 
-    // SSBO variables: one per buffer, descriptor binding = buffer index.
+    // SSBO/Uniform variables: one per buffer, descriptor binding = buffer index.
     B.v_ssbo = calloc((size_t)total_bufs, sizeof *B.v_ssbo);
     for (int i = 0; i < total_bufs; i++) {
         B.v_ssbo[i] = spv_id(&B);
-        uint32_t ptr_type = B.buf_is_16[i]   ? B.t_ptr_ssbo_struct_f16
-                          : B.buf_is_16x4[i] ? B.t_ptr_ssbo_struct_uvec2
-                          :                     B.t_ptr_ssbo_struct;
+        uint32_t const sc = B.buf_is_uniform[i] ? (uint32_t)SpvStorageClassUniform
+                                                : (uint32_t)SpvStorageClassStorageBuffer;
+        uint32_t const ptr_type = B.buf_is_uniform[i] ? B.t_ptr_uniform_struct[i]
+                                : B.buf_is_16     [i] ? B.t_ptr_ssbo_struct_f16
+                                : B.buf_is_16x4   [i] ? B.t_ptr_ssbo_struct_uvec2
+                                :                       B.t_ptr_ssbo_struct;
         spv_op(&B.globals, SpvOpVariable, 4);
         spv_word(&B.globals, ptr_type);
         spv_word(&B.globals, B.v_ssbo[i]);
-        spv_word(&B.globals, SpvStorageClassStorageBuffer);
+        spv_word(&B.globals, sc);
 
         spv_op(&B.decor, SpvOpDecorate, 4);
         spv_word(&B.decor, B.v_ssbo[i]);
@@ -1194,8 +1301,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
 
                 case op_uniform_32: {
                     int p = resolve_ptr(&B, inst);
-                    uint32_t slot_id = spv_const_u32(&B, (uint32_t)inst->imm);
-                    B.val[i] = load_ssbo_u32(&B, p, slot_id);
+                    B.val[i] = load_buf_u32_const_slot(&B, p, inst->imm);
                 } break;
 
                 case op_load_32: {
@@ -1231,7 +1337,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     uint32_t ix_val = as_u32(&B, get_val(&B, inst->x), xid);
                     uint32_t safe_idx, mask;
                     gather_safe(&B, ix_val, p, &safe_idx, &mask);
-                    uint32_t raw = load_ssbo_u32(&B, p, safe_idx);
+                    uint32_t raw = load_buf_u32(&B, p, safe_idx);
                     B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
                 } break;
 
@@ -1988,6 +2094,9 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     free(B.is_f);
     free(B.buf_is_16);
     free(B.buf_is_16x4);
+    free(B.buf_is_uniform);
+    free(B.buf_uniform_slots);
+    free(B.t_ptr_uniform_struct);
     free(B.const_cache);
     free(v_vars);
 

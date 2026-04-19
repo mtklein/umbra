@@ -99,6 +99,7 @@ struct vk_program {
 
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
+    uint8_t          *buf_is_uniform;
 
     uint32_t *spirv;
     int       spirv_words, :32;
@@ -108,7 +109,7 @@ static VkBuffer create_buffer(VkDevice device, VkDeviceSize size) {
     VkBufferCreateInfo ci = {
         .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
         .size = size,
-        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        .usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
         .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
     };
     VkBuffer buf;
@@ -303,9 +304,11 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
                 struct vk_ring_chunk *chunk = loc.handle;
+                size_t const range = vp->buf_is_uniform[i] ? ((bytes + 15) & ~(size_t)15)
+                                                           : bytes;
                 bind_buffer[i] = chunk->buf;
                 bind_offset[i] = (VkDeviceSize)loc.offset;
-                bind_range [i] = (VkDeviceSize)bytes;
+                bind_range [i] = (VkDeviceSize)range;
             } else {
                 int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw);
                 struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
@@ -348,7 +351,8 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstBinding=(uint32_t)i,
             .descriptorCount=1,
-            .descriptorType=VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorType=vp->buf_is_uniform[i] ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                                                  : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .pBufferInfo=&buf_infos[i],
         };
     }
@@ -438,6 +442,7 @@ static void vk_program_free(struct umbra_program *p) {
     vkDestroyShaderModule(be->device, vp->shader, 0);
     free(vp->buf_rw);
     free(vp->buf_shift);
+    free(vp->buf_is_uniform);
     free(vp->binding);
     free(vp->spirv);
     free(vp);
@@ -464,13 +469,14 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
         assume(rc == VK_SUCCESS);
     }
 
-    // Descriptor set layout: one storage buffer per non-push buffer slot.
+    // Descriptor set layout: one storage or uniform buffer per non-push slot.
     VkDescriptorSetLayoutBinding *bindings =
         calloc((size_t)(n_desc ? n_desc : 1), sizeof *bindings);
     for (int i = 0; i < n_desc; i++) {
         bindings[i] = (VkDescriptorSetLayoutBinding){
             .binding = (uint32_t)i,
-            .descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorType = sr.buf_is_uniform[i] ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                                                   : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         };
@@ -530,8 +536,9 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
     p->push_words  = sr.push_words;
-    p->buf_rw    = sr.buf_rw;
-    p->buf_shift = sr.buf_shift;
+    p->buf_rw         = sr.buf_rw;
+    p->buf_shift      = sr.buf_shift;
+    p->buf_is_uniform = sr.buf_is_uniform;
     free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
@@ -780,7 +787,9 @@ struct umbra_backend* umbra_backend_vulkan(void) {
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(phys, &props);
     size_t ssbo_align = (size_t)props.limits.minStorageBufferOffsetAlignment;
-    if (ssbo_align < 16) { ssbo_align = 16; }
+    size_t ubo_align  = (size_t)props.limits.minUniformBufferOffsetAlignment;
+    if (ssbo_align < ubo_align) { ssbo_align = ubo_align; }
+    if (ssbo_align < 16)        { ssbo_align = 16; }
 
     VkQueryPool ts_pool = VK_NULL_HANDLE;
     if (props.limits.timestampComputeAndGraphics) {
