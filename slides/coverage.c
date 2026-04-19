@@ -75,7 +75,7 @@ umbra_val32 coverage_bitmap2d(void *ctx, struct umbra_builder *b,
 umbra_val32 coverage_matrix(void *ctx, struct umbra_builder *b,
                             umbra_val32 x, umbra_val32 y) {
     struct coverage_matrix const *self = ctx;
-    umbra_ptr32 const u = umbra_uniforms(b, &self->mat, sizeof self->mat / 4);
+    umbra_ptr32 const u = umbra_bind_uniforms32(b, &self->mat, sizeof self->mat / 4);
 
     enum {
         M_SX = (int)(__builtin_offsetof(struct umbra_matrix, sx) / 4),

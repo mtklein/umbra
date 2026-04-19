@@ -492,7 +492,7 @@ static umbra_color_val32 test_gradient_fn(void *ctx, struct umbra_builder *build
                                           umbra_val32 x, umbra_val32 y) {
     struct test_gradient_state const *self = ctx;
     (void)y;
-    umbra_ptr32 const u = umbra_uniforms(builder, self, 2);
+    umbra_ptr32 const u = umbra_bind_uniforms32(builder, self, 2);
     umbra_val32 const w    = umbra_uniform_32(builder, u, 0),
                       a    = umbra_uniform_32(builder, u, 1),
                       t    = umbra_div_f32(builder, x, w),
@@ -1476,7 +1476,7 @@ struct test_circle_state {
 static umbra_interval test_circle_fn(void *ctx, struct umbra_builder *b,
                                       umbra_interval x, umbra_interval y) {
     struct test_circle_state const *self = ctx;
-    umbra_ptr32 const u = umbra_uniforms(b, self, 3);
+    umbra_ptr32 const u = umbra_bind_uniforms32(b, self, 3);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
                          cy = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
                          r  = umbra_interval_exact(umbra_uniform_32(b, u, 2));
@@ -1570,7 +1570,7 @@ TEST(test_metal_loop_gather) {
     struct umbra_buf out_buf = {.ptr = &out, .count = 1};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const u    = umbra_uniforms  (b, &uniforms, (int)(sizeof uniforms / 4));
+    umbra_ptr32 const u    = umbra_bind_uniforms32  (b, &uniforms, (int)(sizeof uniforms / 4));
     umbra_ptr32 const dst  = umbra_bind_buf32(b, &out_buf);
     umbra_ptr32 const data = umbra_bind_buf32(b, &arr_buf);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_slot);

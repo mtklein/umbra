@@ -812,7 +812,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     //
     // Today every binding is StorageBuffer SC with a RuntimeArray, because
     // that's the only way to carry a dispatch-time-sized array.  But small
-    // read-only bindings (the umbra_uniforms sugar path, where slots is
+    // read-only bindings (the umbra_bind_uniforms32 sugar path, where slots is
     // known at IR build time) could be uniform-buffer bindings instead, and
     // WebGPU's max_dynamic_uniform_buffers_per_pipeline_layout (default 8)
     // is roomier than max_dynamic_storage_buffers (default 4).  That's what
@@ -820,7 +820,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     //
     // Classification rule at SPIR-V build time, using ir->uniforms[]:
     //   reg in ir->uniforms with reg.buf == NULL
-    //      → umbra_uniforms sugar, slots = reg.storage.count is fixed
+    //      → umbra_bind_uniforms32 sugar, slots = reg.storage.count is fixed
     //      → emit Uniform SC with a bounded array[slots]
     //   anything else (bind_buf, caller-provided bufs, cache-path)
     //      → keep StorageBuffer SC + RuntimeArray as today

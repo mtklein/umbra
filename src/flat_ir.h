@@ -29,12 +29,6 @@ struct ir_inst {
     int   final_id;
 };
 
-// umbra_uniforms() assigns ptr handles with ix >= REG_BASE during IR
-// construction.  flat_ir_bind_uniforms() (run at the end of umbra_flat_ir())
-// rewrites them to synthetic ixes just past the max caller-provided ix, so
-// backends only ever see a single flat ix-space.
-#define REG_BASE (1 << 24)
-
 // A caller-owned buf registration pinned to a specific ptr handle (.ix).
 // Programs auto-populate buf[.ix] at dispatch time so callers don't thread
 // these through queue() args.  If buf != NULL, the dispatch reads the current

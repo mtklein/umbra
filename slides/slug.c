@@ -160,7 +160,7 @@ struct umbra_builder* slug_build_acc(struct umbra_buf const *curves_buf,
                                      struct umbra_buf const *wind_buf) {
     struct umbra_builder *b = umbra_builder();
 
-    umbra_ptr32 const u      = umbra_uniforms   (b, uni, (int)(sizeof *uni / 4));
+    umbra_ptr32 const u      = umbra_bind_uniforms32   (b, uni, (int)(sizeof *uni / 4));
     umbra_ptr32 const curves = umbra_bind_buf32 (b, curves_buf);
     umbra_ptr32 const wind   = umbra_bind_buf32 (b, wind_buf);
 
@@ -293,7 +293,7 @@ struct umbra_builder* slug_build(struct umbra_buf const *curves_buf,
                                  struct umbra_buf const *wind_buf) {
     struct umbra_builder *b = umbra_builder();
 
-    umbra_ptr32 const u      = umbra_uniforms   (b, uni, (int)(sizeof *uni / 4));
+    umbra_ptr32 const u      = umbra_bind_uniforms32   (b, uni, (int)(sizeof *uni / 4));
     umbra_ptr32 const curves = umbra_bind_buf32 (b, curves_buf);
     umbra_ptr32 const wind   = umbra_bind_buf32 (b, wind_buf);
 

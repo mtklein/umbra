@@ -266,7 +266,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     // Build the bounds program: evaluate the sdf over tile-extent intervals.
     // x() and y() are tile indices.
     struct umbra_builder *bb = umbra_builder();
-    umbra_ptr32 const g   = umbra_uniforms   (bb, &d->grid,
+    umbra_ptr32 const g   = umbra_bind_uniforms32   (bb, &d->grid,
                                               (int)(sizeof d->grid / 4));
     umbra_ptr32 const dst = umbra_bind_buf32 (bb, &d->lo_buf);
     umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
@@ -373,7 +373,7 @@ umbra_color_val32 umbra_shader_color(void *ctx, struct umbra_builder *b,
                                      umbra_val32 x, umbra_val32 y) {
     umbra_color const *self = ctx;
     (void)x; (void)y;
-    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr32 const u = umbra_bind_uniforms32(b, self, sizeof *self / 4);
     return (umbra_color_val32){
         umbra_uniform_32(b, u, 0),
         umbra_uniform_32(b, u, 1),
@@ -418,7 +418,7 @@ umbra_color_val32 umbra_shader_supersample(void *ctx, struct umbra_builder *b,
 umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
                                  umbra_val32 x, umbra_val32 y) {
     umbra_rect const *self = ctx;
-    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr32 const u = umbra_bind_uniforms32(b, self, sizeof *self / 4);
     umbra_val32 const l = umbra_uniform_32(b, u, 0),
                       t = umbra_uniform_32(b, u, 1),
                       r = umbra_uniform_32(b, u, 2),
@@ -436,7 +436,7 @@ umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
 umbra_interval umbra_sdf_rect(void *ctx, struct umbra_builder *b,
                               umbra_interval x, umbra_interval y) {
     umbra_rect const *self = ctx;
-    umbra_ptr32 const u = umbra_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr32 const u = umbra_bind_uniforms32(b, self, sizeof *self / 4);
     umbra_interval const l  = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
                          t  = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
                          r  = umbra_interval_exact(umbra_uniform_32(b, u, 2)),

@@ -111,19 +111,16 @@ void umbra_builder_free(builder *b) {
     }
 }
 
-// umbra_bind_buf* and umbra_uniforms() assign ixes starting at REG_BASE so
-// flat_ir_bind_uniforms() can distinguish them from any hand-rolled ptr.ix
-// values when remapping.
 static int reserve_uniform(builder *b) {
     if (b->n_uniforms == b->cap_uniforms) {
         b->cap_uniforms = b->cap_uniforms ? 2 * b->cap_uniforms : 4;
         b->uniforms = realloc(b->uniforms,
                               (size_t)b->cap_uniforms * sizeof *b->uniforms);
     }
-    return REG_BASE + b->n_uniforms;
+    return b->n_uniforms;
 }
 
-umbra_ptr32 umbra_uniforms(builder *b, void const *slot, int slots) {
+umbra_ptr32 umbra_bind_uniforms32(builder *b, void const *slot, int slots) {
     assume(((uintptr_t)slot & 3u) == 0);
     assume(slots >= 0);
     int const ix = reserve_uniform(b);

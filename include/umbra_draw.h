@@ -48,7 +48,7 @@ umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
 void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
 
 // Effects emit IR into a builder.  Any uniforms registered with
-// umbra_uniforms() must outlive the builder, flat_ir, and program.  These are
+// umbra_bind_uniforms32() must outlive the builder, flat_ir, and program.  These are
 // function types (not pointer types), so declarations read as
 // `umbra_blend umbra_blend_src, umbra_blend_srcover, ...;` and struct fields
 // carrying them write as `umbra_shader *inner_fn`.

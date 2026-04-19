@@ -53,7 +53,7 @@ typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 
 // Pointer handles.  Each ptr is backed by a bound umbra_buf or a span of
-// uniform data; see umbra_bind_buf{16,32,64}() and umbra_uniforms() below.
+// uniform data; see umbra_bind_buf{16,32,64}() and umbra_bind_uniforms32() below.
 typedef struct { int ix; } umbra_ptr16;
 typedef struct { int ix; } umbra_ptr32;
 typedef struct { int ix; } umbra_ptr64;
@@ -61,23 +61,24 @@ typedef struct { int ix; } umbra_ptr64;
 // Bind a caller-owned `struct umbra_buf` to a ptr handle.  At each dispatch
 // the backend reads the current contents of *buf, so callers may mutate
 // .ptr / .count / .stride between dispatches without rebuilding the program.
-// Unlike umbra_uniforms() (which captures a fixed ptr/slots pair), the buf
+// Unlike umbra_bind_uniforms32() (which captures a fixed ptr/slots pair), the buf
 // itself is the source of truth.  The buf must outlive the builder and any
 // derived umbra_flat_ir or umbra_programs.
 umbra_ptr16 umbra_bind_buf16(struct umbra_builder*, struct umbra_buf const*);
 umbra_ptr32 umbra_bind_buf32(struct umbra_builder*, struct umbra_buf const*);
 umbra_ptr64 umbra_bind_buf64(struct umbra_builder*, struct umbra_buf const*);
 
-// Register a span of uniform data, returning a ptr handle for use with
+// Bind a span of uniform data, returning a ptr handle for use with
 // umbra_uniform_32() and/or umbra_gather_32().  The uniforms are not retained
 // and must outlive this umbra_builder and any derived umbra_flat_ir or
-// umbra_programs.
+// umbra_programs.  `slot` should be 4-byte aligned; `slots` counts those
+// 4-byte slots.
 //
-// `slot` should be 4-byte aligned, and `slots` counts those 4-byte slots.
-//
-// TODO: rename to umbra_bind_uniforms32(), and note that it can be more
-// efficient than umbra_bind_buf32() for small, fixed-location, fixed-size buffers
-umbra_ptr32 umbra_uniforms(struct umbra_builder*, void const *slot, int slots);
+// Unlike umbra_bind_buf32() — which captures the buf by reference and re-reads
+// its fields each dispatch — umbra_bind_uniforms32() captures a fixed
+// (slot, slots) pair, which backends can route through faster uniform paths
+// for small, immutable spans.
+umbra_ptr32 umbra_bind_uniforms32(struct umbra_builder*, void const *slot, int slots);
 
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);

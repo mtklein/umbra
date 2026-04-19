@@ -2061,12 +2061,12 @@ TEST(test_program_threadsafe) {
 }
 
 static void run_umbra_uniforms_test(struct umbra_backend *be) {
-    // umbra_uniforms() captures only the pointer at IR-build time; the bytes
+    // umbra_bind_uniforms32() captures only the pointer at IR-build time; the bytes
     // can be filled (and later mutated) any time before a queue() call.
     uint32_t u[4] = {0};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const reg = umbra_uniforms(b, u, count(u));
+    umbra_ptr32 const reg = umbra_bind_uniforms32(b, u, count(u));
     umbra_store_32(b, P32(b, 0), umbra_uniform_32(b, reg, 2));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
