@@ -12,8 +12,8 @@ struct jit_program {
     size_t code_size;
     void (*entry)(int, int, int, int, struct umbra_buf*);
     int loop_start, loop_end;
-    int n_reg, pad;
-    struct buffer_binding *reg;
+    int bindings, pad;
+    struct buffer_binding *binding;
 };
 struct jit_program* jit_program(struct jit_backend*, struct umbra_flat_ir const*);
 void   jit_program_run (struct jit_program*, int,int,int,int, struct umbra_buf[]);

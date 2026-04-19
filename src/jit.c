@@ -49,8 +49,8 @@ void release_code_buf(struct jit_backend *be, void *mem, size_t size) {
 static void run_jit(struct umbra_program *prog, int l, int t, int r, int b) {
     struct jit_program *j = (struct jit_program*)prog;
     struct umbra_buf buf[32];
-    for (int i = 0; i < j->n_reg; i++) {
-        buf[j->reg[i].ix] = j->reg[i].buf ? *j->reg[i].buf : j->reg[i].storage;
+    for (int i = 0; i < j->bindings; i++) {
+        buf[j->binding[i].ix] = j->binding[i].buf ? *j->binding[i].buf : j->binding[i].storage;
     }
     jit_program_run(j, l, t, r, b, buf);
 }
@@ -63,7 +63,7 @@ static void free_jit(struct umbra_program *prog) {
     struct jit_program *j = (struct jit_program*)prog;
     struct jit_backend *be = (struct jit_backend*)prog->backend;
     release_code_buf(be, j->code, j->code_size);
-    free(j->reg);
+    free(j->binding);
     free(j);
 }
 

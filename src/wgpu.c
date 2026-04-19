@@ -85,8 +85,8 @@ struct wgpu_program {
 
     int max_ptr;
     int total_bufs;
-    int push_words, n_reg;
-    struct buffer_binding *reg;
+    int push_words, bindings;
+    struct buffer_binding *binding;
 
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
@@ -415,11 +415,11 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 
-    p->n_reg = ir->bindings;
-    if (p->n_reg) {
-        size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
-        p->reg = malloc(sz);
-        __builtin_memcpy(p->reg, ir->binding, sz);
+    p->bindings = ir->bindings;
+    if (p->bindings) {
+        size_t const sz = (size_t)p->bindings * sizeof *p->binding;
+        p->binding = malloc(sz);
+        __builtin_memcpy(p->binding, ir->binding, sz);
     }
 
     return &p->base;
@@ -434,8 +434,8 @@ static void wgpu_program_queue(struct umbra_program *prog,
 
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < p->n_reg; i++) {
-        buf[p->reg[i].ix] = p->reg[i].buf ? *p->reg[i].buf : p->reg[i].storage;
+    for (int i = 0; i < p->bindings; i++) {
+        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].storage;
     }
 
     begin_batch(be);
@@ -453,8 +453,8 @@ static void wgpu_program_queue(struct umbra_program *prog,
     }
 
     _Bool pinned[32] = {0};
-    for (int k = 0; k < p->n_reg; k++) {
-        if (!p->reg[k].buf) { pinned[p->reg[k].ix] = 1; }
+    for (int k = 0; k < p->bindings; k++) {
+        if (!p->binding[k].buf) { pinned[p->binding[k].ix] = 1; }
     }
 
     for (int i = 0; i <= p->max_ptr; i++) {
@@ -614,7 +614,7 @@ static void wgpu_program_free(struct umbra_program *prog) {
     free(p->spirv);
     free(p->buf_rw);
     free(p->buf_shift);
-    free(p->reg);
+    free(p->binding);
     free(p);
 }
 

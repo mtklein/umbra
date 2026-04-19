@@ -97,8 +97,8 @@ struct metal_program {
     uint8_t  *buf_shift;
     int    max_ptr;
     int    total_bufs;
-    int    n_reg, pad;
-    struct buffer_binding *reg;
+    int    bindings, pad;
+    struct buffer_binding *binding;
 };
 
 typedef struct {
@@ -1104,11 +1104,11 @@ static struct metal_program* metal_program(
             p->total_bufs    = total_bufs;
             p->buf_rw        = buf_rw;
             p->buf_shift     = buf_shift;
-            p->n_reg         = ir->bindings;
-            if (p->n_reg) {
-                size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
-                p->reg = malloc(sz);
-                __builtin_memcpy(p->reg, ir->binding, sz);
+            p->bindings      = ir->bindings;
+            if (p->bindings) {
+                size_t const sz = (size_t)p->bindings * sizeof *p->binding;
+                p->binding = malloc(sz);
+                __builtin_memcpy(p->binding, ir->binding, sz);
             }
 
             umbra_flat_ir_free(resolved);
@@ -1189,8 +1189,8 @@ static void encode_dispatch(
     for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
 
     _Bool pinned[32] = {0};
-    for (int k = 0; k < p->n_reg; k++) {
-        if (!p->reg[k].buf) { pinned[p->reg[k].ix] = 1; }
+    for (int k = 0; k < p->bindings; k++) {
+        if (!p->binding[k].buf) { pinned[p->binding[k].ix] = 1; }
     }
 
     for (int i = 0; i <= p->max_ptr; i++) {
@@ -1249,8 +1249,8 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
 
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < p->n_reg; i++) {
-        buf[p->reg[i].ix] = p->reg[i].buf ? *p->reg[i].buf : p->reg[i].storage;
+    for (int i = 0; i < p->bindings; i++) {
+        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].storage;
     }
 
     void *pool = objc_autoreleasePoolPush();
@@ -1303,7 +1303,7 @@ static void metal_program_free(struct metal_program *p) {
     }
     free(p->buf_rw);
     free(p->buf_shift);
-    free(p->reg);
+    free(p->binding);
     free(p->src);
     free(p);
 }

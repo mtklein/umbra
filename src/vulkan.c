@@ -94,8 +94,8 @@ struct vk_program {
 
     int max_ptr;
     int total_bufs;
-    int push_words, n_reg;
-    struct buffer_binding *reg;
+    int push_words, bindings;
+    struct buffer_binding *binding;
 
     uint8_t          *buf_rw;
     uint8_t          *buf_shift;
@@ -267,8 +267,8 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     assume(vp->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < vp->n_reg; i++) {
-        buf[vp->reg[i].ix] = vp->reg[i].buf ? *vp->reg[i].buf : vp->reg[i].storage;
+    for (int i = 0; i < vp->bindings; i++) {
+        buf[vp->binding[i].ix] = vp->binding[i].buf ? *vp->binding[i].buf : vp->binding[i].storage;
     }
 
     double const encode_t0 = now();
@@ -291,8 +291,8 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     }
 
     _Bool pinned[32] = {0};
-    for (int k = 0; k < vp->n_reg; k++) {
-        if (!vp->reg[k].buf) { pinned[vp->reg[k].ix] = 1; }
+    for (int k = 0; k < vp->bindings; k++) {
+        if (!vp->binding[k].buf) { pinned[vp->binding[k].ix] = 1; }
     }
 
     for (int i = 0; i <= vp->max_ptr; i++) {
@@ -438,7 +438,7 @@ static void vk_program_free(struct umbra_program *p) {
     vkDestroyShaderModule(be->device, vp->shader, 0);
     free(vp->buf_rw);
     free(vp->buf_shift);
-    free(vp->reg);
+    free(vp->binding);
     free(vp->spirv);
     free(vp);
 }
@@ -536,11 +536,11 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 
-    p->n_reg = ir->bindings;
-    if (p->n_reg) {
-        size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
-        p->reg = malloc(sz);
-        __builtin_memcpy(p->reg, ir->binding, sz);
+    p->bindings = ir->bindings;
+    if (p->bindings) {
+        size_t const sz = (size_t)p->bindings * sizeof *p->binding;
+        p->binding = malloc(sz);
+        __builtin_memcpy(p->binding, ir->binding, sz);
     }
 
     p->base.queue   = vk_program_queue;

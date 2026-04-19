@@ -435,10 +435,10 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     struct jit_program *j = calloc(1, sizeof *j);
     if (ir->bindings) {
-        j->n_reg = ir->bindings;
-        size_t const sz = (size_t)j->n_reg * sizeof *j->reg;
-        j->reg = malloc(sz);
-        __builtin_memcpy(j->reg, ir->binding, sz);
+        j->bindings = ir->bindings;
+        size_t const sz = (size_t)j->bindings * sizeof *j->binding;
+        j->binding = malloc(sz);
+        __builtin_memcpy(j->binding, ir->binding, sz);
     }
 
     ra_destroy(ra);

@@ -178,8 +178,8 @@ struct interp_program {
     struct sw_inst *inst;
     ival           *v;
     ival           *vars;
-    int             preamble, nptr, n_reg, n_vars;
-    struct buffer_binding *reg;
+    int             preamble, nptr, bindings, n_vars;
+    struct buffer_binding *binding;
 };
 
 static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
@@ -205,14 +205,14 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             max_ptr = ir->inst[i].ptr.bits;
         }
     }
-    p->nptr  = max_ptr + 1;
-    p->n_reg = ir->bindings;
-    if (p->n_reg) {
-        size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
-        p->reg = malloc(sz);
-        __builtin_memcpy(p->reg, ir->binding, sz);
+    p->nptr     = max_ptr + 1;
+    p->bindings = ir->bindings;
+    if (p->bindings) {
+        size_t const sz = (size_t)p->bindings * sizeof *p->binding;
+        p->binding = malloc(sz);
+        __builtin_memcpy(p->binding, ir->binding, sz);
     } else {
-        p->reg = NULL;
+        p->binding = NULL;
     }
 
     struct umbra_flat_ir *resolved = NULL;
@@ -489,8 +489,8 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 static void interp_program_run(struct interp_program *p, int l, int t, int r, int b) {
     assume(p->nptr <= 64);
     struct umbra_buf buf[64];
-    for (int i = 0; i < p->n_reg; i++) {
-        buf[p->reg[i].ix] = p->reg[i].buf ? *p->reg[i].buf : p->reg[i].storage;
+    for (int i = 0; i < p->bindings; i++) {
+        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].storage;
     }
 
     int const      P   = p->preamble;
@@ -1293,7 +1293,7 @@ static void interp_program_free(struct interp_program *p) {
         free(p->inst);
         free(p->v);
         free(p->vars);
-        free(p->reg);
+        free(p->binding);
         free(p);
     }
 }
