@@ -120,9 +120,13 @@ static int reserve_uniform(builder *b) {
     return b->n_uniforms++;
 }
 
-static int bind_buf(builder *b, struct umbra_buf const *buf) {
+static int bind_buf(builder *b, struct umbra_buf const *buf, int elem_shift) {
     int const ix = reserve_uniform(b);
-    b->uniforms[ix] = (struct umbra_uniform_reg){.buf = buf, .ix = ix};
+    b->uniforms[ix] = (struct umbra_uniform_reg){
+        .buf        = buf,
+        .ix         = ix,
+        .elem_shift = elem_shift,
+    };
     return ix;
 }
 
@@ -131,16 +135,17 @@ umbra_ptr32 umbra_bind_uniforms32(builder *b, void const *slot, int slots) {
     assume(slots >= 0);
     int const ix = reserve_uniform(b);
     b->uniforms[ix] = (struct umbra_uniform_reg){
-        .buf     = NULL,
-        .storage = {.ptr = (void*)(uintptr_t)slot, .count = slots, .stride = 0},
-        .ix      = ix,
+        .buf        = NULL,
+        .storage    = {.ptr = (void*)(uintptr_t)slot, .count = slots, .stride = 0},
+        .ix         = ix,
+        .elem_shift = 2,
     };
     return (umbra_ptr32){.ix = ix};
 }
 
-umbra_ptr16 umbra_bind_buf16(builder *b, struct umbra_buf const *buf) { return (umbra_ptr16){.ix = bind_buf(b, buf)}; }
-umbra_ptr32 umbra_bind_buf32(builder *b, struct umbra_buf const *buf) { return (umbra_ptr32){.ix = bind_buf(b, buf)}; }
-umbra_ptr64 umbra_bind_buf64(builder *b, struct umbra_buf const *buf) { return (umbra_ptr64){.ix = bind_buf(b, buf)}; }
+umbra_ptr16 umbra_bind_buf16(builder *b, struct umbra_buf const *buf) { return (umbra_ptr16){.ix = bind_buf(b, buf, 1)}; }
+umbra_ptr32 umbra_bind_buf32(builder *b, struct umbra_buf const *buf) { return (umbra_ptr32){.ix = bind_buf(b, buf, 2)}; }
+umbra_ptr64 umbra_bind_buf64(builder *b, struct umbra_buf const *buf) { return (umbra_ptr64){.ix = bind_buf(b, buf, 3)}; }
 
 umbra_val32 umbra_x(builder *b) { return push32(b, op_x); }
 umbra_val32 umbra_y(builder *b) { return push32(b, op_y); }
