@@ -288,14 +288,16 @@ static void grad_init(struct slide *s, int w, int h) {
     st->h = h;
 }
 
-static void grad_build_draw(struct slide *s, struct umbra_builder *b,
+static _Bool grad_build_draw(struct slide *s, int i, struct umbra_builder *b,
                              umbra_ptr dst_ptr, struct umbra_fmt fmt,
                              umbra_val32 x, umbra_val32 y) {
+    if (i != 0) { return 0; }
     struct grad_slide *st = (struct grad_slide *)s;
     umbra_build_draw(b, dst_ptr, fmt, x, y,
                      NULL, NULL,
                      st->shader_fn, st->shader_ctx,
                      NULL, NULL);
+    return 1;
 }
 
 static struct umbra_builder* grad_builder(struct slide *s, struct umbra_fmt fmt) {
@@ -304,7 +306,7 @@ static struct umbra_builder* grad_builder(struct slide *s, struct umbra_fmt fmt)
     umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
     umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
                       y = umbra_f32_from_i32(b, umbra_y(b));
-    grad_build_draw(s, b, dst_ptr, fmt, x, y);
+    grad_build_draw(s, 0, b, dst_ptr, fmt, x, y);
     return b;
 }
 

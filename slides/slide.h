@@ -39,18 +39,22 @@ struct slide {
     int (*get_builders)(struct slide*, struct umbra_fmt,
                         struct umbra_builder **out, int max);
 
-    // Fill builder `b` with the slide's draw IR.  `dst_ptr` is already bound
-    // on `b` (via umbra_bind_buf) and is the final destination; `fmt` is
-    // its format.  `(x, y)` are the post-transform dispatch coords -- if the
-    // caller wanted a viewport transform applied, they've already issued it.
-    // The slide may still issue its own transforms (e.g. an animated
-    // perspective matrix) on top before calling umbra_build_draw.
+    // Fill builder `b` with the slide's i'th draw IR and return 1, or return
+    // 0 to signal "no more programs" (i == n_programs).  Consumers loop
+    // i = 0, 1, ... compiling and dispatching each program in order.
+    //
+    // `dst_ptr` is already bound on `b` (via umbra_bind_buf) and is the final
+    // destination; `fmt` is its format.  `(x, y)` are the post-transform
+    // dispatch coords -- if the caller wanted a viewport transform applied,
+    // they've already issued it.  The slide may still issue its own transforms
+    // (e.g. an animated perspective matrix) on top before calling
+    // umbra_build_draw.
     //
     // NULL means the slide has no composable draw path; consumers fall back
     // to the slide's own prepare/draw cycle or a placeholder.
-    void (*build_draw)(struct slide*, struct umbra_builder *b,
-                       umbra_ptr dst_ptr, struct umbra_fmt fmt,
-                       umbra_val32 x, umbra_val32 y);
+    _Bool (*build_draw)(struct slide*, int i, struct umbra_builder *b,
+                        umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                        umbra_val32 x, umbra_val32 y);
 
     // Update animation state (e.g. per-frame matrix uniforms) without
     // emitting any GPU/CPU work.  NULL means static.
