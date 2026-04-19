@@ -415,11 +415,11 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 
-    p->n_reg = ir->n_uniforms;
+    p->n_reg = ir->bindings;
     if (p->n_reg) {
         size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
         p->reg = malloc(sz);
-        __builtin_memcpy(p->reg, ir->uniforms, sz);
+        __builtin_memcpy(p->reg, ir->binding, sz);
     }
 
     return &p->base;

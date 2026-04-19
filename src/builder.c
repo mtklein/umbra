@@ -106,31 +106,30 @@ void umbra_builder_free(builder *b) {
         free(b->inst);
         free(b->ht.data);
         free(b->var_uniform);
-        free(b->uniforms);
+        free(b->binding);
         free(b);
     }
 }
 
-static int reserve_uniform(builder *b) {
-    if (b->n_uniforms == b->cap_uniforms) {
-        b->cap_uniforms = b->cap_uniforms ? 2 * b->cap_uniforms : 4;
-        b->uniforms = realloc(b->uniforms,
-                              (size_t)b->cap_uniforms * sizeof *b->uniforms);
+static int reserve_binding(builder *b) {
+    if (b->bindings == b->cap_bindings) {
+        b->cap_bindings = b->cap_bindings ? 2 * b->cap_bindings : 4;
+        b->binding = realloc(b->binding, (size_t)b->cap_bindings * sizeof *b->binding);
     }
-    return b->n_uniforms++;
+    return b->bindings++;
 }
 
 static int bind_buf(builder *b, struct umbra_buf const *buf) {
-    int const ix = reserve_uniform(b);
-    b->uniforms[ix] = (struct buffer_binding){.buf = buf, .ix = ix};
+    int const ix = reserve_binding(b);
+    b->binding[ix] = (struct buffer_binding){.buf = buf, .ix = ix};
     return ix;
 }
 
 umbra_ptr32 umbra_bind_uniforms32(builder *b, void const *slot, int slots) {
     assume(((uintptr_t)slot & 3u) == 0);
     assume(slots >= 0);
-    int const ix = reserve_uniform(b);
-    b->uniforms[ix] = (struct buffer_binding){
+    int const ix = reserve_binding(b);
+    b->binding[ix] = (struct buffer_binding){
         .buf     = NULL,
         .storage = {.ptr = (void*)(uintptr_t)slot, .count = slots, .stride = 0},
         .ix      = ix,

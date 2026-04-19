@@ -1104,11 +1104,11 @@ static struct metal_program* metal_program(
             p->total_bufs    = total_bufs;
             p->buf_rw        = buf_rw;
             p->buf_shift     = buf_shift;
-            p->n_reg         = ir->n_uniforms;
+            p->n_reg         = ir->bindings;
             if (p->n_reg) {
                 size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
                 p->reg = malloc(sz);
-                __builtin_memcpy(p->reg, ir->uniforms, sz);
+                __builtin_memcpy(p->reg, ir->binding, sz);
             }
 
             umbra_flat_ir_free(resolved);

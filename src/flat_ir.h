@@ -54,8 +54,8 @@ struct umbra_builder {
     umbra_val32               loop_trip;
     umbra_var32        loop_var;
     int                       if_depth, pad1;
-    struct buffer_binding *uniforms;
-    int                       n_uniforms, cap_uniforms;
+    struct buffer_binding    *binding;
+    int                       bindings, cap_bindings;
 };
 
 struct umbra_flat_ir {
@@ -65,8 +65,8 @@ struct umbra_flat_ir {
     int                       loop_begin, // Instruction index of op_loop_begin, or -1.
                               loop_end;   // Instruction index of op_loop_end,   or -1.
     int                       n_vars, pad;
-    struct buffer_binding *uniforms;
-    int                       n_uniforms, pad2;
+    struct buffer_binding    *binding;
+    int                       bindings, pad2;
 };
 
 enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };

@@ -206,11 +206,11 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
         }
     }
     p->nptr  = max_ptr + 1;
-    p->n_reg = ir->n_uniforms;
+    p->n_reg = ir->bindings;
     if (p->n_reg) {
         size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
         p->reg = malloc(sz);
-        __builtin_memcpy(p->reg, ir->uniforms, sz);
+        __builtin_memcpy(p->reg, ir->binding, sz);
     } else {
         p->reg = NULL;
     }

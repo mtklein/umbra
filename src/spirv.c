@@ -818,8 +818,8 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     // is roomier than max_dynamic_storage_buffers (default 4).  That's what
     // triggered the all-or-nothing dyn_uniforms fallback in src/wgpu.c.
     //
-    // Classification rule at SPIR-V build time, using ir->uniforms[]:
-    //   reg in ir->uniforms with reg.buf == NULL
+    // Classification rule at SPIR-V build time, using ir->binding[]:
+    //   reg in ir->binding with reg.buf == NULL
     //      → umbra_bind_uniforms32 sugar, slots = reg.storage.count is fixed
     //      → emit Uniform SC with a bounded array[slots]
     //   anything else (bind_buf, caller-provided bufs, cache-path)
