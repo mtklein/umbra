@@ -190,6 +190,14 @@ static void print_compile_header(int be_mask) {
     printf("\n");
 }
 
+static void print_fixed(int width, int precision, double v) {
+    char buf[32];
+    int const n = snprintf(buf, sizeof buf, "%.*f", precision, v);
+    char const *s = buf;
+    if (n >= 2 && buf[0] == '0' && buf[1] == '.') { s++; }
+    printf("%*s", width, s);
+}
+
 static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
                        int be_mask) {
     printf("%-*s", TITLE_W, title);
@@ -203,7 +211,7 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
             printf("%*s", VAL_W + (disp_gpu[d] ? CPU_W : 0), "-");
             continue;
         }
-        printf("%*.2f", VAL_W, ns_px[bi]);
+        print_fixed(VAL_W, 2, ns_px[bi]);
         if (disp_gpu[d]) {
             if (gpu[bi] >= 0 && ns_px[bi] > 0) {
                 int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
@@ -405,9 +413,10 @@ int main(int argc, char *argv[]) {
                 if (us_call[bi] < 0) {
                     printf("%*s", VAL_W + (disp_gpu[d] ? CPU_W : 0), "-");
                 } else if (disp_gpu[d]) {
-                    printf("%*.1f%*s", VAL_W, us_call[bi], CPU_W, "");
+                    print_fixed(VAL_W, 1, us_call[bi]);
+                    printf("%*s", CPU_W, "");
                 } else {
-                    printf("%*.1f", VAL_W, us_call[bi]);
+                    print_fixed(VAL_W, 1, us_call[bi]);
                 }
             }
             printf("\n");
