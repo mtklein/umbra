@@ -260,13 +260,13 @@ typedef struct {
 
     // Constant deduplication cache.
     struct { uint32_t type, value, id; } *const_cache;
-    int n_consts, consts_cap;
+    int consts, consts_cap;
 } SpvBuilder;
 
 static uint32_t spv_id(SpvBuilder *b) { return b->next_id++; }
 
 static uint32_t spv_const(SpvBuilder *b, uint32_t type, uint32_t bits) {
-    for (int i = 0; i < b->n_consts; i++) {
+    for (int i = 0; i < b->consts; i++) {
         if (b->const_cache[i].type == type && b->const_cache[i].value == bits) {
             return b->const_cache[i].id;
         }
@@ -276,15 +276,15 @@ static uint32_t spv_const(SpvBuilder *b, uint32_t type, uint32_t bits) {
     spv_word(&b->types, type);
     spv_word(&b->types, id);
     spv_word(&b->types, bits);
-    if (b->n_consts >= b->consts_cap) {
+    if (b->consts >= b->consts_cap) {
         b->consts_cap = b->consts_cap ? 2 * b->consts_cap : 64;
         b->const_cache = realloc(b->const_cache,
                                  (size_t)b->consts_cap * sizeof *b->const_cache);
     }
-    b->const_cache[b->n_consts].type  = type;
-    b->const_cache[b->n_consts].value = bits;
-    b->const_cache[b->n_consts].id    = id;
-    b->n_consts++;
+    b->const_cache[b->consts].type  = type;
+    b->const_cache[b->consts].value = bits;
+    b->const_cache[b->consts].id    = id;
+    b->consts++;
     return id;
 }
 
