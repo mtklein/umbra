@@ -259,6 +259,10 @@ int main(void) {
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
 
+        // Prepare before get_builders: slides may build their effect state
+        // (e.g. overview's per-cell programs) during prepare.
+        if (s->prepare) { s->prepare(s, be, umbra_fmt_fp16); }
+
         struct umbra_builder *builders[8];
         int nb = s->get_builders
                ? s->get_builders(s, umbra_fmt_fp16, builders, 8)
