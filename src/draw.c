@@ -25,7 +25,7 @@ umbra_color_val32 umbra_load_8888(struct umbra_builder *b, umbra_ptr src) {
     };
 }
 void umbra_store_8888(struct umbra_builder *b, umbra_ptr dst, umbra_color_val32 c) {
-    umbra_val32 s = umbra_imm_f32(b, 255.0f);
+    umbra_val32 const s = umbra_imm_f32(b, 255.0f);
     umbra_store_8x4(b, dst, pack_unorm(b, c.r, s), pack_unorm(b, c.g, s),
                             pack_unorm(b, c.b, s), pack_unorm(b, c.a, s));
 }
@@ -67,7 +67,7 @@ umbra_color_val32 umbra_load_1010102(struct umbra_builder *b, umbra_ptr src) {
     };
 }
 void umbra_store_1010102(struct umbra_builder *b, umbra_ptr dst, umbra_color_val32 c) {
-    umbra_val32 s10 = umbra_imm_f32(b, 1023.0f);
+    umbra_val32 const s10 = umbra_imm_f32(b, 1023.0f);
     umbra_val32 px = pack_unorm(b, c.r, s10);
     px = umbra_or_32(b, px, umbra_shl_i32(b, pack_unorm(b, c.g, s10), umbra_imm_i32(b, 10)));
     px = umbra_or_32(b, px, umbra_shl_i32(b, pack_unorm(b, c.b, s10), umbra_imm_i32(b, 20)));
