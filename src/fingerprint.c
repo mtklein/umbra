@@ -48,7 +48,7 @@ fingerprint fingerprint_hash(void const *buf, size_t bytes) {
     char const *p = buf;
 
     // Main loop: 4 × 16 = 64 bytes per iteration.
-    size_t n64 = bytes / 64;
+    size_t const n64 = bytes / 64;
     for (size_t i = 0; i < n64; i++) {
         uint8x16_t d0 = vld1q_u8((uint8_t const *)(p +  0));
         uint8x16_t d1 = vld1q_u8((uint8_t const *)(p + 16));
@@ -138,7 +138,7 @@ fingerprint fingerprint_hash(void const *buf, size_t bytes) {
 
     if (bytes >= 32) {
         uint64_t h0 = a, h1 = b, h2 = s2, h3 = s3;
-        size_t n32 = bytes / 32;
+        size_t const n32 = bytes / 32;
         for (size_t i = 0; i < n32; i++) {
             h0 = mix(r8(p +  0) ^ s0, r8(p +  8) ^ h0);
             h1 = mix(r8(p + 16) ^ s1, r8(p + 24) ^ h1);
