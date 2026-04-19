@@ -262,7 +262,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     result->inst     = out;
     result->insts    = live;
     result->preamble = preamble;
-    result->n_vars   = b->n_vars;
+    result->vars   = b->vars;
     result->loop_begin = -1;
     result->loop_end   = -1;
     if (b->bindings) {
@@ -361,7 +361,7 @@ struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
     struct umbra_flat_ir *result = calloc(1, sizeof *result);
     result->inst       = out;
     result->insts      = live_count;
-    result->n_vars     = ir->n_vars;
+    result->vars     = ir->vars;
     result->preamble   = new_preamble;
     result->loop_begin = ir->loop_begin >= 0 ? remap[ir->loop_begin] : -1;
     result->loop_end   = ir->loop_end   >= 0 ? remap[ir->loop_end]   : -1;

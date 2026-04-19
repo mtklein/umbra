@@ -908,7 +908,7 @@ static char* build_source(IR const *orig_ir,
          "    if (pos.x >= m.w) return;\n"
          "    uint x = m.x0 + pos.x;\n"
          "    uint y = m.y0 + pos.y;\n");
-    for (int i = 0; i < ir->n_vars; i++) {
+    for (int i = 0; i < ir->vars; i++) {
         emit(&b, "    uint var%d = 0;\n", i);
     }
 

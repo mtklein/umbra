@@ -44,7 +44,7 @@ struct umbra_builder {
     _Bool                    *var_uniform;
     int                       insts, cap;
     struct hash               ht;
-    int                       n_vars;
+    int                       vars;
     _Bool                     has_loop, loop_closed, pad0[2];
     umbra_val32               loop_trip;
     umbra_var32               loop_var;
@@ -59,7 +59,7 @@ struct umbra_flat_ir {
                               preamble;   // Fence: inst[0..preamble) are uniform, [preamble..) vary.
     int                       loop_begin, // Instruction index of op_loop_begin, or -1.
                               loop_end;   // Instruction index of op_loop_end,   or -1.
-    int                       n_vars, pad;
+    int                       vars, pad;
     struct buffer_binding    *binding;
     int                       bindings, pad2;
 };

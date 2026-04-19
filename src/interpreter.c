@@ -178,7 +178,7 @@ struct interp_program {
     struct sw_inst *inst;
     ival           *v;
     ival           *var;
-    int             preamble, nptr, bindings, n_vars;
+    int             preamble, nptr, bindings, vars;
     struct buffer_binding *binding;
 };
 
@@ -477,8 +477,8 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
         free(lu);
     }
 
-    p->n_vars = ir->n_vars;
-    p->var    = ir->n_vars ? calloc((size_t)ir->n_vars, sizeof *p->var)  : NULL;
+    p->vars = ir->vars;
+    p->var    = ir->vars ? calloc((size_t)ir->vars, sizeof *p->var)  : NULL;
 
     free(id);
     umbra_flat_ir_free(resolved);
@@ -495,7 +495,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 
     int const      P   = p->preamble;
     ival                 *var = p->var;
-    int const             n_vars = p->n_vars;
+    int const             vars = p->vars;
     I32                   if_mask_stack[8];
     int                   if_depth = 0;
 
@@ -506,7 +506,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             struct sw_inst const  *ip  = p->inst + (col == l ? 0 : P);
             ival                  *v   = p->v    + (col == l ? 0 : P);
 
-            for (int vi = 0; vi < n_vars; vi++) { var[vi] = (ival){0}; }
+            for (int vi = 0; vi < vars; vi++) { var[vi] = (ival){0}; }
             if_depth = 0;
 
             ival acc = {0};

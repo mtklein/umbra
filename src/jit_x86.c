@@ -96,18 +96,18 @@ struct jit_ctx {
     Buf                            *c;
     struct umbra_flat_ir const *ir;
     struct pool                     pool;
-    int                             n_vars, loop_top, loop_br_skip;
+    int                             vars, loop_top, loop_br_skip;
     int                             if_depth;
     int8_t                          if_mask_reg[8];
 };
 
 static void x86_spill(int reg, int slot, void *ctx) {
     struct jit_ctx *j = ctx;
-    vspill(j->c, reg, slot + j->n_vars);
+    vspill(j->c, reg, slot + j->vars);
 }
 static void x86_fill(int reg, int slot, void *ctx) {
     struct jit_ctx *j = ctx;
-    vfill(j->c, reg, slot + j->n_vars);
+    vfill(j->c, reg, slot + j->vars);
 }
 
 static void pool_broadcast(Buf *c, struct pool *p, int d, uint32_t v) {
@@ -299,7 +299,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     int  ns = 0;
 
     Buf            c = {0};
-    struct jit_ctx jc = {.c = &c, .ir = ir, .pool = {0}, .n_vars = ir->n_vars};
+    struct jit_ctx jc = {.c = &c, .ir = ir, .pool = {0}, .vars = ir->vars};
     struct ra     *ra = ra_create_x86(ir, &jc);
 
     push_r(&c, XM);
@@ -339,10 +339,10 @@ struct jit_program* jit_program(struct jit_backend *be,
     cmp_ri(&c, R11, 8);
     int const br_tail = jcc(&c, 0x0c);
 
-    if (ir->n_vars > 0) {
+    if (ir->vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         vpxor(&c, 1, zr, zr, zr);
-        for (int vi = 0; vi < ir->n_vars; vi++) {
+        for (int vi = 0; vi < ir->vars; vi++) {
             vspill(&c, zr, vi);
         }
         ra_return_reg(ra, zr);
@@ -372,10 +372,10 @@ struct jit_program* jit_program(struct jit_backend *be,
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
 
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
-    if (ir->n_vars > 0) {
+    if (ir->vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         vpxor(&c, 1, zr, zr, zr);
-        for (int vi = 0; vi < ir->n_vars; vi++) {
+        for (int vi = 0; vi < ir->vars; vi++) {
             vspill(&c, zr, vi);
         }
         ra_return_reg(ra, zr);
@@ -402,7 +402,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     {
-        int const total = ns + ir->n_vars;
+        int const total = ns + ir->vars;
         if (total > 0) {
             add_ri(&c, RSP, total * 32);
         }
@@ -416,7 +416,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     ret(&c);
 
     {
-        int const total = ns + ir->n_vars;
+        int const total = ns + ir->vars;
         if (total > 0) {
             int pos = stack_patch;
             c.byte[pos++] = 0x48;

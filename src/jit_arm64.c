@@ -218,20 +218,20 @@ struct jit_ctx {
     Buf                            *c;
     struct umbra_flat_ir const *ir;
     struct pool                     pool;
-    int                             n_vars, loop_top, loop_br_skip;
+    int                             vars, loop_top, loop_br_skip;
     int                             if_depth;
     int8_t                          if_mask_reg[8];
 };
 
 static void arm64_spill(int reg, int slot, void *ctx) {
     struct jit_ctx *j = ctx;
-    int const off = 2 * (slot + j->n_vars);
+    int const off = 2 * (slot + j->vars);
     put(j->c, STR_qi(lo(reg), XS, off));
     put(j->c, STR_qi(hi(reg), XS, off + 1));
 }
 static void arm64_fill(int reg, int slot, void *ctx) {
     struct jit_ctx *j = ctx;
-    int const off = 2 * (slot + j->n_vars);
+    int const off = 2 * (slot + j->vars);
     put(j->c, LDR_qi(lo(reg), XS, off));
     put(j->c, LDR_qi(hi(reg), XS, off + 1));
 }
@@ -293,7 +293,7 @@ struct jit_program* jit_program(struct jit_backend *be,
         .cap       = (int)((buf_size - pg) / 4),
         .mmap_size = buf_size,
     };
-    struct jit_ctx jc = {.c = &c, .ir = ir, .pool = {0}, .n_vars = ir->n_vars};
+    struct jit_ctx jc = {.c = &c, .ir = ir, .pool = {0}, .vars = ir->vars};
     struct ra     *ra = ra_create_arm64(ir, &jc);
 
     put(&c, STP_pre(29, 30, 31, -2));
@@ -338,10 +338,10 @@ struct jit_program* jit_program(struct jit_backend *be,
     int const br_tail = c.words;
     put(&c, Bcond(0xb, 0));
 
-    if (ir->n_vars > 0) {
+    if (ir->vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
-        for (int vi = 0; vi < ir->n_vars; vi++) {
+        for (int vi = 0; vi < ir->vars; vi++) {
             put(&c, STP_qi(lo(zr), lo(zr), XS, 2 * vi));
         }
         ra_return_reg(ra, zr);
@@ -370,10 +370,10 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0,
              &jc);
-    if (ir->n_vars > 0) {
+    if (ir->vars > 0) {
         int8_t zr = ra_alloc(ra, sl, &ns);
         put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
-        for (int vi = 0; vi < ir->n_vars; vi++) {
+        for (int vi = 0; vi < ir->vars; vi++) {
             put(&c, STP_qi(lo(zr), lo(zr), XS, 2 * vi));
         }
         ra_return_reg(ra, zr);
@@ -410,8 +410,8 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, LDP_post(29, 30, 31, 2));
     put(&c, RET());
 
-    if (ns + ir->n_vars > 0) {
-        c.word[stack_patch] = SUB_xi(31, 31, (ns + ir->n_vars) * 32);
+    if (ns + ir->vars > 0) {
+        c.word[stack_patch] = SUB_xi(31, 31, (ns + ir->vars) * 32);
     }
     c.word[stack_patch + 1] = ADD_xi(XS, 31, 0);
     while (c.words & 3) {

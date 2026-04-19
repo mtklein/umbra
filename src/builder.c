@@ -493,8 +493,8 @@ void umbra_end_loop(builder *b) {
 }
 
 umbra_var32 umbra_declare_var32(builder *b) {
-    int const id = b->n_vars++;
-    b->var_uniform = realloc(b->var_uniform, (size_t)b->n_vars * sizeof *b->var_uniform);
+    int const id = b->vars++;
+    b->var_uniform = realloc(b->var_uniform, (size_t)b->vars * sizeof *b->var_uniform);
     b->var_uniform[id] = 1;
     return (umbra_var32){.id = id};
 }

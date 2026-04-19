@@ -28,7 +28,7 @@ static struct umbra_flat_ir* make_ir(int n, int pre) {
     ir->preamble = pre;
     ir->loop_begin = -1;
     ir->loop_end   = -1;
-    ir->n_vars     = 0;
+    ir->vars       = 0;
 
     ir->inst[0].op = op_imm_32;
     ir->inst[0].imm = 42;

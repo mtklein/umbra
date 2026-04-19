@@ -1102,7 +1102,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     spv_word(&B.types, push_sc);
     spv_word(&B.types, B.t_u32);
 
-    if (ir->n_vars > 0) {
+    if (ir->vars > 0) {
         B.t_ptr_func_u32 = spv_id(&B);
         spv_op(&B.types, SpvOpTypePointer, 4);
         spv_word(&B.types, B.t_ptr_func_u32);
@@ -1223,9 +1223,9 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         spv_word(&B.func, label_entry);
 
         // Function-scoped variables (including loop induction variable).
-        if (ir->n_vars > 0) {
-            v_vars = calloc((size_t)ir->n_vars, sizeof *v_vars);
-            for (int vi = 0; vi < ir->n_vars; vi++) {
+        if (ir->vars > 0) {
+            v_vars = calloc((size_t)ir->vars, sizeof *v_vars);
+            for (int vi = 0; vi < ir->vars; vi++) {
                 v_vars[vi] = spv_id(&B);
                 spv_op(&B.func, SpvOpVariable, 5);
                 spv_word(&B.func, B.t_ptr_func_u32);
