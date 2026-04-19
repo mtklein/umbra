@@ -34,13 +34,10 @@ struct ir_inst {
 // these through queue() args.  If buf != NULL, the dispatch reads the current
 // contents of *buf (fully mutable between dispatches).  Otherwise the dispatch
 // uses the fixed `storage` snapshot captured when registered.
-// `elem_shift` is the base-2 log of the element size in bytes (1 for ptr16,
-// 2 for ptr32, 3 for ptr64), captured at bind time so backends don't have
-// to rederive it from the ops that reference this ptr.
 struct umbra_uniform_reg {
     struct umbra_buf const *buf;
     struct umbra_buf        storage;
-    int                     ix, elem_shift;
+    int                     ix, pad;
 };
 
 struct umbra_builder {
