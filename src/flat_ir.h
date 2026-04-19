@@ -47,7 +47,7 @@ struct umbra_builder {
     int                       n_vars;
     _Bool                     has_loop, loop_closed, pad0[2];
     umbra_val32               loop_trip;
-    umbra_var32        loop_var;
+    umbra_var32               loop_var;
     int                       if_depth, pad1;
     struct buffer_binding    *binding;
     int                       bindings, cap_bindings;
