@@ -150,7 +150,7 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
 };
 
 struct umbra_builder* umbra_draw_builder(
-    umbra_transform transform_fn, void *transform_ctx,
+    umbra_transform transform_fn, struct umbra_matrix const *transform_mat,
     umbra_coverage  coverage_fn,  void *coverage_ctx,
     umbra_shader    shader_fn,    void *shader_ctx,
     umbra_blend     blend_fn,     void *blend_ctx,
@@ -162,7 +162,7 @@ struct umbra_builder* umbra_draw_builder(
     umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b)),
                 yf = umbra_f32_from_i32(b, umbra_y(b));
     if (transform_fn) {
-        umbra_point_val32 const p = umbra_transform_point(transform_fn, transform_ctx,
+        umbra_point_val32 const p = umbra_transform_point(transform_fn, transform_mat,
                                                            b, xf, yf);
         xf = p.x;
         yf = p.y;
@@ -195,11 +195,9 @@ struct umbra_builder* umbra_draw_builder(
     return b;
 }
 
-void umbra_transform_perspective(void *ctx, struct umbra_builder *b,
-                                 umbra_interval x, umbra_interval y,
-                                 umbra_interval *x_out, umbra_interval *y_out) {
-    struct umbra_matrix const *self = ctx;
-    umbra_ptr32 const u = umbra_bind_uniforms32(b, self, (int)(sizeof *self / 4));
+void umbra_transform_perspective(struct umbra_matrix const *mat, struct umbra_builder *b,
+                                 umbra_interval *x, umbra_interval *y) {
+    umbra_ptr32 const u = umbra_bind_uniforms32(b, mat, (int)(sizeof *mat / 4));
 
     enum {
         M_SX = (int)(__builtin_offsetof(struct umbra_matrix, sx) / 4),
@@ -224,27 +222,31 @@ void umbra_transform_perspective(void *ctx, struct umbra_builder *b,
                          p2 = umbra_interval_exact(umbra_uniform_32(b, u, M_P2));
 
     umbra_interval const w =
-        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, p0, x),
-                                                            umbra_interval_mul_f32(b, p1, y)),
+        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, p0, *x),
+                                                            umbra_interval_mul_f32(b, p1, *y)),
                                   p2);
-    *x_out = umbra_interval_div_f32(b,
-        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, sx, x),
-                                                            umbra_interval_mul_f32(b, kx, y)),
+    umbra_interval const xp = umbra_interval_div_f32(b,
+        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, sx, *x),
+                                                            umbra_interval_mul_f32(b, kx, *y)),
                                   tx),
         w);
-    *y_out = umbra_interval_div_f32(b,
-        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, ky, x),
-                                                            umbra_interval_mul_f32(b, sy, y)),
+    umbra_interval const yp = umbra_interval_div_f32(b,
+        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, ky, *x),
+                                                            umbra_interval_mul_f32(b, sy, *y)),
                                   ty),
         w);
+    *x = xp;
+    *y = yp;
 }
 
-umbra_point_val32 umbra_transform_point(umbra_transform *fn, void *ctx,
+umbra_point_val32 umbra_transform_point(umbra_transform *fn,
+                                        struct umbra_matrix const *mat,
                                         struct umbra_builder *b,
                                         umbra_val32 x, umbra_val32 y) {
-    umbra_interval xo, yo;
-    fn(ctx, b, umbra_interval_exact(x), umbra_interval_exact(y), &xo, &yo);
-    return (umbra_point_val32){xo.lo, yo.lo};
+    umbra_interval xi = umbra_interval_exact(x),
+                   yi = umbra_interval_exact(y);
+    fn(mat, b, &xi, &yi);
+    return (umbra_point_val32){xi.lo, yi.lo};
 }
 
 umbra_point_val32 umbra_apply_matrix(struct umbra_builder *b, umbra_matrix_val32 m,

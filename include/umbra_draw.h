@@ -75,27 +75,27 @@ typedef umbra_interval    umbra_sdf      (void *ctx, struct umbra_builder*,
 typedef umbra_color_val32 umbra_blend    (void *ctx, struct umbra_builder*,
                                           umbra_color_val32 src,
                                           umbra_color_val32 dst);
-// Interval-based transform: dst-pixel (x, y) -> effect-space (x', y').  Scalar
-// callers pass exact intervals and read .lo from the outputs; the exact-interval
+// Interval-based transform: dst-pixel (x, y) -> effect-space (x', y'), updated
+// in place.  All transforms take a `struct umbra_matrix const *` so call sites
+// like umbra_sdf_draw can sniff affine-vs-perspective uniformly.  Scalar callers
+// pass exact intervals and read .lo from the outputs; the exact-interval
 // peepholes in src/interval.c ensure exact-in produces exact-out with the same
 // scalar IR as a bespoke scalar transform would emit.  sdf_draw's bounds
 // program uses the full interval entry to transform tile-extent intervals.
-// TODO: void *ctx -> const umbra_matrix*, given that we expect them all to use that?
-// TODO: simplify to transform(m,b *x,*y) with in/out x/y arguments?
-typedef void              umbra_transform(void *ctx, struct umbra_builder*,
-                                          umbra_interval  x,      umbra_interval  y,
-                                          umbra_interval *x_out,  umbra_interval *y_out);
+typedef void              umbra_transform(struct umbra_matrix const*, struct umbra_builder*,
+                                          umbra_interval *x, umbra_interval *y);
 
 // Apply a transform's scalar entry: wraps fn with exact intervals and returns
-// the scalar outputs.  Equivalent to fn(ctx, b, {x,x}, {y,y}, &xo, &yo) then
-// (xo.lo, yo.lo); by the exact-interval peepholes, xo.lo == xo.hi and likewise
-// for yo, so either field is fine.
-umbra_point_val32 umbra_transform_point(umbra_transform *fn, void *ctx,
+// the scalar outputs.  Equivalent to fn(mat, b, &ix, &iy) with ix={x,x}, iy={y,y}
+// then (ix.lo, iy.lo); by the exact-interval peepholes, ix.lo == ix.hi and
+// likewise for iy, so either field is fine.
+umbra_point_val32 umbra_transform_point(umbra_transform *fn,
+                                        struct umbra_matrix const*,
                                         struct umbra_builder*,
                                         umbra_val32 x, umbra_val32 y);
 
-// Perspective transform: ctx is a `struct umbra_matrix const*` whose 9 floats
-// are re-read each dispatch through a bound uniforms span.  Emits
+// Perspective transform: the matrix's 9 floats are re-read each dispatch
+// through a bound uniforms span.  Emits
 // w = p0*x + p1*y + p2;  x' = (sx*x + kx*y + tx) / w;  y' = (ky*x + sy*y + ty) / w.
 // Note the interval div by w is unsound when w straddles zero (see TODO near
 // umbra_interval_div_f32); sdf_draw gates this transform to affine-only at
@@ -115,9 +115,10 @@ umbra_blend umbra_blend_src,
 // and writes dst_fmt at the bound dst buf.  Any of the effects may be NULL for
 // default behavior: transform=identity, coverage=1, shader={0,0,0,0},
 // blend=src.  If transform is non-NULL it is applied to the dst-pixel (x, y)
-// before coverage and shader see them.  dst must outlive the builder,
-// flat_ir, and program; its contents are dereferenced at queue time.
-struct umbra_builder* umbra_draw_builder(umbra_transform, void *transform_ctx,
+// before coverage and shader see them; the matrix must outlive the program.
+// dst must outlive the builder, flat_ir, and program; its contents are
+// dereferenced at queue time.
+struct umbra_builder* umbra_draw_builder(umbra_transform, struct umbra_matrix const *transform_mat,
                                          umbra_coverage , void *coverage_ctx,
                                          umbra_shader   , void *shader_ctx,
                                          umbra_blend    , void *blend_ctx,

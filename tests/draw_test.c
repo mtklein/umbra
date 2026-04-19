@@ -9,12 +9,12 @@
 static struct umbra_buf draw_dst_slot;
 
 static struct umbra_builder* draw_builder_shim(
-        umbra_transform xf, void *xf_ctx,
+        umbra_transform xf, struct umbra_matrix const *xf_mat,
         umbra_coverage  cov, void *cov_ctx,
         umbra_shader    sh,  void *sh_ctx,
         umbra_blend     bl,  void *bl_ctx,
         struct umbra_fmt fmt) {
-    return umbra_draw_builder(xf, xf_ctx, cov, cov_ctx, sh, sh_ctx, bl, bl_ctx,
+    return umbra_draw_builder(xf, xf_mat, cov, cov_ctx, sh, sh_ctx, bl, bl_ctx,
                               &draw_dst_slot, fmt);
 }
 #define umbra_draw_builder draw_builder_shim
