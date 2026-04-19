@@ -30,11 +30,11 @@ static struct umbra_builder* build_srcover(void) {
                              dr_buf = {0}, dg_buf = {0}, db_buf = {0}, da_buf = {0};
     struct umbra_builder *b = umbra_builder();
 
-    umbra_ptr32 const sp = umbra_bind_buf32(b, &src);
-    umbra_ptr16 const drp = umbra_bind_buf16(b, &dr_buf),
-                      dgp = umbra_bind_buf16(b, &dg_buf),
-                      dbp = umbra_bind_buf16(b, &db_buf),
-                      dap = umbra_bind_buf16(b, &da_buf);
+    umbra_ptr const sp = umbra_bind_buf(b, &src);
+    umbra_ptr const drp = umbra_bind_buf(b, &dr_buf),
+                      dgp = umbra_bind_buf(b, &dg_buf),
+                      dbp = umbra_bind_buf(b, &db_buf),
+                      dap = umbra_bind_buf(b, &da_buf);
 
     umbra_val32 px = umbra_load_32(b, sp), mask = umbra_imm_i32(b, 0xFF);
     umbra_val32 rgba[4] = {

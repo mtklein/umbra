@@ -250,7 +250,7 @@ typedef struct {
     _Bool *buf_is_16x4;
     int    has_16, has_16x4;
 
-    // Per-buffer flag: true if the buffer is a umbra_bind_uniforms32 binding
+    // Per-buffer flag: true if the buffer is a umbra_bind_uniforms binding
     // (NULL .buf, fixed slot count known at IR build time).  Such bindings are
     // emitted as Uniform-storage blocks with vec4<u32>-packed arrays
     // (std140-compatible) instead of StorageBuffer + RuntimeArray.
@@ -688,7 +688,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         }
     }
 
-    // Classify umbra_bind_uniforms32 bindings: NULL .buf, fixed slot count.
+    // Classify umbra_bind_uniforms bindings: NULL .buf, fixed slot count.
     B.buf_is_uniform    = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_uniform);
     B.buf_uniform_slots = calloc((size_t)(total_bufs + 1), sizeof *B.buf_uniform_slots);
     for (int i = 0; i < ir->bindings; i++) {
@@ -965,7 +965,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         spv_word(&B.types, B.t_uvec2);
     }
 
-    // Per-binding Uniform-storage types for umbra_bind_uniforms32 bindings.
+    // Per-binding Uniform-storage types for umbra_bind_uniforms bindings.
     // Layout is std140-compatible: struct { uvec4 arr[ceil(slots/4)]; }, with
     // ArrayStride 16.  Element s is addressed as arr[s>>2][s&3].
     B.t_ptr_uniform_struct = calloc((size_t)total_bufs, sizeof *B.t_ptr_uniform_struct);

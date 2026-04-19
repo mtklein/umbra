@@ -60,8 +60,8 @@ static void finish_pipe(struct pipe *p, struct umbra_builder *builder) {
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr32 const src_ptr = umbra_bind_buf32(builder, &readback_pipe.src_buf),
-                      dst_ptr = umbra_bind_buf32(builder, &readback_pipe.dst_buf);
+    umbra_ptr const src_ptr = umbra_bind_buf(builder, &readback_pipe.src_buf),
+                      dst_ptr = umbra_bind_buf(builder, &readback_pipe.dst_buf);
     umbra_color_val32 c = fmt_enums[fmt]->load(builder, &src_ptr);
     umbra_fmt_fp16.store(builder, &dst_ptr, c);
     finish_pipe(&readback_pipe, builder);
@@ -70,8 +70,8 @@ static void build_readback(int fmt) {
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr32 const src_ptr = umbra_bind_buf32(builder, &hdr_pipe.src_buf),
-                      dst_ptr = umbra_bind_buf32(builder, &hdr_pipe.dst_buf);
+    umbra_ptr const src_ptr = umbra_bind_buf(builder, &hdr_pipe.src_buf),
+                      dst_ptr = umbra_bind_buf(builder, &hdr_pipe.dst_buf);
     umbra_color_val32 c = fmt_enums[fmt]->load(builder, &src_ptr);
     umbra_fmt_fp16.store(builder, &dst_ptr, c);
     finish_pipe(&hdr_pipe, builder);

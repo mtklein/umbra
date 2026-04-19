@@ -11,10 +11,8 @@ typedef union {
 } val;
 
 typedef union {
-    int         bits;
-    umbra_ptr16 p16;
-    umbra_ptr32 p32;
-    umbra_ptr64 p64;
+    int       bits;
+    umbra_ptr p;
     struct { int ix; };
 } ptr;
 

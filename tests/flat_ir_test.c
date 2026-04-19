@@ -6,20 +6,20 @@
 #include <stdlib.h>
 
 // Shared scratch bufs.  Each test that used hand-rolled caller-bound slots
-// `(umbra_ptr32){.ix=N}` now binds `&slot[N]` at build time; the slot's fields
+// `(umbra_ptr){.ix=N}` now binds `&slot[N]` at build time; the slot's fields
 // are filled in per-run just before dispatch.  The bind captures the address
 // of slot[N], which is stable across dispatches, so mutating .ptr/.count/
 // .stride between runs is the intended pattern.
 static struct umbra_buf slot[32] = {0};
 
-static umbra_ptr32 P32(struct umbra_builder *b, int i) {
-    return umbra_bind_buf32(b, &slot[i]);
+static umbra_ptr P32(struct umbra_builder *b, int i) {
+    return umbra_bind_buf(b, &slot[i]);
 }
-static umbra_ptr16 P16(struct umbra_builder *b, int i) {
-    return umbra_bind_buf16(b, &slot[i]);
+static umbra_ptr P16(struct umbra_builder *b, int i) {
+    return umbra_bind_buf(b, &slot[i]);
 }
-static umbra_ptr64 P64(struct umbra_builder *b, int i) {
-    return umbra_bind_buf64(b, &slot[i]);
+static umbra_ptr P64(struct umbra_builder *b, int i) {
+    return umbra_bind_buf(b, &slot[i]);
 }
 
 static struct umbra_builder* build_srcover(void) {
@@ -1392,7 +1392,7 @@ TEST(test_gather_deref_large) {
 
     struct umbra_builder *b = umbra_builder();
     umbra_val32            idx = umbra_load_32(b, P32(b, 0));
-    umbra_ptr16            src = umbra_bind_buf16(b, &data_buf);
+    umbra_ptr            src = umbra_bind_buf(b, &data_buf);
     umbra_val32            val = umbra_i32_from_s16(b, umbra_gather_16(b, src, idx));
     umbra_store_32(b, P32(b, 1), val);
     struct test_backends B = make(b);
@@ -2061,12 +2061,12 @@ TEST(test_program_threadsafe) {
 }
 
 static void run_umbra_uniforms_test(struct umbra_backend *be) {
-    // umbra_bind_uniforms32() captures only the pointer at IR-build time; the bytes
+    // umbra_bind_uniforms() captures only the pointer at IR-build time; the bytes
     // can be filled (and later mutated) any time before a queue() call.
     uint32_t u[4] = {0};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const reg = umbra_bind_uniforms32(b, u, count(u));
+    umbra_ptr const reg = umbra_bind_uniforms(b, u, count(u));
     umbra_store_32(b, P32(b, 0), umbra_uniform_32(b, reg, 2));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -3372,7 +3372,7 @@ TEST(test_deref_row_bytes_l_gt_0) {
     struct umbra_buf src_buf = {.ptr=src_px, .count=S * TH, .stride=S};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32           src = umbra_bind_buf32(b, &src_buf);
+    umbra_ptr           src = umbra_bind_buf(b, &src_buf);
     umbra_val32            v   = umbra_load_32(b, src);
     umbra_val32            one = umbra_imm_i32(b, 1);
     umbra_store_32(b, P32(b, 0), umbra_add_i32(b, v, one));
@@ -3412,7 +3412,7 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
     struct umbra_buf src_buf = {.ptr=src_px, .count=S * TH, .stride=S};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr16           src = umbra_bind_buf16(b, &src_buf);
+    umbra_ptr           src = umbra_bind_buf(b, &src_buf);
     umbra_val32            v   = umbra_f32_from_f16(b, umbra_load_16(b, src));
     umbra_val32            one = umbra_imm_f32(b, 1.0f);
     umbra_store_32(b, P32(b, 0), umbra_add_f32(b, v, one));
@@ -3449,9 +3449,9 @@ TEST(test_deref_third_uses_else_branch) {
     struct umbra_buf c = {.ptr=bufC, .count=count(bufC)};
 
     struct umbra_builder         *b = umbra_builder();
-    umbra_ptr32 d1  = umbra_bind_buf32(b, &a);
-    umbra_ptr32 d2  = umbra_bind_buf32(b, &bb);
-    umbra_ptr32 d3  = umbra_bind_buf32(b, &c);
+    umbra_ptr d1  = umbra_bind_buf(b, &a);
+    umbra_ptr d2  = umbra_bind_buf(b, &bb);
+    umbra_ptr d3  = umbra_bind_buf(b, &c);
     umbra_val32 v1  = umbra_load_32(b, d1);
     umbra_val32 v2  = umbra_load_32(b, d2);
     umbra_val32 v3  = umbra_load_32(b, d3);
@@ -3550,7 +3550,7 @@ TEST(test_gather_partial_oob) {
 // exercising the put() grow path on arm64 (mmap resize) and x86 (realloc).
 TEST(test_jit_code_buffer_overflow) {
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 p = {0};
+    umbra_ptr p = {0};
     for (int i = 0; i < 500; i++) {
         umbra_val32 r, g, bl, a;
         umbra_load_8x4(b, p, &r, &g, &bl, &a);
@@ -3971,7 +3971,7 @@ TEST(test_deref_ptr_r11_invalidation) {
     struct umbra_buf cov_buf = {.ptr = cov_data, .count = 8, .stride = 8};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr16 deref = umbra_bind_buf16(b, &cov_buf);
+    umbra_ptr deref = umbra_bind_buf(b, &cov_buf);
     umbra_val32 cov   = umbra_f32_from_i32(b, umbra_i32_from_s16(b, umbra_load_16(b, deref)));
     umbra_val32 r, g, bl, a;
     umbra_load_8x4(b, P32(b, 0), &r, &g, &bl, &a);

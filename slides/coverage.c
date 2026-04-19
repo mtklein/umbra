@@ -13,7 +13,7 @@ umbra_val32 coverage_bitmap(void *ctx, struct umbra_builder *b,
                             umbra_val32 x, umbra_val32 y) {
     struct umbra_buf const *self = ctx;
     (void)x; (void)y;
-    umbra_ptr16 const bmp = umbra_bind_buf16(b, self);
+    umbra_ptr const bmp = umbra_bind_buf(b, self);
     umbra_val32 const val = umbra_i32_from_s16(b, umbra_load_16(b, bmp));
     umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
     return umbra_mul_f32(b, umbra_f32_from_i32(b, val), inv255);
@@ -23,7 +23,7 @@ umbra_val32 coverage_sdf(void *ctx, struct umbra_builder *b,
                          umbra_val32 x, umbra_val32 y) {
     struct umbra_buf const *self = ctx;
     (void)x; (void)y;
-    umbra_ptr16 const bmp = umbra_bind_buf16(b, self);
+    umbra_ptr const bmp = umbra_bind_buf(b, self);
     umbra_val32 const raw = umbra_i32_from_s16(b, umbra_load_16(b, bmp));
     umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
     umbra_val32 const dist = umbra_mul_f32(b, umbra_f32_from_i32(b, raw), inv255);
@@ -42,7 +42,7 @@ umbra_val32 coverage_sdf(void *ctx, struct umbra_builder *b,
 umbra_val32 coverage_bitmap2d(void *ctx, struct umbra_builder *b,
                               umbra_val32 x, umbra_val32 y) {
     struct coverage_bitmap2d const *self = ctx;
-    umbra_ptr16 const pixels = umbra_bind_buf16(b, &self->buf);
+    umbra_ptr const pixels = umbra_bind_buf(b, &self->buf);
 
     umbra_val32 const zero_f = umbra_imm_f32(b, 0.0f);
     umbra_val32 const bw     = umbra_imm_f32(b, (float)self->w);
@@ -333,7 +333,7 @@ static void persp_init(struct slide *s, int w, int h) {
 }
 
 static void persp_build_draw(struct slide *s, struct umbra_builder *b,
-                              umbra_ptr32 dst_ptr, struct umbra_fmt fmt,
+                              umbra_ptr dst_ptr, struct umbra_fmt fmt,
                               umbra_val32 x, umbra_val32 y) {
     struct persp_slide *st = (struct persp_slide *)s;
     umbra_point_val32 const p = umbra_transform_perspective(&st->mat, b, x, y);
@@ -348,7 +348,7 @@ static void persp_build_draw(struct slide *s, struct umbra_builder *b,
 static struct umbra_builder* persp_builder(struct slide *s, struct umbra_fmt fmt) {
     struct persp_slide *st = (struct persp_slide *)s;
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, &st->dst_buf);
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
     umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
                       y = umbra_f32_from_i32(b, umbra_y(b));
     persp_build_draw(s, b, dst_ptr, fmt, x, y);
@@ -436,7 +436,7 @@ static void cov_null_init(struct slide *s, int w, int h) {
 }
 
 static void cov_null_build_draw(struct slide *s, struct umbra_builder *b,
-                                 umbra_ptr32 dst_ptr, struct umbra_fmt fmt,
+                                 umbra_ptr dst_ptr, struct umbra_fmt fmt,
                                  umbra_val32 x, umbra_val32 y) {
     struct cov_null_slide *st = (struct cov_null_slide *)s;
     umbra_build_draw(b, dst_ptr, fmt, x, y,
@@ -448,7 +448,7 @@ static void cov_null_build_draw(struct slide *s, struct umbra_builder *b,
 static struct umbra_builder* cov_null_builder(struct slide *s, struct umbra_fmt fmt) {
     struct cov_null_slide *st = (struct cov_null_slide *)s;
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, &st->dst_buf);
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
     umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
                       y = umbra_f32_from_i32(b, umbra_y(b));
     cov_null_build_draw(s, b, dst_ptr, fmt, x, y);

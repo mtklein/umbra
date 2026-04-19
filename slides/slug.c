@@ -12,7 +12,7 @@ umbra_val32 coverage_winding(void *ctx, struct umbra_builder *b,
                              umbra_val32 x, umbra_val32 y) {
     struct umbra_buf const *self = ctx;
     (void)x; (void)y;
-    umbra_ptr32 const w = umbra_bind_buf32(b, self);
+    umbra_ptr const w = umbra_bind_buf(b, self);
     umbra_val32 const raw = umbra_load_32(b, w);
     return umbra_min_f32(b, umbra_abs_f32(b, raw), umbra_imm_f32(b, 1.0f));
 }
@@ -160,9 +160,9 @@ struct umbra_builder* slug_build_acc(struct umbra_buf const *curves_buf,
                                      struct umbra_buf const *wind_buf) {
     struct umbra_builder *b = umbra_builder();
 
-    umbra_ptr32 const u      = umbra_bind_uniforms32(b, uni, (int)(sizeof *uni / 4));
-    umbra_ptr32 const curves = umbra_bind_buf32 (b, curves_buf);
-    umbra_ptr32 const wind   = umbra_bind_buf32 (b, wind_buf);
+    umbra_ptr const u      = umbra_bind_uniforms(b, uni, (int)(sizeof *uni / 4));
+    umbra_ptr const curves = umbra_bind_buf (b, curves_buf);
+    umbra_ptr const wind   = umbra_bind_buf (b, wind_buf);
 
     umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b));
     umbra_val32 yf = umbra_f32_from_i32(b, umbra_y(b));
@@ -286,9 +286,9 @@ struct umbra_builder* slug_build(struct umbra_buf const *curves_buf,
                                  struct umbra_buf const *wind_buf) {
     struct umbra_builder *b = umbra_builder();
 
-    umbra_ptr32 const u      = umbra_bind_uniforms32(b, uni, (int)(sizeof *uni / 4));
-    umbra_ptr32 const curves = umbra_bind_buf32 (b, curves_buf);
-    umbra_ptr32 const wind   = umbra_bind_buf32 (b, wind_buf);
+    umbra_ptr const u      = umbra_bind_uniforms(b, uni, (int)(sizeof *uni / 4));
+    umbra_ptr const curves = umbra_bind_buf (b, curves_buf);
+    umbra_ptr const wind   = umbra_bind_buf (b, wind_buf);
 
     umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b));
     umbra_val32 yf = umbra_f32_from_i32(b, umbra_y(b));

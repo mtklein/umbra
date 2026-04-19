@@ -494,7 +494,7 @@ static umbra_color_val32 test_gradient_fn(void *ctx, struct umbra_builder *build
                                           umbra_val32 x, umbra_val32 y) {
     struct test_gradient_state const *self = ctx;
     (void)y;
-    umbra_ptr32 const u = umbra_bind_uniforms32(builder, self, 2);
+    umbra_ptr const u = umbra_bind_uniforms(builder, self, 2);
     umbra_val32 const w    = umbra_uniform_32(builder, u, 0),
                       a    = umbra_uniform_32(builder, u, 1),
                       t    = umbra_div_f32(builder, x, w),
@@ -1253,8 +1253,8 @@ TEST(test_565_round_trip) {
                      dst_buf = {.ptr=dst, .count=W565};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr16 const sp = umbra_bind_buf16(b, &src_buf),
-                      dp = umbra_bind_buf16(b, &dst_buf);
+    umbra_ptr const sp = umbra_bind_buf(b, &src_buf),
+                      dp = umbra_bind_buf(b, &dst_buf);
     umbra_color_val32 c = umbra_load_565(b, sp);
     umbra_store_565(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -1279,8 +1279,8 @@ TEST(test_1010102_round_trip) {
                      dst_buf = {.ptr=dst, .count=7};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const sp = umbra_bind_buf32(b, &src_buf),
-                      dp = umbra_bind_buf32(b, &dst_buf);
+    umbra_ptr const sp = umbra_bind_buf(b, &src_buf),
+                      dp = umbra_bind_buf(b, &dst_buf);
     umbra_color_val32 c = umbra_load_1010102(b, sp);
     umbra_store_1010102(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -1303,8 +1303,8 @@ TEST(test_fp16_planar_round_trip) {
                      dst_buf = {.ptr=dst, .count=WP * 4, .stride=WP};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr16 const sp = umbra_bind_buf16(b, &src_buf),
-                      dp = umbra_bind_buf16(b, &dst_buf);
+    umbra_ptr const sp = umbra_bind_buf(b, &src_buf),
+                      dp = umbra_bind_buf(b, &dst_buf);
     umbra_color_val32 c = umbra_load_fp16_planar(b, sp);
     umbra_store_fp16_planar(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -1468,7 +1468,7 @@ struct test_circle_state {
 static umbra_interval test_circle_fn(void *ctx, struct umbra_builder *b,
                                       umbra_interval x, umbra_interval y) {
     struct test_circle_state const *self = ctx;
-    umbra_ptr32 const u = umbra_bind_uniforms32(b, self, 3);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, 3);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
                          cy = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
                          r  = umbra_interval_exact(umbra_uniform_32(b, u, 2));
@@ -1561,9 +1561,9 @@ TEST(test_metal_loop_gather) {
     struct umbra_buf out_buf = {.ptr = &out, .count = 1};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const u    = umbra_bind_uniforms32(b, &uniforms, (int)(sizeof uniforms / 4));
-    umbra_ptr32 const dst  = umbra_bind_buf32(b, &out_buf);
-    umbra_ptr32 const data = umbra_bind_buf32(b, &arr_buf);
+    umbra_ptr const u    = umbra_bind_uniforms(b, &uniforms, (int)(sizeof uniforms / 4));
+    umbra_ptr const dst  = umbra_bind_buf(b, &out_buf);
+    umbra_ptr const data = umbra_bind_buf(b, &arr_buf);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_slot);
 
     umbra_var32 sum = umbra_declare_var32(b);
@@ -1609,15 +1609,15 @@ static struct umbra_flat_ir* build_transform_ir(struct umbra_matrix *mat,
                                                  struct umbra_buf *ybuf,
                                                  _Bool use_transform) {
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const xp = umbra_bind_buf32(b, xbuf),
-                      yp = umbra_bind_buf32(b, ybuf);
+    umbra_ptr const xp = umbra_bind_buf(b, xbuf),
+                      yp = umbra_bind_buf(b, ybuf);
     umbra_val32 const xf = umbra_f32_from_i32(b, umbra_x(b)),
                       yf = umbra_f32_from_i32(b, umbra_y(b));
     umbra_point_val32 p;
     if (use_transform) {
         p = umbra_transform_perspective(mat, b, xf, yf);
     } else {
-        umbra_ptr32 const u = umbra_bind_uniforms32(b, mat, (int)(sizeof *mat / 4));
+        umbra_ptr const u = umbra_bind_uniforms(b, mat, (int)(sizeof *mat / 4));
         umbra_matrix_val32 const m = {
             .sx = umbra_uniform_32(b, u, 0),
             .kx = umbra_uniform_32(b, u, 1),

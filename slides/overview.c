@@ -99,7 +99,7 @@ static struct umbra_builder* build_cell_program(struct slide *sub,
                                                 struct umbra_buf *dst,
                                                 struct umbra_fmt fmt) {
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, dst);
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
     umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
                       y = umbra_f32_from_i32(b, umbra_y(b));
     umbra_point_val32 const p = umbra_transform_perspective(cell_mat, b, x, y);

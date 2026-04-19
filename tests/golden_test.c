@@ -284,8 +284,8 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
         struct umbra_builder *bld = umbra_builder();
-        umbra_ptr32 const cu = umbra_bind_uniforms32(bld, color, count(color)),
-                          pp = umbra_bind_buf32(bld, &pixel_buf);
+        umbra_ptr const cu = umbra_bind_uniforms(bld, color, count(color)),
+                          pp = umbra_bind_buf(bld, &pixel_buf);
         umbra_color_val32 c = {
             umbra_uniform_32(bld, cu, 0),
             umbra_uniform_32(bld, cu, 1),
@@ -346,7 +346,7 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
     struct umbra_buf data_buf = {.ptr=data, .count=BW * BH, .stride=BW};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const dp = umbra_bind_buf32(b, &data_buf);
+    umbra_ptr const dp = umbra_bind_buf(b, &data_buf);
     umbra_val32 v   = umbra_load_32(b, dp);
     umbra_val32 one = umbra_imm_f32(b, 1.0f);
     umbra_store_32(b, dp, umbra_add_f32(b, v, one));
@@ -400,8 +400,8 @@ TEST(test_wgpu_misc) {
     struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr32 const cu = umbra_bind_uniforms32(bld, uniform_data, count(uniform_data)),
-                      pp = umbra_bind_buf32(bld, &pixel_buf);
+    umbra_ptr const cu = umbra_bind_uniforms(bld, uniform_data, count(uniform_data)),
+                      pp = umbra_bind_buf(bld, &pixel_buf);
     umbra_color_val32 c = {
         umbra_uniform_32(bld, cu, 0),
         umbra_imm_f32(bld, 0.0f),

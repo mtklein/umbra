@@ -58,19 +58,19 @@ extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_fp16,
                               umbra_fmt_fp16_planar;
 
-umbra_color_val32 umbra_load_8888        (struct umbra_builder*, umbra_ptr32);
-void              umbra_store_8888       (struct umbra_builder*, umbra_ptr32, umbra_color_val32);
-umbra_color_val32 umbra_load_565         (struct umbra_builder*, umbra_ptr16);
-void              umbra_store_565        (struct umbra_builder*, umbra_ptr16, umbra_color_val32);
-umbra_color_val32 umbra_load_1010102     (struct umbra_builder*, umbra_ptr32);
-void              umbra_store_1010102    (struct umbra_builder*, umbra_ptr32, umbra_color_val32);
-umbra_color_val32 umbra_load_fp16        (struct umbra_builder*, umbra_ptr64);
-void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr64, umbra_color_val32);
-umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr16);
-void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, umbra_color_val32);
+umbra_color_val32 umbra_load_8888        (struct umbra_builder*, umbra_ptr);
+void              umbra_store_8888       (struct umbra_builder*, umbra_ptr, umbra_color_val32);
+umbra_color_val32 umbra_load_565         (struct umbra_builder*, umbra_ptr);
+void              umbra_store_565        (struct umbra_builder*, umbra_ptr, umbra_color_val32);
+umbra_color_val32 umbra_load_1010102     (struct umbra_builder*, umbra_ptr);
+void              umbra_store_1010102    (struct umbra_builder*, umbra_ptr, umbra_color_val32);
+umbra_color_val32 umbra_load_fp16        (struct umbra_builder*, umbra_ptr);
+void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr, umbra_color_val32);
+umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr);
+void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr, umbra_color_val32);
 
 // Effects emit IR into a builder.  Any uniforms registered with
-// umbra_bind_uniforms32() must outlive the builder, flat_ir, and program.  These are
+// umbra_bind_uniforms() must outlive the builder, flat_ir, and program.  These are
 // function types (not pointer types), so declarations read as
 // `umbra_blend umbra_blend_src, umbra_blend_srcover, ...;` and struct fields
 // carrying them write as `umbra_shader *inner_fn`.
@@ -109,10 +109,10 @@ umbra_blend umbra_blend_src,
 // coverage=1, shader={0,0,0,0}, blend=src.  Callers can apply any transform
 // they want by pre-processing (x, y) themselves (e.g. via
 // umbra_transform_perspective) and chaining as they please.  dst_ptr must
-// already be bound on the builder via umbra_bind_buf32; the backing buf
+// already be bound on the builder via umbra_bind_buf; the backing buf
 // must outlive the builder, flat_ir, and program.
 void umbra_build_draw(struct umbra_builder*,
-                      umbra_ptr32 dst_ptr, struct umbra_fmt dst_fmt,
+                      umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                       umbra_val32 x, umbra_val32 y,
                       umbra_coverage, void *coverage_ctx,
                       umbra_shader  , void *shader_ctx,
@@ -122,7 +122,7 @@ void umbra_build_draw(struct umbra_builder*,
 // umbra_build_draw that survives only so legacy call sites (slide code that
 // hasn't migrated to build_draw yet, plus umbra_sdf_draw's internal draw
 // program) don't all have to be rewritten at once.  Steady state is every
-// caller does it themselves: umbra_builder() + umbra_bind_buf32(dst) +
+// caller does it themselves: umbra_builder() + umbra_bind_buf(dst) +
 // umbra_f32_from_i32 of umbra_x / umbra_y + optional
 // umbra_transform_perspective + umbra_build_draw -- exactly the same four
 // lines this wrapper inlines.  Delete this prototype and src/draw.c's
