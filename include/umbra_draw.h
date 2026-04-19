@@ -118,9 +118,27 @@ void umbra_build_draw(struct umbra_builder*,
                       umbra_shader  , void *shader_ctx,
                       umbra_blend   , void *blend_ctx);
 
-// Thin wrapper around umbra_build_draw: creates a fresh builder, initializes
-// (x, y) from the dispatch, applies umbra_transform_perspective through
-// transform_mat (if non-NULL), and dispatches to umbra_build_draw.
+// TODO: remove umbra_draw_builder.  It is a thin convenience wrapper around
+// umbra_build_draw that survives only so legacy call sites (slide code that
+// hasn't migrated to build_draw yet, plus umbra_sdf_draw's internal draw
+// program) don't all have to be rewritten at once.  Steady state is every
+// caller does it themselves: umbra_builder() + umbra_bind_buf32(dst) +
+// umbra_f32_from_i32 of umbra_x / umbra_y + optional
+// umbra_transform_perspective + umbra_build_draw -- exactly the same four
+// lines this wrapper inlines.  Delete this prototype and src/draw.c's
+// definition once the last caller is gone.
+//
+// Current callers to migrate first:
+//   * slides/color.c, slides/slug.c, slides/sdf.c, slides/blend.c,
+//     slides/slides.c bg program, slides/overview.c overlay program (each
+//     will typically migrate alongside its own slide->build_draw conversion)
+//   * tests/draw_test.c draw_builder_shim (every TEST using the shim)
+//   * tests/golden_test.c
+//   * src/draw.c inside umbra_sdf_draw (easy -- open-codes the same four
+//     lines).
+// Creates a fresh builder, initializes (x, y) from the dispatch, applies
+// umbra_transform_perspective through transform_mat (if non-NULL), and
+// dispatches to umbra_build_draw.
 struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_mat,
                                          umbra_coverage , void *coverage_ctx,
                                          umbra_shader   , void *shader_ctx,
