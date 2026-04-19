@@ -178,7 +178,7 @@ struct interp_program {
     struct sw_inst *inst;
     ival           *v;
     ival           *var;
-    int             preamble, nptr, bindings, vars;
+    int             preamble, ptrs, bindings, vars;
     struct buffer_binding *binding;
 };
 
@@ -205,7 +205,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             max_ptr = ir->inst[i].ptr.bits;
         }
     }
-    p->nptr     = max_ptr + 1;
+    p->ptrs     = max_ptr + 1;
     p->bindings = ir->bindings;
     if (p->bindings) {
         size_t const sz = (size_t)p->bindings * sizeof *p->binding;
@@ -487,7 +487,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 }
 
 static void interp_program_run(struct interp_program *p, int l, int t, int r, int b) {
-    assume(p->nptr <= 64);
+    assume(p->ptrs <= 64);
     struct umbra_buf buf[64];
     for (int i = 0; i < p->bindings; i++) {
         buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].uniforms;
