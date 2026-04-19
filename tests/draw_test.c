@@ -1428,8 +1428,7 @@ TEST(test_sdf_dispatch_rect) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
 
-        struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi],
-            umbra_sdf_rect, &rect,
+        struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi], NULL, NULL,            umbra_sdf_rect, &rect,
             1,
             umbra_shader_color,  &color,
             umbra_blend_srcover, NULL,
@@ -1494,8 +1493,7 @@ TEST(test_sdf_dispatch_tiling) {
     if (!be) { be = umbra_backend_interp(); }
 
     // Tiled dispatch.
-    struct umbra_sdf_draw *disp = umbra_sdf_draw(be,
-        test_circle_fn, &sdf,
+    struct umbra_sdf_draw *disp = umbra_sdf_draw(be, NULL, NULL,        test_circle_fn, &sdf,
         1,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,

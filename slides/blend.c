@@ -42,8 +42,7 @@ static void blend_prepare(struct slide *s, struct umbra_backend *be,
     struct blend_slide *st = (struct blend_slide *)s;
     umbra_sdf_draw_free(st->qt);
     st->fmt = fmt;
-    st->qt = umbra_sdf_draw(be,
-                            umbra_sdf_rect,     &st->rect,
+    st->qt = umbra_sdf_draw(be, NULL, NULL,                            umbra_sdf_rect,     &st->rect,
                             1,
                             umbra_shader_color, &st->color,
                             st->blend_fn,       NULL,

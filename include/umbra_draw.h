@@ -127,8 +127,18 @@ struct umbra_builder* umbra_draw_builder(umbra_transform, struct umbra_matrix co
 
 // Draw using an umbra_sdf as coverage.  hard_edge=1 gives a binary mask;
 // hard_edge=0 clamps -sdf into [0, 1] for a 1px AA ramp.
+//
+// If transform is non-NULL, its matrix is applied before the sdf (draw and
+// bounds programs both see transformed coordinates).  Affine matrices at
+// build time (p0 == p1 == 0 && p2 == 1) keep the tile-culling bounds program;
+// perspective matrices skip bounds and fall back to a single full-rect
+// dispatch because the interval divide is unsound when w straddles zero
+// (see TODO in src/interval.c).  This is a build-time decision -- if you
+// need an affine-gated sdf_draw, keep the perspective row zero for the
+// lifetime of the program.
 // TODO: _Bool hard_edge -> int quality
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
+                                      umbra_transform, struct umbra_matrix const *transform_mat,
                                       umbra_sdf, void *sdf_ctx,
                                       _Bool hard_edge,
                                       umbra_shader, void *shader_ctx,

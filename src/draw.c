@@ -318,24 +318,13 @@ struct umbra_sdf_draw {
 // compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
 enum { QUEUE_MIN_TILE = 512 };
 
-// TODO: when we add a transform effect here (peer to shader/coverage/sdf),
-// the bounds program below is only sound under affine transforms.  Perspective
-// transforms introduce a `w = p0*x + p1*y + p2` divide whose interval contains
-// zero on horizon-crossing tiles, and umbra_interval_div_f32 is currently
-// unsound in that case (see TODO in src/interval.c) -- we'd silently drop
-// tiles that cross the horizon.
-//
-// Until interval.c grows sound zero-straddling div, sniff the transform at
-// umbra_sdf_draw build time (p0 == 0 && p1 == 0 && p2 == 1 => affine) and:
-//   - affine: build the bounds program with the transform applied to x,y
-//     intervals before sdf_fn, cull as usual.
-//   - perspective: skip the bounds program entirely and fall back to a single
-//     full-rect dispatch of the draw program.  umbra_coverage_from_sdf already
-//     handles the per-pixel sdf->coverage conversion, so the draw path is
-//     correct without any bounds culling; we just lose the tile-skip speedup.
-// Once interval.c's div is sound, drop the sniff and always build bounds.
+static _Bool matrix_is_affine(struct umbra_matrix const *m) {
+    return m->p0 == 0.0f && m->p1 == 0.0f && m->p2 == 1.0f;
+}
 
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
+                                      umbra_transform transform_fn,
+                                      struct umbra_matrix const *transform_mat,
                                       umbra_sdf sdf_fn, void *sdf_ctx,
                                       _Bool hard_edge,
                                       umbra_shader shader_fn, void *shader_ctx,
@@ -348,9 +337,9 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
         .hard_edge = hard_edge,
     };
 
-    // Build the draw program (shader + SDF coverage + blend).
+    // Build the draw program (transform + shader + SDF coverage + blend).
     struct umbra_builder *db = umbra_draw_builder(
-        NULL,                    NULL,
+        transform_fn,            transform_mat,
         umbra_coverage_from_sdf, &d->cov_state,
         shader_fn, shader_ctx,
         blend_fn,  blend_ctx,
@@ -360,6 +349,13 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     d->draw = be->compile(be, dir);
     umbra_flat_ir_free(dir);
     if (!d->draw) { free(d); return NULL; }
+
+    // Gate the bounds program on affine-only transforms.  Perspective interval
+    // divide is unsound when w straddles zero (see TODO in src/interval.c), so
+    // we'd silently drop horizon-crossing tiles.  Non-affine transforms skip
+    // bounds entirely and fall back to a full-rect dispatch in _queue.
+    _Bool const build_bounds = !transform_fn || matrix_is_affine(transform_mat);
+    if (!build_bounds) { return d; }
 
     // Build the bounds program: evaluate the sdf over tile-extent intervals.
     // x() and y() are tile indices.
@@ -373,14 +369,15 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                       tile_h = umbra_uniform_32(bb, g, 3);
     umbra_val32 const xf = umbra_f32_from_i32(bb, umbra_x(bb)),
                       yf = umbra_f32_from_i32(bb, umbra_y(bb));
-    umbra_interval const x = {umbra_add_f32(bb, base_x, umbra_mul_f32(bb, xf, tile_w)),
-                              umbra_add_f32(bb, base_x,
-                                  umbra_mul_f32(bb, umbra_add_f32(bb, xf,
-                                      umbra_imm_f32(bb, 1.0f)), tile_w))},
-                         y = {umbra_add_f32(bb, base_y, umbra_mul_f32(bb, yf, tile_h)),
-                              umbra_add_f32(bb, base_y,
-                                  umbra_mul_f32(bb, umbra_add_f32(bb, yf,
-                                      umbra_imm_f32(bb, 1.0f)), tile_h))};
+    umbra_interval x = {umbra_add_f32(bb, base_x, umbra_mul_f32(bb, xf, tile_w)),
+                        umbra_add_f32(bb, base_x,
+                            umbra_mul_f32(bb, umbra_add_f32(bb, xf,
+                                umbra_imm_f32(bb, 1.0f)), tile_w))},
+                   y = {umbra_add_f32(bb, base_y, umbra_mul_f32(bb, yf, tile_h)),
+                        umbra_add_f32(bb, base_y,
+                            umbra_mul_f32(bb, umbra_add_f32(bb, yf,
+                                umbra_imm_f32(bb, 1.0f)), tile_h))};
+    if (transform_fn) { transform_fn(transform_mat, bb, &x, &y); }
 
     umbra_interval const f = sdf_fn(sdf_ctx, bb, x, y);
 
@@ -400,6 +397,12 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
 void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
                           int l, int t, int r, int b, struct umbra_buf dst) {
     if (!d) { return; }
+    if (!d->bounds) {
+        // Perspective transform: tile-culling bounds are unsound; dispatch full rect.
+        d->draw_dst_buf = dst;
+        d->draw->queue(d->draw, l, t, r, b);
+        return;
+    }
     int const w  = r - l,
               h  = b - t,
               xt = (w + QUEUE_MIN_TILE - 1) / QUEUE_MIN_TILE,
