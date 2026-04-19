@@ -490,7 +490,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     assume(p->nptr <= 64);
     struct umbra_buf buf[64];
     for (int i = 0; i < p->bindings; i++) {
-        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].storage;
+        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].uniforms;
     }
 
     int const      P   = p->preamble;

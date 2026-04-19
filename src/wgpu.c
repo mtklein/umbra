@@ -464,7 +464,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
     for (int i = 0; i < p->bindings; i++) {
-        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].storage;
+        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].uniforms;
     }
 
     begin_batch(be);

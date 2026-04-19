@@ -131,7 +131,7 @@ umbra_ptr umbra_bind_uniforms(builder *b, void const *slot, int slots) {
     int const ix = reserve_binding(b);
     b->binding[ix] = (struct buffer_binding){
         .buf     = NULL,
-        .storage = {.ptr = (void*)(uintptr_t)slot, .count = slots, .stride = 0},
+        .uniforms = {.ptr = (void*)(uintptr_t)slot, .count = slots, .stride = 0},
         .ix      = ix,
     };
     return (umbra_ptr){.ix = ix};

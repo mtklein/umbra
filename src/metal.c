@@ -1250,7 +1250,7 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
     for (int i = 0; i < p->bindings; i++) {
-        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].storage;
+        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].uniforms;
     }
 
     void *pool = objc_autoreleasePoolPush();

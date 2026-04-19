@@ -695,7 +695,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         int const p = ir->binding[i].ix;
         if (0 <= p && p < total_bufs && ir->binding[i].buf == NULL) {
             B.buf_is_uniform   [p] = 1;
-            B.buf_uniform_slots[p] = ir->binding[i].storage.count;
+            B.buf_uniform_slots[p] = ir->binding[i].uniforms.count;
         }
     }
 
