@@ -186,17 +186,17 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     int *id = calloc((size_t)ir->insts, sizeof *id);
 
     struct interp_program *p = malloc(sizeof *p);
-    int num_slots = 1;
+    int slots = 1;
     for (int i = 0; i < ir->insts; i++) {
         enum op const op = ir->inst[i].op;
         if (op == op_load_16x4 || op == op_load_16x4_planar || op == op_load_8x4) {
-            num_slots += 4;
+            slots += 4;
         } else {
-            num_slots += 1;
+            slots += 1;
         }
     }
-    p->inst = malloc((size_t)num_slots * sizeof *p->inst);
-    p->v = malloc((size_t)num_slots * sizeof *p->v);
+    p->inst = malloc((size_t)slots * sizeof *p->inst);
+    p->v = malloc((size_t)slots * sizeof *p->v);
 
     int max_ptr = -1;
     for (int i = 0; i < ir->insts; i++) {
