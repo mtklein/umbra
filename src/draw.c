@@ -238,6 +238,23 @@ struct umbra_sdf_draw {
 // compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
 enum { QUEUE_MIN_TILE = 512 };
 
+// TODO: when we add a transform effect here (peer to shader/coverage/sdf),
+// the bounds program below is only sound under affine transforms.  Perspective
+// transforms introduce a `w = p0*x + p1*y + p2` divide whose interval contains
+// zero on horizon-crossing tiles, and umbra_interval_div_f32 is currently
+// unsound in that case (see TODO in src/interval.c) -- we'd silently drop
+// tiles that cross the horizon.
+//
+// Until interval.c grows sound zero-straddling div, sniff the transform at
+// umbra_sdf_draw build time (p0 == 0 && p1 == 0 && p2 == 1 => affine) and:
+//   - affine: build the bounds program with the transform applied to x,y
+//     intervals before sdf_fn, cull as usual.
+//   - perspective: skip the bounds program entirely and fall back to a single
+//     full-rect dispatch of the draw program.  umbra_coverage_from_sdf already
+//     handles the per-pixel sdf->coverage conversion, so the draw path is
+//     correct without any bounds culling; we just lose the tile-skip speedup.
+// Once interval.c's div is sound, drop the sniff and always build bounds.
+
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                       umbra_sdf sdf_fn, void *sdf_ctx,
                                       _Bool hard_edge,
