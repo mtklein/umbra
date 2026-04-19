@@ -177,7 +177,7 @@ struct interp_program {
     struct umbra_program base;
     struct sw_inst *inst;
     ival           *v;
-    ival           *vars;
+    ival           *var;
     int             preamble, nptr, bindings, n_vars;
     struct buffer_binding *binding;
 };
@@ -478,7 +478,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     }
 
     p->n_vars = ir->n_vars;
-    p->vars   = ir->n_vars ? calloc((size_t)ir->n_vars, sizeof *p->vars) : NULL;
+    p->var    = ir->n_vars ? calloc((size_t)ir->n_vars, sizeof *p->var)  : NULL;
 
     free(id);
     umbra_flat_ir_free(resolved);
@@ -494,7 +494,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     }
 
     int const      P   = p->preamble;
-    ival                 *vars = p->vars;
+    ival                 *var = p->var;
     int const             n_vars = p->n_vars;
     I32                   if_mask_stack[8];
     int                   if_depth = 0;
@@ -506,7 +506,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             struct sw_inst const  *ip  = p->inst + (col == l ? 0 : P);
             ival                  *v   = p->v    + (col == l ? 0 : P);
 
-            for (int vi = 0; vi < n_vars; vi++) { vars[vi] = (ival){0}; }
+            for (int vi = 0; vi < n_vars; vi++) { var[vi] = (ival){0}; }
             if_depth = 0;
 
             ival acc = {0};
@@ -938,7 +938,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_loop_end) {
                     int const back   = ip->x;
                     int const n_trip = v[ip->y].i32[0];
-                    int const i_next = vars[ip->z].i32[0];
+                    int const i_next = var[ip->z].i32[0];
                     if (i_next < n_trip) {
                         ip += back;
                         v  += back;
@@ -953,14 +953,14 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_if_end) {
                     if_depth--;
                 } NEXT;
-                CASE(op_load_var)  v->i32 = vars[ip->x].i32; NEXT;
+                CASE(op_load_var)  v->i32 = var[ip->x].i32; NEXT;
                 CASE(op_store_var) {
                     if (if_depth > 0) {
                         I32 const mask = if_mask_stack[if_depth - 1];
-                        vars[ip->y].i32 = (v[ip->x].i32 & mask)
-                                        | (vars[ip->y].i32 & ~mask);
+                        var[ip->y].i32 = (v[ip->x].i32 & mask)
+                                       | (var[ip->y].i32 & ~mask);
                     } else {
-                        vars[ip->y] = v[ip->x];
+                        var[ip->y] = v[ip->x];
                     }
                 } NEXT;
 
@@ -1292,7 +1292,7 @@ static void interp_program_free(struct interp_program *p) {
     if (p) {
         free(p->inst);
         free(p->v);
-        free(p->vars);
+        free(p->var);
         free(p->binding);
         free(p);
     }
