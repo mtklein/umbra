@@ -1,4 +1,5 @@
 #include "slide.h"
+#include "coverage.h"
 #include <stdlib.h>
 
 static uint8_t const font3x5[10][5] = {
@@ -28,37 +29,48 @@ struct overview_slide {
     struct cell          *cells;
     int                   n_cells, rows, cols, cw, ch;
     int                   :32;
+
+    // Overlay: a uint16_t coverage mask of slide numbers + empty-slot X-boxes,
+    // rasterized CPU-side in prepare and sampled through a white-on-srcover
+    // draw program queued after the cell programs each frame.
+    uint16_t             *overlay;
+    struct umbra_buf      overlay_buf;
+    umbra_color           overlay_color;
+    struct umbra_program *overlay_prog;
 };
 
-static void draw_digit(uint32_t *fb, int stride, int ox, int oy, int digit, uint32_t color) {
+static void plot(uint16_t *mask, int stride, int x, int y) {
+    mask[y * stride + x] = 0xff;
+}
+
+static void draw_digit(uint16_t *mask, int stride, int ox, int oy, int digit) {
     for (int dy = 0; dy < 10; dy++) {
         uint8_t bits = font3x5[digit][dy / 2];
         for (int dx = 0; dx < 6; dx++) {
-            if (bits & (4 >> (dx / 2))) { fb[(oy + dy) * stride + ox + dx] = color; }
+            if (bits & (4 >> (dx / 2))) { plot(mask, stride, ox + dx, oy + dy); }
         }
     }
 }
 
-static void draw_number(uint32_t *fb, int stride, int ox, int oy, int num, uint32_t color) {
+static void draw_number(uint16_t *mask, int stride, int ox, int oy, int num) {
     if (num >= 10) {
-        draw_digit(fb, stride, ox, oy, num / 10, color);
+        draw_digit(mask, stride, ox, oy, num / 10);
         ox += 7;
     }
-    draw_digit(fb, stride, ox, oy, num % 10, color);
+    draw_digit(mask, stride, ox, oy, num % 10);
 }
 
-static void draw_xbox(uint32_t *fb, int stride, int x0, int y0, int cw, int ch,
-                      uint32_t color) {
+static void draw_xbox(uint16_t *mask, int stride, int x0, int y0, int cw, int ch) {
     for (int x = 0; x < cw; x++) {
-        fb[y0 * stride + x0 + x] = color;
-        fb[(y0 + ch - 1) * stride + x0 + x] = color;
+        plot(mask, stride, x0 + x, y0);
+        plot(mask, stride, x0 + x, y0 + ch - 1);
     }
     for (int y = 0; y < ch; y++) {
-        fb[(y0 + y) * stride + x0] = color;
-        fb[(y0 + y) * stride + x0 + cw - 1] = color;
+        plot(mask, stride, x0,          y0 + y);
+        plot(mask, stride, x0 + cw - 1, y0 + y);
         int xd = y * (cw - 1) / (ch - 1);
-        fb[(y0 + y) * stride + x0 + xd] = color;
-        fb[(y0 + y) * stride + x0 + cw - 1 - xd] = color;
+        plot(mask, stride, x0 + xd,          y0 + y);
+        plot(mask, stride, x0 + cw - 1 - xd, y0 + y);
     }
 }
 
@@ -102,6 +114,18 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 
     slide_bg_prepare(be, fmt, st->w, st->h);
 
+    if (!st->overlay) {
+        st->overlay = calloc((size_t)(st->w * st->h), sizeof *st->overlay);
+    } else {
+        for (int i = 0; i < st->w * st->h; i++) { st->overlay[i] = 0; }
+    }
+    st->overlay_buf = (struct umbra_buf){
+        .ptr    = st->overlay,
+        .count  = st->w * st->h,
+        .stride = st->w,
+    };
+    st->overlay_color = (umbra_color){1, 1, 1, 1};
+
     int const n_real = slide_count() - 1;
     if (n_real <= 0) { return; }
 
@@ -130,6 +154,14 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         compute_cell_matrix(&c->cell_mat, c->col, c->row, cw, ch, st->w, st->h);
         c->final_mat = c->cell_mat;
 
+        int const x0 = c->col * cw,
+                  y0 = c->row * ch;
+        if (idx < n_real) {
+            draw_number(st->overlay, st->w, x0 + 2, y0 + 2, idx + 1);
+        } else {
+            draw_xbox(st->overlay, st->w, x0, y0, cw, ch);
+        }
+
         if (idx >= n_real) { continue; }  // empty slot (no slide)
 
         struct slide *sub = slide_get(idx);
@@ -152,6 +184,18 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         c->prog = be->compile(be, ir);
         umbra_flat_ir_free(ir);
     }
+
+    umbra_program_free(st->overlay_prog);
+    struct umbra_builder *ob = umbra_draw_builder(
+        NULL,                NULL,
+        coverage_bitmap,     &st->overlay_buf,
+        umbra_shader_color,  &st->overlay_color,
+        umbra_blend_srcover, NULL,
+        &st->out_buf,        fmt);
+    struct umbra_flat_ir *oir = umbra_flat_ir(ob);
+    umbra_builder_free(ob);
+    st->overlay_prog = be->compile(be, oir);
+    umbra_flat_ir_free(oir);
 }
 
 static void overview_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
@@ -165,10 +209,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         .stride = w,
     };
 
-    // The overlay (slide numbers, placeholder X-box) is CPU-drawn in 8888 only;
-    // other formats get the live/bg'd cells without the overlay.
-    uint32_t *fb = (st->out_fmt.name == umbra_fmt_8888.name) ? (uint32_t*)buf : NULL;
-    float const placeholder_bg[4] = {0.094f, 0.094f, 0.094f, 1};  // 0xff181818
+    float const placeholder_bg[4] = {0.094f, 0.094f, 0.094f, 1};
 
     for (int idx = 0; idx < st->n_cells; idx++) {
         struct cell *c = &st->cells[idx];
@@ -183,10 +224,10 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         int const xl = x0,
                   xr = x1;
 
-        // Paint the cell's background first (live cells use srcover that would
-        // accumulate without a fresh bg each frame; placeholders just need
-        // something other than uninitialized memory).  For slots with no
-        // sub-slide (n_cells > n_real), use a neutral dark gray.
+        // Paint the cell's background first -- live cells use srcover that
+        // would accumulate without a fresh bg each frame; placeholders just
+        // need something visible.  Empty slots (idx >= n_real, c->sub NULL)
+        // get a neutral dark gray.
         float const *bg = c->sub ? c->sub->bg : placeholder_bg;
         slide_bg_draw(bg, xl, yt, xr, yb, buf);
 
@@ -198,16 +239,11 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
             c->sub->get_effects(c->sub, &eff);
             compose_final(&c->final_mat, &eff, &c->cell_mat);
             c->prog->queue(c->prog, xl, yt, xr, yb);
-        } else if (fb) {
-            // Placeholder: bg + X-box overlay on top (8888 only).
-            draw_xbox(fb, w, x0, yt, st->cw, yb - yt, 0xff404040);
-        }
-
-        if (fb) {
-            draw_number(fb, w, x0 + 3, y0 + 3, idx + 1, 0x80000000);
-            draw_number(fb, w, x0 + 2, y0 + 2, idx + 1, 0xffffffff);
         }
     }
+
+    // Overlay: slide numbers + empty-slot X-boxes, white srcover.
+    if (st->overlay_prog) { st->overlay_prog->queue(st->overlay_prog, 0, t, w, b); }
 }
 
 static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -233,6 +269,8 @@ static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void overview_free(struct slide *s) {
     struct overview_slide *st = (struct overview_slide *)s;
+    umbra_program_free(st->overlay_prog);
+    free(st->overlay);
     if (st->cells) {
         for (int i = 0; i < st->n_cells; i++) { umbra_program_free(st->cells[i].prog); }
         free(st->cells);
