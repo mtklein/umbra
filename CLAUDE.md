@@ -200,3 +200,5 @@ Move slowly and pedantically when debugging.  Before claiming a cause:
 Revert speculative changes that did not produce the expected improvement
 before moving on, so the tree stays clean and the next measurement is not
 confounded.
+
+// TODO: which parts of this CLAUDE.md file are better off as skills?
