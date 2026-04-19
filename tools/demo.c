@@ -38,7 +38,7 @@ static struct umbra_fmt const *fmt_enums[] = {
 
 struct pipe {
     struct umbra_program *program;
-    int                   out_ptr, :32;
+    struct umbra_buf      src_buf, dst_buf;
 };
 
 static struct pipe readback_pipe, hdr_pipe;
@@ -60,21 +60,19 @@ static void finish_pipe(struct pipe *p, struct umbra_builder *builder) {
 static void build_readback(int fmt) {
     free_pipe(&readback_pipe);
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr32 src_ptr = {.ix = 1};
-    umbra_ptr32 dst_ptr = {.ix = 2};
+    umbra_ptr32 const src_ptr = umbra_bind_buf32(builder, &readback_pipe.src_buf),
+                      dst_ptr = umbra_bind_buf32(builder, &readback_pipe.dst_buf);
     umbra_color_val32 c = fmt_enums[fmt]->load(builder, &src_ptr);
     umbra_fmt_fp16.store(builder, &dst_ptr, c);
-    readback_pipe.out_ptr = 2;
     finish_pipe(&readback_pipe, builder);
 }
 
 static void build_hdr(int fmt) {
     free_pipe(&hdr_pipe);
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr32 src_ptr = {.ix = 1};
-    umbra_ptr32 dst_ptr = {.ix = 2};
+    umbra_ptr32 const src_ptr = umbra_bind_buf32(builder, &hdr_pipe.src_buf),
+                      dst_ptr = umbra_bind_buf32(builder, &hdr_pipe.dst_buf);
     umbra_color_val32 c = fmt_enums[fmt]->load(builder, &src_ptr);
-    hdr_pipe.out_ptr = 2;
     umbra_fmt_fp16.store(builder, &dst_ptr, c);
     finish_pipe(&hdr_pipe, builder);
 }
@@ -166,30 +164,18 @@ static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double 
     SDL_SetWindowTitle(w, title);
 }
 
-static void readback_row(void *dst, void *src, int n, size_t plane_gap) {
-    int      ps = plane_gap ? 3 : 0;
-    int      op = readback_pipe.out_ptr;
-    struct umbra_buf buf[6] = {0};
-    buf[1] = (struct umbra_buf){.ptr=src, .count=n};
-    for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap,
-                                         .count=n};
-    }
-    buf[op] = (struct umbra_buf){.ptr=dst, .count=n};
-    readback_pipe.program->queue(readback_pipe.program, 0, 0, n, 1, buf);
+static void readback_row(void *dst, void *src, int n) {
+    readback_pipe.src_buf = (struct umbra_buf){.ptr=src, .count=n};
+    readback_pipe.dst_buf = (struct umbra_buf){.ptr=dst, .count=n};
+    readback_pipe.program->queue(readback_pipe.program, 0, 0, n, 1,
+                                 (struct umbra_buf[]){{0}});
 }
 
-static void to_hdr_row(__fp16 *dst, void *src, int n, size_t plane_gap) {
-    int      ps = plane_gap ? 3 : 0;
-    int      op = hdr_pipe.out_ptr;
-    struct umbra_buf buf[6] = {0};
-    buf[1] = (struct umbra_buf){.ptr=src, .count=n};
-    for (int i = 0; i < ps; i++) {
-        buf[2 + i] = (struct umbra_buf){.ptr=(char *)src + (size_t)(i + 1) * plane_gap,
-                                         .count=n};
-    }
-    buf[op] = (struct umbra_buf){.ptr=dst, .count=n};
-    hdr_pipe.program->queue(hdr_pipe.program, 0, 0, n, 1, buf);
+static void to_hdr_row(__fp16 *dst, void *src, int n) {
+    hdr_pipe.src_buf = (struct umbra_buf){.ptr=src, .count=n};
+    hdr_pipe.dst_buf = (struct umbra_buf){.ptr=dst, .count=n};
+    hdr_pipe.program->queue(hdr_pipe.program, 0, 0, n, 1,
+                            (struct umbra_buf[]){{0}});
 }
 
 struct tile_work {
@@ -374,19 +360,19 @@ int main(void) {
         uint8_t *rows = (uint8_t *)tex_pixels;
         if (plane_gap) {
             for (int y = 0; y < H; y++) {
-                int      op = readback_pipe.out_ptr;
-                struct umbra_buf rb[3] = {0};
-                rb[1] = (struct umbra_buf){.ptr = pixbuf,
-                                           .count = W * H * planes,
-                                           .stride = W};
-                rb[op] = (struct umbra_buf){.ptr = rows + y * tex_pitch,
-                                            .count = W};
-                readback_pipe.program->queue(readback_pipe.program, 0, y, W, y + 1, rb);
+                readback_pipe.src_buf = (struct umbra_buf){
+                    .ptr = pixbuf, .count = W * H * planes, .stride = W,
+                };
+                readback_pipe.dst_buf = (struct umbra_buf){
+                    .ptr = rows + y * tex_pitch, .count = W,
+                };
+                readback_pipe.program->queue(readback_pipe.program, 0, y, W, y + 1,
+                                             (struct umbra_buf[]){{0}});
             }
         } else {
             for (int y = 0; y < H; y++) {
                 void *src = (void *)((uint8_t *)pixbuf + (size_t)y * (size_t)W * bpp);
-                readback_row(rows + y * tex_pitch, src, W, plane_gap);
+                readback_row(rows + y * tex_pitch, src, W);
             }
         }
 
@@ -394,19 +380,19 @@ int main(void) {
             __fp16 *hdata = malloc((size_t)(W * H) * 4 * sizeof(__fp16));
             if (plane_gap) {
                 for (int y = 0; y < H; y++) {
-                    int      op = hdr_pipe.out_ptr;
-                    struct umbra_buf hb[3] = {0};
-                    hb[1] = (struct umbra_buf){.ptr = pixbuf,
-                                               .count = W * H * planes,
-                                               .stride = W};
-                    hb[op] = (struct umbra_buf){.ptr = hdata + y * W * 4,
-                                                .count = W};
-                    hdr_pipe.program->queue(hdr_pipe.program, 0, y, W, y + 1, hb);
+                    hdr_pipe.src_buf = (struct umbra_buf){
+                        .ptr = pixbuf, .count = W * H * planes, .stride = W,
+                    };
+                    hdr_pipe.dst_buf = (struct umbra_buf){
+                        .ptr = hdata + y * W * 4, .count = W,
+                    };
+                    hdr_pipe.program->queue(hdr_pipe.program, 0, y, W, y + 1,
+                                            (struct umbra_buf[]){{0}});
                 }
             } else {
                 for (int y = 0; y < H; y++) {
                     void *src = (void *)((uint8_t *)pixbuf + (size_t)y * (size_t)W * bpp);
-                    to_hdr_row(hdata + y * W * 4, src, W, plane_gap);
+                    to_hdr_row(hdata + y * W * 4, src, W);
                 }
             }
             float *fdata = malloc((size_t)(W * H) * 4 * sizeof(float));
