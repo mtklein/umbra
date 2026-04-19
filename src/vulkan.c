@@ -269,7 +269,8 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     assume(vp->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
     for (int i = 0; i < vp->bindings; i++) {
-        buf[vp->binding[i].ix] = vp->binding[i].buf ? *vp->binding[i].buf : vp->binding[i].uniforms;
+        struct buffer_binding const *bb = &vp->binding[i];
+        buf[bb->ix] = bb->buf ? *bb->buf : bb->uniforms;
     }
 
     double const encode_t0 = now();

@@ -137,7 +137,9 @@ umbra_ptr umbra_bind_uniforms(builder *b, void const *slot, int slots) {
     return (umbra_ptr){.ix = ix};
 }
 
-umbra_ptr umbra_bind_buf(builder *b, struct umbra_buf const *buf) { return (umbra_ptr){.ix = bind_buf(b, buf)}; }
+umbra_ptr umbra_bind_buf(builder *b, struct umbra_buf const *buf) {
+    return (umbra_ptr){.ix = bind_buf(b, buf)};
+}
 
 umbra_val32 umbra_x(builder *b) { return push32(b, op_x); }
 umbra_val32 umbra_y(builder *b) { return push32(b, op_y); }
