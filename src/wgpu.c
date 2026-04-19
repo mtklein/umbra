@@ -368,9 +368,10 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     // limits.
     int n_ro_storage = 0, n_ro_uniform = 0;
     for (int i = 0; i < n_desc - 1; i++) {
-        if (sr.buf_rw[i] & BUF_WRITTEN) { continue; }
-        if (sr.buf_is_uniform[i]) { n_ro_uniform++; }
-        else                      { n_ro_storage++; }
+        if (!(sr.buf_rw[i] & BUF_WRITTEN)) {
+            if (sr.buf_is_uniform[i]) { n_ro_uniform++; }
+            else                      { n_ro_storage++; }
+        }
     }
     _Bool const dynamic_offset_bindings =
         (uint32_t)(n_ro_storage + 1) <= be->max_dyn_storage

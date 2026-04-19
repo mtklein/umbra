@@ -693,8 +693,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     B.buf_uniform_slots = calloc((size_t)(total_bufs + 1), sizeof *B.buf_uniform_slots);
     for (int i = 0; i < ir->bindings; i++) {
         int const p = ir->binding[i].ix;
-        if (p < 0 || p >= total_bufs) { continue; }
-        if (ir->binding[i].buf == NULL) {
+        if (0 <= p && p < total_bufs && ir->binding[i].buf == NULL) {
             B.buf_is_uniform   [p] = 1;
             B.buf_uniform_slots[p] = ir->binding[i].storage.count;
         }
@@ -972,43 +971,44 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     B.t_ptr_uniform_struct = calloc((size_t)total_bufs, sizeof *B.t_ptr_uniform_struct);
     _Bool any_uniform = 0;
     for (int p = 0; p < total_bufs; p++) {
-        if (!B.buf_is_uniform[p]) { continue; }
-        any_uniform = 1;
-        int      const slots     = B.buf_uniform_slots[p];
-        int      const vec_count = (slots + 3) / 4;
-        uint32_t const c_count   = spv_const_u32(&B, (uint32_t)vec_count);
+        if (B.buf_is_uniform[p]) {
+            any_uniform = 1;
+            int      const slots     = B.buf_uniform_slots[p];
+            int      const vec_count = (slots + 3) / 4;
+            uint32_t const c_count   = spv_const_u32(&B, (uint32_t)vec_count);
 
-        uint32_t const t_arr = spv_id(&B);
-        spv_op(&B.types, SpvOpTypeArray, 4);
-        spv_word(&B.types, t_arr);
-        spv_word(&B.types, B.t_uvec4);
-        spv_word(&B.types, c_count);
+            uint32_t const t_arr = spv_id(&B);
+            spv_op(&B.types, SpvOpTypeArray, 4);
+            spv_word(&B.types, t_arr);
+            spv_word(&B.types, B.t_uvec4);
+            spv_word(&B.types, c_count);
 
-        spv_op(&B.decor, SpvOpDecorate, 4);
-        spv_word(&B.decor, t_arr);
-        spv_word(&B.decor, SpvDecorationArrayStride);
-        spv_word(&B.decor, 16);
+            spv_op(&B.decor, SpvOpDecorate, 4);
+            spv_word(&B.decor, t_arr);
+            spv_word(&B.decor, SpvDecorationArrayStride);
+            spv_word(&B.decor, 16);
 
-        uint32_t const t_struct = spv_id(&B);
-        spv_op(&B.types, SpvOpTypeStruct, 3);
-        spv_word(&B.types, t_struct);
-        spv_word(&B.types, t_arr);
+            uint32_t const t_struct = spv_id(&B);
+            spv_op(&B.types, SpvOpTypeStruct, 3);
+            spv_word(&B.types, t_struct);
+            spv_word(&B.types, t_arr);
 
-        spv_op(&B.decor, SpvOpDecorate, 3);
-        spv_word(&B.decor, t_struct);
-        spv_word(&B.decor, SpvDecorationBlock);
+            spv_op(&B.decor, SpvOpDecorate, 3);
+            spv_word(&B.decor, t_struct);
+            spv_word(&B.decor, SpvDecorationBlock);
 
-        spv_op(&B.decor, SpvOpMemberDecorate, 5);
-        spv_word(&B.decor, t_struct);
-        spv_word(&B.decor, 0);
-        spv_word(&B.decor, SpvDecorationOffset);
-        spv_word(&B.decor, 0);
+            spv_op(&B.decor, SpvOpMemberDecorate, 5);
+            spv_word(&B.decor, t_struct);
+            spv_word(&B.decor, 0);
+            spv_word(&B.decor, SpvDecorationOffset);
+            spv_word(&B.decor, 0);
 
-        B.t_ptr_uniform_struct[p] = spv_id(&B);
-        spv_op(&B.types, SpvOpTypePointer, 4);
-        spv_word(&B.types, B.t_ptr_uniform_struct[p]);
-        spv_word(&B.types, SpvStorageClassUniform);
-        spv_word(&B.types, t_struct);
+            B.t_ptr_uniform_struct[p] = spv_id(&B);
+            spv_op(&B.types, SpvOpTypePointer, 4);
+            spv_word(&B.types, B.t_ptr_uniform_struct[p]);
+            spv_word(&B.types, SpvStorageClassUniform);
+            spv_word(&B.types, t_struct);
+        }
     }
     if (any_uniform) {
         B.t_ptr_uniform_u32 = spv_id(&B);
