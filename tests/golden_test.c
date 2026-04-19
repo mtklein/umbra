@@ -138,7 +138,7 @@ TEST(test_slug_rect) {
 
     struct umbra_buf dst_slot = {0};
     struct umbra_builder *bld = umbra_draw_builder(
-        NULL, NULL,        coverage_winding,       &wind_uniform,
+        NULL,        coverage_winding,       &wind_uniform,
         umbra_shader_color,     &color,
         umbra_blend_srcover,    NULL,
         &dst_slot,              umbra_fmt_8888);
@@ -196,7 +196,7 @@ TEST(test_perspective_text) {
 
     struct umbra_buf dst_slot = {0};
     struct umbra_builder *bld = umbra_draw_builder(
-        umbra_transform_perspective, &mat,
+        &mat,
         coverage_bitmap2d,           &sampler,
         umbra_shader_color,          &color,
         umbra_blend_srcover,         NULL,
@@ -235,7 +235,7 @@ TEST(test_perspective_text) {
     };
 
     bld = umbra_draw_builder(
-        umbra_transform_perspective, &mat2,
+        &mat2,
         coverage_bitmap2d,           &sampler2,
         umbra_shader_color,          &hc2,
         umbra_blend_srcover,         NULL,

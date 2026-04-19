@@ -9,12 +9,12 @@
 static struct umbra_buf draw_dst_slot;
 
 static struct umbra_builder* draw_builder_shim(
-        umbra_transform xf, struct umbra_matrix const *xf_mat,
+        struct umbra_matrix const *xf_mat,
         umbra_coverage  cov, void *cov_ctx,
         umbra_shader    sh,  void *sh_ctx,
         umbra_blend     bl,  void *bl_ctx,
         struct umbra_fmt fmt) {
-    return umbra_draw_builder(xf, xf_mat, cov, cov_ctx, sh, sh_ctx, bl, bl_ctx,
+    return umbra_draw_builder(xf_mat, cov, cov_ctx, sh, sh_ctx, bl, bl_ctx,
                               &draw_dst_slot, fmt);
 }
 #define umbra_draw_builder draw_builder_shim
@@ -41,7 +41,7 @@ static void cleanup_draw(struct draw_backends *B) {
 TEST(test_draw_builder_flat_solid) {
     umbra_color color = {1, 0, 0, 1};
     struct umbra_builder *builder = umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         NULL,               NULL,
         umbra_fmt_8888);
@@ -74,7 +74,7 @@ TEST(test_draw_builder_flat_solid) {
 TEST(test_solid_src) {
     umbra_color color = {1, 0, 0, 1};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_8888));
@@ -102,7 +102,7 @@ TEST(test_solid_src) {
 TEST(test_solid_src_n1) {
     umbra_color color = {0, 0, 1, 1};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_8888));
@@ -123,7 +123,7 @@ TEST(test_solid_src_n1) {
 TEST(test_solid_src_n9) {
     umbra_color color = {0, 1, 0, 1};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_8888));
@@ -145,7 +145,7 @@ TEST(test_solid_src_n9) {
 TEST(test_solid_src_n16) {
     umbra_color color = {1, 1, 1, 1};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_8888));
@@ -165,7 +165,7 @@ TEST(test_srcover_8888) {
     umbra_color color = {0, 0.5f, 0, 0.5f};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                NULL,
+        NULL,            NULL,                NULL,
             umbra_shader_color,  &color,
             umbra_blend_srcover, NULL,
             umbra_fmt_8888));
@@ -193,7 +193,7 @@ TEST(test_dstover_8888) {
     umbra_color color = {1, 0, 0, 1};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                NULL,
+        NULL,            NULL,                NULL,
             umbra_shader_color,  &color,
             umbra_blend_dstover, NULL,
             umbra_fmt_8888));
@@ -212,7 +212,7 @@ TEST(test_dstover_transparent) {
     umbra_color color = {1, 0, 0, 1};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                NULL,
+        NULL,            NULL,                NULL,
             umbra_shader_color,  &color,
             umbra_blend_dstover, NULL,
             umbra_fmt_8888));
@@ -234,7 +234,7 @@ TEST(test_multiply_8888) {
     umbra_color color = {1, 1, 1, 1};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                 NULL,
+        NULL,            NULL,                 NULL,
             umbra_shader_color,   &color,
             umbra_blend_multiply, NULL,
             umbra_fmt_8888));
@@ -261,7 +261,7 @@ TEST(test_multiply_8888) {
 TEST(test_solid_src_fp16) {
     umbra_color color = {0.25f, 0.5f, 0.75f, 1};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_fp16));
@@ -286,7 +286,7 @@ TEST(test_srcover_fp16) {
     umbra_color color = {0, 0.5f, 0, 0.5f};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                NULL,
+        NULL,            NULL,                NULL,
             umbra_shader_color,  &color,
             umbra_blend_srcover, NULL,
             umbra_fmt_fp16));
@@ -320,7 +320,7 @@ TEST(test_coverage_rect) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {2.0f, 0.0f, 5.0f, 1.0f};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        umbra_coverage_rect, &rect,
+        NULL,        umbra_coverage_rect, &rect,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888));
@@ -347,7 +347,7 @@ TEST(test_coverage_rect_scalar) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {1.0f, 0.0f, 3.0f, 1.0f};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        umbra_coverage_rect, &rect,
+        NULL,        umbra_coverage_rect, &rect,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888));
@@ -372,7 +372,7 @@ TEST(test_coverage_rect_n9) {
     umbra_color color = {0, 1, 0, 1};
     umbra_rect rect = {3.0f, 0.0f, 7.0f, 1.0f};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        umbra_coverage_rect, &rect,
+        NULL,        umbra_coverage_rect, &rect,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888));
@@ -398,7 +398,7 @@ TEST(test_coverage_rect_offset) {
     umbra_color color = {0, 1, 0, 1};
     umbra_rect rect = {1.0f, 0.0f, 3.0f, 10.0f};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        umbra_coverage_rect, &rect,
+        NULL,        umbra_coverage_rect, &rect,
         umbra_shader_color,  &color,
         umbra_blend_src,     NULL,
         umbra_fmt_8888));
@@ -421,7 +421,7 @@ TEST(test_coverage_rect_outside_y) {
     umbra_color color = {1, 1, 1, 1};
     umbra_rect rect = {0.0f, 5.0f, 10.0f, 10.0f};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        umbra_coverage_rect, &rect,
+        NULL,        umbra_coverage_rect, &rect,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888));
@@ -443,7 +443,7 @@ TEST(test_coverage_rect_outside_y) {
 
 TEST(test_no_shader) {
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,            NULL,
+        NULL,        NULL,            NULL,
         NULL,            NULL,
         umbra_blend_src, NULL,
         umbra_fmt_8888));
@@ -466,7 +466,7 @@ TEST(test_no_shader) {
 TEST(test_no_blend) {
     umbra_color color = {1, 0, 1, 1};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         NULL,               NULL,
         umbra_fmt_8888));
@@ -505,7 +505,7 @@ static umbra_color_val32 test_gradient_fn(void *ctx, struct umbra_builder *build
 TEST(test_gradient_shader) {
     struct test_gradient_state state = {.w = 4.0f, .a = 1.0f};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,             NULL,
+        NULL,        NULL,             NULL,
         test_gradient_fn, &state,
         umbra_blend_src,  NULL,
         umbra_fmt_8888));
@@ -528,7 +528,7 @@ TEST(test_multiply_half_alpha) {
     umbra_color color = {1, 0, 0, 0.5f};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                 NULL,
+        NULL,            NULL,                 NULL,
             umbra_shader_color,   &color,
             umbra_blend_multiply, NULL,
             umbra_fmt_8888));
@@ -556,7 +556,7 @@ TEST(test_srcover_8888_n9) {
     umbra_color color = {1, 0, 0, 0.5f};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                NULL,
+        NULL,            NULL,                NULL,
             umbra_shader_color,  &color,
             umbra_blend_srcover, NULL,
             umbra_fmt_8888));
@@ -581,7 +581,7 @@ TEST(test_full_pipeline) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {2.0f, 0.0f, 7.0f, 1.0f};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        umbra_coverage_rect, &rect,
+        NULL,        umbra_coverage_rect, &rect,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888));
@@ -613,7 +613,7 @@ TEST(test_full_pipeline) {
 TEST(test_solid_src_fp16_n9) {
     umbra_color color = {0.125f, 0.25f, 0.5f, 1};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_fp16));
@@ -638,7 +638,7 @@ TEST(test_coverage_rect_white_dst) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {0, 0, 0, 0};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        umbra_coverage_rect, &rect,
+        NULL,        umbra_coverage_rect, &rect,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888));
@@ -681,7 +681,7 @@ TEST(test_coverage_bitmap) {
     uint16_t cov_data[8] = {0, 128, 255, 0, 0, 0, 0, 0};
     struct umbra_buf buf = {.ptr=cov_data, .count=8};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        coverage_bitmap, &buf,
+        NULL,        coverage_bitmap, &buf,
         umbra_shader_color,    &color,
         umbra_blend_srcover,   NULL,
         umbra_fmt_8888));
@@ -706,7 +706,7 @@ TEST(test_coverage_bitmap_565) {
     for (int i = 0; i < 16; i++) { cov_data[i] = 255; }
     struct umbra_buf buf = {.ptr=cov_data, .count=16};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        coverage_bitmap, &buf,
+        NULL,        coverage_bitmap, &buf,
         umbra_shader_color,    &color,
         umbra_blend_srcover,   NULL,
         umbra_fmt_565));
@@ -728,7 +728,7 @@ TEST(test_coverage_sdf) {
     uint16_t cov_data[8] = {0, 100, 128, 200, 255, 0, 0, 0};
     struct umbra_buf buf = {.ptr=cov_data, .count=8};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        coverage_sdf,  &buf,
+        NULL,        coverage_sdf,  &buf,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
         umbra_fmt_8888));
@@ -754,7 +754,7 @@ TEST(test_coverage_bitmap_matrix) {
     struct umbra_matrix mat = {1, 0, 0, 0, 1, 0, 0, 0, 1};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-            umbra_transform_perspective, &mat,
+            &mat,
             coverage_bitmap2d,           &sampler,
             umbra_shader_color,          &color,
             umbra_blend_srcover,         NULL,
@@ -783,7 +783,7 @@ TEST(test_coverage_bitmap_matrix_565) {
     struct umbra_matrix mat = {1, 0, 0, 0, 1, 0, 0, 0, 1};
     struct draw_backends B =
         make_draw(umbra_draw_builder(
-            umbra_transform_perspective, &mat,
+            &mat,
             coverage_bitmap2d,           &sampler,
             umbra_shader_color,          &color,
             umbra_blend_srcover,         NULL,
@@ -810,7 +810,7 @@ TEST(test_coverage_bitmap_matrix_oob) {
     struct umbra_matrix mat = {1, 0, 0, 0, 1, 0, 0.001f, 0, 1};
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-            umbra_transform_perspective, &mat,
+            &mat,
             coverage_bitmap2d,           &sampler,
             umbra_shader_color,          &color,
             umbra_blend_srcover,         NULL,
@@ -838,7 +838,7 @@ TEST(test_linear_2) {
     };
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                            NULL,
+        NULL,            NULL,                            NULL,
             shader_gradient_two_stops, &state,
             umbra_blend_src,                 NULL,
             umbra_fmt_8888));
@@ -868,7 +868,7 @@ TEST(test_radial_2) {
     };
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                            NULL,
+        NULL,            NULL,                            NULL,
             shader_gradient_two_stops, &state,
             umbra_blend_src,                 NULL,
             umbra_fmt_8888));
@@ -905,7 +905,7 @@ TEST(test_linear_grad) {
     };
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                      NULL,
+        NULL,            NULL,                      NULL,
             shader_gradient_lut, &state,
             umbra_blend_src,           NULL,
             umbra_fmt_8888));
@@ -944,7 +944,7 @@ TEST(test_radial_grad) {
     };
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                      NULL,
+        NULL,            NULL,                      NULL,
             shader_gradient_lut, &state,
             umbra_blend_src,           NULL,
             umbra_fmt_8888));
@@ -978,7 +978,7 @@ TEST(test_lut_grad_last_pixel) {
     };
     struct draw_backends B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                      NULL,
+        NULL,            NULL,                      NULL,
             shader_gradient_lut, &state,
             umbra_blend_src,           NULL,
             umbra_fmt_8888));
@@ -1014,7 +1014,7 @@ TEST(test_linear_grad_evenly_spaced) {
     };
     struct draw_backends B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                                      NULL,
+        NULL,            NULL,                                      NULL,
             shader_gradient_evenly_spaced_stops, &state,
             umbra_blend_src,                           NULL,
             umbra_fmt_8888));
@@ -1051,7 +1051,7 @@ TEST(test_radial_grad_evenly_spaced) {
     };
     struct draw_backends B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                                      NULL,
+        NULL,            NULL,                                      NULL,
             shader_gradient_evenly_spaced_stops, &state,
             umbra_blend_src,                           NULL,
             umbra_fmt_8888));
@@ -1087,7 +1087,7 @@ TEST(test_gradient_lut_nonuniform) {
     };
     struct draw_backends     B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                      NULL,
+        NULL,            NULL,                      NULL,
             shader_gradient_lut, &state,
             umbra_blend_src,           NULL,
             umbra_fmt_8888));
@@ -1118,7 +1118,7 @@ TEST(test_linear_stops) {
     };
     struct draw_backends B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                  NULL,
+        NULL,            NULL,                  NULL,
             shader_gradient, &state,
             umbra_blend_src,       NULL,
             umbra_fmt_8888));
@@ -1153,7 +1153,7 @@ TEST(test_linear_stops_fp16_planar) {
     };
     struct draw_backends B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                  NULL,
+        NULL,            NULL,                  NULL,
             shader_gradient, &state,
             NULL,                  NULL,
             umbra_fmt_fp16_planar));
@@ -1182,7 +1182,7 @@ TEST(test_supersample) {
         .samples   = 4,
     };
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,                     NULL,
+        NULL,        NULL,                     NULL,
         umbra_shader_supersample, &ss,
         umbra_blend_src,          NULL,
         umbra_fmt_8888));
@@ -1211,7 +1211,7 @@ TEST(test_page_aligned_buffer) {
 #else
     umbra_color color = {0, 1, 0, 1};
     struct draw_backends B = make_draw(umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_8888));
@@ -1322,7 +1322,7 @@ TEST(test_fp16_planar_round_trip) {
 TEST(test_solid_src_565) {
     umbra_color color = {1, 0, 0, 1};
     struct umbra_builder *b = umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_565);
@@ -1342,7 +1342,7 @@ TEST(test_solid_src_565) {
 TEST(test_solid_src_1010102) {
     umbra_color color = {0, 1, 0, 1};
     struct umbra_builder *b = umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_1010102);
@@ -1363,7 +1363,7 @@ TEST(test_solid_src_1010102) {
 TEST(test_solid_src_fp16_planar) {
     umbra_color color = {0, 0, 1, 1};
     struct umbra_builder *b = umbra_draw_builder(
-        NULL,                NULL,        NULL,               NULL,
+        NULL,        NULL,               NULL,
         umbra_shader_color, &color,
         umbra_blend_src,    NULL,
         umbra_fmt_fp16_planar);
@@ -1391,7 +1391,7 @@ TEST(test_srcover_fp16_planar) {
     umbra_color color = {0, 0.5f, 0, 0.5f};
     struct draw_backends B =
         make_draw(umbra_draw_builder(
-        NULL,                NULL,            NULL,                NULL,
+        NULL,            NULL,                NULL,
             umbra_shader_color,  &color,
             umbra_blend_srcover, NULL,
             umbra_fmt_fp16_planar));
@@ -1428,7 +1428,7 @@ TEST(test_sdf_dispatch_rect) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
 
-        struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi], NULL, NULL,            umbra_sdf_rect, &rect,
+        struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi], NULL,            umbra_sdf_rect, &rect,
             1,
             umbra_shader_color,  &color,
             umbra_blend_srcover, NULL,
@@ -1493,7 +1493,7 @@ TEST(test_sdf_dispatch_tiling) {
     if (!be) { be = umbra_backend_interp(); }
 
     // Tiled dispatch.
-    struct umbra_sdf_draw *disp = umbra_sdf_draw(be, NULL, NULL,        test_circle_fn, &sdf,
+    struct umbra_sdf_draw *disp = umbra_sdf_draw(be, NULL,        test_circle_fn, &sdf,
         1,
         umbra_shader_color,  &color,
         umbra_blend_srcover, NULL,
@@ -1507,7 +1507,7 @@ TEST(test_sdf_dispatch_tiling) {
         .hard_edge = 1,
     };
     struct umbra_builder *fb = umbra_draw_builder(
-        NULL,                NULL,        umbra_coverage_from_sdf, &cov,
+        NULL,        umbra_coverage_from_sdf, &cov,
         umbra_shader_color,      &color,
         umbra_blend_srcover,     NULL,
         umbra_fmt_8888);
@@ -1602,8 +1602,8 @@ TEST(test_metal_loop_gather) {
 }
 
 // Build a program that stores (x', y') for each pixel into xbuf/ybuf using
-// either umbra_transform_point(umbra_transform_perspective, mat) or the
-// direct umbra_apply_matrix path for reference.
+// either umbra_transform_perspective(mat) or the direct umbra_apply_matrix
+// path for reference.
 static struct umbra_flat_ir* build_transform_ir(struct umbra_matrix *mat,
                                                  struct umbra_buf *xbuf,
                                                  struct umbra_buf *ybuf,
@@ -1615,7 +1615,7 @@ static struct umbra_flat_ir* build_transform_ir(struct umbra_matrix *mat,
                       yf = umbra_f32_from_i32(b, umbra_y(b));
     umbra_point_val32 p;
     if (use_transform) {
-        p = umbra_transform_point(umbra_transform_perspective, mat, b, xf, yf);
+        p = umbra_transform_perspective(mat, b, xf, yf);
     } else {
         umbra_ptr32 const u = umbra_bind_uniforms32(b, mat, (int)(sizeof *mat / 4));
         umbra_matrix_val32 const m = {

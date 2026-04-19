@@ -456,7 +456,7 @@ static void slug_two_pass_prepare(struct slide *s,
     st->fmt = fmt;
     {
         struct umbra_builder *b = umbra_draw_builder(
-        NULL, NULL,            coverage_winding,       &st->wind_uniform,
+        NULL,            coverage_winding,       &st->wind_uniform,
             umbra_shader_color,     &st->color,
             umbra_blend_srcover,    NULL,
             &st->dst_buf,           fmt);
@@ -501,7 +501,7 @@ static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
     struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
     out[0] = slug_build_acc(&st->curves_buf, &st->au, &st->wind_uniform);
     out[1] = umbra_draw_builder(
-        NULL, NULL,        coverage_winding,       &st->wind_uniform,
+        NULL,        coverage_winding,       &st->wind_uniform,
         umbra_shader_color,     &st->color,
         umbra_blend_srcover,    NULL,
         &st->dst_buf,           fmt);
@@ -578,7 +578,7 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
     st->fmt = fmt;
     {
         struct umbra_builder *b = umbra_draw_builder(
-        NULL, NULL,            coverage_winding,       &st->wind_uniform,
+        NULL,            coverage_winding,       &st->wind_uniform,
             umbra_shader_color,     &st->color,
             umbra_blend_srcover,    NULL,
             &st->dst_buf,           fmt);

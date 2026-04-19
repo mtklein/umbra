@@ -213,7 +213,7 @@ static void text_prepare(struct slide *s, struct umbra_backend *be,
     };
     st->fmt = fmt;
     struct umbra_builder *b = umbra_draw_builder(
-        NULL, NULL,        st->coverage_fn,    &st->buf,
+        NULL,        st->coverage_fn,    &st->buf,
         umbra_shader_color, &st->color,
         umbra_blend_srcover, NULL,
         &st->dst_buf,        fmt);
@@ -239,7 +239,7 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct text_slide *st = (struct text_slide *)s;
     out[0] = umbra_draw_builder(
-        NULL, NULL,        st->coverage_fn,    &st->buf,
+        NULL,        st->coverage_fn,    &st->buf,
         umbra_shader_color, &st->color,
         umbra_blend_srcover, NULL,
         &st->dst_buf,        fmt);
@@ -320,7 +320,7 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
     umbra_program_free(st->prog);
     st->fmt = fmt;
     struct umbra_builder *b = umbra_draw_builder(
-        umbra_transform_perspective, &st->mat,
+        &st->mat,
         coverage_bitmap2d,           &st->bmp,
         umbra_shader_color,          &st->color,
         umbra_blend_srcover,         NULL,
@@ -348,7 +348,7 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct persp_slide *st = (struct persp_slide *)s;
     out[0] = umbra_draw_builder(
-        umbra_transform_perspective, &st->mat,
+        &st->mat,
         coverage_bitmap2d,           &st->bmp,
         umbra_shader_color,          &st->color,
         umbra_blend_srcover,         NULL,
@@ -359,7 +359,6 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
 static _Bool persp_get_effects(struct slide *s, struct slide_effects *out) {
     struct persp_slide *st = (struct persp_slide *)s;
     *out = (struct slide_effects){
-        .transform_fn  = umbra_transform_perspective,
         .transform_mat = &st->mat,
         .coverage_fn   = coverage_bitmap2d,
         .coverage_ctx  = &st->bmp,
@@ -427,7 +426,7 @@ static void cov_null_prepare(struct slide *s, struct umbra_backend *be, struct u
         st->fmt = fmt;
         umbra_flat_ir_free(st->ir);
         struct umbra_builder *b = umbra_draw_builder(
-        NULL, NULL,            NULL,                NULL,
+        NULL,            NULL,                NULL,
             umbra_shader_color,  &st->color,
             umbra_blend_srcover, NULL,
             &st->dst_buf,        fmt);
@@ -454,7 +453,7 @@ static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
     if (max < 1) { return 0; }
     struct cov_null_slide *st = (struct cov_null_slide *)s;
     out[0] = umbra_draw_builder(
-        NULL, NULL,        NULL,                NULL,
+        NULL,        NULL,                NULL,
         umbra_shader_color,  &st->color,
         umbra_blend_srcover, NULL,
         &st->dst_buf,        fmt);

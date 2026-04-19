@@ -94,7 +94,7 @@ static void compute_cell_matrix(struct umbra_matrix *out, int col, int row,
 static void compose_final(struct umbra_matrix *out,
                           struct slide_effects const *eff,
                           struct umbra_matrix const *cell_mat) {
-    if (eff->transform_fn && eff->transform_mat) {
+    if (eff->transform_mat) {
         umbra_matrix_mul(out, eff->transform_mat, cell_mat);
     } else {
         *out = *cell_mat;
@@ -199,7 +199,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         compose_final(&c->final_mat, &eff, &c->cell_mat);
 
         struct umbra_builder *b = umbra_draw_builder(
-            umbra_transform_perspective, &c->final_mat,
+            &c->final_mat,
             eff.coverage_fn, eff.coverage_ctx,
             eff.shader_fn,   eff.shader_ctx,
             eff.blend_fn,    eff.blend_ctx,
@@ -212,7 +212,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 
     umbra_program_free(st->overlay_prog);
     struct umbra_builder *ob = umbra_draw_builder(
-        NULL,                NULL,
+        NULL,
         coverage_bitmap,     &st->overlay_buf,
         umbra_shader_color,  &st->overlay_color,
         umbra_blend_srcover, NULL,
@@ -282,7 +282,7 @@ static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
         struct slide_effects eff = {0};
         if (!c->sub->get_effects(c->sub, &eff)) { continue; }
         out[0] = umbra_draw_builder(
-            umbra_transform_perspective, &c->final_mat,
+            &c->final_mat,
             eff.coverage_fn, eff.coverage_ctx,
             eff.shader_fn,   eff.shader_ctx,
             eff.blend_fn,    eff.blend_ctx,

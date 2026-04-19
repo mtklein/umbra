@@ -23,11 +23,11 @@
 // A slide's effect stack, if it can be expressed as a single-pass composition
 // through umbra_draw_builder.  Callers fill in a zero-initialized struct and
 // consult .coverage_fn / .shader_fn / .blend_fn to tell what the slide draws.
-// transform_fn / transform_mat are optional: NULL means identity.
+// transform_mat is optional: NULL means identity, non-NULL means the driver
+// should apply umbra_transform_perspective through this matrix.
 // ctxs point at state owned by the slide, alive until the slide is freed;
 // callers must not free them.
 struct slide_effects {
-    umbra_transform           *transform_fn;
     struct umbra_matrix const *transform_mat;
     umbra_coverage *coverage_fn; void *coverage_ctx;
     umbra_shader   *shader_fn;   void *shader_ctx;

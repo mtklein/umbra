@@ -150,10 +150,10 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
 };
 
 struct umbra_builder* umbra_draw_builder(
-    umbra_transform transform_fn, struct umbra_matrix const *transform_mat,
-    umbra_coverage  coverage_fn,  void *coverage_ctx,
-    umbra_shader    shader_fn,    void *shader_ctx,
-    umbra_blend     blend_fn,     void *blend_ctx,
+    struct umbra_matrix const *transform_mat,
+    umbra_coverage  coverage_fn, void *coverage_ctx,
+    umbra_shader    shader_fn,   void *shader_ctx,
+    umbra_blend     blend_fn,    void *blend_ctx,
     struct umbra_buf *dst_buf,
     struct umbra_fmt  fmt)
 {
@@ -161,9 +161,8 @@ struct umbra_builder* umbra_draw_builder(
     umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, dst_buf);
     umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b)),
                 yf = umbra_f32_from_i32(b, umbra_y(b));
-    if (transform_fn) {
-        umbra_point_val32 const p = umbra_transform_point(transform_fn, transform_mat,
-                                                           b, xf, yf);
+    if (transform_mat) {
+        umbra_point_val32 const p = umbra_transform_perspective(transform_mat, b, xf, yf);
         xf = p.x;
         yf = p.y;
     }
@@ -195,22 +194,45 @@ struct umbra_builder* umbra_draw_builder(
     return b;
 }
 
-void umbra_transform_perspective(struct umbra_matrix const *mat, struct umbra_builder *b,
-                                 umbra_interval *x, umbra_interval *y) {
+enum {
+    M_SX = (int)(__builtin_offsetof(struct umbra_matrix, sx) / 4),
+    M_KX = (int)(__builtin_offsetof(struct umbra_matrix, kx) / 4),
+    M_TX = (int)(__builtin_offsetof(struct umbra_matrix, tx) / 4),
+    M_KY = (int)(__builtin_offsetof(struct umbra_matrix, ky) / 4),
+    M_SY = (int)(__builtin_offsetof(struct umbra_matrix, sy) / 4),
+    M_TY = (int)(__builtin_offsetof(struct umbra_matrix, ty) / 4),
+    M_P0 = (int)(__builtin_offsetof(struct umbra_matrix, p0) / 4),
+    M_P1 = (int)(__builtin_offsetof(struct umbra_matrix, p1) / 4),
+    M_P2 = (int)(__builtin_offsetof(struct umbra_matrix, p2) / 4),
+};
+
+umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
+                                              struct umbra_builder *b,
+                                              umbra_val32 x, umbra_val32 y) {
     umbra_ptr32 const u = umbra_bind_uniforms32(b, mat, (int)(sizeof *mat / 4));
-
-    enum {
-        M_SX = (int)(__builtin_offsetof(struct umbra_matrix, sx) / 4),
-        M_KX = (int)(__builtin_offsetof(struct umbra_matrix, kx) / 4),
-        M_TX = (int)(__builtin_offsetof(struct umbra_matrix, tx) / 4),
-        M_KY = (int)(__builtin_offsetof(struct umbra_matrix, ky) / 4),
-        M_SY = (int)(__builtin_offsetof(struct umbra_matrix, sy) / 4),
-        M_TY = (int)(__builtin_offsetof(struct umbra_matrix, ty) / 4),
-        M_P0 = (int)(__builtin_offsetof(struct umbra_matrix, p0) / 4),
-        M_P1 = (int)(__builtin_offsetof(struct umbra_matrix, p1) / 4),
-        M_P2 = (int)(__builtin_offsetof(struct umbra_matrix, p2) / 4),
+    umbra_matrix_val32 const m = {
+        .sx = umbra_uniform_32(b, u, M_SX),
+        .kx = umbra_uniform_32(b, u, M_KX),
+        .tx = umbra_uniform_32(b, u, M_TX),
+        .ky = umbra_uniform_32(b, u, M_KY),
+        .sy = umbra_uniform_32(b, u, M_SY),
+        .ty = umbra_uniform_32(b, u, M_TY),
+        .p0 = umbra_uniform_32(b, u, M_P0),
+        .p1 = umbra_uniform_32(b, u, M_P1),
+        .p2 = umbra_uniform_32(b, u, M_P2),
     };
+    return umbra_apply_matrix(b, m, x, y);
+}
 
+// Interval perspective transform, used only by umbra_sdf_draw's bounds
+// program.  NOT safe when the runtime w-interval straddles zero (see TODO
+// near umbra_interval_div_f32 in src/interval.c); umbra_sdf_draw gates this
+// to build-time-affine matrices only.  Kept private because we can't offer
+// a sound general-purpose interval perspective today.
+static void transform_perspective_interval(struct umbra_matrix const *mat,
+                                           struct umbra_builder *b,
+                                           umbra_interval *x, umbra_interval *y) {
+    umbra_ptr32 const u = umbra_bind_uniforms32(b, mat, (int)(sizeof *mat / 4));
     umbra_interval const sx = umbra_interval_exact(umbra_uniform_32(b, u, M_SX)),
                          kx = umbra_interval_exact(umbra_uniform_32(b, u, M_KX)),
                          tx = umbra_interval_exact(umbra_uniform_32(b, u, M_TX)),
@@ -237,16 +259,6 @@ void umbra_transform_perspective(struct umbra_matrix const *mat, struct umbra_bu
         w);
     *x = xp;
     *y = yp;
-}
-
-umbra_point_val32 umbra_transform_point(umbra_transform *fn,
-                                        struct umbra_matrix const *mat,
-                                        struct umbra_builder *b,
-                                        umbra_val32 x, umbra_val32 y) {
-    umbra_interval xi = umbra_interval_exact(x),
-                   yi = umbra_interval_exact(y);
-    fn(mat, b, &xi, &yi);
-    return (umbra_point_val32){xi.lo, yi.lo};
 }
 
 void umbra_matrix_mul(struct umbra_matrix *out,
@@ -340,7 +352,6 @@ static _Bool matrix_is_affine(struct umbra_matrix const *m) {
 }
 
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
-                                      umbra_transform transform_fn,
                                       struct umbra_matrix const *transform_mat,
                                       umbra_sdf sdf_fn, void *sdf_ctx,
                                       _Bool hard_edge,
@@ -356,7 +367,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
 
     // Build the draw program (transform + shader + SDF coverage + blend).
     struct umbra_builder *db = umbra_draw_builder(
-        transform_fn,            transform_mat,
+        transform_mat,
         umbra_coverage_from_sdf, &d->cov_state,
         shader_fn, shader_ctx,
         blend_fn,  blend_ctx,
@@ -371,7 +382,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     // divide is unsound when w straddles zero (see TODO in src/interval.c), so
     // we'd silently drop horizon-crossing tiles.  Non-affine transforms skip
     // bounds entirely and fall back to a full-rect dispatch in _queue.
-    _Bool const build_bounds = !transform_fn || matrix_is_affine(transform_mat);
+    _Bool const build_bounds = !transform_mat || matrix_is_affine(transform_mat);
     if (!build_bounds) { return d; }
 
     // Build the bounds program: evaluate the sdf over tile-extent intervals.
@@ -394,7 +405,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                         umbra_add_f32(bb, base_y,
                             umbra_mul_f32(bb, umbra_add_f32(bb, yf,
                                 umbra_imm_f32(bb, 1.0f)), tile_h))};
-    if (transform_fn) { transform_fn(transform_mat, bb, &x, &y); }
+    if (transform_mat) { transform_perspective_interval(transform_mat, bb, &x, &y); }
 
     umbra_interval const f = sdf_fn(sdf_ctx, bb, x, y);
 
