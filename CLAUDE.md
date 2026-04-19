@@ -15,15 +15,6 @@ become visible after a backend `flush()`.
 
 Claude
 ------
-Invoke `/prove` when starting any new non-trivial task.
-
-Invoke `/pedantic` when a test is failing, a backend is misbehaving, or an
-optimization did not produce the change you expected.
-
-Invoke `/perf` when the task involves measuring speed, investigating a
-regression, comparing backends, or deciding whether an optimization is worth
-keeping.
-
 Never push to origin without the user's explicit permission.
 Never amend commits.  Always create new commits.
 
