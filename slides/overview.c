@@ -100,6 +100,8 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     st->be      = be;
     st->out_fmt = fmt;
 
+    slide_bg_prepare(be, fmt, st->w, st->h);
+
     int const n_real = slide_count() - 1;
     if (n_real <= 0) { return; }
 
@@ -128,15 +130,15 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         compute_cell_matrix(&c->cell_mat, c->col, c->row, cw, ch, st->w, st->h);
         c->final_mat = c->cell_mat;
 
-        if (idx >= n_real) { continue; }  // placeholder cell
+        if (idx >= n_real) { continue; }  // empty slot (no slide)
 
         struct slide *sub = slide_get(idx);
+        c->sub = sub;
         if (sub->prepare) { sub->prepare(sub, be, fmt); }
 
         struct slide_effects eff = {0};
         if (!sub->get_effects || !sub->get_effects(sub, &eff)) { continue; }
 
-        c->sub = sub;
         compose_final(&c->final_mat, &eff, &c->cell_mat);
 
         struct umbra_builder *b = umbra_draw_builder(
@@ -163,12 +165,10 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         .stride = w,
     };
 
-    // Clear each cell region to dark gray via a placeholder X-box first; then
-    // overwrite with live cell programs where available.  The X-box + number
-    // overlay requires CPU writes to an 8888 buffer, so we render directly
-    // into `buf` only if the output is 8888.  For other formats we skip the
-    // overlay for now.
+    // The overlay (slide numbers, placeholder X-box) is CPU-drawn in 8888 only;
+    // other formats get the live/bg'd cells without the overlay.
     uint32_t *fb = (st->out_fmt.name == umbra_fmt_8888.name) ? (uint32_t*)buf : NULL;
+    float const placeholder_bg[4] = {0.094f, 0.094f, 0.094f, 1};  // 0xff181818
 
     for (int idx = 0; idx < st->n_cells; idx++) {
         struct cell *c = &st->cells[idx];
@@ -183,6 +183,13 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         int const xl = x0,
                   xr = x1;
 
+        // Paint the cell's background first (live cells use srcover that would
+        // accumulate without a fresh bg each frame; placeholders just need
+        // something other than uninitialized memory).  For slots with no
+        // sub-slide (n_cells > n_real), use a neutral dark gray.
+        float const *bg = c->sub ? c->sub->bg : placeholder_bg;
+        slide_bg_draw(bg, xl, yt, xr, yb, buf);
+
         if (c->sub && c->prog) {
             // Refresh animated uniforms, then recompose final_mat so its
             // contents reflect the current frame.
@@ -192,9 +199,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
             compose_final(&c->final_mat, &eff, &c->cell_mat);
             c->prog->queue(c->prog, xl, yt, xr, yb);
         } else if (fb) {
-            for (int y = yt; y < yb; y++) {
-                for (int x = xl; x < xr; x++) { fb[y * w + x] = 0xff181818; }
-            }
+            // Placeholder: bg + X-box overlay on top (8888 only).
             draw_xbox(fb, w, x0, yt, st->cw, yb - yt, 0xff404040);
         }
 
@@ -212,7 +217,7 @@ static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
     // Return the first live cell's builder as a representative.
     for (int i = 0; i < st->n_cells; i++) {
         struct cell *c = &st->cells[i];
-        if (!c->sub) { continue; }
+        if (!c->sub || !c->prog) { continue; }
         struct slide_effects eff = {0};
         if (!c->sub->get_effects(c->sub, &eff)) { continue; }
         out[0] = umbra_draw_builder(
