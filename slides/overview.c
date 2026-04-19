@@ -8,12 +8,14 @@ static uint8_t const font3x5[10][5] = {
 };
 
 // One cell: either a live-composed per-cell program (if sub exposes effects) or
-// a static X-box placeholder.  The live cell's program was built with a
-// final_mat = sub.transform * cell_mat, which we update per frame in draw.
+// a static X-box placeholder.  The cell's program was built by stacking its
+// cell_mat (cell -> canvas) with whatever transform the sub-slide's effects
+// declared; each transform runs as its own umbra_transform_perspective pass
+// in the IR, so matrices compose through the built-in uniforms rebind each
+// dispatch rather than through any CPU-side composition.
 struct cell {
     struct slide              *sub;          // NULL = placeholder
     struct umbra_matrix        cell_mat;   int :32;  // cell -> canvas, fixed at prepare
-    struct umbra_matrix        final_mat;  int :32;  // mutated per frame, bound into prog
     struct umbra_program      *prog;
     int                        col, row;
 };
@@ -89,16 +91,20 @@ static void compute_cell_matrix(struct umbra_matrix *out, int col, int row,
     };
 }
 
-// Compose sub.transform (if any) with cell_mat into final_mat, so
-// final_mat.apply(cell_pixel) == sub.transform.apply(cell_mat.apply(cell_pixel)).
-static void compose_final(struct umbra_matrix *out,
-                          struct slide_effects const *eff,
-                          struct umbra_matrix const *cell_mat) {
-    if (eff->transform_mat) {
-        umbra_matrix_mul(out, eff->transform_mat, cell_mat);
-    } else {
-        *out = *cell_mat;
-    }
+// Build the per-cell IR: overview binds dst, applies cell_mat to the dispatch
+// coords, then hands control to the sub-slide's build_draw which layers on
+// whatever transforms it wants before calling umbra_build_draw.
+static struct umbra_builder* build_cell_program(struct slide *sub,
+                                                struct umbra_matrix const *cell_mat,
+                                                struct umbra_buf *dst,
+                                                struct umbra_fmt fmt) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, dst);
+    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
+                      y = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_point_val32 const p = umbra_transform_perspective(cell_mat, b, x, y);
+    sub->build_draw(sub, b, dst_ptr, fmt, p.x, p.y);
+    return b;
 }
 
 static void overview_init(struct slide *s, int w, int h) {
@@ -152,7 +158,6 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         c->col = idx % cols;
         c->row = idx / cols;
         compute_cell_matrix(&c->cell_mat, c->col, c->row, cw, ch, st->w, st->h);
-        c->final_mat = c->cell_mat;
 
         int const x0 = c->col * cw,
                   y0 = c->row * ch;
@@ -170,40 +175,25 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 
         // TODO: SDF-based slides (all of slides/sdf.c, and the blend variants
         // in slides/blend.c that wrap an SDF) currently render as placeholders
-        // here because they have no get_effects hook.  Exposing them the same
-        // way we do persp_slide -- i.e. umbra_coverage_from_sdf as the coverage
-        // slot of slide_effects -- looks right but collapses perf at our
-        // workloads: coverage_from_sdf evaluates the SDF at every pixel with
-        // no tile culling, so sdf_text with ~100 curves/pixel x 30 cells
-        // blew past the `ninja` 30s dump timeout in one experiment and would
-        // tank demo FPS.  The standalone slides dodge this by going through
-        // umbra_sdf_draw, whose bounds program tile-culls most pixels before
-        // they reach sdf evaluation.
+        // here because they have no build_draw hook.  Wiring one that goes
+        // through umbra_coverage_from_sdf looks right but collapses perf:
+        // per-pixel SDF evaluation with no tile culling blew past the `ninja`
+        // 30s dump timeout in one experiment and would tank demo FPS for
+        // sdf_text (~100 curves/pixel).  The standalone slides dodge this by
+        // going through umbra_sdf_draw, whose bounds program tile-culls most
+        // pixels before they reach sdf evaluation.
         //
-        // Right fix: grow slide_effects (or a sibling get_sdf_effects hook)
-        // to carry an umbra_sdf *sdf_fn + void *sdf_ctx + _Bool hard_edge,
-        // and branch this cell builder to build a per-cell umbra_sdf_draw
-        // (with &c->final_mat as the transform) instead of a draw_builder +
-        // coverage_from_sdf.  The cell transform is affine (scale+translate)
-        // so umbra_sdf_draw's affine-gate accepts it and keeps tile culling
-        // -- see the TODO near umbra_sdf_draw in src/draw.c and commit
-        // f63cec88 for that gate.  Then each cell dispatches via
+        // Right fix: grow slide with a sibling build_sdf_draw hook (or teach
+        // build_draw to optionally produce multiple programs) so the overview
+        // can build a per-cell umbra_sdf_draw with cell_mat as its transform.
+        // The cell transform is affine (scale+translate), so umbra_sdf_draw's
+        // affine-gate accepts it and keeps tile culling -- see the TODO near
+        // umbra_sdf_draw in src/draw.c.  Then each cell dispatches via
         // umbra_sdf_draw_queue in overview_draw instead of c->prog->queue.
-        //
-        // Same treatment applies to blend slides, which also build an
-        // umbra_sdf_draw internally.  If a slide exposes both effects and
-        // sdf hooks, prefer the tile-culled sdf path.
-        struct slide_effects eff = {0};
-        if (!sub->get_effects || !sub->get_effects(sub, &eff)) { continue; }
+        if (!sub->build_draw) { continue; }
 
-        compose_final(&c->final_mat, &eff, &c->cell_mat);
-
-        struct umbra_builder *b = umbra_draw_builder(
-            &c->final_mat,
-            eff.coverage_fn, eff.coverage_ctx,
-            eff.shader_fn,   eff.shader_ctx,
-            eff.blend_fn,    eff.blend_ctx,
-            &st->out_buf,    fmt);
+        struct umbra_builder *b = build_cell_program(sub, &c->cell_mat,
+                                                      &st->out_buf, fmt);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         c->prog = be->compile(be, ir);
@@ -257,12 +247,10 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         slide_bg_draw(bg, xl, yt, xr, yb, buf);
 
         if (c->sub && c->prog) {
-            // Refresh animated uniforms, then recompose final_mat so its
-            // contents reflect the current frame.
+            // Refresh animated uniforms -- the cell program reads the sub's
+            // matrices as uniforms at dispatch time, so mutating them here
+            // is enough; no recompile.
             if (c->sub->animate) { c->sub->animate(c->sub, secs); }
-            struct slide_effects eff = {0};
-            c->sub->get_effects(c->sub, &eff);
-            compose_final(&c->final_mat, &eff, &c->cell_mat);
             c->prog->queue(c->prog, xl, yt, xr, yb);
         }
     }
@@ -278,15 +266,8 @@ static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
     // Return the first live cell's builder as a representative.
     for (int i = 0; i < st->n_cells; i++) {
         struct cell *c = &st->cells[i];
-        if (!c->sub || !c->prog) { continue; }
-        struct slide_effects eff = {0};
-        if (!c->sub->get_effects(c->sub, &eff)) { continue; }
-        out[0] = umbra_draw_builder(
-            &c->final_mat,
-            eff.coverage_fn, eff.coverage_ctx,
-            eff.shader_fn,   eff.shader_ctx,
-            eff.blend_fn,    eff.blend_ctx,
-            &st->out_buf,    fmt);
+        if (!c->sub || !c->prog || !c->sub->build_draw) { continue; }
+        out[0] = build_cell_program(c->sub, &c->cell_mat, &st->out_buf, fmt);
         return out[0] ? 1 : 0;
     }
     return 0;

@@ -20,20 +20,6 @@
 //
 //       Unsure quite yet how to square this with SDF dispatch.
 
-// A slide's effect stack, if it can be expressed as a single-pass composition
-// through umbra_draw_builder.  Callers fill in a zero-initialized struct and
-// consult .coverage_fn / .shader_fn / .blend_fn to tell what the slide draws.
-// transform_mat is optional: NULL means identity, non-NULL means the driver
-// should apply umbra_transform_perspective through this matrix.
-// ctxs point at state owned by the slide, alive until the slide is freed;
-// callers must not free them.
-struct slide_effects {
-    struct umbra_matrix const *transform_mat;
-    umbra_coverage *coverage_fn; void *coverage_ctx;
-    umbra_shader   *shader_fn;   void *shader_ctx;
-    umbra_blend    *blend_fn;    void *blend_ctx;
-};
-
 struct slide {
     char const     *title;
     float           bg[4];
@@ -46,12 +32,18 @@ struct slide {
     int (*get_builders)(struct slide*, struct umbra_fmt,
                         struct umbra_builder **out, int max);
 
-    // Composable-effects hook: 1 if the slide can be expressed as a
-    // transform + coverage + shader + blend stack (fills *out), 0 otherwise.
-    // Consumers (e.g. the overview) wrap these with their own transform and
-    // compile one program that draws the slide directly to a sub-rect of
-    // the destination framebuffer.
-    _Bool (*get_effects)(struct slide*, struct slide_effects *out);
+    // Fill builder `b` with the slide's draw IR.  `dst_ptr` is already bound
+    // on `b` (via umbra_bind_buf32) and is the final destination; `fmt` is
+    // its format.  `(x, y)` are the post-transform dispatch coords -- if the
+    // caller wanted a viewport transform applied, they've already issued it.
+    // The slide may still issue its own transforms (e.g. an animated
+    // perspective matrix) on top before calling umbra_build_draw.
+    //
+    // NULL means the slide has no composable draw path; consumers fall back
+    // to the slide's own prepare/draw cycle or a placeholder.
+    void (*build_draw)(struct slide*, struct umbra_builder *b,
+                       umbra_ptr32 dst_ptr, struct umbra_fmt fmt,
+                       umbra_val32 x, umbra_val32 y);
 
     // Update animation state (e.g. per-frame matrix uniforms) without
     // emitting any GPU/CPU work.  NULL means static.
