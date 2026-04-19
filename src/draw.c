@@ -237,11 +237,11 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
 }
 
 // Interval affine transform, used only by umbra_sdf_draw's bounds program.
-// Interval perspective is unavailable by design: umbra_interval_div_f32 is
-// unsound when w straddles zero (see TODO near it in src/interval.c), so
-// callers that want a transform applied to intervals must first verify the
-// matrix is affine (p0 == p1 == 0 && p2 == 1) -- at which point the divide
-// collapses to 1 and we just emit the six-parameter affine form here.
+// Interval perspective is unavailable by design: umbra_interval_div_f32
+// cannot safely handle a zero-straddling divisor and we don't expect to
+// tile-dispatch anything but affine transforms.  Callers gate on the matrix
+// being affine (p0 == p1 == 0 && p2 == 1) and route through this helper,
+// which just emits the six-parameter affine form -- no divide.
 static void transform_affine_interval(struct umbra_matrix const *mat,
                                       struct umbra_builder *b,
                                       umbra_interval *x, umbra_interval *y) {
@@ -381,10 +381,11 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     umbra_flat_ir_free(dir);
     if (!d->draw) { free(d); return NULL; }
 
-    // Gate the bounds program on affine-only transforms.  Perspective interval
-    // divide is unsound when w straddles zero (see TODO in src/interval.c), so
-    // we'd silently drop horizon-crossing tiles.  Non-affine transforms skip
-    // bounds entirely and fall back to a full-rect dispatch in _queue.
+    // Gate the bounds program on affine-only transforms.  We don't support
+    // tile-culled dispatch under perspective: the interval divide would be
+    // unsound on horizon-crossing tiles, and perspective-sdf isn't a use
+    // case we have.  Non-affine transforms skip the bounds program and fall
+    // back to a full-rect dispatch in _queue.
     _Bool const build_bounds = !transform_mat || matrix_is_affine(transform_mat);
     if (!build_bounds) { return d; }
 

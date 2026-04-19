@@ -45,35 +45,22 @@ umbra_interval umbra_interval_mul_f32(struct umbra_builder *b,
     };
 }
 
-// TODO: unsound when c straddles zero.  The {1/c.hi, 1/c.lo} recip here
-// assumes c is sign-consistent (all positive or all negative); if c.lo < 0 <
-// c.hi the true set {a/x : x in c} is unbounded, e.g. [2,3] / [-1,1] =
-// (-inf, -2] U [2, +inf), but this code produces a narrow finite interval
-// like [-3, 3] that does NOT enclose the truth.  Downstream this causes
-// unsound tile culling in umbra_sdf_draw under perspective transforms (see
-// TODO near umbra_sdf_draw in draw.c): a horizon-crossing tile can have its
-// f.lo come out positive when the true f.lo is deeply negative, and the
-// `f.lo < 0` predicate drops a tile that should have drawn -> visible holes.
+// TODO: unsound on zero-straddling divisors.  The {1/c.hi, 1/c.lo} recip
+// here assumes c is sign-consistent (all positive or all negative).  If
+// c.lo < 0 < c.hi the true set {a/x : x in c} is unbounded -- for example
+// [2, 3] / [-1, 1] = (-inf, -2] U [2, +inf) -- but this op returns a narrow
+// finite interval like [-3, 3] that does NOT enclose the truth.  Any caller
+// that could end up here with a zero-straddling divisor gets silently wrong
+// bounds.
 //
-// Two candidate fixes once we actually need perspective-sdf support:
-//
-//  (1) Return (-inf, +inf) from this op when c straddles zero, AND plug the
-//      NaN leak in umbra_interval_mul_f32 so infinities survive downstream:
-//      0 * (+-inf) = NaN in IEEE, and NaN < 0 = false would silently break
-//      soundness again.  Fix by appending sel(isnan(lo), -inf, lo) and
-//      sel(isnan(hi), +inf, hi) after every interval op (or at least mul and
-//      sqrt).  Cheap since these ops run in the bounds program once per tile,
-//      not per pixel.  Makes the library self-consistent against any future
-//      NaN source, not just this one.
-//
-//  (2) Clamp at the divide: route the zero-straddle case through a saturating
-//      div returning +-FLT_MAX sentinels.  Avoids NaN without touching mul.
-//      Leaks precision though -- FLT_MAX * small is finite and misleadingly
-//      tight, whereas inf * small is inf and stays honest.
-//
-// Prefer (1); (2) is a local hack.  Either way, update umbra_sdf_draw's
-// perspective-sniff fallback (see draw.c) once this lands so we cull tiles
-// instead of full-rect dispatch.
+// No consumer today needs it: umbra_sdf_draw's bounds program is
+// affine-only (transform_affine_interval in src/draw.c emits no divide),
+// and the other interval ops don't introduce division.  But the op is part
+// of our public interval library, so figure out the right behavior before
+// a caller shows up that would be hurt.  Candidates: return (-inf, +inf)
+// and harden every other interval op against NaN from later 0*inf; or a
+// saturating +-FLT_MAX at the divide; or simply make it a precondition
+// that the divisor be sign-consistent.
 umbra_interval umbra_interval_div_f32(struct umbra_builder *b,
                                       umbra_interval a, umbra_interval c) {
     if (exact(a) && exact(c)) {

@@ -88,11 +88,8 @@ typedef umbra_color_val32 umbra_blend    (void *ctx, struct umbra_builder*,
 // through a bound uniforms span, then applied as
 // w = p0*x + p1*y + p2;  x' = (sx*x + kx*y + tx) / w;  y' = (ky*x + sy*y + ty) / w.
 // Operates on scalar dispatch coords; callers that need to chain another
-// transform just call this again on the result.  (We intentionally don't
-// export an interval entry: umbra_interval_div_f32 is unsound when w
-// straddles zero -- see TODO in src/interval.c -- so a sound interval
-// perspective is not available today.  sdf_draw has its own private interval
-// impl for its bounds program, affine-gated.)
+// transform just call this again on the result.  (There is no interval
+// entry point: tile-culled dispatch is affine-only by design.)
 umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const*,
                                               struct umbra_builder*,
                                               umbra_val32 x, umbra_val32 y);
@@ -138,10 +135,9 @@ struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_ma
 // bounds programs both see transformed coordinates).  Affine matrices at
 // build time (p0 == p1 == 0 && p2 == 1) keep the tile-culling bounds program;
 // perspective matrices skip bounds and fall back to a single full-rect
-// dispatch because the interval divide is unsound when w straddles zero
-// (see TODO in src/interval.c).  This is a build-time decision -- if you
-// need an affine-gated sdf_draw, keep the perspective row zero for the
-// lifetime of the program.
+// dispatch -- tile culling is affine-only by design.  This is a build-time
+// decision: if you need an affine-gated sdf_draw, keep the perspective row
+// zero for the lifetime of the program.
 // TODO: _Bool hard_edge -> int quality
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
                                       struct umbra_matrix const *transform_mat,
