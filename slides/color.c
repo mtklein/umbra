@@ -20,7 +20,6 @@ struct swatch_slide {
     struct slide base;
 
     int w, h;
-    int :32, :32;
 
     struct umbra_fmt      fmt;
     struct umbra_program *progs[SWATCH_N];

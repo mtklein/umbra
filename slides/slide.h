@@ -17,15 +17,12 @@
 //   * The overview consumes it (loops build_draw(i) until it returns 0).
 //
 // Still ahead:
-//   * Migrate the remaining slides.  Today-blockers: sdf slides (need a
-//     tile-culled sibling path -- see TODO in slides/overview.c); slug
-//     (two-pass, now buildable on multi-program build_draw).
-//   * Extend build_draw (or add a sibling) to let a slide produce more than
-//     one program so the two-pass slug accumulator fits.  The driver would
-//     compile each in sequence and dispatch them in order.
-//   * Once every slide has a build_draw (or equivalent), retire prepare /
-//     draw / get_builders and have every driver just loop over
-//     slide->build_draw.
+//   * Migrate slug (two-pass accumulator + draw -- the multi-program
+//     build_draw(i) contract fits, it's just not wired yet) and the sdf
+//     slides (need a tile-culled sibling path -- see TODO in
+//     slides/overview.c).
+//   * Once every slide has a build_draw, retire prepare / draw /
+//     get_builders and have every driver just loop over slide->build_draw.
 
 struct slide {
     char const     *title;
