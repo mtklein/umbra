@@ -279,6 +279,7 @@ struct grad_slide {
     struct umbra_fmt      fmt;
     struct umbra_flat_ir *ir;
     struct umbra_program *prog;
+    struct umbra_buf      dst_buf;
 };
 
 static void grad_init(struct slide *s, int w, int h) {
@@ -296,7 +297,7 @@ static void grad_prepare(struct slide *s, struct umbra_backend *be, struct umbra
             NULL, NULL,
             st->shader_fn, st->shader_ctx,
             NULL, NULL,
-            fmt);
+            &st->dst_buf, fmt);
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
@@ -307,10 +308,10 @@ static void grad_prepare(struct slide *s, struct umbra_backend *be, struct umbra
 static void grad_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct grad_slide *st = (struct grad_slide *)s;
     (void)secs;
-    struct umbra_buf ubuf[] = {
-        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
+    st->dst_buf = (struct umbra_buf){
+        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
     };
-    st->prog->queue(st->prog, l, t, r, b, ubuf);
+    st->prog->queue(st->prog, l, t, r, b, (struct umbra_buf[]){{0}});
 }
 
 static int grad_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -321,7 +322,7 @@ static int grad_get_builders(struct slide *s, struct umbra_fmt fmt,
         NULL, NULL,
         st->shader_fn, st->shader_ctx,
         NULL, NULL,
-        fmt);
+        &st->dst_buf, fmt);
     return out[0] ? 1 : 0;
 }
 

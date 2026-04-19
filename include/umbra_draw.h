@@ -72,12 +72,14 @@ umbra_blend umbra_blend_src,
             umbra_blend_multiply;
 
 // Compose coverage, shader, and blend into an IR builder that reads and writes
-// dst_fmt at ptr.ix=0.  Any of the effects may be NULL for default behavior:
-// coverage=1, shader={0,0,0,0}, blend=src.
+// dst_fmt at the bound dst buf.  Any of the effects may be NULL for default
+// behavior: coverage=1, shader={0,0,0,0}, blend=src.  dst must outlive the
+// builder, flat_ir, and program; its contents are dereferenced at queue time.
 struct umbra_builder* umbra_draw_builder(umbra_coverage, void *coverage_ctx,
                                          umbra_shader  , void *shader_ctx,
                                          umbra_blend   , void *blend_ctx,
-                                         struct umbra_fmt dst_fmt);
+                                         struct umbra_buf *dst,
+                                         struct umbra_fmt  dst_fmt);
 
 // Draw using an umbra_sdf as coverage.  hard_edge=1 gives a binary mask;
 // hard_edge=0 clamps -sdf into [0, 1] for a 1px AA ramp.

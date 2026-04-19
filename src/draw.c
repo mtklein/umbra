@@ -149,17 +149,15 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
     .name="fp16_planar", .bpp=2, .planes=4, .load=load_fp16p, .store=store_fp16p,
 };
 
-// umbra_ptr32 .ix assignment for umbra_draw_builder:
-//   buf[0] = destination render target
-enum { DRAW_DST_IX = 0 };
-
 struct umbra_builder* umbra_draw_builder(
     umbra_coverage coverage_fn, void *coverage_ctx,
     umbra_shader   shader_fn,   void *shader_ctx,
     umbra_blend    blend_fn,    void *blend_ctx,
-    struct umbra_fmt fmt)
+    struct umbra_buf *dst_buf,
+    struct umbra_fmt  fmt)
 {
     struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, dst_buf);
     umbra_val32 const xf = umbra_f32_from_i32(b, umbra_x(b)),
                       yf = umbra_f32_from_i32(b, umbra_y(b));
 
@@ -170,7 +168,6 @@ struct umbra_builder* umbra_draw_builder(
     umbra_color_val32 src = {zero, zero, zero, zero};
     if (shader_fn) { src = shader_fn(shader_ctx, b, xf, yf); }
 
-    umbra_ptr32 dst_ptr = {.ix = DRAW_DST_IX};
     umbra_color_val32 dst = {zero, zero, zero, zero};
     if (blend_fn || coverage_fn) { dst = fmt.load(b, &dst_ptr); }
 
@@ -223,6 +220,7 @@ struct umbra_sdf_draw {
     int                            lo_cap;
     int                            :32;
     struct umbra_buf               lo_buf;
+    struct umbra_buf               draw_dst_buf;
 };
 
 // TODO: add a second `covered` program alongside `draw` for tiles where the
@@ -258,7 +256,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
         umbra_coverage_from_sdf, &d->cov_state,
         shader_fn, shader_ctx,
         blend_fn,  blend_ctx,
-        fmt);
+        &d->draw_dst_buf, fmt);
     struct umbra_flat_ir *dir = umbra_flat_ir(db);
     umbra_builder_free(db);
     d->draw = be->compile(be, dir);
@@ -354,7 +352,8 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
                           tt = t + ty * QUEUE_MIN_TILE,
                           tr = tl + QUEUE_MIN_TILE < r ? tl + QUEUE_MIN_TILE : r,
                           tb = tt + QUEUE_MIN_TILE < b ? tt + QUEUE_MIN_TILE : b;
-                d->draw->queue(d->draw, tl, tt, tr, tb, buf);
+                d->draw_dst_buf = buf[0];
+                d->draw->queue(d->draw, tl, tt, tr, tb, (struct umbra_buf[]){{0}});
             }
         }
     }

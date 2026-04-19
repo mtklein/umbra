@@ -243,6 +243,7 @@ struct text_slide {
 
     struct umbra_fmt      fmt;
     struct umbra_program *prog;
+    struct umbra_buf      dst_buf;
 };
 
 static void text_init(struct slide *s, int w, int h) {
@@ -265,7 +266,7 @@ static void text_prepare(struct slide *s, struct umbra_backend *be,
         st->coverage_fn,    &st->buf,
         umbra_shader_color, &st->color,
         umbra_blend_srcover, NULL,
-        fmt);
+        &st->dst_buf,        fmt);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     st->prog = be->compile(be, ir);
@@ -277,10 +278,10 @@ static void text_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     struct text_slide *st = (struct text_slide *)s;
     (void)secs;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    struct umbra_buf ubuf[] = {
-        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
+    st->dst_buf = (struct umbra_buf){
+        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
     };
-    st->prog->queue(st->prog, l, t, r, b, ubuf);
+    st->prog->queue(st->prog, l, t, r, b, (struct umbra_buf[]){{0}});
 }
 
 static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -291,7 +292,7 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
         st->coverage_fn,    &st->buf,
         umbra_shader_color, &st->color,
         umbra_blend_srcover, NULL,
-        fmt);
+        &st->dst_buf,        fmt);
     return out[0] ? 1 : 0;
 }
 
@@ -349,6 +350,7 @@ struct persp_slide {
 
     struct umbra_fmt          fmt;
     struct umbra_program     *prog;
+    struct umbra_buf          dst_buf;
 };
 
 static void persp_init(struct slide *s, int w, int h) {
@@ -375,7 +377,7 @@ static void persp_prepare(struct slide *s, struct umbra_backend *be,
         coverage_matrix,     &st->mat,
         umbra_shader_color,  &st->color,
         umbra_blend_srcover, NULL,
-        fmt);
+        &st->dst_buf,        fmt);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     st->prog = be->compile(be, ir);
@@ -388,10 +390,10 @@ static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b,
     slide_bg_draw(s->bg, l, t, r, b, buf);
     slide_perspective_matrix(&st->mat.mat, (float)secs, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
-    struct umbra_buf ubuf[] = {
-        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
+    st->dst_buf = (struct umbra_buf){
+        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
     };
-    st->prog->queue(st->prog, l, t, r, b, ubuf);
+    st->prog->queue(st->prog, l, t, r, b, (struct umbra_buf[]){{0}});
 }
 
 static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -402,7 +404,7 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
         coverage_matrix,     &st->mat,
         umbra_shader_color,  &st->color,
         umbra_blend_srcover, NULL,
-        fmt);
+        &st->dst_buf,        fmt);
     return out[0] ? 1 : 0;
 }
 
@@ -439,6 +441,7 @@ struct cov_null_slide {
     struct umbra_fmt      fmt;
     struct umbra_flat_ir *ir;
     struct umbra_program *prog;
+    struct umbra_buf      dst_buf;
 };
 
 static void cov_null_init(struct slide *s, int w, int h) {
@@ -456,7 +459,7 @@ static void cov_null_prepare(struct slide *s, struct umbra_backend *be, struct u
             NULL,                NULL,
             umbra_shader_color,  &st->color,
             umbra_blend_srcover, NULL,
-            fmt);
+            &st->dst_buf,        fmt);
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
@@ -469,10 +472,10 @@ static void cov_null_draw(struct slide *s, double secs, int l, int t, int r, int
     struct cov_null_slide *st = (struct cov_null_slide *)s;
     (void)secs;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    struct umbra_buf ubuf[] = {
-        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
+    st->dst_buf = (struct umbra_buf){
+        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
     };
-    st->prog->queue(st->prog, l, t, r, b, ubuf);
+    st->prog->queue(st->prog, l, t, r, b, (struct umbra_buf[]){{0}});
 }
 
 static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -483,7 +486,7 @@ static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
         NULL,                NULL,
         umbra_shader_color,  &st->color,
         umbra_blend_srcover, NULL,
-        fmt);
+        &st->dst_buf,        fmt);
     return out[0] ? 1 : 0;
 }
 

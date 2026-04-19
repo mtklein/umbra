@@ -439,6 +439,7 @@ struct slug_two_pass_slide {
     umbra_color               color;
     struct umbra_fmt          fmt;
     struct umbra_program     *draw_prog;
+    struct umbra_buf          dst_buf;
 };
 
 static void slug_two_pass_init(struct slide *s, int w, int h) {
@@ -472,7 +473,7 @@ static void slug_two_pass_prepare(struct slide *s,
             coverage_winding,       &st->wind_uniform,
             umbra_shader_color,     &st->color,
             umbra_blend_srcover,    NULL,
-            fmt);
+            &st->dst_buf,           fmt);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         st->draw_prog = be->compile(be, ir);
@@ -502,10 +503,10 @@ static void slug_two_pass_draw(struct slide *s, double secs, int l, int t, int r
         acc->queue(acc, l, t, r, b, (struct umbra_buf[]){{0}});
     }
 
-    struct umbra_buf rbuf[] = {
-        {.ptr=buf, .count=w * h * st->fmt.planes, .stride=w},
+    st->dst_buf = (struct umbra_buf){
+        .ptr=buf, .count=w * h * st->fmt.planes, .stride=w,
     };
-    st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
+    st->draw_prog->queue(st->draw_prog, l, t, r, b, (struct umbra_buf[]){{0}});
 }
 
 static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -517,7 +518,7 @@ static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
         coverage_winding,       &st->wind_uniform,
         umbra_shader_color,     &st->color,
         umbra_blend_srcover,    NULL,
-        fmt);
+        &st->dst_buf,           fmt);
     return 2;
 }
 
@@ -561,6 +562,7 @@ struct slug_slide {
     umbra_color                   color;
     struct umbra_fmt              fmt;
     struct umbra_program         *draw_prog;
+    struct umbra_buf              dst_buf;
 };
 
 static void slug_init(struct slide *s, int w, int h) {
@@ -593,7 +595,7 @@ static void slug_prepare(struct slide *s, struct umbra_backend *be,
             coverage_winding,       &st->wind_uniform,
             umbra_shader_color,     &st->color,
             umbra_blend_srcover,    NULL,
-            fmt);
+            &st->dst_buf,           fmt);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         st->draw_prog = be->compile(be, ir);
@@ -622,10 +624,10 @@ static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, 
 
     st->acc_prog->queue(st->acc_prog, l, t, r, b, (struct umbra_buf[]){{0}});
 
-    struct umbra_buf rbuf[] = {
-        {.ptr=buf, .count=w * h * st->fmt.planes, .stride=w},
+    st->dst_buf = (struct umbra_buf){
+        .ptr=buf, .count=w * h * st->fmt.planes, .stride=w,
     };
-    st->draw_prog->queue(st->draw_prog, l, t, r, b, rbuf);
+    st->draw_prog->queue(st->draw_prog, l, t, r, b, (struct umbra_buf[]){{0}});
 }
 
 static void slug_free_slide(struct slide *s) {

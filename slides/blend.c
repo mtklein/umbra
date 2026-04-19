@@ -15,6 +15,7 @@ struct blend_slide {
 
     struct umbra_fmt       fmt;
     struct umbra_sdf_draw *qt;
+    struct umbra_buf       dst_buf;
 };
 
 static void blend_init(struct slide *s, int w, int h) {
@@ -75,7 +76,7 @@ static int blend_get_builders(struct slide *s, struct umbra_fmt fmt,
     out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 st->blend_fn,            NULL,
-                                fmt);
+                                &st->dst_buf,            fmt);
     return out[0] ? 1 : 0;
 }
 

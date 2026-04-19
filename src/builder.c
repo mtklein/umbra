@@ -111,10 +111,9 @@ void umbra_builder_free(builder *b) {
     }
 }
 
-// Composer APIs (umbra_draw_builder, etc.) reserve ptr.ix slots 0..N-1 for
-// caller-provided bufs at queue time; umbra_uniforms() assigns ixes starting
-// at REG_BASE so flat_ir_bind_uniforms() can cheaply distinguish the two
-// when remapping.
+// umbra_bind_buf* and umbra_uniforms() assign ixes starting at REG_BASE so
+// flat_ir_bind_uniforms() can distinguish them from any hand-rolled ptr.ix
+// values when remapping.
 static int reserve_uniform(builder *b) {
     if (b->n_uniforms == b->cap_uniforms) {
         b->cap_uniforms = b->cap_uniforms ? 2 * b->cap_uniforms : 4;
