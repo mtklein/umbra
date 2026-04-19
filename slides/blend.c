@@ -13,9 +13,9 @@ struct blend_slide {
     umbra_rect    rect;
     umbra_blend   *blend_fn;
 
-    struct umbra_fmt       fmt;
-    struct umbra_sdf_draw *qt;
-    struct umbra_buf       dst_buf;
+    struct umbra_fmt      fmt;
+    struct umbra_program *prog;
+    struct umbra_buf      dst_buf;
 };
 
 static void blend_init(struct slide *s, int w, int h) {
@@ -37,52 +37,67 @@ static float bounce(float p0, float v, double secs, float range) {
     return p;
 }
 
+static void blend_build_draw(struct slide *s, struct umbra_builder *b,
+                             umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                             umbra_val32 x, umbra_val32 y) {
+    struct blend_slide *st = (struct blend_slide *)s;
+    umbra_build_draw(b, dst_ptr, fmt, x, y,
+                     umbra_coverage_rect, &st->rect,
+                     umbra_shader_color,  &st->color,
+                     st->blend_fn,        NULL);
+}
+
+static struct umbra_builder* blend_builder(struct slide *s, struct umbra_fmt fmt) {
+    struct blend_slide *st = (struct blend_slide *)s;
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
+    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
+                      y = umbra_f32_from_i32(b, umbra_y(b));
+    blend_build_draw(s, b, dst_ptr, fmt, x, y);
+    return b;
+}
+
 static void blend_prepare(struct slide *s, struct umbra_backend *be,
                           struct umbra_fmt fmt) {
     struct blend_slide *st = (struct blend_slide *)s;
-    umbra_sdf_draw_free(st->qt);
+    umbra_program_free(st->prog);
     st->fmt = fmt;
-    st->qt = umbra_sdf_draw(be, NULL,                            umbra_sdf_rect,     &st->rect,
-                            1,
-                            umbra_shader_color, &st->color,
-                            st->blend_fn,       NULL,
-                            fmt);
+    struct umbra_builder *b = blend_builder(s, fmt);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    st->prog = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
     slide_bg_prepare(be, fmt, st->w, st->h);
+}
+
+static void blend_animate(struct slide *s, double secs) {
+    struct blend_slide *st = (struct blend_slide *)s;
+    double const ticks = secs * 60.0;
+    float const rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w),
+                ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
+    st->rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
 }
 
 static void blend_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct blend_slide *st = (struct blend_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    double const ticks = secs * 60.0;
-    float const rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w),
-                ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
-    st->rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
-    umbra_sdf_draw_queue(st->qt, l, t, r, b, (struct umbra_buf){
+    blend_animate(s, secs);
+    st->dst_buf = (struct umbra_buf){
         .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
-    });
+    };
+    st->prog->queue(st->prog, l, t, r, b);
 }
 
 static int blend_get_builders(struct slide *s, struct umbra_fmt fmt,
                               struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
-    struct blend_slide *st = (struct blend_slide *)s;
-    struct umbra_coverage_from_sdf cov = {
-        .sdf_fn    = umbra_sdf_rect,
-        .sdf_ctx   = &st->rect,
-        .hard_edge = 1,
-    };
-    out[0] = umbra_draw_builder(
-        NULL,
-                                umbra_coverage_from_sdf, &cov,
-                                umbra_shader_color,      &st->color,
-                                st->blend_fn,            NULL,
-                                &st->dst_buf,            fmt);
+    out[0] = blend_builder(s, fmt);
     return out[0] ? 1 : 0;
 }
 
 static void blend_free(struct slide *s) {
     struct blend_slide *st = (struct blend_slide *)s;
-    umbra_sdf_draw_free(st->qt);
+    umbra_program_free(st->prog);
     free(st);
 }
 
@@ -100,6 +115,8 @@ static struct slide* make_blend(char const *title, float const bg[4], float cons
         .draw = blend_draw,
         .free = blend_free,
         .get_builders = blend_get_builders,
+        .build_draw   = blend_build_draw,
+        .animate      = blend_animate,
     };
     return &st->base;
 }

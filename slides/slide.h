@@ -11,13 +11,13 @@
 //
 // Partially landed:
 //   * build_draw exists and lives alongside prepare/draw/get_builders.
-//   * persp_slide, cov_null_slide, text_slide (bitmap and SDF bitmap), and all
-//     8 gradient variants implement it.
+//   * persp_slide, cov_null_slide, text_slide (bitmap and SDF bitmap), all 5
+//     blend variants, and all 8 gradient variants implement it.
 //   * The overview consumes it.
 //
 // Still ahead:
-//   * Migrate the remaining slides.  Today-blockers: sdf / blend slides (need
-//     a tile-culled sibling path -- see TODO in slides/overview.c); slug
+//   * Migrate the remaining slides.  Today-blockers: sdf slides (need a
+//     tile-culled sibling path -- see TODO in slides/overview.c); slug
 //     (two-pass, needs multi-program support); swatch (multi-dispatch per
 //     frame).
 //   * Extend build_draw (or add a sibling) to let a slide produce more than

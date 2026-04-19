@@ -173,15 +173,14 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         c->sub = sub;
         if (sub->prepare) { sub->prepare(sub, be, fmt); }
 
-        // TODO: SDF-based slides (all of slides/sdf.c, and the blend variants
-        // in slides/blend.c that wrap an SDF) currently render as placeholders
-        // here because they have no build_draw hook.  Wiring one that goes
-        // through umbra_coverage_from_sdf looks right but collapses perf:
-        // per-pixel SDF evaluation with no tile culling blew past the `ninja`
-        // 30s dump timeout in one experiment and would tank demo FPS for
-        // sdf_text (~100 curves/pixel).  The standalone slides dodge this by
-        // going through umbra_sdf_draw, whose bounds program tile-culls most
-        // pixels before they reach sdf evaluation.
+        // TODO: SDF-based slides (all of slides/sdf.c) currently render as
+        // placeholders here because they have no build_draw hook.  Wiring one
+        // that goes through umbra_coverage_from_sdf looks right but collapses
+        // perf: per-pixel SDF evaluation with no tile culling blew past the
+        // `ninja` 30s dump timeout in one experiment and would tank demo FPS
+        // for sdf_text (~100 curves/pixel).  The standalone slides dodge this
+        // by going through umbra_sdf_draw, whose bounds program tile-culls
+        // most pixels before they reach sdf evaluation.
         //
         // Right fix: grow slide with a sibling build_sdf_draw hook (or teach
         // build_draw to optionally produce multiple programs) so the overview
