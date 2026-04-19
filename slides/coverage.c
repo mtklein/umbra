@@ -71,6 +71,18 @@ umbra_val32 coverage_bitmap2d(void *ctx, struct umbra_builder *b,
     return umbra_sel_32(b, in, cov, zero_f);
 }
 
+umbra_val32 coverage_sdf2d(void *ctx, struct umbra_builder *b,
+                           umbra_val32 x, umbra_val32 y) {
+    umbra_val32 const dist = coverage_bitmap2d(ctx, b, x, y);
+    umbra_val32 const lo      = umbra_imm_f32(b, 0.4375f);
+    umbra_val32 const scale   = umbra_imm_f32(b, 8.0f);
+    umbra_val32 const shifted = umbra_sub_f32(b, dist, lo);
+    umbra_val32 const scaled  = umbra_mul_f32(b, shifted, scale);
+    umbra_val32 const zero    = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const one     = umbra_imm_f32(b, 1.0f);
+    return umbra_min_f32(b, umbra_max_f32(b, scaled, zero), one);
+}
+
 static unsigned char* text_load_font(char const *path) {
     FILE *f = fopen(path, "rb");
     if (!f) { return NULL; }
@@ -180,34 +192,19 @@ struct text_cov* text_shared_bitmap(void) { return &shared_bitmap; }
 struct text_cov* text_shared_sdf   (void) { return &shared_sdf; }
 
 // Coverage (8-bit bitmap) and Coverage (SDF bitmap): sample a glyph-mask
-// through umbra_coverage_{bitmap,sdf}.
-//
-// TODO: text_slide doesn't implement slide->build_draw yet (it renders as a
-// placeholder in the overview).  One attempt to migrate it:
-//   - Added a `struct coverage_bitmap2d bmp` field to text_slide, populated
-//     in text_init from the shared text_cov.
-//   - Swapped coverage_fn from coverage_bitmap / coverage_sdf (linear load,
-//     ignores x/y) to coverage_bitmap2d / a new coverage_sdf2d (gather at
-//     (x, y)), so the slide composes correctly under an outer transform.
-//   - Added text_build_draw / text_builder / .build_draw wire-up; routed
-//     standalone prepare and get_builders through the same builder.
-//
-// With that change, tests/golden_test.c's test_slide_golden reported
-// "Coverage (8-bit bitmap)" mismatches for all four backend pairs that
-// involve jit (interp vs jit, jit vs metal, jit vs vulkan, jit vs wgpu):
-// 4593 / 49152 bytes differ at 8888, worst delta 229 at byte 11869.
-// interp / metal / vulkan / wgpu all agreed with each other; only jit
-// produced different output.  The overlapping persp_slide case (which also
-// uses coverage_bitmap2d, but through a perspective warp) passed pairwise.
+// through coverage_bitmap2d / coverage_sdf2d so the slide composes under an
+// outer transform (e.g. the overview's cell matrix).  When the slide stands
+// alone the dispatch (x, y) equals the bitmap (x, y), so the gather-based
+// samplers reproduce the linear-load coverage_bitmap / coverage_sdf output.
 struct text_slide {
     struct slide base;
 
     struct text_cov *tc;
     int              w, h;
 
-    umbra_color       color;
-    struct umbra_buf  buf;
-    umbra_coverage    *coverage_fn;
+    umbra_color              color;
+    struct coverage_bitmap2d bmp;
+    umbra_coverage          *coverage_fn;
 
     struct umbra_fmt      fmt;
     struct umbra_program *prog;
@@ -218,23 +215,39 @@ static void text_init(struct slide *s, int w, int h) {
     struct text_slide *st = (struct text_slide *)s;
     st->w = w;
     st->h = h;
+    st->bmp = (struct coverage_bitmap2d){
+        .buf = {.ptr = st->tc->data, .count = st->tc->w * st->tc->h},
+        .w   = st->tc->w,
+        .h   = st->tc->h,
+    };
+}
+
+static void text_build_draw(struct slide *s, struct umbra_builder *b,
+                            umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                            umbra_val32 x, umbra_val32 y) {
+    struct text_slide *st = (struct text_slide *)s;
+    umbra_build_draw(b, dst_ptr, fmt, x, y,
+                     st->coverage_fn,     &st->bmp,
+                     umbra_shader_color,  &st->color,
+                     umbra_blend_srcover, NULL);
+}
+
+static struct umbra_builder* text_builder(struct slide *s, struct umbra_fmt fmt) {
+    struct text_slide *st = (struct text_slide *)s;
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
+    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
+                      y = umbra_f32_from_i32(b, umbra_y(b));
+    text_build_draw(s, b, dst_ptr, fmt, x, y);
+    return b;
 }
 
 static void text_prepare(struct slide *s, struct umbra_backend *be,
                          struct umbra_fmt fmt) {
     struct text_slide *st = (struct text_slide *)s;
     umbra_program_free(st->prog);
-    st->buf = (struct umbra_buf){
-        .ptr    = st->tc->data,
-        .count  = st->w * st->h,
-        .stride = st->w,
-    };
     st->fmt = fmt;
-    struct umbra_builder *b = umbra_draw_builder(
-        NULL,        st->coverage_fn,    &st->buf,
-        umbra_shader_color, &st->color,
-        umbra_blend_srcover, NULL,
-        &st->dst_buf,        fmt);
+    struct umbra_builder *b = text_builder(s, fmt);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     st->prog = be->compile(be, ir);
@@ -255,12 +268,7 @@ static void text_draw(struct slide *s, double secs, int l, int t, int r, int b, 
 static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
-    struct text_slide *st = (struct text_slide *)s;
-    out[0] = umbra_draw_builder(
-        NULL,        st->coverage_fn,    &st->buf,
-        umbra_shader_color, &st->color,
-        umbra_blend_srcover, NULL,
-        &st->dst_buf,        fmt);
+    out[0] = text_builder(s, fmt);
     return out[0] ? 1 : 0;
 }
 
@@ -274,7 +282,7 @@ SLIDE(slide_coverage_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->tc          = text_shared_bitmap();
     st->color       = (umbra_color){1.0f, 1.0f, 1.0f, 1.0f};
-    st->coverage_fn = coverage_bitmap;
+    st->coverage_fn = coverage_bitmap2d;
     st->base = (struct slide){
         .title = "Coverage (8-bit bitmap)",
         .bg = {0.18f, 0.1f, 0.1f, 1},
@@ -283,6 +291,7 @@ SLIDE(slide_coverage_bitmap) {
         .draw = text_draw,
         .free = text_free,
         .get_builders = text_get_builders,
+        .build_draw   = text_build_draw,
     };
     return &st->base;
 }
@@ -291,7 +300,7 @@ SLIDE(slide_coverage_sdf_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->tc          = text_shared_sdf();
     st->color       = (umbra_color){0.2f, 0.8f, 1.0f, 1.0f};
-    st->coverage_fn = coverage_sdf;
+    st->coverage_fn = coverage_sdf2d;
     st->base = (struct slide){
         .title = "Coverage (SDF bitmap)",
         .bg = {0.18f, 0.1f, 0.1f, 1},
@@ -300,6 +309,7 @@ SLIDE(slide_coverage_sdf_bitmap) {
         .draw = text_draw,
         .free = text_free,
         .get_builders = text_get_builders,
+        .build_draw   = text_build_draw,
     };
     return &st->base;
 }

@@ -11,15 +11,15 @@
 //
 // Partially landed:
 //   * build_draw exists and lives alongside prepare/draw/get_builders.
-//   * persp_slide, cov_null_slide, and all 8 gradient variants implement it.
+//   * persp_slide, cov_null_slide, text_slide (bitmap and SDF bitmap), and all
+//     8 gradient variants implement it.
 //   * The overview consumes it.
 //
 // Still ahead:
-//   * Migrate the remaining slides.  Today-blockers: text_slide (golden-test
-//     disagreement the move surfaced -- see TODO in slides/coverage.c);
-//     sdf / blend slides (need a tile-culled sibling path -- see TODO in
-//     slides/overview.c); slug (two-pass, needs multi-program support);
-//     swatch (multi-dispatch per frame).
+//   * Migrate the remaining slides.  Today-blockers: sdf / blend slides (need
+//     a tile-culled sibling path -- see TODO in slides/overview.c); slug
+//     (two-pass, needs multi-program support); swatch (multi-dispatch per
+//     frame).
 //   * Extend build_draw (or add a sibling) to let a slide produce more than
 //     one program so the two-pass slug accumulator fits.  The driver would
 //     compile each in sequence and dispatch them in order.

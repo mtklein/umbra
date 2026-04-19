@@ -20,3 +20,8 @@ struct coverage_bitmap2d {
 umbra_val32 coverage_bitmap2d(void *coverage_bitmap2d, struct umbra_builder*,
                               umbra_val32 x, umbra_val32 y);
 
+// Gather-based SDF bitmap coverage.  Like coverage_bitmap2d, but applies the
+// SDF -> coverage transform (matching coverage_sdf) after sampling.
+umbra_val32 coverage_sdf2d(void *coverage_bitmap2d, struct umbra_builder*,
+                           umbra_val32 x, umbra_val32 y);
+

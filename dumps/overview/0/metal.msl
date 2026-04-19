@@ -2,15 +2,14 @@
 using namespace metal;
 
 
-struct meta { uint w, x0, y0, count0, count1, count2, count3, count4, stride0, stride1, stride2, stride3, stride4; };
+struct meta { uint w, x0, y0, count0, count1, count2, count3, stride0, stride1, stride2, stride3; };
 
 kernel void main0(
     constant meta &m [[buffer(0)]],
     device half4 * __restrict p0 [[buffer(1)]],
     device const uint * __restrict p1 [[buffer(2)]],
-    device const uint * __restrict p2 [[buffer(3)]],
-    device const ushort * __restrict p3 [[buffer(4)]],
-    device const uint * __restrict p4 [[buffer(5)]],
+    device const ushort * __restrict p2 [[buffer(3)]],
+    device const uint * __restrict p3 [[buffer(4)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
     if (pos.x >= m.w) return;
@@ -26,91 +25,71 @@ kernel void main0(
     uint v7 = p1[6];
     uint v8 = p1[7];
     uint v9 = p1[8];
-    uint v10 = p2[0];
-    uint v11 = p2[1];
-    uint v12 = p2[2];
-    uint v13 = p2[3];
-    uint v14 = p2[4];
-    uint v15 = p2[5];
-    uint v16 = p2[6];
-    uint v17 = p2[7];
-    uint v18 = p2[8];
-    uint v19 = 1065353216u;
-    uint v20 = p4[0];
-    uint v21 = p4[1];
-    uint v22 = p4[2];
-    uint v23 = p4[3];
-    float v24 = as_type<float>(v19) - as_type<float>(v23);
-    uint v25 = m.x0 + pos.x;
-    float v26 = (float)(int)v25;
-    uint v27 = m.y0 + pos.y;
-    float v28 = (float)(int)v27;
-    float v29 = v28 * as_type<float>(v5);
-    float v30 = fma(v26, as_type<float>(v4), v29);
-    float v31 = as_type<float>(v6) + v30;
-    float v32 = v28 * as_type<float>(v8);
-    float v33 = fma(v26, as_type<float>(v7), v32);
-    float v34 = as_type<float>(v9) + v33;
-    float v35 = v31 / v34;
-    float v36 = v35 * as_type<float>(v14);
-    float v37 = v28 * as_type<float>(v2);
-    float v38 = fma(v26, as_type<float>(v1), v37);
-    float v39 = as_type<float>(v3) + v38;
-    float v40 = v39 / v34;
-    float v41 = fma(v40, as_type<float>(v13), v36);
-    float v42 = as_type<float>(v15) + v41;
-    float v43 = v35 * as_type<float>(v17);
-    float v44 = fma(v40, as_type<float>(v16), v43);
-    float v45 = as_type<float>(v18) + v44;
-    float v46 = v42 / v45;
-    float v47 = v35 * as_type<float>(v11);
-    float v48 = fma(v40, as_type<float>(v10), v47);
-    float v49 = as_type<float>(v12) + v48;
-    float v50 = v49 / v45;
-    float v51 = max(v50, as_type<float>(0u));
-    float v52 = max(v46, as_type<float>(0u));
-    uint v53 = v50 <  as_type<float>(1149239296u) ? 0xffffffffu : 0u;
-    uint v54 = as_type<float>(v0) <= v50 ? 0xffffffffu : 0u;
-    uint v55 = v54 & v53;
-    uint v56 = v46 <  as_type<float>(1145044992u) ? 0xffffffffu : 0u;
-    uint v57 = as_type<float>(v0) <= v46 ? 0xffffffffu : 0u;
-    uint v58 = v57 & v56;
-    uint v59 = v55 & v58;
-    float v60 = min(v51, as_type<float>(1149222912u));
-    uint v61 = (uint)(int)floor(v60);
-    float v62 = min(v52, as_type<float>(1145028608u));
-    uint v63 = (uint)(int)floor(v62);
-    uint v64 = v63 << 10u;
-    uint v65 = v61 + v64;
-    uint v66 = (uint)p3[min(v65, m.count3 - 1u)] & ((v65 < m.count3) ? ~0u : 0u);
-    uint v67 = (uint)(int)(short)(ushort)v66;
-    float v68 = (float)(int)v67;
-    float v69 = v68 * as_type<float>(998277249u);
-    uint v70 = (v59 != 0u) ? as_type<uint>(v69) : v0;
-    half4 _px71 = p0[y * m.stride0 + x];
-    uint v71 = (uint)as_type<ushort>(_px71.x);
-    uint v71_1 = (uint)as_type<ushort>(_px71.y);
-    uint v71_2 = (uint)as_type<ushort>(_px71.z);
-    uint v71_3 = (uint)as_type<ushort>(_px71.w);
-    float v72 = (float)as_type<half>((ushort)v71);
-    float v73 = fma(v72, v24, as_type<float>(v20));
-    float v74 = v73 - v72;
-    float v75 = fma(as_type<float>(v70), v74, v72);
-    float v76 = (float)as_type<half>((ushort)v71_1);
-    float v77 = fma(v76, v24, as_type<float>(v21));
-    float v78 = v77 - v76;
-    float v79 = fma(as_type<float>(v70), v78, v76);
-    float v80 = (float)as_type<half>((ushort)v71_2);
-    float v81 = fma(v80, v24, as_type<float>(v22));
-    float v82 = v81 - v80;
-    float v83 = fma(as_type<float>(v70), v82, v80);
-    float v84 = (float)as_type<half>((ushort)v71_3);
-    float v85 = fma(v84, v24, as_type<float>(v23));
-    float v86 = v85 - v84;
-    float v87 = fma(as_type<float>(v70), v86, v84);
-    uint v88 = (uint)as_type<ushort>((half)v87);
-    uint v89 = (uint)as_type<ushort>((half)v83);
-    uint v90 = (uint)as_type<ushort>((half)v79);
-    uint v91 = (uint)as_type<ushort>((half)v75);
-    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v91), as_type<half>((ushort)v90), as_type<half>((ushort)v89), as_type<half>((ushort)v88));
+    uint v10 = 1065353216u;
+    uint v11 = p3[0];
+    uint v12 = p3[1];
+    uint v13 = p3[2];
+    uint v14 = p3[3];
+    float v15 = as_type<float>(v10) - as_type<float>(v14);
+    uint v16 = m.x0 + pos.x;
+    float v17 = (float)(int)v16;
+    uint v18 = m.y0 + pos.y;
+    float v19 = (float)(int)v18;
+    float v20 = v19 * as_type<float>(v5);
+    float v21 = fma(v17, as_type<float>(v4), v20);
+    float v22 = as_type<float>(v6) + v21;
+    float v23 = v19 * as_type<float>(v8);
+    float v24 = fma(v17, as_type<float>(v7), v23);
+    float v25 = as_type<float>(v9) + v24;
+    float v26 = v22 / v25;
+    float v27 = v19 * as_type<float>(v2);
+    float v28 = fma(v17, as_type<float>(v1), v27);
+    float v29 = as_type<float>(v3) + v28;
+    float v30 = v29 / v25;
+    float v31 = max(v30, as_type<float>(0u));
+    float v32 = max(v26, as_type<float>(0u));
+    uint v33 = v30 <  as_type<float>(1149239296u) ? 0xffffffffu : 0u;
+    uint v34 = as_type<float>(v0) <= v30 ? 0xffffffffu : 0u;
+    uint v35 = v34 & v33;
+    uint v36 = v26 <  as_type<float>(1145044992u) ? 0xffffffffu : 0u;
+    uint v37 = as_type<float>(v0) <= v26 ? 0xffffffffu : 0u;
+    uint v38 = v37 & v36;
+    uint v39 = v35 & v38;
+    float v40 = min(v31, as_type<float>(1149222912u));
+    uint v41 = (uint)(int)floor(v40);
+    float v42 = min(v32, as_type<float>(1145028608u));
+    uint v43 = (uint)(int)floor(v42);
+    uint v44 = v43 << 10u;
+    uint v45 = v41 + v44;
+    uint v46 = (uint)p2[min(v45, m.count2 - 1u)] & ((v45 < m.count2) ? ~0u : 0u);
+    uint v47 = (uint)(int)(short)(ushort)v46;
+    float v48 = (float)(int)v47;
+    float v49 = v48 * as_type<float>(998277249u);
+    uint v50 = (v39 != 0u) ? as_type<uint>(v49) : v0;
+    half4 _px51 = p0[y * m.stride0 + x];
+    uint v51 = (uint)as_type<ushort>(_px51.x);
+    uint v51_1 = (uint)as_type<ushort>(_px51.y);
+    uint v51_2 = (uint)as_type<ushort>(_px51.z);
+    uint v51_3 = (uint)as_type<ushort>(_px51.w);
+    float v52 = (float)as_type<half>((ushort)v51);
+    float v53 = fma(v52, v15, as_type<float>(v11));
+    float v54 = v53 - v52;
+    float v55 = fma(as_type<float>(v50), v54, v52);
+    float v56 = (float)as_type<half>((ushort)v51_1);
+    float v57 = fma(v56, v15, as_type<float>(v12));
+    float v58 = v57 - v56;
+    float v59 = fma(as_type<float>(v50), v58, v56);
+    float v60 = (float)as_type<half>((ushort)v51_2);
+    float v61 = fma(v60, v15, as_type<float>(v13));
+    float v62 = v61 - v60;
+    float v63 = fma(as_type<float>(v50), v62, v60);
+    float v64 = (float)as_type<half>((ushort)v51_3);
+    float v65 = fma(v64, v15, as_type<float>(v14));
+    float v66 = v65 - v64;
+    float v67 = fma(as_type<float>(v50), v66, v64);
+    uint v68 = (uint)as_type<ushort>((half)v67);
+    uint v69 = (uint)as_type<ushort>((half)v63);
+    uint v70 = (uint)as_type<ushort>((half)v59);
+    uint v71 = (uint)as_type<ushort>((half)v55);
+    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v71), as_type<half>((ushort)v70), as_type<half>((ushort)v69), as_type<half>((ushort)v68));
 }
