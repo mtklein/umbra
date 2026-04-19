@@ -129,10 +129,9 @@ static void csg_draw(struct slide *s, double secs, int l, int t, int r, int b, v
     struct csg_slide *st = (struct csg_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     two_circle_orbit(&st->sdf, (float)secs, st->w, st->h);
-    struct umbra_buf ubuf[] = {
-        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-    };
-    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, (struct umbra_buf){
+        .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
+    });
 }
 
 static int csg_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -250,10 +249,9 @@ static void circle_draw(struct slide *s, double secs, int l, int t, int r, int b
     st->sdf.cy = pad + bounce(st->cy0 - pad, st->vy, ticks, (float)st->h - 2.0f*pad);
     st->sdf.r  = st->r;
 
-    struct umbra_buf ubuf[] = {
-        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-    };
-    umbra_sdf_draw_queue(st->qt, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->qt, l, t, r, b, (struct umbra_buf){
+        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
+    });
 }
 
 static int circle_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -361,10 +359,9 @@ static void ring_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     orbit_compute(&st->sdf.cx, &st->sdf.cy, &ox, &oy, &st->sdf.r, &r_orbit,
                    (float)secs, st->w, st->h);
     st->sdf.w = st->sdf.r * 0.15f;
-    struct umbra_buf ubuf[] = {
-        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-    };
-    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, (struct umbra_buf){
+        .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
+    });
 }
 
 static int ring_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -479,10 +476,9 @@ static void rounded_rect_draw(struct slide *s, double secs, int l, int t, int r,
     st->sdf.hh = (float)(st->w < st->h ? st->w : st->h) * (0.10f + 0.08f * anim);
     st->sdf.r  = (float)(st->w < st->h ? st->w : st->h) * 0.04f;
 
-    struct umbra_buf ubuf[] = {
-        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-    };
-    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, (struct umbra_buf){
+        .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
+    });
 }
 
 static int rounded_rect_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -603,10 +599,9 @@ static void capsule_draw(struct slide *s, double secs, int l, int t, int r, int 
     st->sdf.p0x = cx; st->sdf.p0y = cy;
     st->sdf.p1x = ox; st->sdf.p1y = oy;
     st->sdf.rad = r_center * 0.15f;
-    struct umbra_buf ubuf[] = {
-        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-    };
-    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, (struct umbra_buf){
+        .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
+    });
 }
 
 static int capsule_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -706,10 +701,9 @@ static void halfplane_draw(struct slide *s, double secs, int l, int t, int r, in
     st->sdf.nx = len > 0 ? dy / len : 0;
     st->sdf.ny = len > 0 ? -dx / len : 1;
     st->sdf.d  = st->sdf.nx * cx + st->sdf.ny * cy;
-    struct umbra_buf ubuf[] = {
-        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-    };
-    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, (struct umbra_buf){
+        .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
+    });
 }
 
 static int halfplane_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -912,10 +906,9 @@ static void sdf_text_draw(struct slide *s, double secs, int l, int t, int r, int
     (void)secs;
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    struct umbra_buf ubuf[] = {
-        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-    };
-    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, (struct umbra_buf){
+        .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
+    });
 }
 
 static int sdf_text_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -1054,10 +1047,9 @@ static void ngon_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     }
     st->sdf.n_sides = NGON_SIDES;
     st->sdf.hp      = (struct umbra_buf){.ptr = st->hp_data, .count = 3 * NGON_SIDES};
-    struct umbra_buf ubuf[] = {
-        {.ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w},
-    };
-    umbra_sdf_draw_queue(st->disp, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->disp, l, t, r, b, (struct umbra_buf){
+        .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
+    });
 }
 
 static int ngon_get_builders(struct slide *s, struct umbra_fmt fmt,

@@ -435,8 +435,7 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     struct jit_program *j = calloc(1, sizeof *j);
     if (ir->n_uniforms) {
-        j->n_reg       = ir->n_uniforms;
-        j->caller_nptr = ir->uniforms[0].ix;
+        j->n_reg = ir->n_uniforms;
         size_t const sz = (size_t)j->n_reg * sizeof *j->reg;
         j->reg = malloc(sz);
         __builtin_memcpy(j->reg, ir->uniforms, sz);

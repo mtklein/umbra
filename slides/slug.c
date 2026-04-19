@@ -500,13 +500,13 @@ static void slug_two_pass_draw(struct slide *s, double secs, int l, int t, int r
 
     for (int j = 0; j < st->slug.count; j++) {
         __builtin_memcpy(&st->au.j, &j, 4);
-        acc->queue(acc, l, t, r, b, (struct umbra_buf[]){{0}});
+        acc->queue(acc, l, t, r, b);
     }
 
     st->dst_buf = (struct umbra_buf){
         .ptr=buf, .count=w * h * st->fmt.planes, .stride=w,
     };
-    st->draw_prog->queue(st->draw_prog, l, t, r, b, (struct umbra_buf[]){{0}});
+    st->draw_prog->queue(st->draw_prog, l, t, r, b);
 }
 
 static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -622,12 +622,12 @@ static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, 
         __builtin_memcpy(&st->au.n_curves, &n, 4);
     }
 
-    st->acc_prog->queue(st->acc_prog, l, t, r, b, (struct umbra_buf[]){{0}});
+    st->acc_prog->queue(st->acc_prog, l, t, r, b);
 
     st->dst_buf = (struct umbra_buf){
         .ptr=buf, .count=w * h * st->fmt.planes, .stride=w,
     };
-    st->draw_prog->queue(st->draw_prog, l, t, r, b, (struct umbra_buf[]){{0}});
+    st->draw_prog->queue(st->draw_prog, l, t, r, b);
 }
 
 static void slug_free_slide(struct slide *s) {

@@ -97,7 +97,7 @@ struct metal_program {
     uint8_t  *buf_shift;
     int    max_ptr;
     int    total_bufs;
-    int    caller_nptr, n_reg;
+    int    n_reg, pad;
     struct umbra_uniform_reg *reg;
 };
 
@@ -1105,7 +1105,6 @@ static struct metal_program* metal_program(
             p->buf_rw        = buf_rw;
             p->buf_shift     = buf_shift;
             p->n_reg         = ir->n_uniforms;
-            p->caller_nptr   = p->n_reg ? ir->uniforms[0].ix : max_ptr + 1;
             if (p->n_reg) {
                 size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
                 p->reg = malloc(sz);
@@ -1242,19 +1241,14 @@ static void encode_dispatch(
 
 static void metal_submit_cmdbuf(struct metal_backend *be);
 
-static void metal_program_queue(
-    struct metal_program *p, int l, int t, int r, int b, struct umbra_buf caller_buf[]
-) {
+static void metal_program_queue(struct metal_program *p, int l, int t, int r, int b) {
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
 
     struct metal_backend *be = (struct metal_backend*)p->base.backend;
 
-    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
-    // registered uniform slots from p->reg.
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < p->n_reg; i++) {
         buf[p->reg[i].ix] = p->reg[i].buf ? *p->reg[i].buf : p->reg[i].storage;
     }
@@ -1322,9 +1316,8 @@ static void metal_program_dump(
     }
 }
 
-static void run_metal(struct umbra_program *prog,
-                      int l, int t, int r, int b, struct umbra_buf buf[]) {
-    metal_program_queue((struct metal_program*)prog, l, t, r, b, buf);
+static void run_metal(struct umbra_program *prog, int l, int t, int r, int b) {
+    metal_program_queue((struct metal_program*)prog, l, t, r, b);
 }
 static void dump_metal(struct umbra_program const *prog, FILE *f) {
     metal_program_dump((struct metal_program const*)prog, f);

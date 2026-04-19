@@ -281,7 +281,7 @@ static void text_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     st->dst_buf = (struct umbra_buf){
         .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
     };
-    st->prog->queue(st->prog, l, t, r, b, (struct umbra_buf[]){{0}});
+    st->prog->queue(st->prog, l, t, r, b);
 }
 
 static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -393,7 +393,7 @@ static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b,
     st->dst_buf = (struct umbra_buf){
         .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
     };
-    st->prog->queue(st->prog, l, t, r, b, (struct umbra_buf[]){{0}});
+    st->prog->queue(st->prog, l, t, r, b);
 }
 
 static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -475,7 +475,7 @@ static void cov_null_draw(struct slide *s, double secs, int l, int t, int r, int
     st->dst_buf = (struct umbra_buf){
         .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
     };
-    st->prog->queue(st->prog, l, t, r, b, (struct umbra_buf[]){{0}});
+    st->prog->queue(st->prog, l, t, r, b);
 }
 
 static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,

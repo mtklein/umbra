@@ -58,10 +58,9 @@ static void blend_draw(struct slide *s, double secs, int l, int t, int r, int b,
     float const rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w),
                 ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
     st->rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
-    struct umbra_buf ubuf[] = {
-        {.ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w},
-    };
-    umbra_sdf_draw_queue(st->qt, l, t, r, b, ubuf);
+    umbra_sdf_draw_queue(st->qt, l, t, r, b, (struct umbra_buf){
+        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
+    });
 }
 
 static int blend_get_builders(struct slide *s, struct umbra_fmt fmt,

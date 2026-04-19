@@ -32,12 +32,11 @@ static void slide_draw(void *vctx) {
 
 struct prog_draw_ctx {
     struct umbra_program *p;
-    struct umbra_buf     *bufs;
     int                   w, h;
 };
 static void prog_draw(void *vctx) {
     struct prog_draw_ctx *c = vctx;
-    c->p->queue(c->p, 0, 0, c->w, c->h, c->bufs);
+    c->p->queue(c->p, 0, 0, c->w, c->h);
 }
 
 // Doubling pilot + min-of-K timing.
@@ -335,13 +334,11 @@ int main(int argc, char *argv[]) {
         }
         umbra_flat_ir_free(ir);
 
-        struct umbra_buf abuf[] = {{0}};
-
         double ns_px[5] = {-1, -1, -1, -1, -1};
         double gpu[5]   = {-1, -1, -1, -1, -1};
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !progs[bi]) { continue; }
-            struct prog_draw_ctx pctx = {.p=progs[bi], .bufs=abuf, .w=W, .h=H};
+            struct prog_draw_ctx pctx = {.p=progs[bi], .w=W, .h=H};
             ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs,
                               &gpu[bi], NULL);
         }

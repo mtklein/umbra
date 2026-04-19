@@ -90,8 +90,8 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
                                       umbra_shader, void *shader_ctx,
                                       umbra_blend,  void *blend_ctx,
                                       struct umbra_fmt);
-void umbra_sdf_draw_queue(struct umbra_sdf_draw*,
-                          int l, int t, int r, int b, struct umbra_buf[]);
+void umbra_sdf_draw_queue(struct umbra_sdf_draw*, int l, int t, int r, int b,
+                          struct umbra_buf dst);
 void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
 

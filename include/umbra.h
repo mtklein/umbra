@@ -41,7 +41,7 @@ struct umbra_buf {
 };
 
 struct umbra_program {
-    void (*queue)(struct umbra_program*, int l, int t, int r, int b, struct umbra_buf[]);
+    void (*queue)(struct umbra_program*, int l, int t, int r, int b);
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
@@ -52,7 +52,8 @@ void umbra_program_free(struct umbra_program*);
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 
-// Pointer handles.  `ix` indexes into the caller's buf[] at dispatch time.
+// Pointer handles.  Each ptr is backed by a bound umbra_buf or a span of
+// uniform data; see umbra_bind_buf{16,32,64}() and umbra_uniforms() below.
 typedef struct { int ix; } umbra_ptr16;
 typedef struct { int ix; } umbra_ptr32;
 typedef struct { int ix; } umbra_ptr64;

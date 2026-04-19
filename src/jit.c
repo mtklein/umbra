@@ -46,17 +46,9 @@ void release_code_buf(struct jit_backend *be, void *mem, size_t size) {
     be->cache[be->count++] = (struct cache_entry){.mem = mem, .size = size};
 }
 
-static void run_jit(struct umbra_program *prog,
-                    int l, int t, int r, int b, struct umbra_buf caller_buf[]) {
+static void run_jit(struct umbra_program *prog, int l, int t, int r, int b) {
     struct jit_program *j = (struct jit_program*)prog;
-    if (j->n_reg == 0) {
-        jit_program_run(j, l, t, r, b, caller_buf);
-        return;
-    }
-    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
-    // registered uniform slots overlaid at their assigned ixes.
     struct umbra_buf buf[32];
-    for (int i = 0; i < j->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < j->n_reg; i++) {
         buf[j->reg[i].ix] = j->reg[i].buf ? *j->reg[i].buf : j->reg[i].storage;
     }

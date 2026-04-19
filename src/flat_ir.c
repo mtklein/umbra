@@ -183,22 +183,13 @@ static _Bool is_cf(enum op op) {
         || op == op_if_begin   || op == op_if_end;
 }
 
-// Rewrite REG_BASE+k ptr handles into synthetic ixes just past the max
-// caller-provided ix, so backends never have to know about REG_BASE.
-// Updates ir->uniforms[k].ix in step with the rewrites.  Idempotent: after
-// this runs, no ptr.ix in the IR is >= REG_BASE.
+// Rewrite REG_BASE+k ptr handles into dense 0..n_uniforms-1 ixes so backends
+// never have to know about REG_BASE.  Updates ir->uniforms[k].ix in step with
+// the rewrites.  Idempotent: after this runs, no ptr.ix in the IR is >= REG_BASE.
 static void flat_ir_bind_uniforms(struct umbra_flat_ir *ir) {
     if (ir->n_uniforms == 0) { return; }
-    int caller_nptr = 0;
-    for (int i = 0; i < ir->insts; i++) {
-        ptr const p = ir->inst[i].ptr;
-        if (op_has_ptr(ir->inst[i].op) && p.ix >= 0 && p.ix < REG_BASE
-                                       && p.ix >= caller_nptr) {
-            caller_nptr = p.ix + 1;
-        }
-    }
     for (int k = 0; k < ir->n_uniforms; k++) {
-        ir->uniforms[k].ix = caller_nptr + k;
+        ir->uniforms[k].ix = k;
     }
     for (int i = 0; i < ir->insts; i++) {
         ptr p = ir->inst[i].ptr;

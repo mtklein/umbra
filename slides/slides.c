@@ -97,7 +97,7 @@ void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
     bg_dst_buf = (struct umbra_buf){
         .ptr=buf, .count=bg_w * bg_h * bg_fmt.planes, .stride=bg_w,
     };
-    bg_prog->queue(bg_prog, l, t, r, b, (struct umbra_buf[]){{0}});
+    bg_prog->queue(bg_prog, l, t, r, b);
 }
 
 void slide_bg_cleanup(void) {

@@ -178,8 +178,7 @@ struct interp_program {
     struct sw_inst *inst;
     ival           *v;
     ival           *vars;
-    int             preamble, nptr, caller_nptr, n_reg;
-    int             n_vars, pad;
+    int             preamble, nptr, n_reg, n_vars;
     struct umbra_uniform_reg *reg;
 };
 
@@ -206,9 +205,8 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             max_ptr = ir->inst[i].ptr.bits;
         }
     }
-    p->nptr        = max_ptr + 1;
-    p->n_reg       = ir->n_uniforms;
-    p->caller_nptr = p->n_reg ? ir->uniforms[0].ix : p->nptr;
+    p->nptr  = max_ptr + 1;
+    p->n_reg = ir->n_uniforms;
     if (p->n_reg) {
         size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
         p->reg = malloc(sz);
@@ -488,13 +486,9 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     return p;
 }
 
-static void interp_program_run(struct interp_program *p, int l, int t, int r, int b,
-                                    struct umbra_buf caller_buf[]) {
-    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
-    // registered uniform slots from p->reg.
+static void interp_program_run(struct interp_program *p, int l, int t, int r, int b) {
     assume(p->nptr <= 64);
     struct umbra_buf buf[64];
-    for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < p->n_reg; i++) {
         buf[p->reg[i].ix] = p->reg[i].buf ? *p->reg[i].buf : p->reg[i].storage;
     }
@@ -1304,9 +1298,8 @@ static void interp_program_free(struct interp_program *p) {
     }
 }
 
-static void run_interp(struct umbra_program *prog,
-                       int l, int t, int r, int b, struct umbra_buf buf[]) {
-    interp_program_run((struct interp_program*)prog, l, t, r, b, buf);
+static void run_interp(struct umbra_program *prog, int l, int t, int r, int b) {
+    interp_program_run((struct interp_program*)prog, l, t, r, b);
 }
 static void free_interp(struct umbra_program *prog) {
     interp_program_free((struct interp_program*)prog);

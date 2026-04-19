@@ -85,8 +85,7 @@ struct wgpu_program {
 
     int max_ptr;
     int total_bufs;
-    int push_words, :32;
-    int caller_nptr, n_reg;
+    int push_words, n_reg;
     struct umbra_uniform_reg *reg;
 
     uint8_t          *buf_rw;
@@ -416,8 +415,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 
-    p->n_reg       = ir->n_uniforms;
-    p->caller_nptr = p->n_reg ? ir->uniforms[0].ix : p->max_ptr + 1;
+    p->n_reg = ir->n_uniforms;
     if (p->n_reg) {
         size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
         p->reg = malloc(sz);
@@ -427,18 +425,15 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     return &p->base;
 }
 
-static void wgpu_program_queue(struct umbra_program *prog, int l, int t,
-                               int r, int b, struct umbra_buf caller_buf[]) {
+static void wgpu_program_queue(struct umbra_program *prog,
+                               int l, int t, int r, int b) {
     struct wgpu_program *p  = (struct wgpu_program *)prog;
     struct wgpu_backend *be = p->be;
 
     int w = r - l, h = b - t;
 
-    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
-    // registered uniform slots overlaid from p->reg.
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < p->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < p->n_reg; i++) {
         buf[p->reg[i].ix] = p->reg[i].buf ? *p->reg[i].buf : p->reg[i].storage;
     }

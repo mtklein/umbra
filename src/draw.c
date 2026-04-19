@@ -300,7 +300,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
 }
 
 void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
-                          int l, int t, int r, int b, struct umbra_buf buf[]) {
+                          int l, int t, int r, int b, struct umbra_buf dst) {
     if (!d) { return; }
     int const w  = r - l,
               h  = b - t,
@@ -320,7 +320,7 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
     }
     __builtin_memset(d->lo, 0, (size_t)tiles * sizeof(float));
     d->lo_buf = (struct umbra_buf){.ptr = d->lo, .count = tiles, .stride = xt};
-    d->bounds->queue(d->bounds, 0, 0, xt, yt, (struct umbra_buf[]){{0}});
+    d->bounds->queue(d->bounds, 0, 0, xt, yt);
     float *lo = d->lo;
 
     // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
@@ -352,8 +352,8 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
                           tt = t + ty * QUEUE_MIN_TILE,
                           tr = tl + QUEUE_MIN_TILE < r ? tl + QUEUE_MIN_TILE : r,
                           tb = tt + QUEUE_MIN_TILE < b ? tt + QUEUE_MIN_TILE : b;
-                d->draw_dst_buf = buf[0];
-                d->draw->queue(d->draw, tl, tt, tr, tb, (struct umbra_buf[]){{0}});
+                d->draw_dst_buf = dst;
+                d->draw->queue(d->draw, tl, tt, tr, tb);
             }
         }
     }

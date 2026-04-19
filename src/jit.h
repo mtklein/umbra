@@ -12,7 +12,7 @@ struct jit_program {
     size_t code_size;
     void (*entry)(int, int, int, int, struct umbra_buf*);
     int loop_start, loop_end;
-    int caller_nptr, n_reg;
+    int n_reg, pad;
     struct umbra_uniform_reg *reg;
 };
 struct jit_program* jit_program(struct jit_backend*, struct umbra_flat_ir const*);

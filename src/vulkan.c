@@ -94,8 +94,7 @@ struct vk_program {
 
     int max_ptr;
     int total_bufs;
-    int push_words, pad;
-    int caller_nptr, n_reg;
+    int push_words, n_reg;
     struct umbra_uniform_reg *reg;
 
     uint8_t          *buf_rw;
@@ -259,19 +258,15 @@ static void vk_cache_release(gpu_buf buf, void *ctx) {
 static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
 
-static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
-                              struct umbra_buf caller_buf[]) {
+static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b) {
     struct vk_program *vp = (struct vk_program *)p;
     struct vk_backend *be = vp->be;
 
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
 
-    // Thread-local scratch: caller-provided prefix [0, caller_nptr), then
-    // registered uniform slots overlaid from vp->reg.
     assume(vp->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < vp->caller_nptr; i++) { buf[i] = caller_buf[i]; }
     for (int i = 0; i < vp->n_reg; i++) {
         buf[vp->reg[i].ix] = vp->reg[i].buf ? *vp->reg[i].buf : vp->reg[i].storage;
     }
@@ -541,8 +536,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 
-    p->n_reg       = ir->n_uniforms;
-    p->caller_nptr = p->n_reg ? ir->uniforms[0].ix : p->max_ptr + 1;
+    p->n_reg = ir->n_uniforms;
     if (p->n_reg) {
         size_t const sz = (size_t)p->n_reg * sizeof *p->reg;
         p->reg = malloc(sz);

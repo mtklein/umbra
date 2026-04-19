@@ -131,7 +131,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         .count  = w * h * st->out_fmt.planes,
         .stride = w,
     };
-    st->cvt->queue(st->cvt, 0, t, w, b, (struct umbra_buf[]){{0}});
+    st->cvt->queue(st->cvt, 0, t, w, b);
 }
 
 static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
