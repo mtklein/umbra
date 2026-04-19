@@ -45,29 +45,32 @@ struct umbra_bitmap {
     int              w,h;
 };
 
+typedef umbra_color_val32 umbra_load(struct umbra_builder*, umbra_ptr);
+umbra_load umbra_load_8888,
+           umbra_load_565,
+           umbra_load_1010102,
+           umbra_load_fp16,
+           umbra_load_fp16_planar;
+
+typedef void umbra_store(struct umbra_builder*, umbra_ptr, umbra_color_val32);
+umbra_store umbra_store_8888,
+            umbra_store_565,
+            umbra_store_1010102,
+            umbra_store_fp16,
+            umbra_store_fp16_planar;
+
 struct umbra_fmt {
-    char const *name;
-    size_t      bpp;
-    int         planes, :32;
-    umbra_color_val32 (*load) (struct umbra_builder*, umbra_ptr);
-    void              (*store)(struct umbra_builder*, umbra_ptr, umbra_color_val32);
+    char const  *name;
+    size_t       bpp;
+    int          planes, :32;
+    umbra_load  *load;
+    umbra_store *store;
 };
 extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_565,
                               umbra_fmt_1010102,
                               umbra_fmt_fp16,
                               umbra_fmt_fp16_planar;
-
-umbra_color_val32 umbra_load_8888        (struct umbra_builder*, umbra_ptr);
-void              umbra_store_8888       (struct umbra_builder*, umbra_ptr, umbra_color_val32);
-umbra_color_val32 umbra_load_565         (struct umbra_builder*, umbra_ptr);
-void              umbra_store_565        (struct umbra_builder*, umbra_ptr, umbra_color_val32);
-umbra_color_val32 umbra_load_1010102     (struct umbra_builder*, umbra_ptr);
-void              umbra_store_1010102    (struct umbra_builder*, umbra_ptr, umbra_color_val32);
-umbra_color_val32 umbra_load_fp16        (struct umbra_builder*, umbra_ptr);
-void              umbra_store_fp16       (struct umbra_builder*, umbra_ptr, umbra_color_val32);
-umbra_color_val32 umbra_load_fp16_planar (struct umbra_builder*, umbra_ptr);
-void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr, umbra_color_val32);
 
 // Effects emit IR into a builder.  Any uniforms registered with
 // umbra_bind_uniforms() must outlive the builder, flat_ir, and program.  These are
