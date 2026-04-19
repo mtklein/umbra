@@ -216,25 +216,6 @@ static void fp16p_to_float(float *out, void const *pixbuf) {
     }
 }
 
-// TODO: the .hdr dumps look vertically compressed -- the slide content
-// appears in the upper half of the image with uninitialized garbage below.
-// The live demo renders correctly at the same canvas size, so this is
-// dump-specific.  Introduced somewhere in the recent overview rewrite /
-// slide->build_draw migration (commits up through the gradient one).
-//
-// Places to investigate:
-//   * render_hdr dispatches s->draw(s, 0.0, 0, 0, RW, RH, pixbuf) with
-//     RW=1024, RH=768.  Does the slide's draw see the right height?
-//     (slides were init()'d with a smaller (w, h) via slides_init -- check
-//     what that size is and whether the per-slide prepare/draw assumes it.)
-//   * umbra_fmt_fp16_planar has planes=4; the slides' dst_buf setters use
-//     st->w * st->h * fmt.planes for count and stride = st->w.  With stride
-//     in pixels (not bytes) and planes accounted for in count, is the
-//     backend addressing the planar strides correctly at RH=768?
-//   * Does slides_init actually get called with (RW, RH) from this tool?
-//     Look at main() below.  If init'd with smaller dims and draw()
-//     dispatched at RW x RH, the per-slide stride mismatch produces
-//     exactly the "compressed with garbage" symptom.
 static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be) {
     struct slide *s = slide_get(slide_idx);
     size_t const pixbuf_sz = (size_t)RW * RH * umbra_fmt_fp16_planar.bpp * 4;
