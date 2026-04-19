@@ -31,7 +31,7 @@ TEST(resolve_with_loop) {
     int32_t uni[1] = {0};
     struct umbra_buf dummy = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const u   = umbra_bind_uniforms32  (b, uni, 1);
+    umbra_ptr32 const u   = umbra_bind_uniforms32(b, uni, 1);
     umbra_ptr32 const dst = umbra_bind_buf32(b, &dummy);
     umbra_var32 acc = umbra_declare_var32(b);
     umbra_val32 trip = umbra_uniform_32(b, u, 0);

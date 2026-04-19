@@ -266,9 +266,9 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     // Build the bounds program: evaluate the sdf over tile-extent intervals.
     // x() and y() are tile indices.
     struct umbra_builder *bb = umbra_builder();
-    umbra_ptr32 const g   = umbra_bind_uniforms32   (bb, &d->grid,
-                                              (int)(sizeof d->grid / 4));
-    umbra_ptr32 const dst = umbra_bind_buf32 (bb, &d->lo_buf);
+    umbra_ptr32 const g   = umbra_bind_uniforms32(bb, &d->grid,
+                                                  (int)(sizeof d->grid / 4));
+    umbra_ptr32 const dst = umbra_bind_buf32(bb, &d->lo_buf);
     umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
                       base_y = umbra_uniform_32(bb, g, 1),
                       tile_w = umbra_uniform_32(bb, g, 2),

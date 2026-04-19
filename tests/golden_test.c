@@ -291,7 +291,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
         struct umbra_builder *bld = umbra_builder();
-        umbra_ptr32 const cu = umbra_bind_uniforms32  (bld, color, count(color)),
+        umbra_ptr32 const cu = umbra_bind_uniforms32(bld, color, count(color)),
                           pp = umbra_bind_buf32(bld, &pixel_buf);
         umbra_color_val32 c = {
             umbra_uniform_32(bld, cu, 0),
@@ -407,7 +407,7 @@ TEST(test_wgpu_misc) {
     struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr32 const cu = umbra_bind_uniforms32  (bld, uniform_data, count(uniform_data)),
+    umbra_ptr32 const cu = umbra_bind_uniforms32(bld, uniform_data, count(uniform_data)),
                       pp = umbra_bind_buf32(bld, &pixel_buf);
     umbra_color_val32 c = {
         umbra_uniform_32(bld, cu, 0),

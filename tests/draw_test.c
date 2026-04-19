@@ -1570,7 +1570,7 @@ TEST(test_metal_loop_gather) {
     struct umbra_buf out_buf = {.ptr = &out, .count = 1};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const u    = umbra_bind_uniforms32  (b, &uniforms, (int)(sizeof uniforms / 4));
+    umbra_ptr32 const u    = umbra_bind_uniforms32(b, &uniforms, (int)(sizeof uniforms / 4));
     umbra_ptr32 const dst  = umbra_bind_buf32(b, &out_buf);
     umbra_ptr32 const data = umbra_bind_buf32(b, &arr_buf);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_slot);
