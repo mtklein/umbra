@@ -288,16 +288,32 @@ static void grad_init(struct slide *s, int w, int h) {
     st->h = h;
 }
 
+static void grad_build_draw(struct slide *s, struct umbra_builder *b,
+                             umbra_ptr32 dst_ptr, struct umbra_fmt fmt,
+                             umbra_val32 x, umbra_val32 y) {
+    struct grad_slide *st = (struct grad_slide *)s;
+    umbra_build_draw(b, dst_ptr, fmt, x, y,
+                     NULL, NULL,
+                     st->shader_fn, st->shader_ctx,
+                     NULL, NULL);
+}
+
+static struct umbra_builder* grad_builder(struct slide *s, struct umbra_fmt fmt) {
+    struct grad_slide *st = (struct grad_slide *)s;
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, &st->dst_buf);
+    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
+                      y = umbra_f32_from_i32(b, umbra_y(b));
+    grad_build_draw(s, b, dst_ptr, fmt, x, y);
+    return b;
+}
+
 static void grad_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct grad_slide *st = (struct grad_slide *)s;
     if (st->fmt.name != fmt.name || !st->ir) {
         st->fmt = fmt;
         umbra_flat_ir_free(st->ir);
-        struct umbra_builder *b = umbra_draw_builder(
-        NULL,            NULL, NULL,
-            st->shader_fn, st->shader_ctx,
-            NULL, NULL,
-            &st->dst_buf, fmt);
+        struct umbra_builder *b = grad_builder(s, fmt);
         st->ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }
@@ -317,12 +333,7 @@ static void grad_draw(struct slide *s, double secs, int l, int t, int r, int b, 
 static int grad_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
-    struct grad_slide *st = (struct grad_slide *)s;
-    out[0] = umbra_draw_builder(
-        NULL,        NULL, NULL,
-        st->shader_fn, st->shader_ctx,
-        NULL, NULL,
-        &st->dst_buf, fmt);
+    out[0] = grad_builder(s, fmt);
     return out[0] ? 1 : 0;
 }
 
@@ -346,6 +357,7 @@ static struct grad_slide* make_grad(char const *title) {
         .draw         = grad_draw,
         .free         = grad_free,
         .get_builders = grad_get_builders,
+        .build_draw   = grad_build_draw,
     };
     return st;
 }
