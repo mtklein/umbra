@@ -75,12 +75,12 @@ fingerprint fingerprint_hash(void const *buf, size_t bytes) {
         h0 = vaesmcq_u8(vaeseq_u8(h0, vld1q_u8(tmp)));
     }
 
-    // Mix the length in to distinguish buffers that differ only in
+    // Mix the byte count in to distinguish buffers that differ only in
     // trailing zeros.
     {
-        uint8_t len_buf[16] = {0};
-        __builtin_memcpy(len_buf, &bytes, sizeof bytes);
-        h0 = vaesmcq_u8(vaeseq_u8(h0, vld1q_u8(len_buf)));
+        uint8_t size_buf[16] = {0};
+        __builtin_memcpy(size_buf, &bytes, sizeof bytes);
+        h0 = vaesmcq_u8(vaeseq_u8(h0, vld1q_u8(size_buf)));
     }
 
     // Fold the 4 pipelines together with a few extra AES rounds.
