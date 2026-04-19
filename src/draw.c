@@ -249,6 +249,23 @@ umbra_point_val32 umbra_transform_point(umbra_transform *fn,
     return (umbra_point_val32){xi.lo, yi.lo};
 }
 
+void umbra_matrix_mul(struct umbra_matrix *out,
+                      struct umbra_matrix const *a,
+                      struct umbra_matrix const *b) {
+    struct umbra_matrix const r = {
+        .sx = a->sx*b->sx + a->kx*b->ky + a->tx*b->p0,
+        .kx = a->sx*b->kx + a->kx*b->sy + a->tx*b->p1,
+        .tx = a->sx*b->tx + a->kx*b->ty + a->tx*b->p2,
+        .ky = a->ky*b->sx + a->sy*b->ky + a->ty*b->p0,
+        .sy = a->ky*b->kx + a->sy*b->sy + a->ty*b->p1,
+        .ty = a->ky*b->tx + a->sy*b->ty + a->ty*b->p2,
+        .p0 = a->p0*b->sx + a->p1*b->ky + a->p2*b->p0,
+        .p1 = a->p0*b->kx + a->p1*b->sy + a->p2*b->p1,
+        .p2 = a->p0*b->tx + a->p1*b->ty + a->p2*b->p2,
+    };
+    *out = r;
+}
+
 umbra_point_val32 umbra_apply_matrix(struct umbra_builder *b, umbra_matrix_val32 m,
                                       umbra_val32 x, umbra_val32 y) {
     umbra_val32 const w =

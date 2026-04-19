@@ -32,6 +32,13 @@ typedef struct {
 umbra_point_val32 umbra_apply_matrix(struct umbra_builder*, umbra_matrix_val32,
                                       umbra_val32 x, umbra_val32 y);
 
+// Compose two 3x3 matrices: out = a * b, such that applying `out` to a point
+// is equivalent to applying b first, then a.  Useful for folding a caller's
+// cell/viewport transform into a slide's intrinsic transform at build time.
+void umbra_matrix_mul(struct umbra_matrix *out,
+                      struct umbra_matrix const *a,
+                      struct umbra_matrix const *b);
+
 struct umbra_bitmap {
     struct umbra_buf buf;
     int              w,h;

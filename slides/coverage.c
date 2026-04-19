@@ -356,6 +356,27 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
     return out[0] ? 1 : 0;
 }
 
+static _Bool persp_get_effects(struct slide *s, struct slide_effects *out) {
+    struct persp_slide *st = (struct persp_slide *)s;
+    *out = (struct slide_effects){
+        .transform_fn  = umbra_transform_perspective,
+        .transform_mat = &st->mat,
+        .coverage_fn   = coverage_bitmap2d,
+        .coverage_ctx  = &st->bmp,
+        .shader_fn     = umbra_shader_color,
+        .shader_ctx    = &st->color,
+        .blend_fn      = umbra_blend_srcover,
+        .blend_ctx     = NULL,
+    };
+    return 1;
+}
+
+static void persp_animate(struct slide *s, double secs) {
+    struct persp_slide *st = (struct persp_slide *)s;
+    slide_perspective_matrix(&st->mat, (float)secs, st->w, st->h,
+                             st->bitmap->w, st->bitmap->h);
+}
+
 static void persp_free(struct slide *s) {
     struct persp_slide *st = (struct persp_slide *)s;
     umbra_program_free(st->prog);
@@ -374,6 +395,8 @@ SLIDE(slide_coverage_bitmap_matrix) {
         .draw = persp_draw,
         .free = persp_free,
         .get_builders = persp_get_builders,
+        .get_effects  = persp_get_effects,
+        .animate      = persp_animate,
     };
     return &st->base;
 }
@@ -438,6 +461,17 @@ static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
     return out[0] ? 1 : 0;
 }
 
+static _Bool cov_null_get_effects(struct slide *s, struct slide_effects *out) {
+    struct cov_null_slide *st = (struct cov_null_slide *)s;
+    *out = (struct slide_effects){
+        .shader_fn  = umbra_shader_color,
+        .shader_ctx = &st->color,
+        .blend_fn   = umbra_blend_srcover,
+        .blend_ctx  = NULL,
+    };
+    return 1;
+}
+
 static void cov_null_free(struct slide *s) {
     struct cov_null_slide *st = (struct cov_null_slide *)s;
     umbra_program_free(st->prog);
@@ -456,6 +490,7 @@ SLIDE(slide_coverage_null) {
         .draw = cov_null_draw,
         .free = cov_null_free,
         .get_builders = cov_null_get_builders,
+        .get_effects  = cov_null_get_effects,
     };
     return &st->base;
 }

@@ -2,6 +2,20 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
+// A slide's effect stack, if it can be expressed as a single-pass composition
+// through umbra_draw_builder.  Callers fill in a zero-initialized struct and
+// consult .coverage_fn / .shader_fn / .blend_fn to tell what the slide draws.
+// transform_fn / transform_mat are optional: NULL means identity.
+// ctxs point at state owned by the slide, alive until the slide is freed;
+// callers must not free them.
+struct slide_effects {
+    umbra_transform           *transform_fn;
+    struct umbra_matrix const *transform_mat;
+    umbra_coverage *coverage_fn; void *coverage_ctx;
+    umbra_shader   *shader_fn;   void *shader_ctx;
+    umbra_blend    *blend_fn;    void *blend_ctx;
+};
+
 struct slide {
     char const     *title;
     float           bg[4];
@@ -13,6 +27,17 @@ struct slide {
 
     int (*get_builders)(struct slide*, struct umbra_fmt,
                         struct umbra_builder **out, int max);
+
+    // Composable-effects hook: 1 if the slide can be expressed as a
+    // transform + coverage + shader + blend stack (fills *out), 0 otherwise.
+    // Consumers (e.g. the overview) wrap these with their own transform and
+    // compile one program that draws the slide directly to a sub-rect of
+    // the destination framebuffer.
+    _Bool (*get_effects)(struct slide*, struct slide_effects *out);
+
+    // Update animation state (e.g. per-frame matrix uniforms) without
+    // emitting any GPU/CPU work.  NULL means static.
+    void  (*animate)(struct slide*, double secs);
 };
 
 typedef struct slide *(*slide_factory_fn)(void);

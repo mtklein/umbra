@@ -1689,3 +1689,42 @@ TEST(test_transform_perspective_full) {
     struct umbra_matrix mat = {1.5f, 0.25f, -5, -0.1f, 1.25f, 7, 0.002f, 0.001f, 1};
     check_transform_matches_apply(&mat, 4, 4);
 }
+
+// umbra_matrix_mul(out, a, b) should produce a matrix that, applied to a
+// point, is equivalent to applying b first then a.  Easiest check: compare
+// composed vs sequential application on a handful of points.
+static umbra_point apply_mat(struct umbra_matrix const *m, umbra_point p) {
+    float const w = m->p0*p.x + m->p1*p.y + m->p2;
+    return (umbra_point){(m->sx*p.x + m->kx*p.y + m->tx) / w,
+                         (m->ky*p.x + m->sy*p.y + m->ty) / w};
+}
+
+TEST(test_matrix_mul_affine) {
+    struct umbra_matrix a = {2, 0, 10, 0, 3, 20, 0, 0, 1},
+                        b = {1, 0,  5, 0, 1,  7, 0, 0, 1};
+    struct umbra_matrix ab;
+    umbra_matrix_mul(&ab, &a, &b);
+    umbra_point const pts[] = {{0,0}, {1,2}, {-3,4}, {10,-7}};
+    for (int i = 0; i < 4; i++) {
+        umbra_point const p    = pts[i];
+        umbra_point const seq  = apply_mat(&a, apply_mat(&b, p));
+        umbra_point const comp = apply_mat(&ab, p);
+        equiv(seq.x, comp.x) here;
+        equiv(seq.y, comp.y) here;
+    }
+}
+
+TEST(test_matrix_mul_identity) {
+    struct umbra_matrix I = {1,0,0, 0,1,0, 0,0,1},
+                        m = {1.5f, 0.25f, -5, -0.1f, 1.25f, 7, 0.002f, 0.001f, 1};
+    struct umbra_matrix IM, MI;
+    umbra_matrix_mul(&IM, &I, &m);
+    umbra_matrix_mul(&MI, &m, &I);
+    float const *m_f  = &m.sx,
+                *im_f = &IM.sx,
+                *mi_f = &MI.sx;
+    for (int i = 0; i < 9; i++) {
+        equiv(m_f[i], im_f[i]) here;
+        equiv(m_f[i], mi_f[i]) here;
+    }
+}
