@@ -126,8 +126,8 @@ TEST(resolve_preserves_channels) {
     struct umbra_builder *b = umbra_builder();
     umbra_ptr sp = umbra_bind_buf(b, &src),
                 dp = umbra_bind_buf(b, &dst);
-    umbra_color_val32 c = umbra_fmt_fp16.load(b, &sp);
-    umbra_fmt_fp16.store(b, &dp, c);
+    umbra_color_val32 c = umbra_fmt_fp16.load(b, sp);
+    umbra_fmt_fp16.store(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
 
