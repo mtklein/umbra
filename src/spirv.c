@@ -816,7 +816,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     // known at IR build time) could be uniform-buffer bindings instead, and
     // WebGPU's max_dynamic_uniform_buffers_per_pipeline_layout (default 8)
     // is roomier than max_dynamic_storage_buffers (default 4).  That's what
-    // triggered the all-or-nothing dyn_uniforms fallback in src/wgpu.c.
+    // triggered the all-or-nothing dynamic_offset_bindings fallback in src/wgpu.c.
     //
     // Classification rule at SPIR-V build time, using ir->binding[]:
     //   reg in ir->binding with reg.buf == NULL
