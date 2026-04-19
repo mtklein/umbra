@@ -6,13 +6,6 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     for (int i = 0; i < c->n; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->host == host && ce->buf.size >= bytes) {
-            // TODO: this fingerprint_hash runs every dispatch on every
-            // read-only, non-zero-copy cache entry -- that's the dominant CPU
-            // cost on wgpu for slides with large immutable bitmaps (e.g. the
-            // bitmap+matrix coverage slide's glyph mask).  Possible fixes:
-            //   (a) callers hint "host memory is stable", skip re-hashing;
-            //   (b) per-entry dirty bit flipped on external mutation;
-            //   (c) only re-hash every N frames.
             if (host && bytes
                     && !ce->nocopy              // Zero-copy: GPU reads host directly.
                     && !(ce->uploaded && ce->writable)) {  // Umbra owns writable bufs.
