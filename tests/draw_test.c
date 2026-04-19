@@ -4,6 +4,7 @@
 #include "../src/count.h"
 #include "test.h"
 #include <stdint.h>
+#include <stdlib.h>
 
 static struct umbra_buf draw_dst_slot;
 
@@ -1608,4 +1609,93 @@ TEST(test_metal_loop_gather) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         umbra_backend_free(bes[bi]);
     }
+}
+
+// Build a program that stores (x', y') for each pixel into xbuf/ybuf using
+// either umbra_transform_point(umbra_transform_perspective, mat) or the
+// direct umbra_apply_matrix path for reference.
+static struct umbra_flat_ir* build_transform_ir(struct umbra_matrix *mat,
+                                                 struct umbra_buf *xbuf,
+                                                 struct umbra_buf *ybuf,
+                                                 _Bool use_transform) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const xp = umbra_bind_buf32(b, xbuf),
+                      yp = umbra_bind_buf32(b, ybuf);
+    umbra_val32 const xf = umbra_f32_from_i32(b, umbra_x(b)),
+                      yf = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_point_val32 p;
+    if (use_transform) {
+        p = umbra_transform_point(umbra_transform_perspective, mat, b, xf, yf);
+    } else {
+        umbra_ptr32 const u = umbra_bind_uniforms32(b, mat, (int)(sizeof *mat / 4));
+        umbra_matrix_val32 const m = {
+            .sx = umbra_uniform_32(b, u, 0),
+            .kx = umbra_uniform_32(b, u, 1),
+            .tx = umbra_uniform_32(b, u, 2),
+            .ky = umbra_uniform_32(b, u, 3),
+            .sy = umbra_uniform_32(b, u, 4),
+            .ty = umbra_uniform_32(b, u, 5),
+            .p0 = umbra_uniform_32(b, u, 6),
+            .p1 = umbra_uniform_32(b, u, 7),
+            .p2 = umbra_uniform_32(b, u, 8),
+        };
+        p = umbra_apply_matrix(b, m, xf, yf);
+    }
+    umbra_store_32(b, xp, p.x);
+    umbra_store_32(b, yp, p.y);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    return ir;
+}
+
+// Verify umbra_transform_perspective's scalar entry produces bit-identical
+// output to umbra_apply_matrix on every backend.  The exact-interval peepholes
+// in interval.c make this a contract: exact-in -> exact-out with the same
+// scalar IR.
+static void check_transform_matches_apply(struct umbra_matrix *mat, int w, int h) {
+    int const n = w * h;
+    float *xA = calloc((size_t)n, sizeof *xA), *yA = calloc((size_t)n, sizeof *yA);
+    float *xB = calloc((size_t)n, sizeof *xB), *yB = calloc((size_t)n, sizeof *yB);
+    struct umbra_buf xBufA = {.ptr=xA, .count=n, .stride=w},
+                     yBufA = {.ptr=yA, .count=n, .stride=w},
+                     xBufB = {.ptr=xB, .count=n, .stride=w},
+                     yBufB = {.ptr=yB, .count=n, .stride=w};
+
+    struct umbra_flat_ir *ir_ref = build_transform_ir(mat, &xBufA, &yBufA, 0);
+    struct umbra_flat_ir *ir_new = build_transform_ir(mat, &xBufB, &yBufB, 1);
+
+    struct test_backends A = test_backends_make(ir_ref),
+                         B = test_backends_make(ir_new);
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        for (int i = 0; i < n; i++) { xA[i] = yA[i] = xB[i] = yB[i] = 0; }
+        _Bool const okA = test_backends_run(&A, bi, w, h),
+                    okB = test_backends_run(&B, bi, w, h);
+        okA == okB here;
+        if (!okA) { continue; }
+        for (int i = 0; i < n; i++) {
+            equiv(xA[i], xB[i]) here;
+            equiv(yA[i], yB[i]) here;
+        }
+    }
+    test_backends_free(&A);
+    test_backends_free(&B);
+    umbra_flat_ir_free(ir_ref);
+    umbra_flat_ir_free(ir_new);
+    free(xA); free(yA); free(xB); free(yB);
+}
+
+TEST(test_transform_perspective_identity) {
+    struct umbra_matrix mat = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+    check_transform_matches_apply(&mat, 4, 4);
+}
+
+TEST(test_transform_perspective_affine) {
+    struct umbra_matrix mat = {2, 0, 10, 0, 3, 20, 0, 0, 1};
+    check_transform_matches_apply(&mat, 4, 4);
+}
+
+TEST(test_transform_perspective_full) {
+    struct umbra_matrix mat = {1.5f, 0.25f, -5, -0.1f, 1.25f, 7, 0.002f, 0.001f, 1};
+    check_transform_matches_apply(&mat, 4, 4);
 }

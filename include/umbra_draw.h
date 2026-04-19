@@ -66,15 +66,39 @@ void              umbra_store_fp16_planar(struct umbra_builder*, umbra_ptr16, um
 // function types (not pointer types), so declarations read as
 // `umbra_blend umbra_blend_src, umbra_blend_srcover, ...;` and struct fields
 // carrying them write as `umbra_shader *inner_fn`.
-typedef umbra_color_val32 umbra_shader  (void *ctx, struct umbra_builder*,
-                                         umbra_val32 x, umbra_val32 y);
-typedef umbra_val32       umbra_coverage(void *ctx, struct umbra_builder*,
-                                         umbra_val32 x, umbra_val32 y);
-typedef umbra_interval    umbra_sdf     (void *ctx, struct umbra_builder*,
-                                         umbra_interval x, umbra_interval y);
-typedef umbra_color_val32 umbra_blend   (void *ctx, struct umbra_builder*,
-                                         umbra_color_val32 src,
-                                         umbra_color_val32 dst);
+typedef umbra_color_val32 umbra_shader   (void *ctx, struct umbra_builder*,
+                                          umbra_val32 x, umbra_val32 y);
+typedef umbra_val32       umbra_coverage (void *ctx, struct umbra_builder*,
+                                          umbra_val32 x, umbra_val32 y);
+typedef umbra_interval    umbra_sdf      (void *ctx, struct umbra_builder*,
+                                          umbra_interval x, umbra_interval y);
+typedef umbra_color_val32 umbra_blend    (void *ctx, struct umbra_builder*,
+                                          umbra_color_val32 src,
+                                          umbra_color_val32 dst);
+// Interval-based transform: dst-pixel (x, y) -> effect-space (x', y').  Scalar
+// callers pass exact intervals and read .lo from the outputs; the exact-interval
+// peepholes in src/interval.c ensure exact-in produces exact-out with the same
+// scalar IR as a bespoke scalar transform would emit.  sdf_draw's bounds
+// program uses the full interval entry to transform tile-extent intervals.
+typedef void              umbra_transform(void *ctx, struct umbra_builder*,
+                                          umbra_interval  x,      umbra_interval  y,
+                                          umbra_interval *x_out,  umbra_interval *y_out);
+
+// Apply a transform's scalar entry: wraps fn with exact intervals and returns
+// the scalar outputs.  Equivalent to fn(ctx, b, {x,x}, {y,y}, &xo, &yo) then
+// (xo.lo, yo.lo); by the exact-interval peepholes, xo.lo == xo.hi and likewise
+// for yo, so either field is fine.
+umbra_point_val32 umbra_transform_point(umbra_transform *fn, void *ctx,
+                                        struct umbra_builder*,
+                                        umbra_val32 x, umbra_val32 y);
+
+// Perspective transform: ctx is a `struct umbra_matrix const*` whose 9 floats
+// are re-read each dispatch through a bound uniforms span.  Emits
+// w = p0*x + p1*y + p2;  x' = (sx*x + kx*y + tx) / w;  y' = (ky*x + sy*y + ty) / w.
+// Note the interval div by w is unsound when w straddles zero (see TODO near
+// umbra_interval_div_f32); sdf_draw gates this transform to affine-only at
+// build time for its bounds program.
+umbra_transform umbra_transform_perspective;
 
 // Shade a single color; ctx is an umbra_color*.
 umbra_color_val32 umbra_shader_color(void *umbra_color, struct umbra_builder*,

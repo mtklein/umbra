@@ -188,6 +188,58 @@ struct umbra_builder* umbra_draw_builder(
     return b;
 }
 
+void umbra_transform_perspective(void *ctx, struct umbra_builder *b,
+                                 umbra_interval x, umbra_interval y,
+                                 umbra_interval *x_out, umbra_interval *y_out) {
+    struct umbra_matrix const *self = ctx;
+    umbra_ptr32 const u = umbra_bind_uniforms32(b, self, (int)(sizeof *self / 4));
+
+    enum {
+        M_SX = (int)(__builtin_offsetof(struct umbra_matrix, sx) / 4),
+        M_KX = (int)(__builtin_offsetof(struct umbra_matrix, kx) / 4),
+        M_TX = (int)(__builtin_offsetof(struct umbra_matrix, tx) / 4),
+        M_KY = (int)(__builtin_offsetof(struct umbra_matrix, ky) / 4),
+        M_SY = (int)(__builtin_offsetof(struct umbra_matrix, sy) / 4),
+        M_TY = (int)(__builtin_offsetof(struct umbra_matrix, ty) / 4),
+        M_P0 = (int)(__builtin_offsetof(struct umbra_matrix, p0) / 4),
+        M_P1 = (int)(__builtin_offsetof(struct umbra_matrix, p1) / 4),
+        M_P2 = (int)(__builtin_offsetof(struct umbra_matrix, p2) / 4),
+    };
+
+    umbra_interval const sx = umbra_interval_exact(umbra_uniform_32(b, u, M_SX)),
+                         kx = umbra_interval_exact(umbra_uniform_32(b, u, M_KX)),
+                         tx = umbra_interval_exact(umbra_uniform_32(b, u, M_TX)),
+                         ky = umbra_interval_exact(umbra_uniform_32(b, u, M_KY)),
+                         sy = umbra_interval_exact(umbra_uniform_32(b, u, M_SY)),
+                         ty = umbra_interval_exact(umbra_uniform_32(b, u, M_TY)),
+                         p0 = umbra_interval_exact(umbra_uniform_32(b, u, M_P0)),
+                         p1 = umbra_interval_exact(umbra_uniform_32(b, u, M_P1)),
+                         p2 = umbra_interval_exact(umbra_uniform_32(b, u, M_P2));
+
+    umbra_interval const w =
+        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, p0, x),
+                                                            umbra_interval_mul_f32(b, p1, y)),
+                                  p2);
+    *x_out = umbra_interval_div_f32(b,
+        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, sx, x),
+                                                            umbra_interval_mul_f32(b, kx, y)),
+                                  tx),
+        w);
+    *y_out = umbra_interval_div_f32(b,
+        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, ky, x),
+                                                            umbra_interval_mul_f32(b, sy, y)),
+                                  ty),
+        w);
+}
+
+umbra_point_val32 umbra_transform_point(umbra_transform *fn, void *ctx,
+                                        struct umbra_builder *b,
+                                        umbra_val32 x, umbra_val32 y) {
+    umbra_interval xo, yo;
+    fn(ctx, b, umbra_interval_exact(x), umbra_interval_exact(y), &xo, &yo);
+    return (umbra_point_val32){xo.lo, yo.lo};
+}
+
 umbra_point_val32 umbra_apply_matrix(struct umbra_builder *b, umbra_matrix_val32 m,
                                       umbra_val32 x, umbra_val32 y) {
     umbra_val32 const w =
