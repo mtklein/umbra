@@ -80,6 +80,8 @@ typedef umbra_color_val32 umbra_blend    (void *ctx, struct umbra_builder*,
 // peepholes in src/interval.c ensure exact-in produces exact-out with the same
 // scalar IR as a bespoke scalar transform would emit.  sdf_draw's bounds
 // program uses the full interval entry to transform tile-extent intervals.
+// TODO: void *ctx -> const umbra_matrix*, given that we expect them all to use that?
+// TODO: simplify to transform(m,b *x,*y) with in/out x/y arguments?
 typedef void              umbra_transform(void *ctx, struct umbra_builder*,
                                           umbra_interval  x,      umbra_interval  y,
                                           umbra_interval *x_out,  umbra_interval *y_out);
@@ -109,13 +111,16 @@ umbra_blend umbra_blend_src,
             umbra_blend_dstover,
             umbra_blend_multiply;
 
-// Compose coverage, shader, and blend into an IR builder that reads and writes
-// dst_fmt at the bound dst buf.  Any of the effects may be NULL for default
-// behavior: coverage=1, shader={0,0,0,0}, blend=src.  dst must outlive the
-// builder, flat_ir, and program; its contents are dereferenced at queue time.
-struct umbra_builder* umbra_draw_builder(umbra_coverage, void *coverage_ctx,
-                                         umbra_shader  , void *shader_ctx,
-                                         umbra_blend   , void *blend_ctx,
+// Compose transform, coverage, shader, and blend into an IR builder that reads
+// and writes dst_fmt at the bound dst buf.  Any of the effects may be NULL for
+// default behavior: transform=identity, coverage=1, shader={0,0,0,0},
+// blend=src.  If transform is non-NULL it is applied to the dst-pixel (x, y)
+// before coverage and shader see them.  dst must outlive the builder,
+// flat_ir, and program; its contents are dereferenced at queue time.
+struct umbra_builder* umbra_draw_builder(umbra_transform, void *transform_ctx,
+                                         umbra_coverage , void *coverage_ctx,
+                                         umbra_shader   , void *shader_ctx,
+                                         umbra_blend    , void *blend_ctx,
                                          struct umbra_buf *dst,
                                          struct umbra_fmt  dst_fmt);
 

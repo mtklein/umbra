@@ -72,7 +72,8 @@ static int blend_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->rect,
         .hard_edge = 1,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 st->blend_fn,            NULL,
                                 &st->dst_buf,            fmt);

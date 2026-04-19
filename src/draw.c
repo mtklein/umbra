@@ -150,16 +150,23 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
 };
 
 struct umbra_builder* umbra_draw_builder(
-    umbra_coverage coverage_fn, void *coverage_ctx,
-    umbra_shader   shader_fn,   void *shader_ctx,
-    umbra_blend    blend_fn,    void *blend_ctx,
+    umbra_transform transform_fn, void *transform_ctx,
+    umbra_coverage  coverage_fn,  void *coverage_ctx,
+    umbra_shader    shader_fn,    void *shader_ctx,
+    umbra_blend     blend_fn,     void *blend_ctx,
     struct umbra_buf *dst_buf,
     struct umbra_fmt  fmt)
 {
     struct umbra_builder *b = umbra_builder();
     umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, dst_buf);
-    umbra_val32 const xf = umbra_f32_from_i32(b, umbra_x(b)),
-                      yf = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b)),
+                yf = umbra_f32_from_i32(b, umbra_y(b));
+    if (transform_fn) {
+        umbra_point_val32 const p = umbra_transform_point(transform_fn, transform_ctx,
+                                                           b, xf, yf);
+        xf = p.x;
+        yf = p.y;
+    }
 
     umbra_val32 coverage = {0};
     if (coverage_fn) { coverage = coverage_fn(coverage_ctx, b, xf, yf); }
@@ -341,6 +348,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
 
     // Build the draw program (shader + SDF coverage + blend).
     struct umbra_builder *db = umbra_draw_builder(
+        NULL,                    NULL,
         umbra_coverage_from_sdf, &d->cov_state,
         shader_fn, shader_ctx,
         blend_fn,  blend_ctx,

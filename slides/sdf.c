@@ -143,7 +143,8 @@ static int csg_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->sdf,
         .hard_edge = 0,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 umbra_blend_srcover,     NULL,
                                 &st->dst_buf,            fmt);
@@ -263,7 +264,8 @@ static int circle_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->sdf,
         .hard_edge = 0,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 umbra_blend_srcover,     NULL,
                                 &st->dst_buf,            fmt);
@@ -373,7 +375,8 @@ static int ring_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->sdf,
         .hard_edge = 0,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 umbra_blend_srcover,     NULL,
                                 &st->dst_buf,            fmt);
@@ -490,7 +493,8 @@ static int rounded_rect_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->sdf,
         .hard_edge = 0,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 umbra_blend_srcover,     NULL,
                                 &st->dst_buf,            fmt);
@@ -613,7 +617,8 @@ static int capsule_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->sdf,
         .hard_edge = 0,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 umbra_blend_srcover,     NULL,
                                 &st->dst_buf,            fmt);
@@ -715,7 +720,8 @@ static int halfplane_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->sdf,
         .hard_edge = 0,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 umbra_blend_srcover,     NULL,
                                 &st->dst_buf,            fmt);
@@ -920,7 +926,8 @@ static int sdf_text_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->sdf,
         .hard_edge = 0,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 umbra_blend_srcover,     NULL,
                                 &st->dst_buf,            fmt);
@@ -1061,7 +1068,8 @@ static int ngon_get_builders(struct slide *s, struct umbra_fmt fmt,
         .sdf_ctx   = &st->sdf,
         .hard_edge = 0,
     };
-    out[0] = umbra_draw_builder(umbra_coverage_from_sdf, &cov,
+    out[0] = umbra_draw_builder(NULL, NULL,
+                                umbra_coverage_from_sdf, &cov,
                                 umbra_shader_color,      &st->color,
                                 umbra_blend_srcover,     NULL,
                                 &st->dst_buf,            fmt);

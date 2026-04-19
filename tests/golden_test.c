@@ -138,7 +138,7 @@ TEST(test_slug_rect) {
 
     struct umbra_buf dst_slot = {0};
     struct umbra_builder *bld = umbra_draw_builder(
-        coverage_winding,       &wind_uniform,
+        NULL, NULL,        coverage_winding,       &wind_uniform,
         umbra_shader_color,     &color,
         umbra_blend_srcover,    NULL,
         &dst_slot,              umbra_fmt_8888);
@@ -192,18 +192,15 @@ TEST(test_perspective_text) {
     struct coverage_bitmap2d sampler = {
         .buf = {.ptr=bmp, .count=BW * BH}, .w=BW, .h=BH,
     };
-    struct coverage_matrix state = {
-        .mat       = {1,0,0, 0,1,0, 0,0,1},
-        .inner_fn  = coverage_bitmap2d,
-        .inner_ctx = &sampler,
-    };
+    struct umbra_matrix mat = {1,0,0, 0,1,0, 0,0,1};
 
     struct umbra_buf dst_slot = {0};
     struct umbra_builder *bld = umbra_draw_builder(
-        coverage_matrix,     &state,
-        umbra_shader_color,  &color,
-        umbra_blend_srcover, NULL,
-        &dst_slot,           umbra_fmt_8888);
+        umbra_transform_perspective, &mat,
+        coverage_bitmap2d,           &sampler,
+        umbra_shader_color,          &color,
+        umbra_blend_srcover,         NULL,
+        &dst_slot,                   umbra_fmt_8888);
     struct umbra_flat_ir *ir =
         umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -236,17 +233,13 @@ TEST(test_perspective_text) {
         .w   = tc.w,
         .h   = tc.h,
     };
-    struct coverage_matrix state2 = {
-        .mat       = mat2,
-        .inner_fn  = coverage_bitmap2d,
-        .inner_ctx = &sampler2,
-    };
 
     bld = umbra_draw_builder(
-        coverage_matrix,     &state2,
-        umbra_shader_color,  &hc2,
-        umbra_blend_srcover, NULL,
-        &dst_slot,           umbra_fmt_8888);
+        umbra_transform_perspective, &mat2,
+        coverage_bitmap2d,           &sampler2,
+        umbra_shader_color,          &hc2,
+        umbra_blend_srcover,         NULL,
+        &dst_slot,                   umbra_fmt_8888);
     ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
     interp = be->compile(be, ir);

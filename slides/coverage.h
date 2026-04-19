@@ -20,15 +20,3 @@ struct coverage_bitmap2d {
 umbra_val32 coverage_bitmap2d(void *coverage_bitmap2d, struct umbra_builder*,
                               umbra_val32 x, umbra_val32 y);
 
-// Matrix-transform combinator: applies a 3x3 perspective transform to (x, y)
-// and forwards to an inner coverage.  mat mutates freely between dispatches;
-// inner_fn / inner_ctx are baked at IR-build time (same shape as
-// umbra_supersample).
-struct coverage_matrix {
-    struct umbra_matrix  mat;
-    int                  :32;
-    umbra_coverage      *inner_fn;
-    void                *inner_ctx;
-};
-umbra_val32 coverage_matrix(void *coverage_matrix, struct umbra_builder*,
-                            umbra_val32 x, umbra_val32 y);
