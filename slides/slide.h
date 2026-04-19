@@ -2,6 +2,24 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
+// TODO: I want to invert the control flow here somewhat,
+//       less introspective of the slides and more feed-forward.
+//       The driver program (bench, demo, dump, golden tests)
+//       should be able to remain oblivious of slide internals.
+//
+//       Maybe the driver sets up a builder with prepared dst
+//       binding and passes that, dst's fmt, w,h, and a transform
+//       matrix to the slide, and if the slide has another draw
+//       to make it fills out the builder.  The driver then does
+//       its dumps, compiles, draws, timing, whatever.
+//
+//       Most slides would fill out only one builder and generate
+//       one program, but slides like two-pass slug would make
+//       more than one, and the driver would compile those into
+//       a program each, and dispatch them in order.
+//
+//       Unsure quite yet how to square this with SDF dispatch.
+
 // A slide's effect stack, if it can be expressed as a single-pass composition
 // through umbra_draw_builder.  Callers fill in a zero-initialized struct and
 // consult .coverage_fn / .shader_fn / .blend_fn to tell what the slide draws.
