@@ -168,6 +168,31 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         c->sub = sub;
         if (sub->prepare) { sub->prepare(sub, be, fmt); }
 
+        // TODO: SDF-based slides (all of slides/sdf.c, and the blend variants
+        // in slides/blend.c that wrap an SDF) currently render as placeholders
+        // here because they have no get_effects hook.  Exposing them the same
+        // way we do persp_slide -- i.e. umbra_coverage_from_sdf as the coverage
+        // slot of slide_effects -- looks right but collapses perf at our
+        // workloads: coverage_from_sdf evaluates the SDF at every pixel with
+        // no tile culling, so sdf_text with ~100 curves/pixel x 30 cells
+        // blew past the `ninja` 30s dump timeout in one experiment and would
+        // tank demo FPS.  The standalone slides dodge this by going through
+        // umbra_sdf_draw, whose bounds program tile-culls most pixels before
+        // they reach sdf evaluation.
+        //
+        // Right fix: grow slide_effects (or a sibling get_sdf_effects hook)
+        // to carry an umbra_sdf *sdf_fn + void *sdf_ctx + _Bool hard_edge,
+        // and branch this cell builder to build a per-cell umbra_sdf_draw
+        // (with &c->final_mat as the transform) instead of a draw_builder +
+        // coverage_from_sdf.  The cell transform is affine (scale+translate)
+        // so umbra_sdf_draw's affine-gate accepts it and keeps tile culling
+        // -- see the TODO near umbra_sdf_draw in src/draw.c and commit
+        // f63cec88 for that gate.  Then each cell dispatches via
+        // umbra_sdf_draw_queue in overview_draw instead of c->prog->queue.
+        //
+        // Same treatment applies to blend slides, which also build an
+        // umbra_sdf_draw internally.  If a slide exposes both effects and
+        // sdf hooks, prefer the tile-culled sdf path.
         struct slide_effects eff = {0};
         if (!sub->get_effects || !sub->get_effects(sub, &eff)) { continue; }
 
