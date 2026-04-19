@@ -25,34 +25,34 @@ struct pool_ref {
 };
 struct pool {
     uint8_t         *data;
-    struct pool_ref *refs;
-    int              nbytes, nrefs, cap_data, cap_refs;
+    struct pool_ref *ref;
+    int              bytes, refs, cap_data, cap_refs;
 };
 static int pool_add(struct pool *p, void const *src, int n) {
-    for (int i = 0; i + n <= p->nbytes; i += n) {
+    for (int i = 0; i + n <= p->bytes; i += n) {
         if (__builtin_memcmp(p->data + i, src, (size_t)n) == 0) {
             return i;
         }
     }
-    if (p->cap_data < p->nbytes + n) {
+    if (p->cap_data < p->bytes + n) {
         p->cap_data = p->cap_data ? 2 * p->cap_data : 256;
         p->data = realloc(p->data, (size_t)p->cap_data);
     }
-    int off = p->nbytes;
+    int off = p->bytes;
     __builtin_memcpy(p->data + off, src, (size_t)n);
-    p->nbytes += n;
+    p->bytes += n;
     return off;
 }
 static void pool_ref_at(struct pool *p, int data_off, int code_pos, int extra) {
-    if (p->nrefs == p->cap_refs) {
+    if (p->refs == p->cap_refs) {
         p->cap_refs = p->cap_refs ? 2 * p->cap_refs : 32;
-        p->refs = realloc(p->refs, (size_t)p->cap_refs * sizeof *p->refs);
+        p->ref = realloc(p->ref, (size_t)p->cap_refs * sizeof *p->ref);
     }
-    p->refs[p->nrefs++] = (struct pool_ref){data_off, code_pos, extra};
+    p->ref[p->refs++] = (struct pool_ref){data_off, code_pos, extra};
 }
 static void pool_free(struct pool *p) {
     free(p->data);
-    free(p->refs);
+    free(p->ref);
 }
 
 // RDI=col_end, RSI=x0_col, RDX=buf, R10=col, R14=row, R12=end_row.
@@ -428,11 +428,11 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     int const pool_start = (int)c.size;
-    for (int i = 0; i < jc.pool.nbytes; i++) {
+    for (int i = 0; i < jc.pool.bytes; i++) {
         emit1(&c, jc.pool.data[i]);
     }
-    for (int i = 0; i < jc.pool.nrefs; i++) {
-        struct pool_ref *r = &jc.pool.refs[i];
+    for (int i = 0; i < jc.pool.refs; i++) {
+        struct pool_ref *r = &jc.pool.ref[i];
         int     const entry_off = pool_start + r->data_off;
         int32_t const rel       = (int32_t)(entry_off - (r->code_pos + 4 + r->extra));
         __builtin_memcpy(c.byte + r->code_pos, &rel, 4);
