@@ -106,13 +106,24 @@ umbra_blend umbra_blend_src,
             umbra_blend_dstover,
             umbra_blend_multiply;
 
-// Compose coverage, shader, and blend into an IR builder that reads and writes
-// dst_fmt at the bound dst buf.  Any of the effects may be NULL for default
-// behavior: coverage=1, shader={0,0,0,0}, blend=src.  If transform_mat is
-// non-NULL, umbra_transform_perspective maps the dst-pixel (x, y) through it
-// before coverage and shader see them; the matrix must outlive the program.
-// dst must outlive the builder, flat_ir, and program; its contents are
-// dereferenced at queue time.
+// Write a draw pipeline into an existing builder: load dst (if needed),
+// run coverage + shader + blend at the supplied (x, y), compose with dst,
+// store back to dst.  Any of the effects may be NULL for default behavior:
+// coverage=1, shader={0,0,0,0}, blend=src.  Callers can apply any transform
+// they want by pre-processing (x, y) themselves (e.g. via
+// umbra_transform_perspective) and chaining as they please.  dst_ptr must
+// already be bound on the builder via umbra_bind_buf32; the backing buf
+// must outlive the builder, flat_ir, and program.
+void umbra_build_draw(struct umbra_builder*,
+                      umbra_ptr32 dst_ptr, struct umbra_fmt dst_fmt,
+                      umbra_val32 x, umbra_val32 y,
+                      umbra_coverage, void *coverage_ctx,
+                      umbra_shader  , void *shader_ctx,
+                      umbra_blend   , void *blend_ctx);
+
+// Thin wrapper around umbra_build_draw: creates a fresh builder, initializes
+// (x, y) from the dispatch, applies umbra_transform_perspective through
+// transform_mat (if non-NULL), and dispatches to umbra_build_draw.
 struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_mat,
                                          umbra_coverage , void *coverage_ctx,
                                          umbra_shader   , void *shader_ctx,

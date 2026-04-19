@@ -149,30 +149,19 @@ struct umbra_fmt const umbra_fmt_fp16_planar = {
     .name="fp16_planar", .bpp=2, .planes=4, .load=load_fp16p, .store=store_fp16p,
 };
 
-struct umbra_builder* umbra_draw_builder(
-    struct umbra_matrix const *transform_mat,
-    umbra_coverage  coverage_fn, void *coverage_ctx,
-    umbra_shader    shader_fn,   void *shader_ctx,
-    umbra_blend     blend_fn,    void *blend_ctx,
-    struct umbra_buf *dst_buf,
-    struct umbra_fmt  fmt)
+void umbra_build_draw(struct umbra_builder *b,
+                      umbra_ptr32 dst_ptr, struct umbra_fmt fmt,
+                      umbra_val32 x, umbra_val32 y,
+                      umbra_coverage coverage_fn, void *coverage_ctx,
+                      umbra_shader   shader_fn,   void *shader_ctx,
+                      umbra_blend    blend_fn,    void *blend_ctx)
 {
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, dst_buf);
-    umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b)),
-                yf = umbra_f32_from_i32(b, umbra_y(b));
-    if (transform_mat) {
-        umbra_point_val32 const p = umbra_transform_perspective(transform_mat, b, xf, yf);
-        xf = p.x;
-        yf = p.y;
-    }
-
     umbra_val32 coverage = {0};
-    if (coverage_fn) { coverage = coverage_fn(coverage_ctx, b, xf, yf); }
+    if (coverage_fn) { coverage = coverage_fn(coverage_ctx, b, x, y); }
 
     umbra_val32 const zero = umbra_imm_f32(b, 0.0f);
     umbra_color_val32 src = {zero, zero, zero, zero};
-    if (shader_fn) { src = shader_fn(shader_ctx, b, xf, yf); }
+    if (shader_fn) { src = shader_fn(shader_ctx, b, x, y); }
 
     umbra_color_val32 dst = {zero, zero, zero, zero};
     if (blend_fn || coverage_fn) { dst = fmt.load(b, &dst_ptr); }
@@ -191,6 +180,29 @@ struct umbra_builder* umbra_draw_builder(
     }
 
     fmt.store(b, &dst_ptr, out);
+}
+
+struct umbra_builder* umbra_draw_builder(
+    struct umbra_matrix const *transform_mat,
+    umbra_coverage  coverage_fn, void *coverage_ctx,
+    umbra_shader    shader_fn,   void *shader_ctx,
+    umbra_blend     blend_fn,    void *blend_ctx,
+    struct umbra_buf *dst_buf,
+    struct umbra_fmt  fmt)
+{
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr32 const dst_ptr = umbra_bind_buf32(b, dst_buf);
+    umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
+                y = umbra_f32_from_i32(b, umbra_y(b));
+    if (transform_mat) {
+        umbra_point_val32 const p = umbra_transform_perspective(transform_mat, b, x, y);
+        x = p.x;
+        y = p.y;
+    }
+    umbra_build_draw(b, dst_ptr, fmt, x, y,
+                     coverage_fn, coverage_ctx,
+                     shader_fn,   shader_ctx,
+                     blend_fn,    blend_ctx);
     return b;
 }
 
