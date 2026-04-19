@@ -928,8 +928,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     __builtin_memcpy(&v->i32, tmp, sizeof v->i32);
                 } NEXT;
                 CASE(op_loop_begin) {
-                    int const n_trip = v[ip->x].i32[0];
-                    if (n_trip <= 0) {
+                    int const trips = v[ip->x].i32[0];
+                    if (trips <= 0) {
                         int const skip = ip->y;
                         ip += skip;
                         v  += skip;
@@ -937,9 +937,9 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
                 CASE(op_loop_end) {
                     int const back   = ip->x;
-                    int const n_trip = v[ip->y].i32[0];
+                    int const trips = v[ip->y].i32[0];
                     int const i_next = var[ip->z].i32[0];
-                    if (i_next < n_trip) {
+                    if (i_next < trips) {
                         ip += back;
                         v  += back;
                     }
