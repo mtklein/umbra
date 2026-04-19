@@ -2,12 +2,12 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
-// The endgame for this interface is for drivers (bench, demo, dump, golden
-// tests, overview) to stop knowing anything about slide internals and just
-// drive the slide through .build_draw + .animate.  Each driver creates a
-// builder, binds its chosen dst, initializes (x, y) from the dispatch,
-// optionally pre-applies a viewport transform, calls build_draw, and takes
-// it from there (compile, dispatch, dump, time, pairwise-compare).
+// TODO: drive every slide through .build_draw + .animate so the drivers
+// (bench, demo, dump, golden tests, overview) can stop knowing anything
+// about slide internals.  Each driver creates a builder, binds its chosen
+// dst, initializes (x, y) from the dispatch, optionally pre-applies a
+// viewport transform, calls build_draw, and takes it from there (compile,
+// dispatch, dump, time, pairwise-compare).
 //
 // Partially landed:
 //   * build_draw exists and lives alongside prepare/draw/get_builders.
