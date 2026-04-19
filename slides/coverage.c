@@ -181,6 +181,24 @@ struct text_cov* text_shared_sdf   (void) { return &shared_sdf; }
 
 // Coverage (8-bit bitmap) and Coverage (SDF bitmap): sample a glyph-mask
 // through umbra_coverage_{bitmap,sdf}.
+//
+// TODO: text_slide doesn't implement slide->build_draw yet (it renders as a
+// placeholder in the overview).  One attempt to migrate it:
+//   - Added a `struct coverage_bitmap2d bmp` field to text_slide, populated
+//     in text_init from the shared text_cov.
+//   - Swapped coverage_fn from coverage_bitmap / coverage_sdf (linear load,
+//     ignores x/y) to coverage_bitmap2d / a new coverage_sdf2d (gather at
+//     (x, y)), so the slide composes correctly under an outer transform.
+//   - Added text_build_draw / text_builder / .build_draw wire-up; routed
+//     standalone prepare and get_builders through the same builder.
+//
+// With that change, tests/golden_test.c's test_slide_golden reported
+// "Coverage (8-bit bitmap)" mismatches for all four backend pairs that
+// involve jit (interp vs jit, jit vs metal, jit vs vulkan, jit vs wgpu):
+// 4593 / 49152 bytes differ at 8888, worst delta 229 at byte 11869.
+// interp / metal / vulkan / wgpu all agreed with each other; only jit
+// produced different output.  The overlapping persp_slide case (which also
+// uses coverage_bitmap2d, but through a perspective warp) passed pairwise.
 struct text_slide {
     struct slide base;
 
