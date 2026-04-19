@@ -357,12 +357,12 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             .pBufferInfo=&buf_infos[i],
         };
     }
-    int n_desc = n;
+    int descs = n;
 
     vkCmdBindPipeline(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE, vp->pipeline);
-    if (n_desc) {
+    if (descs) {
         vkCmdPushDescriptorSet(be->batch_cmd, VK_PIPELINE_BIND_POINT_COMPUTE,
-                               vp->pipe_layout, 0, (uint32_t)n_desc, writes);
+                               vp->pipe_layout, 0, (uint32_t)descs, writes);
     }
     vkCmdPushConstants(be->batch_cmd, vp->pipe_layout, VK_SHADER_STAGE_COMPUTE_BIT,
                        0, (uint32_t)(vp->push_words * (int)sizeof(uint32_t)), push_data);
@@ -456,7 +456,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     struct spirv_result const sr =
         build_spirv(ir, SPIRV_FLOAT_CONTROLS);
 
-    int n_desc = sr.total_bufs;
+    int descs = sr.total_bufs;
 
     // Create shader module.
     VkShaderModule shader;
@@ -472,8 +472,8 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
 
     // Descriptor set layout: one storage or uniform buffer per non-push slot.
     VkDescriptorSetLayoutBinding *bindings =
-        calloc((size_t)(n_desc ? n_desc : 1), sizeof *bindings);
-    for (int i = 0; i < n_desc; i++) {
+        calloc((size_t)(descs ? descs : 1), sizeof *bindings);
+    for (int i = 0; i < descs; i++) {
         bindings[i] = (VkDescriptorSetLayoutBinding){
             .binding = (uint32_t)i,
             .descriptorType = sr.buf_is_uniform[i] ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
@@ -487,7 +487,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
         VkDescriptorSetLayoutCreateInfo ci = {
             .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
             .flags = VK_DESCRIPTOR_SET_LAYOUT_CREATE_PUSH_DESCRIPTOR_BIT_KHR,
-            .bindingCount = (uint32_t)n_desc,
+            .bindingCount = (uint32_t)descs,
             .pBindings = bindings,
         };
         vkCreateDescriptorSetLayout(vbe->device, &ci, 0, &ds_layout);

@@ -356,9 +356,9 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
         });
     if (!shader) { free(sr.spirv); return 0; }
 
-    int n_desc = sr.total_bufs + 1;
+    int descs = sr.total_bufs + 1;
     WGPUBindGroupLayoutEntry *entries =
-        calloc((size_t)n_desc, sizeof *entries);
+        calloc((size_t)descs, sizeof *entries);
 
     // Count read-only bindings split by descriptor type.  If both classes
     // (storage RO + push, uniform RO) fit within their respective dynamic
@@ -367,7 +367,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     // back to only-push-is-dynamic; bg cache thrashes but we stay within
     // limits.
     int n_ro_storage = 0, n_ro_uniform = 0;
-    for (int i = 0; i < n_desc - 1; i++) {
+    for (int i = 0; i < descs - 1; i++) {
         if (!(sr.buf_rw[i] & BUF_WRITTEN)) {
             if (sr.buf_is_uniform[i]) { n_ro_uniform++; }
             else                      { n_ro_storage++; }
@@ -377,7 +377,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
         (uint32_t)(n_ro_storage + 1) <= be->max_dyn_storage
      && (uint32_t) n_ro_uniform      <= be->max_dyn_uniform;
 
-    for (int i = 0; i < n_desc - 1; i++) {
+    for (int i = 0; i < descs - 1; i++) {
         _Bool const is_ring = dynamic_offset_bindings && !(sr.buf_rw[i] & BUF_WRITTEN);
         entries[i] = (WGPUBindGroupLayoutEntry){
             .binding    = (uint32_t)i,
@@ -389,8 +389,8 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
             },
         };
     }
-    entries[n_desc - 1] = (WGPUBindGroupLayoutEntry){
-        .binding    = (uint32_t)(n_desc - 1),
+    entries[descs - 1] = (WGPUBindGroupLayoutEntry){
+        .binding    = (uint32_t)(descs - 1),
         .visibility = WGPUShaderStage_Compute,
         .buffer = {
             .type             = WGPUBufferBindingType_Storage,
@@ -399,7 +399,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     };
     WGPUBindGroupLayout bg_layout = wgpuDeviceCreateBindGroupLayout(be->device,
         &(WGPUBindGroupLayoutDescriptor){
-            .entryCount = (size_t)n_desc,
+            .entryCount = (size_t)descs,
             .entries    = entries,
         });
     free(entries);
