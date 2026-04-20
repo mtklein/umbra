@@ -1,4 +1,5 @@
 #include "test.h"
+#include "../src/assume.h"
 #include <string.h>
 
 enum { TEST_CAP = 4096 };
@@ -8,11 +9,10 @@ static char const *names[TEST_CAP];
 static int         test_count;
 
 void test_register(test_fn fn, char const *name) {
-    if (test_count < TEST_CAP) {
-        registry[test_count] = fn;
-        names[test_count] = name;
-        test_count++;
-    }
+    assume(test_count < TEST_CAP);
+    registry[test_count] = fn;
+    names[test_count] = name;
+    test_count++;
 }
 
 void test_run(char const *match, int shards, int shard) {
