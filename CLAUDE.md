@@ -51,8 +51,8 @@ related assignments of the same type, with one shared type declaration:
     float const not_int = ...;
 
 Comments should be extremely rare.  Reserve comments only for important context
-that cannot be expressed through code.  Never use comments for organization or
-decoration.
+that is not obvious and cannot be expressed through code.  Never use comments
+for organization or decoration.  Don't make comment about ordinary convention.
 
 Use East `const`, and use it liberally, especially to distinguish locals that
 name an immutable value like `double const start_time = now()` from locals that
