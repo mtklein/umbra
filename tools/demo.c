@@ -127,9 +127,10 @@ static _Bool is_leaf(struct slide const *s) {
 static void rebuild_rt(struct slide *s, int fmt, int W, int H) {
     slide_runtime_free(slide_rt);
     slide_rt = NULL;
-    if (!bes[cur_backend] || !is_leaf(s)) { return; }
-    slide_rt = slide_runtime(s, W, H, bes[cur_backend], *fmt_enums[fmt], NULL);
-    slide_bg_prepare(bes[cur_backend], *fmt_enums[fmt], W, H);
+    if (bes[cur_backend] && is_leaf(s)) {
+        slide_rt = slide_runtime(s, W, H, bes[cur_backend], *fmt_enums[fmt], NULL);
+        slide_bg_prepare(bes[cur_backend], *fmt_enums[fmt], W, H);
+    }
 }
 
 static void build_slide_fmt(struct slide *s, int fmt, int W, int H) {

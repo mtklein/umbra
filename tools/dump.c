@@ -191,7 +191,6 @@ static void dump_builder(struct dump_backends *db,
     umbra_flat_ir_free(ir);
 }
 
-
 static void slugify(char const *title, char *out, size_t sz) {
     int n = snprintf(out, sz, "dumps/");
     for (int i = 0; title[i] && n < (int)sz - 1; i++) {

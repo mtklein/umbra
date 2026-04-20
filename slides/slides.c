@@ -218,13 +218,14 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
 }
 
 void slide_runtime_free(struct slide_runtime *rt) {
-    if (!rt) { return; }
-    struct umbra_backend *bounds_be = rt->bounds ? rt->bounds->backend : NULL;
-    umbra_program_free(rt->draw);
-    umbra_program_free(rt->bounds);
-    umbra_backend_free(bounds_be);
-    free(rt->cov);
-    free(rt);
+    if (rt) {
+        struct umbra_backend *bounds_be = rt->bounds ? rt->bounds->backend : NULL;
+        umbra_program_free(rt->draw);
+        umbra_program_free(rt->bounds);
+        umbra_backend_free(bounds_be);
+        free(rt->cov);
+        free(rt);
+    }
 }
 
 struct slide_builders slide_builders(struct slide_runtime *rt, struct slide *s,

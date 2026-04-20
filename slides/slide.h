@@ -8,7 +8,7 @@
 struct slide {
     char const     *title;
     umbra_color     bg;
-    int             w, h;
+    int             w,h;
 
     void (*init)   (struct slide*);
     void (*prepare)(struct slide*, struct umbra_backend*, struct umbra_fmt);
@@ -56,7 +56,6 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
 void slide_bg_draw   (umbra_color bg, int l, int t, int r, int b, void *buf);
 void slide_bg_cleanup(void);
 
-// Compiled state for one slide on one backend + format.
 struct slide_runtime {
     struct umbra_program *draw;
     struct umbra_program *bounds;      // NULL for non-SDF; owns its backend
@@ -71,24 +70,16 @@ struct slide_runtime {
     int                   :32;
 };
 
-// Allocate and compile a slide_runtime.  Caller frees via slide_runtime_free.
 struct slide_runtime* slide_runtime(struct slide*, int w, int h,
                                     struct umbra_backend*, struct umbra_fmt,
                                     struct umbra_matrix const *pre_transform);
-void slide_runtime_draw (struct slide_runtime*, struct slide*,
-                         double secs, int l, int t, int r, int b);
-void slide_runtime_free (struct slide_runtime*);
+void   slide_runtime_draw(struct slide_runtime*, struct slide*,
+                          double secs, int l, int t, int r, int b);
+void   slide_runtime_free(struct slide_runtime*);
 
-// Builders for the slide's composable draw paths for inspection.  `rt`
-// holds the bind-site backing storage and must outlive any program
-// compiled from the returned builders.  Both fields are NULL for slides
-// with neither build_draw nor build_sdf_draw (e.g. overview); .draw is
-// set for build_draw slides and both are set for build_sdf_draw slides.
-// Caller owns the returned builders.
 struct slide_builders {
     struct umbra_builder *draw;
     struct umbra_builder *bounds;
 };
-struct slide_builders slide_builders(struct slide_runtime *rt, struct slide*,
-                                     struct umbra_fmt,
-                                     struct umbra_matrix const *pre);
+struct slide_builders slide_builders(struct slide_runtime *rt,
+                                     struct slide*, struct umbra_fmt, struct umbra_matrix const*);
