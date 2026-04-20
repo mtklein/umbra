@@ -219,12 +219,26 @@ static void fp16p_to_float(float *out, void const *pixbuf) {
 
 static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be) {
     struct slide *s = slide_get(slide_idx);
-    size_t const pixbuf_sz = (size_t)RW * RH * umbra_fmt_fp16_planar.bpp * 4;
+    struct umbra_fmt const fmt = umbra_fmt_fp16_planar;
+    size_t const pixbuf_sz = (size_t)RW * RH * fmt.bpp * (size_t)fmt.planes;
     void *pixbuf = calloc(1, pixbuf_sz);
 
-    s->prepare(s, be, umbra_fmt_fp16_planar);
-    s->draw(s, 0.0, 0, 0, RW, RH, pixbuf);
+    struct slide_runtime rt = {0};
+    _Bool const leaf = s->build_draw || s->build_sdf_draw;
+    if (leaf) {
+        slide_runtime_compile(&rt, s, RW, RH, be, fmt, NULL);
+        slide_bg_prepare(be, fmt, RW, RH);
+        slide_bg_draw(s->bg, 0, 0, RW, RH, pixbuf);
+        rt.dst_buf = (struct umbra_buf){
+            .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
+        };
+        slide_runtime_draw(&rt, s, 0.0, 0, 0, RW, RH);
+    } else {
+        s->prepare(s, be, fmt);
+        s->draw(s, 0.0, 0, 0, RW, RH, pixbuf);
+    }
     be->flush(be);
+    if (leaf) { slide_runtime_cleanup(&rt); }
 
     float *fdata = malloc((size_t)(RW * RH) * 4 * sizeof(float));
     fp16p_to_float(fdata, pixbuf);
