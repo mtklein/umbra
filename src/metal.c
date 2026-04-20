@@ -141,15 +141,19 @@ static _Bool produces_float(enum op op) {
 
 static char const* fv(char *tmp, char const *vn,
                       int id, _Bool const *is_f) {
-    if (is_f[id]) { return vn; }
-    snprintf(tmp, 40, "as_type<float>(%s)", vn);
-    return tmp;
+    if (!is_f[id]) {
+        snprintf(tmp, 40, "as_type<float>(%s)", vn);
+        return tmp;
+    }
+    return vn;
 }
 static char const* uv(char *tmp, char const *vn,
                       int id, _Bool const *is_f) {
-    if (!is_f[id]) { return vn; }
-    snprintf(tmp, 40, "as_type<uint>(%s)", vn);
-    return tmp;
+    if (is_f[id]) {
+        snprintf(tmp, 40, "as_type<uint>(%s)", vn);
+        return tmp;
+    }
+    return vn;
 }
 
 static void emit_ops(SrcBuf *b, IR const *ir,
