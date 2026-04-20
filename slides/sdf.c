@@ -41,30 +41,23 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
 }
 
 // Shared state for every SDF slide in this file.  Each slide embeds this as
-// its first field so (struct slide *) casts hit sdf_common.base and
-// (struct sdf_common *) casts work too.  Slides fill sdf_fn/sdf_ctx/color
-// in their ctor; the shared build_sdf_draw hook below feeds those to
-// umbra_build_sdf_draw / umbra_build_sdf_bounds.
+// its first field so (struct slide *) casts hit sdf_common.base.  Slides
+// fill base.sdf_fn/base.sdf_ctx/color in their ctor; the shared
+// build_sdf_draw hook below feeds those to umbra_build_sdf_draw.
 struct sdf_common {
-    struct slide  base;
-    umbra_color   color;
-    umbra_sdf    *sdf_fn;
-    void         *sdf_ctx;
+    struct slide base;
+    umbra_color  color;
 };
 
 static void sdf_common_build_draw(struct slide *s,
-                                  struct umbra_builder *b_draw,
+                                  struct umbra_builder *b,
                                   umbra_ptr dst_ptr, struct umbra_fmt fmt,
-                                  umbra_val32 x, umbra_val32 y,
-                                  struct umbra_builder      *b_bounds,
-                                  struct umbra_sdf_bounds   *bounds,
-                                  struct umbra_matrix const *transform) {
+                                  umbra_val32 x, umbra_val32 y) {
     struct sdf_common *c = (struct sdf_common *)s;
-    umbra_build_sdf_draw(b_draw, dst_ptr, fmt, x, y,
-                         c->sdf_fn, c->sdf_ctx, 1,
+    umbra_build_sdf_draw(b, dst_ptr, fmt, x, y,
+                         s->sdf_fn, s->sdf_ctx, 1,
                          umbra_shader_color,  &c->color,
                          umbra_blend_srcover, NULL);
-    umbra_build_sdf_bounds(b_bounds, bounds, transform, c->sdf_fn, c->sdf_ctx);
 }
 
 static void sdf_common_free(struct slide *s) { free(s); }
@@ -143,8 +136,6 @@ static struct slide* make_csg(char const *title, umbra_color color, enum csg_op 
     struct csg_slide *st = calloc(1, sizeof *st);
     st->op               = op;
     st->common.color     = color;
-    st->common.sdf_fn    = build;
-    st->common.sdf_ctx   = &st->sdf;
     st->common.base      = (struct slide){
         .title   = title,
         .bg      = {0.08f, 0.10f, 0.14f, 1},
@@ -152,6 +143,8 @@ static struct slide* make_csg(char const *title, umbra_color color, enum csg_op 
         .animate = csg_animate,
         SDF_COMMON_HOOKS,
     };
+    st->common.base.sdf_fn    = build;
+    st->common.base.sdf_ctx   = &st->sdf;
     return &st->common.base;
 }
 
@@ -211,8 +204,6 @@ static void circle_animate(struct slide *s, double secs) {
 SLIDE(slide_sdf_circle) {
     struct circle_slide *st = calloc(1, sizeof *st);
     st->common.color     = (umbra_color){0.95f, 0.45f, 0.10f, 1.0f};
-    st->common.sdf_fn    = circle_build;
-    st->common.sdf_ctx   = &st->sdf;
     st->common.base      = (struct slide){
         .title   = "SDF Circle",
         .bg      = {0.08f, 0.10f, 0.14f, 1.0f},
@@ -221,6 +212,8 @@ SLIDE(slide_sdf_circle) {
         .animate = circle_animate,
         SDF_COMMON_HOOKS,
     };
+    st->common.base.sdf_fn    = circle_build;
+    st->common.base.sdf_ctx   = &st->sdf;
     return &st->common.base;
 }
 
@@ -257,8 +250,6 @@ static void ring_animate(struct slide *s, double secs) {
 SLIDE(slide_sdf_ring) {
     struct ring_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){1.0f, 0.6f, 0.1f, 1};
-    st->common.sdf_fn  = ring_build;
-    st->common.sdf_ctx = &st->sdf;
     st->common.base    = (struct slide){
         .title   = "SDF Ring",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
@@ -266,6 +257,8 @@ SLIDE(slide_sdf_ring) {
         .animate = ring_animate,
         SDF_COMMON_HOOKS,
     };
+    st->common.base.sdf_fn  = ring_build;
+    st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }
 
@@ -321,8 +314,6 @@ static void rounded_rect_animate(struct slide *s, double secs) {
 SLIDE(slide_sdf_rounded_rect) {
     struct rounded_rect_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.1f, 0.5f, 0.9f, 1};
-    st->common.sdf_fn  = rounded_rect_build;
-    st->common.sdf_ctx = &st->sdf;
     st->common.base    = (struct slide){
         .title   = "SDF Rounded Rect",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
@@ -330,6 +321,8 @@ SLIDE(slide_sdf_rounded_rect) {
         .animate = rounded_rect_animate,
         SDF_COMMON_HOOKS,
     };
+    st->common.base.sdf_fn  = rounded_rect_build;
+    st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }
 
@@ -395,8 +388,6 @@ static void capsule_animate(struct slide *s, double secs) {
 SLIDE(slide_sdf_capsule) {
     struct capsule_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.9f, 0.3f, 0.6f, 1};
-    st->common.sdf_fn  = capsule_build;
-    st->common.sdf_ctx = &st->sdf;
     st->common.base    = (struct slide){
         .title   = "SDF Capsule",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
@@ -404,6 +395,8 @@ SLIDE(slide_sdf_capsule) {
         .animate = capsule_animate,
         SDF_COMMON_HOOKS,
     };
+    st->common.base.sdf_fn  = capsule_build;
+    st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }
 
@@ -448,8 +441,6 @@ static void halfplane_animate(struct slide *s, double secs) {
 SLIDE(slide_sdf_halfplane) {
     struct halfplane_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.3f, 0.7f, 0.9f, 1};
-    st->common.sdf_fn  = halfplane_build;
-    st->common.sdf_ctx = &st->sdf;
     st->common.base    = (struct slide){
         .title   = "SDF Halfplane",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
@@ -457,6 +448,8 @@ SLIDE(slide_sdf_halfplane) {
         .animate = halfplane_animate,
         SDF_COMMON_HOOKS,
     };
+    st->common.base.sdf_fn  = halfplane_build;
+    st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }
 
@@ -608,8 +601,6 @@ static void sdf_text_free(struct slide *s) {
 SLIDE(slide_sdf_text) {
     struct sdf_text_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
-    st->common.sdf_fn  = sdf_text_build;
-    st->common.sdf_ctx = &st->sdf;
     st->common.base    = (struct slide){
         .title = "SDF Text",
         .bg    = {0.08f, 0.10f, 0.14f, 1},
@@ -617,6 +608,8 @@ SLIDE(slide_sdf_text) {
         .free  = sdf_text_free,
         SDF_COMMON_HOOKS,
     };
+    st->common.base.sdf_fn  = sdf_text_build;
+    st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }
 
@@ -705,8 +698,6 @@ SLIDE(slide_sdf_ngon) {
     struct ngon_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.8f, 0.8f, 0.2f, 1};
     st->hp_data        = malloc(3 * NGON_SIDES * sizeof(float));
-    st->common.sdf_fn  = ngon_build;
-    st->common.sdf_ctx = &st->sdf;
     st->common.base    = (struct slide){
         .title   = "SDF N-Gon",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
@@ -714,5 +705,7 @@ SLIDE(slide_sdf_ngon) {
         .animate = ngon_animate,
         SDF_COMMON_HOOKS,
     };
+    st->common.base.sdf_fn  = ngon_build;
+    st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }

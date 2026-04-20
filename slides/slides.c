@@ -103,10 +103,12 @@ void slide_bg_free(struct slide_bg *bg) {
     }
 }
 
-static struct umbra_builder* runtime_draw_builder(
-        struct slide *s, struct umbra_buf *dst,
-        struct umbra_fmt fmt,
-        struct umbra_matrix const *pre) {
+struct umbra_builder* slide_draw_builder(struct slide *s,
+                                         struct umbra_buf *dst,
+                                         struct umbra_fmt fmt,
+                                         struct umbra_matrix const *pre) {
+    if (!s->build_draw && !s->build_sdf_draw) { return NULL; }
+
     struct umbra_builder *b = umbra_builder();
     umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
     umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
@@ -116,31 +118,9 @@ static struct umbra_builder* runtime_draw_builder(
         x = p.x;
         y = p.y;
     }
-    s->build_draw(s, b, dst_ptr, fmt, x, y);
+    if (s->build_sdf_draw) { s->build_sdf_draw(s, b, dst_ptr, fmt, x, y); }
+    else                   { s->build_draw    (s, b, dst_ptr, fmt, x, y); }
     return b;
-}
-
-static void runtime_sdf_builders(
-        struct slide *s, struct slide_runtime *rt,
-        struct umbra_fmt fmt,
-        struct umbra_matrix const *pre,
-        struct umbra_builder **out_draw,
-        struct umbra_builder **out_bounds) {
-    struct umbra_builder *db = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(db, &rt->dst_buf);
-    umbra_val32 x = umbra_f32_from_i32(db, umbra_x(db)),
-                y = umbra_f32_from_i32(db, umbra_y(db));
-    if (pre) {
-        umbra_point_val32 const p = umbra_transform_perspective(pre, db, x, y);
-        x = p.x;
-        y = p.y;
-    }
-
-    struct umbra_builder *bb = umbra_builder();
-    s->build_sdf_draw(s, db, dst_ptr, fmt, x, y, bb, &rt->bounds, pre);
-
-    *out_draw   = db;
-    *out_bounds = bb;
 }
 
 struct slide_runtime* slide_runtime(struct slide *s,
@@ -152,27 +132,16 @@ struct slide_runtime* slide_runtime(struct slide *s,
     rt->w   = w;
     rt->h   = h;
 
-    if (s->build_sdf_draw) {
-        struct umbra_builder *db, *bb;
-        runtime_sdf_builders(s, rt, fmt, pre, &db, &bb);
-
-        struct umbra_flat_ir *dir = umbra_flat_ir(db);
-        umbra_builder_free(db);
-        rt->draw = be->compile(be, dir);
-        umbra_flat_ir_free(dir);
-
-        struct umbra_flat_ir *bir = umbra_flat_ir(bb);
-        umbra_builder_free(bb);
-        rt->bounds_be = umbra_backend_jit();
-        if (!rt->bounds_be) { rt->bounds_be = umbra_backend_interp(); }
-        rt->bounds.prog = rt->bounds_be->compile(rt->bounds_be, bir);
-        umbra_flat_ir_free(bir);
-    } else if (s->build_draw) {
-        struct umbra_builder *b = runtime_draw_builder(s, &rt->dst_buf, fmt, pre);
+    struct umbra_builder *b = slide_draw_builder(s, &rt->dst_buf, fmt, pre);
+    if (b) {
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
         rt->draw = be->compile(be, ir);
         umbra_flat_ir_free(ir);
+    }
+
+    if (s->build_sdf_draw) {
+        rt->bounds = umbra_sdf_bounds_program(umbra_sdf_bounds_builder(pre, s->sdf_fn, s->sdf_ctx));
     }
     return rt;
 }
@@ -181,8 +150,8 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
                         double secs, int l, int t, int r, int b) {
     if (s->animate) { s->animate(s, secs); }
 
-    if (rt->bounds.prog) {
-        umbra_sdf_dispatch(&rt->bounds, rt->draw, l, t, r, b);
+    if (rt->bounds) {
+        umbra_sdf_dispatch(rt->bounds, rt->draw, l, t, r, b);
     } else {
         rt->draw->queue(rt->draw, l, t, r, b);
     }
@@ -191,20 +160,7 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
 void slide_runtime_free(struct slide_runtime *rt) {
     if (rt) {
         umbra_program_free(rt->draw);
-        umbra_sdf_bounds_free(&rt->bounds);
-        umbra_backend_free(rt->bounds_be);
+        umbra_sdf_bounds_program_free(rt->bounds);
         free(rt);
     }
-}
-
-struct slide_builders slide_builders(struct slide_runtime *rt, struct slide *s,
-                                     struct umbra_fmt fmt,
-                                     struct umbra_matrix const *pre) {
-    struct slide_builders out = {0};
-    if (s->build_sdf_draw) {
-        runtime_sdf_builders(s, rt, fmt, pre, &out.draw, &out.bounds);
-    } else if (s->build_draw) {
-        out.draw = runtime_draw_builder(s, &rt->dst_buf, fmt, pre);
-    }
-    return out;
 }

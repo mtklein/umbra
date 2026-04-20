@@ -1,7 +1,6 @@
 #pragma once
 #include "umbra.h"
 #include "umbra_interval.h"
-#include <stdint.h>
 
 typedef struct { float       x, y; } umbra_point;
 typedef struct { umbra_val32 x, y; } umbra_point_val32;
@@ -107,37 +106,33 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 
-// A bounds program plus the storage it needs between dispatches: the grid
-// uniforms it was built against, the cov buffer it writes tile classifications
-// into, and our running capacity for that buffer.  Pass the bounds struct to
-// umbra_build_sdf_bounds(), compile the resulting IR, stash the program in
-// bounds.prog, then call umbra_sdf_dispatch().
-struct umbra_sdf_bounds {
-    struct umbra_program *prog;
-    struct umbra_buf      cov_buf;
-    uint16_t             *cov;
-    int                   cov_cap, :32;
-    float                 base_x,base_y,
-                          tile_w,tile_h;
+// SDF bounds programs build in two steps:
+//   1. umbra_sdf_bounds_builder() emits the bounds IR into a fresh umbra_builder
+//      and allocates the per-dispatch binding storage.
+//   2. umbra_sdf_bounds_program() consumes the builder and compiles on a
+//      backend picked internally (jit when available, else interp).
+//
+// The split exists so tooling can inspect/compile the IR on arbitrary backends
+// between the two steps.  If you use .builder yourself, you still own .bounds
+// and must free it via umbra_sdf_bounds_program_free() once the IR and any
+// compiled programs derived from it have been freed.
+struct umbra_sdf_bounds_program;
+struct umbra_sdf_bounds_builder {
+    struct umbra_builder            *builder;
+    struct umbra_sdf_bounds_program *bounds;
 };
 
-// Build an SDF bounds IR that classifies each tile at (umbra_x, umbra_y) into
-// the uint16 TILE_NONE / TILE_PARTIAL / TILE_FULL enum and writes it to
-// bounds->cov_buf.  Binds bounds->cov_buf (storage) and bounds->grid (uniforms)
-// on the builder.  `transform`, if non-NULL, composes an affine pre-transform
-// onto the per-tile intervals.
-void umbra_build_sdf_bounds(struct umbra_builder*,
-                            struct umbra_sdf_bounds *bounds,
-                            struct umbra_matrix const *transform,
-                            umbra_sdf, void *sdf_ctx);
+struct umbra_sdf_bounds_builder  umbra_sdf_bounds_builder(
+    struct umbra_matrix const *transform,
+    umbra_sdf, void *sdf_ctx);
+struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_sdf_bounds_builder);
 
-// Frees bounds->prog and bounds->cov.  Does not free the struct itself —
-// callers usually embed one.
-void umbra_sdf_bounds_free(struct umbra_sdf_bounds*);
+// Tolerates NULL and partially-constructed state.
+void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program*);
 
 // Use the bounds program's coverage results to intelligently dispatch
 // draw->queue() calls, skipping any uncovered rectangles.
 // TODO: use a draw that skips per-pixel SDF eval when TILE_FULL.
-void umbra_sdf_dispatch(struct umbra_sdf_bounds *bounds,
-                        struct umbra_program    *draw,
+void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
+                        struct umbra_program            *draw,
                         int l, int t, int r, int b);

@@ -113,18 +113,23 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     return best / px * 1e9;
 }
 
+static void compile_builder_on(struct umbra_builder *b, struct umbra_backend *be) {
+    if (!b) { return; }
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    struct umbra_program *p = be->compile(be, ir);
+    umbra_program_free(p);
+    umbra_flat_ir_free(ir);
+}
+
 static void compile_all_builders(struct slide_runtime *rt, struct slide *s,
                                  struct umbra_fmt fmt,
                                  struct umbra_backend *be) {
-    struct slide_builders b = slide_builders(rt, s, fmt, NULL);
-    struct umbra_builder *builders[2] = {b.draw, b.bounds};
-    for (int j = 0; j < 2; j++) {
-        if (!builders[j]) { continue; }
-        struct umbra_flat_ir *ir = umbra_flat_ir(builders[j]);
-        umbra_builder_free(builders[j]);
-        struct umbra_program *p = be->compile(be, ir);
-        umbra_program_free(p);
-        umbra_flat_ir_free(ir);
+    compile_builder_on(slide_draw_builder(s, &rt->dst_buf, fmt, NULL), be);
+    if (s->build_sdf_draw) {
+        struct umbra_sdf_bounds_builder bb = umbra_sdf_bounds_builder(NULL, s->sdf_fn, s->sdf_ctx);
+        compile_builder_on(bb.builder, be);
+        umbra_sdf_bounds_program_free(bb.bounds);
     }
 }
 

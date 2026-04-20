@@ -281,17 +281,23 @@ int main(void) {
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
 
-        struct slide_runtime *rt = calloc(1, sizeof *rt);
-        struct slide_builders b = slide_builders(rt, s, umbra_fmt_fp16, NULL);
-        struct umbra_builder *builders[2] = {b.draw, b.bounds};
-        for (int j = 0; j < 2; j++) {
-            if (!builders[j]) { continue; }
+        struct umbra_buf dst_dummy = {0};
+        struct umbra_builder *draw = slide_draw_builder(s, &dst_dummy, umbra_fmt_fp16, NULL);
+        if (draw) {
             char sub[256];
-            snprintf(sub, sizeof sub, "%s/%d", dir, j);
+            snprintf(sub, sizeof sub, "%s/0", dir);
             mkdir(sub, 0755);
-            dump_builder(&db, sub, builders[j]);
+            dump_builder(&db, sub, draw);
         }
-        slide_runtime_free(rt);
+        if (s->build_sdf_draw) {
+            struct umbra_sdf_bounds_builder bb =
+                umbra_sdf_bounds_builder(NULL, s->sdf_fn, s->sdf_ctx);
+            char sub[256];
+            snprintf(sub, sizeof sub, "%s/1", dir);
+            mkdir(sub, 0755);
+            dump_builder(&db, sub, bb.builder);
+            umbra_sdf_bounds_program_free(bb.bounds);
+        }
 
         render_hdr(dir, i, be);
     }

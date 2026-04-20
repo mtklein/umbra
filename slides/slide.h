@@ -16,15 +16,14 @@ struct slide {
                        umbra_ptr dst_ptr, struct umbra_fmt fmt,
                        umbra_val32 x, umbra_val32 y);
 
-    void (*build_sdf_draw)(struct slide*,
-
-                           struct umbra_builder *b_draw,
+    // SDF-backed slides set sdf_fn/sdf_ctx and implement build_sdf_draw to
+    // emit the draw IR (slide_runtime builds the bounds program separately
+    // from sdf_fn/sdf_ctx via umbra_sdf_bounds()).
+    umbra_sdf *sdf_fn;
+    void      *sdf_ctx;
+    void (*build_sdf_draw)(struct slide*, struct umbra_builder *b,
                            umbra_ptr dst_ptr, struct umbra_fmt fmt,
-                           umbra_val32 x, umbra_val32 y,
-
-                           struct umbra_builder       *b_bounds,
-                           struct umbra_sdf_bounds    *bounds,
-                           struct umbra_matrix const  *transform);
+                           umbra_val32 x, umbra_val32 y);
 
     void  (*animate)(struct slide*, double secs);
 };
@@ -55,13 +54,12 @@ void             slide_bg_draw(struct slide_bg*, umbra_color,
 void             slide_bg_free(struct slide_bg*);
 
 struct slide_runtime {
-    struct umbra_program   *draw;
-    struct umbra_sdf_bounds bounds;    // .prog == NULL for non-SDF; owns its backend
-    struct umbra_backend   *bounds_be; // backend that compiled bounds.prog
+    struct umbra_program            *draw;
+    struct umbra_sdf_bounds_program *bounds;   // NULL for non-SDF
 
-    struct umbra_fmt        fmt;
-    int                     w, h;
-    struct umbra_buf        dst_buf;
+    struct umbra_fmt                 fmt;
+    int                              w, h;
+    struct umbra_buf                 dst_buf;
 };
 
 struct slide_runtime* slide_runtime(struct slide*, int w, int h,
@@ -71,9 +69,12 @@ void   slide_runtime_draw(struct slide_runtime*, struct slide*,
                           double secs, int l, int t, int r, int b);
 void   slide_runtime_free(struct slide_runtime*);
 
-struct slide_builders {
-    struct umbra_builder *draw;
-    struct umbra_builder *bounds;
-};
-struct slide_builders slide_builders(struct slide_runtime *rt,
-                                     struct slide*, struct umbra_fmt, struct umbra_matrix const*);
+// Build a fresh draw-side builder for a slide, without compiling.  Returns
+// NULL for slides that don't draw anything (no build_draw / build_sdf_draw).
+// `dst` is a stable umbra_buf whose address the returned builder binds as
+// the dst; keep it alive until any IR / program derived from this builder
+// is freed.
+struct umbra_builder* slide_draw_builder(struct slide*,
+                                          struct umbra_buf *dst,
+                                          struct umbra_fmt,
+                                          struct umbra_matrix const *pre);

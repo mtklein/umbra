@@ -270,15 +270,26 @@ enum umbra_sdf_tile {
     UMBRA_SDF_TILE_FULL    = 0x0002,  // f.hi <  0: tile entirely inside
 };
 
+struct umbra_sdf_bounds_program {
+    struct umbra_backend *be;   // owned; freed in umbra_sdf_bounds_program_free()
+    struct umbra_program *prog;
+    struct umbra_buf      cov_buf;
+    uint16_t             *cov;
+    int                   cov_cap, :32;
+    // base_x/base_y/tile_w/tile_h sit contiguously so the bounds program can
+    // bind them as a 4-slot uniform block via &base_x.  Dispatch fills these
+    // in each call.
+    float                 base_x, base_y,
+                          tile_w, tile_h;
+};
+
 static _Bool matrix_is_affine(struct umbra_matrix const *m) {
     return m->p0 == 0.0f && m->p1 == 0.0f && m->p2 == 1.0f;
 }
 
-// Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()).  The bounds
-// struct's base_x/base_y/tile_w/tile_h live contiguously and bind as a 4-slot
-// uniform block; dispatch writes those fields each call.
+// Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()).
 static void sdf_tile_intervals(struct umbra_builder *bb,
-                               struct umbra_sdf_bounds *bounds,
+                               struct umbra_sdf_bounds_program *bounds,
                                struct umbra_matrix const *transform_mat,
                                umbra_interval *ix, umbra_interval *iy) {
     umbra_ptr const g = umbra_bind_uniforms(bb, &bounds->base_x, 4);
@@ -302,12 +313,13 @@ static void sdf_tile_intervals(struct umbra_builder *bb,
     }
 }
 
-void umbra_build_sdf_bounds(struct umbra_builder *b,
-                            struct umbra_sdf_bounds *bounds,
-                            struct umbra_matrix const *transform,
-                            umbra_sdf sdf_fn, void *sdf_ctx) {
-    umbra_ptr const cov = umbra_bind_buf(b, &bounds->cov_buf);
+struct umbra_sdf_bounds_builder umbra_sdf_bounds_builder(
+        struct umbra_matrix const *transform,
+        umbra_sdf sdf_fn, void *sdf_ctx) {
+    struct umbra_sdf_bounds_program *bounds = calloc(1, sizeof *bounds);
+    struct umbra_builder *b = umbra_builder();
 
+    umbra_ptr const cov = umbra_bind_buf(b, &bounds->cov_buf);
     umbra_interval x, y;
     sdf_tile_intervals(b, bounds, transform, &x, &y);
 
@@ -329,23 +341,40 @@ void umbra_build_sdf_bounds(struct umbra_builder *b,
     umbra_val32 const base = umbra_sel_32(b, partial, partial_i, none_i);
     umbra_val32 const tri  = umbra_sel_32(b, full,    full_i,    base);
     umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));
+
+    return (struct umbra_sdf_bounds_builder){.builder = b, .bounds = bounds};
 }
 
-void umbra_sdf_bounds_free(struct umbra_sdf_bounds *b) {
+struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_sdf_bounds_builder bb) {
+    struct umbra_flat_ir *ir = umbra_flat_ir(bb.builder);
+    umbra_builder_free(bb.builder);
+
+    bb.bounds->be = umbra_backend_jit();
+    if (!bb.bounds->be) { bb.bounds->be = umbra_backend_interp(); }
+    bb.bounds->prog = bb.bounds->be->compile(bb.bounds->be, ir);
+    umbra_flat_ir_free(ir);
+
+    if (!bb.bounds->prog) {
+        umbra_sdf_bounds_program_free(bb.bounds);
+        return NULL;
+    }
+    return bb.bounds;
+}
+
+void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
     if (b) {
         umbra_program_free(b->prog);
+        umbra_backend_free(b->be);
         free(b->cov);
-        b->prog    = NULL;
-        b->cov     = NULL;
-        b->cov_cap = 0;
+        free(b);
     }
 }
 
 // TODO: query per-backend dispatch_granularity instead of a global compromise.
 enum { UMBRA_SDF_TILE = 512 };
 
-void umbra_sdf_dispatch(struct umbra_sdf_bounds *bounds,
-                        struct umbra_program    *draw,
+void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
+                        struct umbra_program            *draw,
                         int l, int t, int r, int b) {
     int const T  = UMBRA_SDF_TILE,
               xt = (r - l + T - 1) / T,
