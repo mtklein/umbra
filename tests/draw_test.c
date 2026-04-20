@@ -21,7 +21,10 @@ TEST(test_draw_builder_flat_solid) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, NULL, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     NULL, NULL);
 
     struct test_backends B = make(builder);
 
@@ -56,7 +59,10 @@ TEST(test_solid_src) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -87,7 +93,10 @@ TEST(test_solid_src_n1) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -111,7 +120,10 @@ TEST(test_solid_src_n9) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -136,7 +148,10 @@ TEST(test_solid_src_n16) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -158,7 +173,10 @@ TEST(test_srcover_8888) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -188,7 +206,10 @@ TEST(test_dstover_8888) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_dstover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_dstover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -209,7 +230,10 @@ TEST(test_dstover_transparent) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_dstover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_dstover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -233,7 +257,10 @@ TEST(test_multiply_8888) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_multiply, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_multiply, NULL);
     struct test_backends B = make(builder);
 
 
@@ -263,7 +290,10 @@ TEST(test_solid_src_fp16) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -290,7 +320,10 @@ TEST(test_srcover_fp16) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -327,7 +360,10 @@ TEST(test_coverage_rect) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -357,7 +393,10 @@ TEST(test_coverage_rect_scalar) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -385,7 +424,10 @@ TEST(test_coverage_rect_n9) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -414,7 +456,10 @@ TEST(test_coverage_rect_offset) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -440,7 +485,10 @@ TEST(test_coverage_rect_outside_y) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -465,7 +513,10 @@ TEST(test_no_shader) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, NULL, NULL, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     NULL, NULL,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -491,7 +542,10 @@ TEST(test_no_blend) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, NULL, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     NULL, NULL);
     struct test_backends B = make(builder);
 
 
@@ -533,7 +587,10 @@ TEST(test_gradient_shader) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, test_gradient_fn, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     test_gradient_fn, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -558,7 +615,10 @@ TEST(test_multiply_half_alpha) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_multiply, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_multiply, NULL);
     struct test_backends B = make(builder);
 
 
@@ -588,7 +648,10 @@ TEST(test_srcover_8888_n9) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -616,7 +679,10 @@ TEST(test_full_pipeline) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -651,7 +717,10 @@ TEST(test_solid_src_fp16_n9) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -679,7 +748,10 @@ TEST(test_coverage_rect_white_dst) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -725,7 +797,10 @@ TEST(test_coverage_bitmap) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, coverage_bitmap, &buf, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     coverage_bitmap, &buf,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -753,7 +828,10 @@ TEST(test_coverage_bitmap_565) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_565, dx, dy, coverage_bitmap, &buf, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_565, dx, dy,
+                     coverage_bitmap, &buf,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -778,7 +856,10 @@ TEST(test_coverage_sdf) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, coverage_sdf, &buf, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     coverage_sdf, &buf,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -809,7 +890,10 @@ TEST(test_coverage_bitmap_matrix) {
     umbra_point_val32 const p = umbra_transform_perspective(&mat, builder, dx, dy);
     dx = p.x;
     dy = p.y;
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, coverage_bitmap2d, &sampler, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     coverage_bitmap2d, &sampler,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -842,7 +926,10 @@ TEST(test_coverage_bitmap_matrix_565) {
     umbra_point_val32 const p = umbra_transform_perspective(&mat, builder, dx, dy);
     dx = p.x;
     dy = p.y;
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_565, dx, dy, coverage_bitmap2d, &sampler, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_565, dx, dy,
+                     coverage_bitmap2d, &sampler,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -873,7 +960,10 @@ TEST(test_coverage_bitmap_matrix_oob) {
     umbra_point_val32 const p = umbra_transform_perspective(&mat, builder, dx, dy);
     dx = p.x;
     dy = p.y;
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, coverage_bitmap2d, &sampler, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     coverage_bitmap2d, &sampler,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -902,7 +992,10 @@ TEST(test_linear_2) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient_two_stops, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient_two_stops, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -934,7 +1027,10 @@ TEST(test_radial_2) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient_two_stops, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient_two_stops, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -973,7 +1069,10 @@ TEST(test_linear_grad) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient_lut, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient_lut, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1014,7 +1113,10 @@ TEST(test_radial_grad) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient_lut, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient_lut, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1050,7 +1152,10 @@ TEST(test_lut_grad_last_pixel) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient_lut, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient_lut, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1088,7 +1193,10 @@ TEST(test_linear_grad_evenly_spaced) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient_evenly_spaced_stops, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient_evenly_spaced_stops, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1127,7 +1235,10 @@ TEST(test_radial_grad_evenly_spaced) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient_evenly_spaced_stops, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient_evenly_spaced_stops, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1165,7 +1276,10 @@ TEST(test_gradient_lut_nonuniform) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient_lut, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient_lut, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1198,7 +1312,10 @@ TEST(test_linear_stops) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, shader_gradient, &state, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     shader_gradient, &state,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1234,7 +1351,10 @@ TEST(test_linear_stops_fp16_planar) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy, NULL, NULL, shader_gradient, &state, NULL, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy,
+                     NULL, NULL,
+                     shader_gradient, &state,
+                     NULL, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1265,7 +1385,10 @@ TEST(test_supersample) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_supersample, &ss, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_supersample, &ss,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1297,7 +1420,10 @@ TEST(test_page_aligned_buffer) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
     enum { N = 64 };
@@ -1409,7 +1535,10 @@ TEST(test_solid_src_565) {
     umbra_ptr const dst_ptr = umbra_bind_buf(b, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(b, umbra_x(b)),
                 dy = umbra_f32_from_i32(b, umbra_y(b));
-    umbra_build_draw(b, dst_ptr, umbra_fmt_565, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(b, dst_ptr, umbra_fmt_565, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -1431,7 +1560,10 @@ TEST(test_solid_src_1010102) {
     umbra_ptr const dst_ptr = umbra_bind_buf(b, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(b, umbra_x(b)),
                 dy = umbra_f32_from_i32(b, umbra_y(b));
-    umbra_build_draw(b, dst_ptr, umbra_fmt_1010102, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(b, dst_ptr, umbra_fmt_1010102, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -1454,7 +1586,10 @@ TEST(test_solid_src_fp16_planar) {
     umbra_ptr const dst_ptr = umbra_bind_buf(b, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(b, umbra_x(b)),
                 dy = umbra_f32_from_i32(b, umbra_y(b));
-    umbra_build_draw(b, dst_ptr, umbra_fmt_fp16_planar, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_src, NULL);
+    umbra_build_draw(b, dst_ptr, umbra_fmt_fp16_planar, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_src, NULL);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -1503,7 +1638,10 @@ TEST(test_coverage_rect_tail_matrix) {
         umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
         umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                     dy = umbra_f32_from_i32(builder, umbra_y(builder));
-        umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+        umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                         umbra_coverage_rect, &rect,
+                         umbra_shader_color,  &color,
+                         umbra_blend_srcover, NULL);
         struct test_backends B = make(builder);
 
 
@@ -1538,7 +1676,10 @@ TEST(test_coverage_rect_tail_srcover_fp16_planar) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy, umbra_coverage_rect, &rect, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
 
@@ -1573,7 +1714,10 @@ TEST(test_srcover_fp16_planar) {
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
     umbra_val32 dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                 dy = umbra_f32_from_i32(builder, umbra_y(builder));
-    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy, NULL, NULL, umbra_shader_color, &color, umbra_blend_srcover, NULL);
+    umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy,
+                     NULL, NULL,
+                     umbra_shader_color, &color,
+                     umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
     enum { W = 16 };
