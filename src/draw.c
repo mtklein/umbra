@@ -439,10 +439,8 @@ umbra_color_val32 umbra_shader_supersample(void *ctx, struct umbra_builder *b,
 
     umbra_color_val32 sum = self->inner_fn(self->inner_ctx, b, x, y);
     for (int i = 1; i < samples; i++) {
-        umbra_val32 const sx = umbra_add_f32(b, x,
-                                              umbra_imm_f32(b, jitter[i - 1][0])),
-                          sy = umbra_add_f32(b, y,
-                                              umbra_imm_f32(b, jitter[i - 1][1]));
+        umbra_val32 const sx = umbra_add_f32(b, x, umbra_imm_f32(b, jitter[i - 1][0])),
+                          sy = umbra_add_f32(b, y, umbra_imm_f32(b, jitter[i - 1][1]));
         umbra_color_val32 const c = self->inner_fn(self->inner_ctx, b, sx, sy);
         sum.r = umbra_add_f32(b, sum.r, c.r);
         sum.g = umbra_add_f32(b, sum.g, c.g);
@@ -463,15 +461,15 @@ umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
                                  umbra_val32 x, umbra_val32 y) {
     umbra_rect const *self = ctx;
     umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_val32 const l = umbra_uniform_32(b, u, 0),
-                      t = umbra_uniform_32(b, u, 1),
-                      r = umbra_uniform_32(b, u, 2),
+    umbra_val32 const l   = umbra_uniform_32(b, u, 0),
+                      t   = umbra_uniform_32(b, u, 1),
+                      r   = umbra_uniform_32(b, u, 2),
                       bot = umbra_uniform_32(b, u, 3);
     umbra_val32 const inside = umbra_and_32(b,
-                                    umbra_and_32(b, umbra_le_f32(b, l, x),
-                                                     umbra_lt_f32(b, x, r)),
-                                    umbra_and_32(b, umbra_le_f32(b, t, y),
-                                                     umbra_lt_f32(b, y, bot)));
+                                   umbra_and_32(b, umbra_le_f32(b, l, x),
+                                                   umbra_lt_f32(b, x, r)),
+                                   umbra_and_32(b, umbra_le_f32(b, t, y),
+                                                   umbra_lt_f32(b, y, bot)));
     umbra_val32 const one_f  = umbra_imm_f32(b, 1.0f),
                       zero_f = umbra_imm_f32(b, 0.0f);
     return umbra_sel_32(b, inside, one_f, zero_f);
