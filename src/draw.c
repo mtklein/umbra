@@ -1,5 +1,6 @@
 #include "../include/umbra_draw.h"
 
+#include "assume.h"
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -427,9 +428,8 @@ umbra_color_val32 umbra_shader_supersample(void *ctx, struct umbra_builder *b,
         {-0.375f, -0.125f}, {0.125f, -0.375f}, {0.375f, 0.125f}, {-0.125f, 0.375f},
         {-0.250f, 0.375f},  {0.250f, -0.250f}, {0.375f, 0.250f}, {-0.375f, -0.250f},
     };
-    int samples = self->samples;
-    if (samples < 1) { samples = 1; }
-    if (samples > 8) { samples = 8; }
+    int const samples = self->samples;
+    assume(1 <= samples && samples <= 8);
 
     umbra_color_val32 sum = self->inner_fn(self->inner_ctx, b, x, y);
     for (int i = 1; i < samples; i++) {
