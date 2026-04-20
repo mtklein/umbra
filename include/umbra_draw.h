@@ -46,24 +46,21 @@ extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_fp16_planar;
 
 
-// Perspective transform: the matrix's 9 floats are re-read each dispatch
-// through a bound uniforms span, then applied as
-// w = p0*x + p1*y + p2;  x' = (sx*x + kx*y + tx) / w;  y' = (ky*x + sy*y + ty) / w.
-// Operates on scalar dispatch coords; callers that need to chain another
-// transform just call this again on the result.  (There is no interval
-// entry point: tile-culled dispatch is affine-only by design.)
+// 3x3 matrix transform with perspective divide.
 umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const*,
                                               struct umbra_builder*,
                                               umbra_val32 x, umbra_val32 y);
 
 typedef umbra_val32 umbra_coverage(void *ctx, struct umbra_builder*,
                                    umbra_val32 x, umbra_val32 y);
-umbra_coverage umbra_coverage_rect;  // Cover a rectangle; ctx is umbra_rect*.
+// Cover a rectangle; ctx is umbra_rect*.
+umbra_coverage umbra_coverage_rect;
 
 
 typedef umbra_color_val32 umbra_shader(void *ctx, struct umbra_builder*,
                                        umbra_val32 x, umbra_val32 y);
-umbra_shader umbra_shader_color;  // Shade a single color; ctx is umbra_color*.
+// Shade a single color; ctx is umbra_color*.
+umbra_shader umbra_shader_color;
 
 // Supersample a wrapped shader; ctx is struct umbra_supersample*.
 struct umbra_supersample {
@@ -76,19 +73,20 @@ umbra_shader umbra_shader_supersample;
 typedef umbra_color_val32 umbra_blend(void *ctx, struct umbra_builder*,
                                       umbra_color_val32 src,
                                       umbra_color_val32 dst);
-umbra_blend umbra_blend_src,     // ctx=NULL for all these blend functions.
+// ctx=NULL for all these blends.
+umbra_blend umbra_blend_src,
             umbra_blend_srcover,
             umbra_blend_dstover,
             umbra_blend_multiply;
 
-// Write a draw pipeline into an existing builder: load dst (if needed),
-// run coverage + shader + blend at the supplied (x, y), compose with dst,
-// store back to dst.  Any of the effects may be NULL for default behavior:
-// coverage=1, shader={0,0,0,0}, blend=src.  Callers can apply any transform
-// they want by pre-processing (x, y) themselves (e.g. via
-// umbra_transform_perspective) and chaining as they please.  dst_ptr must
-// already be bound on the builder via umbra_bind_buf; the backing buf
-// must outlive the builder, flat_ir, and program.
+// Write a draw pipeline into an existing builder:
+//   cov = coverage(x,y)
+//   src = shader(x,y)
+//   dst = fmt.load()
+//   out = blend(src,dst)
+//   fmt.store(lerp(cov, dst,out))
+// NULL effects provide default behavior: coverage=1, shader={0,0,0,0}, blend=src.
+// dst_ptr must already be bound on the builder via umbra_bind_buf().
 void umbra_build_draw(struct umbra_builder*,
                       umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                       umbra_val32 x, umbra_val32 y,
