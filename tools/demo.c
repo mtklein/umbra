@@ -12,6 +12,16 @@
 #include "../third_party/stb/stb_image_write.h"
 #pragma clang diagnostic pop
 
+#include <stdio.h>
+
+static void atomic_write_hdr(char const *path, int w, int h, int comp, float const *data) {
+    char tmp[512];
+    snprintf(tmp, sizeof tmp, "%s~", path);
+    if (stbi_write_hdr(tmp, w, h, comp, data)) {
+        rename(tmp, path);
+    }
+}
+
 enum { NUM_BACKENDS = 5 };
 static char const *backend_name[NUM_BACKENDS] = {
     "interp",
@@ -431,7 +441,7 @@ int main(void) {
             float *fdata = malloc((size_t)(W * H) * 4 * sizeof(float));
             for (int i = 0; i < W * H * 4; i++) { fdata[i] = (float)hdata[i]; }
             free(hdata);
-            stbi_write_hdr("dump.hdr", W, H, 4, fdata);
+            atomic_write_hdr("dump.hdr", W, H, 4, fdata);
             SDL_Log("saved dump.hdr (%s)", fmt_enums[cur_fmt]->name);
             free(fdata);
             want_dump = 0;

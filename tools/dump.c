@@ -25,6 +25,13 @@ static void atomic_close(FILE *f, char const *path) {
     snprintf(tmp, sizeof tmp, "%s~", path);
     rename(tmp, path);
 }
+static void atomic_write_hdr(char const *path, int w, int h, int comp, float const *data) {
+    char tmp[520];
+    snprintf(tmp, sizeof tmp, "%s~", path);
+    if (stbi_write_hdr(tmp, w, h, comp, data)) {
+        rename(tmp, path);
+    }
+}
 
 static struct umbra_builder* build_srcover(void) {
     static struct umbra_buf src    = {0},
@@ -261,7 +268,7 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
     base = base ? base + 1 : dir;
     char p[512];
     snprintf(p, sizeof p, "%s/%s.hdr", dir, base);
-    stbi_write_hdr(p, RW, RH, 4, fdata);
+    atomic_write_hdr(p, RW, RH, 4, fdata);
     free(fdata);
 }
 
