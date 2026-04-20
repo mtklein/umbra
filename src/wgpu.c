@@ -61,7 +61,8 @@ struct wgpu_backend {
     uint32_t                  max_dyn_uniform;
 
     WGPUSubmissionIndex       frame_submitted[WGPU_N_FRAMES];
-    _Bool                     frame_has_work [WGPU_N_FRAMES]; int :16, :32;
+    _Bool                     frame_has_work [WGPU_N_FRAMES];
+    _Bool                     had_error; int :8, :32;
 
     struct gpu_buf_cache          cache;
 
@@ -170,13 +171,11 @@ static void device_request_cb(WGPURequestDeviceStatus status, WGPUDevice dev,
     }
 }
 
-static _Bool wgpu_had_error;
-
 static void error_cb(WGPUDevice const *dev, WGPUErrorType type, WGPUStringView msg,
                      void *u1, void *u2) {
-    (void)dev; (void)u1; (void)u2;
+    (void)dev; (void)u2;
     if (type != WGPUErrorType_NoError) {
-        wgpu_had_error = 1;
+        ((struct wgpu_backend *)u1)->had_error = 1;
         dprintf(2, "wgpu error: %.*s\n", (int)msg.length, msg.data);
     }
 }
@@ -341,7 +340,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
                                           struct umbra_flat_ir const *ir) {
     struct wgpu_backend *be = (struct wgpu_backend *)base;
 
-    wgpu_had_error = 0;
+    be->had_error = 0;
     struct spirv_result const sr =
         build_spirv(ir, SPIRV_PUSH_VIA_SSBO);
 
@@ -418,7 +417,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
                     .entryPoint = {.data = "main", .length = 4},
                 },
             });
-    if (!pipeline || wgpu_had_error) {
+    if (!pipeline || be->had_error) {
         if (pipeline) { wgpuComputePipelineRelease(pipeline); }
         wgpuPipelineLayoutRelease(pipe_layout);
         wgpuBindGroupLayoutRelease(bg_layout);
@@ -728,12 +727,18 @@ struct umbra_backend* umbra_backend_wgpu(void) {
         WGPUFeatureName_TimestampQuery,
     };
     int n_features = count(features);
+
+    struct wgpu_backend *be = calloc(1, sizeof *be);
+    be->instance = instance;
+    be->adapter  = adapter;
+
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
     dev_desc.requiredFeatureCount     = (size_t)n_features;
     dev_desc.requiredFeatures         = features;
     dev_desc.requiredLimits           = &adapter_limits;
-    dev_desc.uncapturedErrorCallbackInfo.callback = (WGPUUncapturedErrorCallback)error_cb;
+    dev_desc.uncapturedErrorCallbackInfo.callback  = (WGPUUncapturedErrorCallback)error_cb;
+    dev_desc.uncapturedErrorCallbackInfo.userdata1 = be;
     wgpuAdapterRequestDevice(adapter, &dev_desc,
         (WGPURequestDeviceCallbackInfo){
             .callback  = device_request_cb,
@@ -742,16 +747,12 @@ struct umbra_backend* umbra_backend_wgpu(void) {
     if (!dev) {
         wgpuAdapterRelease(adapter);
         wgpuInstanceRelease(instance);
+        free(be);
         return 0;
     }
 
-    WGPUQueue queue = wgpuDeviceGetQueue(dev);
-
-    struct wgpu_backend *be = calloc(1, sizeof *be);
-    be->instance = instance;
-    be->adapter  = adapter;
-    be->device   = dev;
-    be->queue    = queue;
+    be->device = dev;
+    be->queue  = wgpuDeviceGetQueue(dev);
     be->max_dyn_storage = adapter_limits.maxDynamicStorageBuffersPerPipelineLayout;
     be->max_dyn_uniform = adapter_limits.maxDynamicUniformBuffersPerPipelineLayout;
     be->ts_query = wgpuDeviceCreateQuerySet(dev, &(WGPUQuerySetDescriptor){
@@ -766,7 +767,7 @@ struct umbra_backend* umbra_backend_wgpu(void) {
         .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
         .size  = WGPU_N_FRAMES * TS_RESOLVE_ALIGN,
     });
-    be->ts_period = (double)wgpuQueueGetTimestampPeriod(queue) * 1e-9;
+    be->ts_period = (double)wgpuQueueGetTimestampPeriod(be->queue) * 1e-9;
     be->cache = (struct gpu_buf_cache){
         .ops = {wgpu_cache_alloc, wgpu_cache_upload, wgpu_cache_download,
                 NULL, wgpu_cache_release},
