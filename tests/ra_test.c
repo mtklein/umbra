@@ -7,6 +7,8 @@
 struct spill_record {
     int reg, slot;
 };
+
+// TODO: thread these through as normal values instead of using globals
 static struct spill_record spills[256], fills[256];
 static int                 nspills, nfills;
 

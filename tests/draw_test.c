@@ -6,6 +6,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+// TODO: update these tests to drop the draw_builder shim notion;
+//       it's deleted, test with umbra_build_draw() only now
+// TODO: draw_dst_slot should not be a global
 static struct umbra_buf draw_dst_slot;
 
 static struct umbra_builder* draw_builder_shim(
