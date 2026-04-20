@@ -486,8 +486,8 @@ umbra_val32 umbra_loop(builder *b, umbra_val32 n) {
 void umbra_end_loop(builder *b) {
     assume(b->has_loop && !b->loop_closed);
     b->loop_closed = 1;
-    umbra_val32 cur  = umbra_load_var32(b, b->loop_var);
-    umbra_val32 next = umbra_add_i32(b, cur, umbra_imm_i32(b, 1));
+    umbra_val32 const cur  = umbra_load_var32(b, b->loop_var),
+                      next = umbra_add_i32(b, cur, umbra_imm_i32(b, 1));
     umbra_store_var32(b, b->loop_var, next);
     push(b, op_loop_end, VX(b->loop_trip), .imm = b->loop_var.id);
 }
