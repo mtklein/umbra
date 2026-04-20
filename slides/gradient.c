@@ -260,7 +260,6 @@ void gradient_lut(float *out, int lut_n, int n_stops, float const positions[],
 struct grad_slide {
     struct slide base;
 
-    int    w, h;
     float *colors_data, *pos_data, *lut_data;
 
     union {
@@ -275,14 +274,7 @@ struct grad_slide {
     } colorizer;
     umbra_shader          *shader_fn;
     void                 *shader_ctx;
-
 };
-
-static void grad_init(struct slide *s, int w, int h) {
-    struct grad_slide *st = (struct grad_slide *)s;
-    st->w = w;
-    st->h = h;
-}
 
 static void grad_build_draw(struct slide *s, struct umbra_builder *b,
                             umbra_ptr dst_ptr, struct umbra_fmt fmt,
@@ -307,7 +299,6 @@ static struct grad_slide* make_grad(char const *title) {
     st->base = (struct slide){
         .title        = title,
         .bg           = {0, 0, 0, 1},
-        .init         = grad_init,
         .free         = grad_free,
         .build_draw   = grad_build_draw,
     };

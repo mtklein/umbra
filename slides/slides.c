@@ -45,7 +45,9 @@ struct slide* slide_get(int i)  { return all[i]; }
 
 static void add_slide(struct slide *s, int w, int h) {
     all[count] = s;
-    if (s->init) { s->init(s, w, h); }
+    s->w = w;
+    s->h = h;
+    if (s->init) { s->init(s); }
     count++;
 }
 

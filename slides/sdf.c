@@ -47,7 +47,6 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
 // umbra_build_sdf_draw / umbra_build_sdf_bounds.
 struct sdf_common {
     struct slide  base;
-    int           w, h;
     umbra_color   color;
     umbra_sdf    *sdf_fn;
     void         *sdf_ctx;
@@ -125,17 +124,11 @@ struct csg_slide {
     struct two_circle_sdf   sdf;
 };
 
-static void csg_init(struct slide *s, int w, int h) {
-    struct csg_slide *st = (struct csg_slide *)s;
-    st->common.w = w;
-    st->common.h = h;
-}
-
 static void csg_animate(struct slide *s, double secs) {
     struct csg_slide *st = (struct csg_slide *)s;
     float ox, oy, r_orbit;
     orbit_compute(&st->sdf.cx1, &st->sdf.cy1, &ox, &oy,
-                   &st->sdf.r1, &r_orbit, (float)secs, st->common.w, st->common.h);
+                   &st->sdf.r1, &r_orbit, (float)secs, s->w, s->h);
     st->sdf.cx2 = ox;
     st->sdf.cy2 = oy;
     st->sdf.r2  = r_orbit;
@@ -155,7 +148,6 @@ static struct slide* make_csg(char const *title, float const color[4], enum csg_
     st->common.base      = (struct slide){
         .title   = title,
         .bg      = {0.08f, 0.10f, 0.14f, 1},
-        .init    = csg_init,
         .free    = sdf_common_free,
         .animate = csg_animate,
         SDF_COMMON_HOOKS,
@@ -191,13 +183,11 @@ struct circle_slide {
     struct circle_sdf_ctx sdf;
 };
 
-static void circle_init(struct slide *s, int w, int h) {
+static void circle_init(struct slide *s) {
     struct circle_slide *st = (struct circle_slide *)s;
-    st->common.w  = w;
-    st->common.h  = h;
-    st->r  = (float)(w < h ? w : h) * 0.18f;
-    st->cx0 = (float)w * 0.3f;
-    st->cy0 = (float)h * 0.4f;
+    st->r  = (float)(s->w < s->h ? s->w : s->h) * 0.18f;
+    st->cx0 = (float)s->w * 0.3f;
+    st->cy0 = (float)s->h * 0.4f;
     st->vx  = 1.7f;
     st->vy  = 1.3f;
 }
@@ -213,8 +203,8 @@ static void circle_animate(struct slide *s, double secs) {
     struct circle_slide *st = (struct circle_slide *)s;
     double const ticks = secs * 60.0;
     float const pad = st->r + 2.0f;
-    st->sdf.cx = pad + bounce(st->cx0 - pad, st->vx, ticks, (float)st->common.w - 2.0f*pad);
-    st->sdf.cy = pad + bounce(st->cy0 - pad, st->vy, ticks, (float)st->common.h - 2.0f*pad);
+    st->sdf.cx = pad + bounce(st->cx0 - pad, st->vx, ticks, (float)s->w - 2.0f*pad);
+    st->sdf.cy = pad + bounce(st->cy0 - pad, st->vy, ticks, (float)s->h - 2.0f*pad);
     st->sdf.r  = st->r;
 }
 
@@ -256,17 +246,11 @@ struct ring_slide {
     struct ring_sdf_ctx sdf;
 };
 
-static void ring_init(struct slide *s, int w, int h) {
-    struct ring_slide *st = (struct ring_slide *)s;
-    st->common.w = w;
-    st->common.h = h;
-}
-
 static void ring_animate(struct slide *s, double secs) {
     struct ring_slide *st = (struct ring_slide *)s;
     float ox, oy, r_orbit;
     orbit_compute(&st->sdf.cx, &st->sdf.cy, &ox, &oy, &st->sdf.r, &r_orbit,
-                   (float)secs, st->common.w, st->common.h);
+                   (float)secs, s->w, s->h);
     st->sdf.w = st->sdf.r * 0.15f;
 }
 
@@ -278,7 +262,6 @@ SLIDE(slide_sdf_ring) {
     st->common.base    = (struct slide){
         .title   = "SDF Ring",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
-        .init    = ring_init,
         .free    = sdf_common_free,
         .animate = ring_animate,
         SDF_COMMON_HOOKS,
@@ -324,15 +307,9 @@ struct rounded_rect_slide {
     struct rounded_rect_sdf_ctx sdf;
 };
 
-static void rounded_rect_init(struct slide *s, int w, int h) {
-    struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
-    st->common.w = w;
-    st->common.h = h;
-}
-
 static void rounded_rect_animate(struct slide *s, double secs) {
     struct rounded_rect_slide *st = (struct rounded_rect_slide *)s;
-    int const w = st->common.w, h = st->common.h;
+    int const w = s->w, h = s->h;
     float const anim = sinf((float)secs) * 0.5f + 0.5f;
     st->sdf.cx = (float)w * 0.5f;
     st->sdf.cy = (float)h * 0.5f;
@@ -349,7 +326,6 @@ SLIDE(slide_sdf_rounded_rect) {
     st->common.base    = (struct slide){
         .title   = "SDF Rounded Rect",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
-        .init    = rounded_rect_init,
         .free    = sdf_common_free,
         .animate = rounded_rect_animate,
         SDF_COMMON_HOOKS,
@@ -406,17 +382,11 @@ struct capsule_slide {
     struct capsule_sdf_ctx sdf;
 };
 
-static void capsule_init(struct slide *s, int w, int h) {
-    struct capsule_slide *st = (struct capsule_slide *)s;
-    st->common.w = w;
-    st->common.h = h;
-}
-
 static void capsule_animate(struct slide *s, double secs) {
     struct capsule_slide *st = (struct capsule_slide *)s;
     float cx, cy, ox, oy, r_center, r_orbit;
     orbit_compute(&cx, &cy, &ox, &oy, &r_center, &r_orbit,
-                   (float)secs, st->common.w, st->common.h);
+                   (float)secs, s->w, s->h);
     st->sdf.p0x = cx; st->sdf.p0y = cy;
     st->sdf.p1x = ox; st->sdf.p1y = oy;
     st->sdf.rad = r_center * 0.15f;
@@ -430,7 +400,6 @@ SLIDE(slide_sdf_capsule) {
     st->common.base    = (struct slide){
         .title   = "SDF Capsule",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
-        .init    = capsule_init,
         .free    = sdf_common_free,
         .animate = capsule_animate,
         SDF_COMMON_HOOKS,
@@ -464,17 +433,11 @@ struct halfplane_slide {
     struct halfplane_sdf_ctx sdf;
 };
 
-static void halfplane_init(struct slide *s, int w, int h) {
-    struct halfplane_slide *st = (struct halfplane_slide *)s;
-    st->common.w = w;
-    st->common.h = h;
-}
-
 static void halfplane_animate(struct slide *s, double secs) {
     struct halfplane_slide *st = (struct halfplane_slide *)s;
     float cx, cy, ox, oy, r_center, r_orbit;
     orbit_compute(&cx, &cy, &ox, &oy, &r_center, &r_orbit,
-                   (float)secs, st->common.w, st->common.h);
+                   (float)secs, s->w, s->h);
     float const dx = ox - cx, dy = oy - cy;
     float const len = sqrtf(dx * dx + dy * dy);
     st->sdf.nx = len > 0 ?  dy / len : 0;
@@ -490,7 +453,6 @@ SLIDE(slide_sdf_halfplane) {
     st->common.base    = (struct slide){
         .title   = "SDF Halfplane",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
-        .init    = halfplane_init,
         .free    = sdf_common_free,
         .animate = halfplane_animate,
         SDF_COMMON_HOOKS,
@@ -617,19 +579,17 @@ struct sdf_text_slide {
     struct sdf_text_sdf sdf;
 };
 
-static void sdf_text_init(struct slide *s, int w, int h) {
+static void sdf_text_init(struct slide *s) {
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
-    st->common.w = w;
-    st->common.h = h;
-    st->slug = slug_extract("Hamburgefons", (float)h * 0.4f);
+    st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
 
     float const gw = st->slug.w,
                 gh = st->slug.h;
-    float const sx = gw / (float)w,
-                sy = gh / (float)h;
+    float const sx = gw / (float)s->w,
+                sy = gh / (float)s->h;
     float const scale = sx > sy ? sx : sy;
-    float const pad_x = ((float)w * scale - gw) * 0.5f,
-                pad_y = ((float)h * scale - gh) * 0.5f;
+    float const pad_x = ((float)s->w * scale - gw) * 0.5f,
+                pad_y = ((float)s->h * scale - gh) * 0.5f;
     st->sdf.scale_x = scale;
     st->sdf.scale_y = scale;
     st->sdf.off_x   = -pad_x;
@@ -709,17 +669,11 @@ struct ngon_slide {
     struct ngon_sdf_ctx sdf;
 };
 
-static void ngon_init(struct slide *s, int w, int h) {
-    struct ngon_slide *st = (struct ngon_slide *)s;
-    st->common.w = w;
-    st->common.h = h;
-}
-
 static void ngon_animate(struct slide *s, double secs) {
     struct ngon_slide *st = (struct ngon_slide *)s;
-    st->cx    = (float)st->common.w * 0.5f;
-    st->cy    = (float)st->common.h * 0.5f;
-    st->r     = (float)(st->common.w < st->common.h ? st->common.w : st->common.h) * 0.3f;
+    st->cx    = (float)s->w * 0.5f;
+    st->cy    = (float)s->h * 0.5f;
+    st->r     = (float)(s->w < s->h ? s->w : s->h) * 0.3f;
     st->angle = (float)secs;
     for (int i = 0; i < NGON_SIDES; i++) {
         float const a = st->angle + (float)i * (2.0f * 3.14159265f / NGON_SIDES);
@@ -756,7 +710,6 @@ SLIDE(slide_sdf_ngon) {
     st->common.base    = (struct slide){
         .title   = "SDF N-Gon",
         .bg      = {0.08f, 0.10f, 0.14f, 1},
-        .init    = ngon_init,
         .free    = ngon_free,
         .animate = ngon_animate,
         SDF_COMMON_HOOKS,

@@ -259,7 +259,6 @@ struct slug_slide {
 
     struct slug_curves       slug;
     struct umbra_buf         curves_buf;
-    int                      w, h;
     struct slug_cov_uniforms cov_uni;
     struct slug_cov_ctx      cov_ctx;
     struct umbra_matrix      mat; int :32;
@@ -267,11 +266,9 @@ struct slug_slide {
     umbra_color              color;
 };
 
-static void slug_init(struct slide *s, int w, int h) {
+static void slug_init(struct slide *s) {
     struct slug_slide *st = (struct slug_slide *)s;
-    st->w = w;
-    st->h = h;
-    st->slug = slug_extract("Slug", (float)h * 0.3125f);
+    st->slug = slug_extract("Slug", (float)s->h * 0.3125f);
     st->curves_buf = (struct umbra_buf){
         .ptr = st->slug.data, .count = st->slug.count * 6,
     };
@@ -296,7 +293,7 @@ static void slug_build_draw(struct slide *s, struct umbra_builder *b,
 
 static void slug_animate(struct slide *s, double secs) {
     struct slug_slide *st = (struct slug_slide *)s;
-    slide_perspective_matrix(&st->mat, (float)secs, st->w, st->h,
+    slide_perspective_matrix(&st->mat, (float)secs, s->w, s->h,
                              (int)st->slug.w, (int)st->slug.h);
 }
 

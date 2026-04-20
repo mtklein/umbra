@@ -25,7 +25,6 @@ struct cell {
 struct overview_slide {
     struct slide base;
 
-    int                   w, h;
     struct umbra_backend *be;
     struct umbra_fmt      out_fmt;
     struct umbra_buf      out_buf;
@@ -93,28 +92,22 @@ static void compute_cell_matrix(struct umbra_matrix *out, int col, int row,
     };
 }
 
-static void overview_init(struct slide *s, int w, int h) {
-    struct overview_slide *st = (struct overview_slide *)s;
-    st->w = w;
-    st->h = h;
-}
-
 static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct overview_slide *st = (struct overview_slide *)s;
     st->be      = be;
     st->out_fmt = fmt;
 
-    slide_bg_prepare(be, fmt, st->w, st->h);
+    slide_bg_prepare(be, fmt, s->w, s->h);
 
     if (!st->overlay) {
-        st->overlay = calloc((size_t)(st->w * st->h), sizeof *st->overlay);
+        st->overlay = calloc((size_t)(s->w * s->h), sizeof *st->overlay);
     } else {
-        for (int i = 0; i < st->w * st->h; i++) { st->overlay[i] = 0; }
+        for (int i = 0; i < s->w * s->h; i++) { st->overlay[i] = 0; }
     }
     st->overlay_buf = (struct umbra_buf){
         .ptr    = st->overlay,
-        .count  = st->w * st->h,
-        .stride = st->w,
+        .count  = s->w * s->h,
+        .stride = s->w,
     };
     st->overlay_color = (umbra_color){1, 1, 1, 1};
 
@@ -124,8 +117,8 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     int cols = 1;
     while (cols * cols < n_real) { cols++; }
     int const rows = (n_real + cols - 1) / cols,
-              cw   = st->w / cols,
-              ch   = st->h / rows;
+              cw   = s->w / cols,
+              ch   = s->h / rows;
     st->cols = cols;
     st->rows = rows;
     st->cw   = cw;
@@ -145,14 +138,14 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         struct cell *c = &st->cells[idx];
         c->col = idx % cols;
         c->row = idx / cols;
-        compute_cell_matrix(&c->cell_mat, c->col, c->row, cw, ch, st->w, st->h);
+        compute_cell_matrix(&c->cell_mat, c->col, c->row, cw, ch, s->w, s->h);
 
         int const x0 = c->col * cw,
                   y0 = c->row * ch;
         if (idx < n_real) {
-            draw_number(st->overlay, st->w, x0 + 2, y0 + 2, idx + 1);
+            draw_number(st->overlay, s->w, x0 + 2, y0 + 2, idx + 1);
         } else {
-            draw_xbox(st->overlay, st->w, x0, y0, cw, ch);
+            draw_xbox(st->overlay, s->w, x0, y0, cw, ch);
         }
 
         if (idx >= n_real) { continue; }  // empty slot (no slide)
@@ -161,7 +154,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         c->sub = sub;
         if (sub->prepare) { sub->prepare(sub, be, fmt); }
 
-        slide_runtime_compile(&c->rt, sub, st->w, st->h, be, fmt, &c->cell_mat);
+        slide_runtime_compile(&c->rt, sub, s->w, s->h, be, fmt, &c->cell_mat);
     }
 
     umbra_program_free(st->overlay_prog);
@@ -182,7 +175,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 static void overview_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct overview_slide *st = (struct overview_slide *)s;
     (void)l; (void)r;
-    int const w = st->w, h = st->h;
+    int const w = s->w, h = s->h;
 
     st->out_buf = (struct umbra_buf){
         .ptr    = buf,
@@ -242,7 +235,6 @@ struct slide* make_overview(void) {
     st->base = (struct slide){
         .title = "Overview",
         .bg = {0.06f, 0.06f, 0.06f, 1},
-        .init = overview_init,
         .prepare = overview_prepare,
         .draw = overview_draw,
         .free = overview_free,

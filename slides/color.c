@@ -55,24 +55,20 @@ static umbra_color_val32 shader_swatch(void *vctx, struct umbra_builder *b,
 struct swatch_slide {
     struct slide base;
 
-    int w, h;
-
     struct umbra_buf      colors_buf;
     struct swatch_ctx     ctx;
 };
 
-static void swatch_init(struct slide *s, int w, int h) {
+static void swatch_init(struct slide *s) {
     struct swatch_slide *st = (struct swatch_slide *)s;
-    st->w = w;
-    st->h = h;
     st->colors_buf = (struct umbra_buf){
         .ptr   = swatch_colors,
         .count = SWATCH_N * 4,
     };
     st->ctx = (struct swatch_ctx){
         .colors = &st->colors_buf,
-        .cw     = (float)(w / SWATCH_COLS),
-        .ch     = (float)(h / SWATCH_ROWS),
+        .cw     = (float)(s->w / SWATCH_COLS),
+        .ch     = (float)(s->h / SWATCH_ROWS),
     };
 }
 

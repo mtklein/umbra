@@ -200,17 +200,14 @@ struct text_slide {
     struct slide base;
 
     struct text_cov *tc;
-    int              w, h;
 
     umbra_color              color;
     struct coverage_bitmap2d bmp;
     umbra_coverage          *coverage_fn;
 };
 
-static void text_init(struct slide *s, int w, int h) {
+static void text_init(struct slide *s) {
     struct text_slide *st = (struct text_slide *)s;
-    st->w = w;
-    st->h = h;
     st->bmp = (struct coverage_bitmap2d){
         .buf = {.ptr = st->tc->data, .count = st->tc->w * st->tc->h},
         .w   = st->tc->w,
@@ -266,17 +263,14 @@ struct persp_slide {
     struct slide base;
 
     struct text_cov *bitmap;
-    int              w, h;
 
     umbra_color               color;
     struct coverage_bitmap2d  bmp;
     struct umbra_matrix       mat; int :32;
 };
 
-static void persp_init(struct slide *s, int w, int h) {
+static void persp_init(struct slide *s) {
     struct persp_slide *st = (struct persp_slide *)s;
-    st->w = w;
-    st->h = h;
     st->bmp = (struct coverage_bitmap2d){
         .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
         .w   = st->bitmap->w,
@@ -297,7 +291,7 @@ static void persp_build_draw(struct slide *s, struct umbra_builder *b,
 
 static void persp_animate(struct slide *s, double secs) {
     struct persp_slide *st = (struct persp_slide *)s;
-    slide_perspective_matrix(&st->mat, (float)secs, st->w, st->h,
+    slide_perspective_matrix(&st->mat, (float)secs, s->w, s->h,
                              st->bitmap->w, st->bitmap->h);
 }
 
@@ -322,17 +316,8 @@ SLIDE(slide_coverage_bitmap_matrix) {
 // fast path.
 struct cov_null_slide {
     struct slide base;
-
-    int w, h;
-
-    umbra_color           color;
+    umbra_color  color;
 };
-
-static void cov_null_init(struct slide *s, int w, int h) {
-    struct cov_null_slide *st = (struct cov_null_slide *)s;
-    st->w = w;
-    st->h = h;
-}
 
 static void cov_null_build_draw(struct slide *s, struct umbra_builder *b,
                                 umbra_ptr dst_ptr, struct umbra_fmt fmt,
@@ -352,7 +337,6 @@ SLIDE(slide_coverage_null) {
     st->base = (struct slide){
         .title = "Coverage NULL",
         .bg = {1, 1, 1, 1},
-        .init = cov_null_init,
         .free = cov_null_free,
         .build_draw   = cov_null_build_draw,
     };

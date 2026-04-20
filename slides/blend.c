@@ -7,21 +7,18 @@ struct blend_slide {
 
     float rx, ry, vx, vy;
     float rect_w, rect_h;
-    int   w, h;
 
     umbra_color   color;
     umbra_rect    rect;
     umbra_blend   *blend_fn;
 };
 
-static void blend_init(struct slide *s, int w, int h) {
+static void blend_init(struct slide *s) {
     struct blend_slide *st = (struct blend_slide *)s;
-    st->w = w;
-    st->h = h;
-    st->rect_w = (float)w * 5.0f / 16.0f;
-    st->rect_h = (float)h * 5.0f / 16.0f;
-    st->rx = (float)w * 5.0f / 32.0f;
-    st->ry = (float)h / 6.0f;
+    st->rect_w = (float)s->w * 5.0f / 16.0f;
+    st->rect_h = (float)s->h * 5.0f / 16.0f;
+    st->rx = (float)s->w * 5.0f / 32.0f;
+    st->ry = (float)s->h / 6.0f;
     st->vx = 1.5f;
     st->vy = 1.1f;
 }
@@ -46,8 +43,8 @@ static void blend_build_draw(struct slide *s, struct umbra_builder *b,
 static void blend_animate(struct slide *s, double secs) {
     struct blend_slide *st = (struct blend_slide *)s;
     double const ticks = secs * 60.0;
-    float const rx = bounce(st->rx, st->vx, ticks, (float)st->w - st->rect_w),
-                ry = bounce(st->ry, st->vy, ticks, (float)st->h - st->rect_h);
+    float const rx = bounce(st->rx, st->vx, ticks, (float)s->w - st->rect_w),
+                ry = bounce(st->ry, st->vy, ticks, (float)s->h - st->rect_h);
     st->rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
 }
 
