@@ -81,7 +81,7 @@ static struct umbra_builder* build_srcover(void) {
 #define JIT_EXT "avx2"
 #endif
 
-static char const *const mvk_dump_dir = "/tmp/umbra_mvk_dump";
+static char mvk_dump_dir[64];
 
 static void clear_dir(char const *path) {
     DIR *d = opendir(path);
@@ -272,15 +272,29 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
     free(fdata);
 }
 
-int main(void) {
+int main(int argc, char *argv[]) {
+    int shards = 1, shard = 0;
+    for (int i = 1; i < argc; i++) {
+        if (!strcmp(argv[i], "--shards") && i + 1 < argc) {
+            shards = atoi(argv[++i]);
+        } else if (!strcmp(argv[i], "--shard") && i + 1 < argc) {
+            shard = atoi(argv[++i]);
+        }
+    }
+
+    snprintf(mvk_dump_dir, sizeof mvk_dump_dir,
+             "/tmp/umbra_mvk_dump.%d", shard);
     setenv("MVK_CONFIG_SHADER_DUMP_DIR", mvk_dump_dir, 1);
     mkdir(mvk_dump_dir, 0755);
 
     struct dump_backends db = dump_backends_init();
+    int unit = 0;
 
-    mkdir("dumps/srcover", 0755);
-    mkdir("dumps/srcover/0", 0755);
-    dump_builder(&db, "dumps/srcover/0", build_srcover());
+    if (unit++ % shards == shard) {
+        mkdir("dumps/srcover", 0755);
+        mkdir("dumps/srcover/0", 0755);
+        dump_builder(&db, "dumps/srcover/0", build_srcover());
+    }
 
     slides_init(RW, RH);
 
@@ -293,26 +307,38 @@ int main(void) {
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
 
-        struct umbra_buf dst_dummy = {0};
-        struct umbra_builder *draw = slide_draw_builder(s, &dst_dummy, umbra_fmt_fp16, NULL);
-        if (draw) {
-            char sub[256];
-            snprintf(sub, sizeof sub, "%s/0", dir);
-            mkdir(sub, 0755);
-            dump_builder(&db, sub, draw);
+        int const slide_hdr_unit = unit;
+        _Bool const has_draw = s->build_draw || s->build_sdf_draw;
+
+        if (has_draw) {
+            if (unit % shards == shard) {
+                struct umbra_buf dst_dummy = {0};
+                struct umbra_builder *draw =
+                    slide_draw_builder(s, &dst_dummy, umbra_fmt_fp16, NULL);
+                char sub[256];
+                snprintf(sub, sizeof sub, "%s/0", dir);
+                mkdir(sub, 0755);
+                dump_builder(&db, sub, draw);
+            }
+            unit++;
         }
         if (s->build_sdf_draw) {
-            struct umbra_builder *bb = umbra_builder();
-            struct umbra_sdf_bounds_program *bounds =
-                umbra_sdf_bounds_program(bb, NULL, s->sdf_fn, s->sdf_ctx);
-            char sub[256];
-            snprintf(sub, sizeof sub, "%s/1", dir);
-            mkdir(sub, 0755);
-            dump_builder(&db, sub, bb);    // consumes bb; binding targets live in `bounds`
-            umbra_sdf_bounds_program_free(bounds);
+            if (unit % shards == shard) {
+                struct umbra_builder *bb = umbra_builder();
+                struct umbra_sdf_bounds_program *bounds =
+                    umbra_sdf_bounds_program(bb, NULL, s->sdf_fn, s->sdf_ctx);
+                char sub[256];
+                snprintf(sub, sizeof sub, "%s/1", dir);
+                mkdir(sub, 0755);
+                dump_builder(&db, sub, bb);
+                umbra_sdf_bounds_program_free(bounds);
+            }
+            unit++;
         }
 
-        render_hdr(dir, i, be);
+        if (slide_hdr_unit % shards == shard) {
+            render_hdr(dir, i, be);
+        }
     }
 
     slides_cleanup();

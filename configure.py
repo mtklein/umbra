@@ -33,7 +33,8 @@ CFLAGS = {
 }
 
 
-TEST_SHARDS = 2
+TEST_SHARDS = 3
+DUMP_SHARDS = 2
 
 
 def obj(src):
@@ -162,22 +163,31 @@ DUMPS = [
 ]
 
 
-def dump_paths(suffixes):
-    """Yield 'dumps/{name}/{i}/{suffix}' for every (name, i, suffix) triple."""
+def dump_units():
+    """Yield ('dumps/{name}/{i}', ...) one per dump-unit, in dump.c order.
+    One unit per (slide, subdir) pair, matching dump.c's internal enumeration
+    — srcover counts as one unit, each slide contributes one unit per subdir."""
     for name, count in DUMPS:
         for i in range(count):
-            for suf in suffixes:
-                yield f'dumps/{name}/{i}/{suf}'
+            yield f'dumps/{name}/{i}'
 
 
 def dump_outputs_block(suffixes):
-    """Emit the `build $out/dump.log | $\n     path $\n     ...: run $out/dump`
-    block from the current DUMPS registry, in dump.c order."""
-    paths = list(dump_paths(suffixes))
-    lines = ['build $out/dump.log | $\n']
-    for p in paths[:-1]:
-        lines.append(f'      {p} $\n')
-    lines.append(f'      {paths[-1]}: run $out/dump\n')
+    """Emit DUMP_SHARDS `build $out/dump_{K}.log | ...: run $out/dump` blocks,
+    each listing the outputs for that shard (unit_index % DUMP_SHARDS == K)."""
+    units = list(dump_units())
+    lines = []
+    for sh in range(DUMP_SHARDS):
+        paths = [f'{units[k]}/{suf}'
+                 for k in range(len(units)) if k % DUMP_SHARDS == sh
+                 for suf in suffixes]
+        if not paths:
+            continue
+        lines.append(f'build $out/dump_{sh}.log | $\n')
+        for p in paths[:-1]:
+            lines.append(f'      {p} $\n')
+        lines.append(f'      {paths[-1]}: run $out/dump\n')
+        lines.append(f'    args = --shards {DUMP_SHARDS} --shard {sh}\n')
     return ''.join(lines)
 
 
@@ -277,17 +287,19 @@ include build/project.ninja
 {DEMO_BLOCK}
 """
 def render_xsan_suffix():
-    test_deps = ''
+    log_deps = ''
     for s in range(TEST_SHARDS):
-        test_deps += f'      $out/test_{s}.log $\n'
-        test_deps += f'      $x86/test_{s}.log $\n'
+        log_deps += f'      $out/test_{s}.log $\n'
+        log_deps += f'      $x86/test_{s}.log $\n'
+    for s in range(DUMP_SHARDS):
+        log_deps += f'      $out/dump_{s}.log $\n'
+        log_deps += f'      $x86/dump_{s}.log $\n'
+    log_deps = log_deps.rstrip(' $\n') + '\n'
     return f"""
 x86 = $builddir/x86_xsan
 
 build $out/coverage.profdata: profmerge | $
-{test_deps}      $out/dump.log $
-      $x86/dump.log
-    dir = $out $x86
+{log_deps}    dir = $out $x86
 
 build $out/coverage.txt: cov_report $out/coverage.profdata | $
       $out/test $
