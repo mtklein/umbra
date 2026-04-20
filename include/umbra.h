@@ -34,12 +34,6 @@ struct umbra_backend* umbra_backend_vulkan(void);
 struct umbra_backend* umbra_backend_wgpu  (void);
 void   umbra_backend_free(struct umbra_backend*);
 
-struct umbra_buf {
-    void *ptr;
-    int   count;
-    int   stride;
-};
-
 struct umbra_program {
     void (*queue)(struct umbra_program*, int l, int t, int r, int b);
     void (*dump )(struct umbra_program const*, FILE*);
@@ -49,34 +43,17 @@ struct umbra_program {
 };
 void umbra_program_free(struct umbra_program*);
 
+typedef struct { int ix; } umbra_ptr;
+struct umbra_buf {
+    void *ptr;
+    int   count;
+    int   stride;
+};
+umbra_ptr umbra_bind_buf     (struct umbra_builder*, struct umbra_buf const*);
+umbra_ptr umbra_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
+
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
-
-// Opaque pointer handle.  Each one is backed by a bound umbra_buf or a span
-// of uniform data; see umbra_bind_buf() and umbra_bind_uniforms() below.
-// The bound span's element width isn't part of this type -- the width comes
-// from the op you use on the ptr (umbra_load_16, umbra_gather_32, etc.).
-typedef struct { int ix; } umbra_ptr;
-
-// Bind a caller-owned `struct umbra_buf` to a ptr handle.  At each dispatch
-// the backend reads the current contents of *buf, so callers may mutate
-// .ptr / .count / .stride between dispatches without rebuilding the program.
-// Unlike umbra_bind_uniforms() (which captures a fixed ptr/slots pair), the
-// buf itself is the source of truth.  The buf must outlive the builder and
-// any derived umbra_flat_ir or umbra_programs.
-umbra_ptr umbra_bind_buf(struct umbra_builder*, struct umbra_buf const*);
-
-// Bind a span of uniform data, returning a ptr handle for use with
-// umbra_uniform_32() and/or umbra_gather_32().  The uniforms are not retained
-// and must outlive this umbra_builder and any derived umbra_flat_ir or
-// umbra_programs.  `slot` should be 4-byte aligned; `slots` counts those
-// 4-byte slots.
-//
-// Unlike umbra_bind_buf() -- which captures the buf by reference and re-reads
-// its fields each dispatch -- umbra_bind_uniforms() captures a fixed
-// (slot, slots) pair, which backends can route through faster uniform paths
-// for small, immutable spans.
-umbra_ptr umbra_bind_uniforms(struct umbra_builder*, void const *slot, int slots);
 
 umbra_val32 umbra_x(struct umbra_builder*);
 umbra_val32 umbra_y(struct umbra_builder*);

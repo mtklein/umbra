@@ -106,45 +106,34 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_blend , void *blend_ctx);
 
 // Tile coverage class stored by umbra_build_sdf_bounds (one uint16 per tile).
-// Ordered so `cov > 0` means "draw the tile" and `cov == FULL` means "skip the
-// per-pixel SDF eval fast path (TODO)."
-enum {
-    UMBRA_SDF_TILE_NONE    = 0,  // f.lo >= 0: tile entirely outside
-    UMBRA_SDF_TILE_PARTIAL = 1,  // f.lo <  0, f.hi >= 0: edge tile, needs the full draw program
-    UMBRA_SDF_TILE_FULL    = 2,  // f.hi <  0: tile entirely inside
+// Ordered so `cov > 0` means "draw the tile" and `cov == FULL` permits a fast
+// path skipping per-pixel SDF evaluation.
+enum umbra_sdf_tile {
+    UMBRA_SDF_TILE_NONE    = 0x0000,  // f.lo >= 0: tile entirely outside
+    UMBRA_SDF_TILE_PARTIAL = 0x0001,  // f.lo <  0, f.hi >= 0: edge tile, needs per-pixel SDF eval
+    UMBRA_SDF_TILE_FULL    = 0x0002,  // f.hi <  0: tile entirely inside
 };
 
-// Evaluate SDF f(x,y) and store a uint16 umbra_sdf_tile classification to cov.
+// Evaluate SDF f(x,y) storing a uint16 umbra_sdf_tile classification to cov.
 void umbra_build_sdf_bounds(struct umbra_builder*,
                             umbra_ptr cov,
                             umbra_interval x, umbra_interval y,
                             umbra_sdf, void *sdf_ctx);
 
-// Dispatch grid: l/t origin and tile size shared between the bounds program
-// (bound as uniforms) and umbra_sdf_dispatch (writes before queue).
+// Dispatch grid uniforms used by umbra_sdf_dispatch() and the bounds program.
 struct umbra_sdf_grid { float base_x, base_y, tile_w, tile_h; };
 
-// Inside a bounds builder, produce (ix, iy) covering the tile at
-// (umbra_x(), umbra_y()) -- grid is bound as uniforms, optionally transformed
-// into sdf space by an affine transform_mat, ready to pass to
-// umbra_build_sdf_bounds.
+// Produce (ix, iy) covering the tile at  (umbra_x(), umbra_y()).
 void umbra_sdf_tile_intervals(struct umbra_builder*,
                               struct umbra_sdf_grid *grid,
-                              struct umbra_matrix const *transform_mat,
+                              struct umbra_matrix const *transform,
                               umbra_interval *ix, umbra_interval *iy);
 
-// Run paired (bounds, draw) programs over the rect (l,t,r,b).  Writes
-// grid with (l, t, tile_size, tile_size), queues bounds over the xt*yt
-// tile index grid (xt = ceil((r-l)/tile_size), yt = ceil((b-t)/tile_size)),
-// then queues draw on every non-NONE tile.  cov is the u16 output buffer
-// bounds was built against; its .ptr must point to a uint16 array sized
-// >= xt*yt; dispatch writes its .count and .stride.  All pointers must
-// outlive the call.  If the caller couldn't build a bounds program (e.g.
-// their draw uses a perspective transform we can't interval-divide), they
-// should skip this and just call draw->queue(draw, l, t, r, b) directly.
+// Use the bounds program's coverage results to intelligently dispatch
+// draw->queue() calls, skipping any uncovered rectangles.
+// TODO: use a draw that skips per-pixel SDF eval when TILE_FULL.
 void umbra_sdf_dispatch(struct umbra_program *bounds,
                         struct umbra_program *draw,
                         struct umbra_sdf_grid *grid,
                         struct umbra_buf *cov,
                         int tile_size, int l, int t, int r, int b);
-
