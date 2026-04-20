@@ -8,6 +8,9 @@
 #include "../third_party/stb/stb_truetype.h"
 #pragma clang diagnostic pop
 
+#define UNI_SLOT(type, field) \
+    ((int)(__builtin_offsetof(type, field) / 4))
+
 umbra_val32 coverage_winding(void *ctx, struct umbra_builder *b,
                              umbra_val32 x, umbra_val32 y) {
     struct umbra_buf const *self = ctx;
@@ -15,6 +18,123 @@ umbra_val32 coverage_winding(void *ctx, struct umbra_builder *b,
     umbra_ptr const w = umbra_bind_buf(b, self);
     umbra_val32 const raw = umbra_load_32(b, w);
     return umbra_min_f32(b, umbra_abs_f32(b, raw), umbra_imm_f32(b, 1.0f));
+}
+
+struct slug_cov_uniforms {
+    float bw, bh;
+    int   n_curves;
+    int   :32;
+};
+
+struct slug_cov_ctx {
+    struct umbra_buf         const *curves;
+    struct slug_cov_uniforms const *uni;
+};
+
+// One-pass winding coverage: uniform-count loop over all curves, accumulate
+// signed scanline crossings at (x, y), clamp |acc| into [0, 1].  Returns 0
+// outside [0, bw) x [0, bh) so the loop work doesn't contribute outside the
+// glyph bounds.  ctx is a struct slug_cov_ctx*.
+static umbra_val32 coverage_slug_winding(void *vctx, struct umbra_builder *b,
+                                         umbra_val32 x, umbra_val32 y) {
+    struct slug_cov_ctx const *ctx = vctx;
+    umbra_ptr const curves = umbra_bind_buf(b, ctx->curves);
+    umbra_ptr const u      = umbra_bind_uniforms(b, ctx->uni,
+                                                 (int)(sizeof *ctx->uni / 4));
+
+    umbra_val32 const bw = umbra_uniform_32(b, u, UNI_SLOT(struct slug_cov_uniforms, bw)),
+                      bh = umbra_uniform_32(b, u, UNI_SLOT(struct slug_cov_uniforms, bh)),
+                      n  = umbra_uniform_32(b, u, UNI_SLOT(struct slug_cov_uniforms, n_curves));
+
+    umbra_val32 const z  = umbra_imm_f32(b, 0.0f),
+                      o  = umbra_imm_f32(b, 1.0f),
+                      tw = umbra_imm_f32(b, 2.0f),
+                      ep = umbra_imm_f32(b, 1.0f/65536.0f),
+                      po = umbra_imm_f32(b, 1.0f),
+                      no = umbra_imm_f32(b, -1.0f);
+
+    umbra_val32 const in = umbra_and_32(b,
+        umbra_and_32(b, umbra_le_f32(b, z, x), umbra_lt_f32(b, x, bw)),
+        umbra_and_32(b, umbra_le_f32(b, z, y), umbra_lt_f32(b, y, bh)));
+
+    umbra_var32 const acc = umbra_declare_var32(b);
+
+    umbra_val32 j = umbra_loop(b, n); {
+        umbra_val32 k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));
+
+        umbra_val32 p0x = umbra_gather_32(b, curves, k),
+                    p0y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 1))),
+                    p1x = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 2))),
+                    p1y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 3))),
+                    p2x = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 4))),
+                    p2y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 5)));
+
+        umbra_val32 q0y = umbra_sub_f32(b, p0y, y),
+                    q1y = umbra_sub_f32(b, p1y, y),
+                    q2y = umbra_sub_f32(b, p2y, y);
+
+        umbra_val32 a  = umbra_add_f32(b, umbra_sub_f32(b, q0y, umbra_mul_f32(b, tw, q1y)), q2y);
+        umbra_val32 bv = umbra_sub_f32(b, q0y, q1y);
+
+        umbra_val32 disc = umbra_sub_f32(b, umbra_mul_f32(b, bv, bv),
+                                            umbra_mul_f32(b, a, q0y));
+        umbra_val32 ok = umbra_le_f32(b, z, disc);
+        umbra_val32 sd = umbra_sqrt_f32(b, umbra_max_f32(b, disc, z));
+
+        umbra_val32 abs_a   = umbra_abs_f32(b, a);
+        umbra_val32 is_quad = umbra_lt_f32(b, ep, abs_a);
+
+        umbra_val32 ia = umbra_div_f32(b, o, umbra_sel_32(b, is_quad, a, o));
+
+        umbra_val32 qt1 = umbra_mul_f32(b, umbra_sub_f32(b, bv, sd), ia);
+        umbra_val32 qt2 = umbra_mul_f32(b, umbra_add_f32(b, bv, sd), ia);
+
+        umbra_val32 abs_bv = umbra_abs_f32(b, bv);
+        umbra_val32 lt = umbra_div_f32(b, q0y,
+                             umbra_sel_32(b, umbra_lt_f32(b, ep, abs_bv),
+                                         umbra_mul_f32(b, tw, bv), o));
+
+        umbra_val32 t1 = umbra_sel_32(b, is_quad, qt1, lt);
+        umbra_val32 t2 = qt2;
+
+        umbra_val32 t1ok = umbra_and_32(b, ok, umbra_and_32(b, umbra_le_f32(b, z, t1),
+                                                                umbra_lt_f32(b, t1, o)));
+        umbra_val32 t2ok = umbra_and_32(b, umbra_and_32(b, ok, is_quad),
+                                           umbra_and_32(b, umbra_le_f32(b, z, t2),
+                                                           umbra_lt_f32(b, t2, o)));
+
+        umbra_val32 q0x = umbra_sub_f32(b, p0x, x),
+                    q1x = umbra_sub_f32(b, p1x, x),
+                    q2x = umbra_sub_f32(b, p2x, x);
+        umbra_val32 ax = umbra_add_f32(b, umbra_sub_f32(b, q0x, umbra_mul_f32(b, tw, q1x)), q2x);
+        umbra_val32 bx = umbra_mul_f32(b, tw, umbra_sub_f32(b, q1x, q0x));
+
+        umbra_val32 x1 = umbra_add_f32(b,
+                             umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ax, t1), bx), t1),
+                             q0x);
+        umbra_val32 x2 = umbra_add_f32(b,
+                             umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ax, t2), bx), t2),
+                             q0x);
+
+        umbra_val32 dy1 = umbra_sub_f32(b, umbra_mul_f32(b, a, t1), bv);
+        umbra_val32 dy2 = umbra_sub_f32(b, umbra_mul_f32(b, a, t2), bv);
+
+        umbra_val32 dir1 = umbra_sel_32(b, umbra_lt_f32(b, z, dy1), po,
+                               umbra_sel_32(b, umbra_lt_f32(b, dy1, z), no, z));
+        umbra_val32 dir2 = umbra_sel_32(b, umbra_lt_f32(b, z, dy2), po,
+                               umbra_sel_32(b, umbra_lt_f32(b, dy2, z), no, z));
+
+        umbra_val32 w1 = umbra_sel_32(b, umbra_and_32(b, t1ok, umbra_lt_f32(b, z, x1)), dir1, z);
+        umbra_val32 w2 = umbra_sel_32(b, umbra_and_32(b, t2ok, umbra_lt_f32(b, z, x2)), dir2, z);
+
+        umbra_val32 dw = umbra_add_f32(b, w1, w2);
+
+        umbra_store_var32(b, acc, umbra_add_f32(b, umbra_load_var32(b, acc), dw));
+    } umbra_end_loop(b);
+
+    umbra_val32 const wind = umbra_load_var32(b, acc);
+    umbra_val32 const cov  = umbra_min_f32(b, umbra_abs_f32(b, wind), o);
+    return umbra_sel_32(b, in, cov, z);
 }
 
 struct slug_curves slug_extract(char const *text, float font_size) {
@@ -133,8 +253,8 @@ void slug_free(struct slug_curves *sc) {
 // flicker (easy to dismiss as noise); large sizes clearly mis-render slug past
 // the animation step we capture in dumps/.  Every backend (interp, jit, metal,
 // vulkan, wgpu) shows the same wrongness, and both the one-pass loop variant
-// (slug_build below) and the two-pass accumulator (this function) agree — so
-// it's not a backend issue, it's the shared winding-contribution algorithm.
+// (coverage_slug_winding above) and the two-pass accumulator (this function)
+// agree -- so it's not a backend issue, it's the shared winding algorithm.
 //
 // Candidates to investigate:
 //   - quadratic root conditioning when a is small but is_quad is still true
@@ -149,11 +269,8 @@ void slug_free(struct slug_curves *sc) {
 //     the actual curve-crossing sign, giving cancelling winding contributions
 //     that shouldn't cancel.
 //
-// Both slug_build_acc and slug_build below duplicate this math — fix them
-// together (or factor into a shared emit helper before fixing).
-
-#define UNI_SLOT(type, field) \
-    ((int)(__builtin_offsetof(type, field) / 4))
+// Both slug_build_acc and coverage_slug_winding above duplicate this math --
+// fix them together (or factor into a shared emit helper before fixing).
 
 struct umbra_builder* slug_build_acc(struct umbra_buf const *curves_buf,
                                      struct slug_acc_uniforms const *uni,
@@ -277,135 +394,6 @@ struct umbra_builder* slug_build_acc(struct umbra_buf const *curves_buf,
     umbra_val32 acc = umbra_load_32(b, wind);
     acc = umbra_add_f32(b, acc, dw);
     umbra_store_32(b, wind, acc);
-
-    return b;
-}
-
-struct umbra_builder* slug_build(struct umbra_buf const *curves_buf,
-                                 struct slug_uniforms const *uni,
-                                 struct umbra_buf const *wind_buf) {
-    struct umbra_builder *b = umbra_builder();
-
-    umbra_ptr const u      = umbra_bind_uniforms(b, uni, (int)(sizeof *uni / 4));
-    umbra_ptr const curves = umbra_bind_buf (b, curves_buf);
-    umbra_ptr const wind   = umbra_bind_buf (b, wind_buf);
-
-    umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b));
-    umbra_val32 yf = umbra_f32_from_i32(b, umbra_y(b));
-
-    int const mbase = UNI_SLOT(struct slug_uniforms, mat);
-    umbra_matrix_val32 const m = {
-        .sx = umbra_uniform_32(b, u, mbase + 0),
-        .kx = umbra_uniform_32(b, u, mbase + 1),
-        .tx = umbra_uniform_32(b, u, mbase + 2),
-        .ky = umbra_uniform_32(b, u, mbase + 3),
-        .sy = umbra_uniform_32(b, u, mbase + 4),
-        .ty = umbra_uniform_32(b, u, mbase + 5),
-        .p0 = umbra_uniform_32(b, u, mbase + 6),
-        .p1 = umbra_uniform_32(b, u, mbase + 7),
-        .p2 = umbra_uniform_32(b, u, mbase + 8),
-    };
-    umbra_val32 bw = umbra_uniform_32(b, u, UNI_SLOT(struct slug_uniforms, bw));
-    umbra_val32 bh = umbra_uniform_32(b, u, UNI_SLOT(struct slug_uniforms, bh));
-
-    umbra_point_val32 const g = umbra_apply_matrix(b, m, xf, yf);
-    umbra_val32 gx = g.x, gy = g.y;
-
-    umbra_val32 z  = umbra_imm_f32(b, 0.0f);
-    umbra_val32 o  = umbra_imm_f32(b, 1.0f);
-    umbra_val32 tw = umbra_imm_f32(b, 2.0f);
-    umbra_val32 ep = umbra_imm_f32(b, 1.0f/65536.0f);
-
-    umbra_val32 in = umbra_and_32(b,
-        umbra_and_32(b,
-            umbra_le_f32(b, z, gx),
-            umbra_lt_f32(b, gx, bw)),
-        umbra_and_32(b,
-            umbra_le_f32(b, z, gy),
-            umbra_lt_f32(b, gy, bh)));
-
-    umbra_val32 count = umbra_uniform_32(b, u, UNI_SLOT(struct slug_uniforms, n_curves));
-    umbra_var32 wind_var = umbra_declare_var32(b);
-
-    umbra_val32 j = umbra_loop(b, count); {
-        umbra_val32 k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));
-
-        umbra_val32 p0x = umbra_gather_32(b, curves, k),
-                    p0y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 1))),
-                    p1x = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 2))),
-                    p1y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 3))),
-                    p2x = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 4))),
-                    p2y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 5)));
-
-        umbra_val32 q0y = umbra_sub_f32(b, p0y, gy),
-                    q1y = umbra_sub_f32(b, p1y, gy),
-                    q2y = umbra_sub_f32(b, p2y, gy);
-
-        umbra_val32 a  = umbra_add_f32(b, umbra_sub_f32(b, q0y, umbra_mul_f32(b, tw, q1y)), q2y);
-        umbra_val32 bv = umbra_sub_f32(b, q0y, q1y);
-
-        umbra_val32 disc = umbra_sub_f32(b, umbra_mul_f32(b, bv, bv),
-                                            umbra_mul_f32(b, a, q0y));
-        umbra_val32 ok = umbra_le_f32(b, z, disc);
-        umbra_val32 sd = umbra_sqrt_f32(b, umbra_max_f32(b, disc, z));
-
-        umbra_val32 abs_a = umbra_abs_f32(b, a);
-        umbra_val32 is_quad = umbra_lt_f32(b, ep, abs_a);
-
-        umbra_val32 ia = umbra_div_f32(b, o, umbra_sel_32(b, is_quad, a, o));
-
-        umbra_val32 qt1 = umbra_mul_f32(b, umbra_sub_f32(b, bv, sd), ia);
-        umbra_val32 qt2 = umbra_mul_f32(b, umbra_add_f32(b, bv, sd), ia);
-
-        umbra_val32 abs_bv = umbra_abs_f32(b, bv);
-        umbra_val32 lt = umbra_div_f32(b, q0y,
-                             umbra_sel_32(b, umbra_lt_f32(b, ep, abs_bv),
-                                         umbra_mul_f32(b, tw, bv), o));
-
-        umbra_val32 t1 = umbra_sel_32(b, is_quad, qt1, lt);
-        umbra_val32 t2 = qt2;
-
-        umbra_val32 t1ok = umbra_and_32(b, ok, umbra_and_32(b, umbra_le_f32(b, z, t1),
-                                                                umbra_lt_f32(b, t1, o)));
-        umbra_val32 t2ok = umbra_and_32(b, umbra_and_32(b, ok, is_quad),
-                                           umbra_and_32(b, umbra_le_f32(b, z, t2),
-                                                           umbra_lt_f32(b, t2, o)));
-
-        umbra_val32 q0x = umbra_sub_f32(b, p0x, gx),
-                    q1x = umbra_sub_f32(b, p1x, gx),
-                    q2x = umbra_sub_f32(b, p2x, gx);
-        umbra_val32 ax = umbra_add_f32(b, umbra_sub_f32(b, q0x, umbra_mul_f32(b, tw, q1x)), q2x);
-        umbra_val32 bx = umbra_mul_f32(b, tw, umbra_sub_f32(b, q1x, q0x));
-
-        umbra_val32 x1 = umbra_add_f32(b,
-                             umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ax, t1), bx), t1),
-                             q0x);
-        umbra_val32 x2 = umbra_add_f32(b,
-                             umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ax, t2), bx), t2),
-                             q0x);
-
-        umbra_val32 dy1 = umbra_sub_f32(b, umbra_mul_f32(b, a, t1), bv);
-        umbra_val32 dy2 = umbra_sub_f32(b, umbra_mul_f32(b, a, t2), bv);
-
-        umbra_val32 po = umbra_imm_f32(b, 1.0f);
-        umbra_val32 no = umbra_imm_f32(b, -1.0f);
-
-        umbra_val32 dir1 = umbra_sel_32(b, umbra_lt_f32(b, z, dy1), po,
-                               umbra_sel_32(b, umbra_lt_f32(b, dy1, z), no, z));
-        umbra_val32 dir2 = umbra_sel_32(b, umbra_lt_f32(b, z, dy2), po,
-                               umbra_sel_32(b, umbra_lt_f32(b, dy2, z), no, z));
-
-        umbra_val32 w1 = umbra_sel_32(b, umbra_and_32(b, t1ok, umbra_lt_f32(b, z, x1)),
-                                      dir1, z);
-        umbra_val32 w2 = umbra_sel_32(b, umbra_and_32(b, t2ok, umbra_lt_f32(b, z, x2)),
-                                      dir2, z);
-
-        umbra_val32 dw = umbra_sel_32(b, in, umbra_add_f32(b, w1, w2), z);
-
-        umbra_store_var32(b, wind_var, umbra_add_f32(b, umbra_load_var32(b, wind_var), dw));
-    } umbra_end_loop(b);
-
-    umbra_store_32(b, wind, umbra_load_var32(b, wind_var));
 
     return b;
 }
@@ -536,19 +524,17 @@ SLIDE(slide_slug_wind) {
 struct slug_slide {
     struct slide base;
 
-    struct slug_curves            slug;
-    struct umbra_buf              curves_buf;
-    int                           w, h;
-    float                        *wind_buf;
-    struct umbra_buf              wind_uniform;
-    struct slug_uniforms          au;
-    struct umbra_flat_ir         *acc_ir;
-    struct umbra_program         *acc_prog;
+    struct slug_curves       slug;
+    struct umbra_buf         curves_buf;
+    int                      w, h;
+    struct slug_cov_uniforms cov_uni;
+    struct slug_cov_ctx      cov_ctx;
+    struct umbra_matrix      mat; int :32;
 
-    umbra_color                   color;
-    struct umbra_fmt              fmt;
-    struct umbra_program         *draw_prog;
-    struct umbra_buf              dst_buf;
+    umbra_color              color;
+    struct umbra_fmt         fmt;
+    struct umbra_program    *prog;
+    struct umbra_buf         dst_buf;
 };
 
 static void slug_init(struct slide *s, int w, int h) {
@@ -559,80 +545,78 @@ static void slug_init(struct slide *s, int w, int h) {
     st->curves_buf = (struct umbra_buf){
         .ptr = st->slug.data, .count = st->slug.count * 6,
     };
-    st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
-    st->wind_uniform = (struct umbra_buf){
-        .ptr = st->wind_buf, .count = w * h, .stride = w,
+    st->cov_uni = (struct slug_cov_uniforms){
+        .bw = st->slug.w, .bh = st->slug.h, .n_curves = st->slug.count,
     };
+    st->cov_ctx = (struct slug_cov_ctx){
+        .curves = &st->curves_buf, .uni = &st->cov_uni,
+    };
+}
 
-    struct umbra_builder *b = slug_build(&st->curves_buf, &st->au, &st->wind_uniform);
-    st->acc_ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
+static _Bool slug_build_draw(struct slide *s, int i, struct umbra_builder *b,
+                             umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                             umbra_val32 x, umbra_val32 y) {
+    if (i != 0) { return 0; }
+    struct slug_slide *st = (struct slug_slide *)s;
+    umbra_point_val32 const p = umbra_transform_perspective(&st->mat, b, x, y);
+    umbra_build_draw(b, dst_ptr, fmt, p.x, p.y,
+                     coverage_slug_winding, &st->cov_ctx,
+                     umbra_shader_color,    &st->color,
+                     umbra_blend_srcover,   NULL);
+    return 1;
+}
+
+static struct umbra_builder* slug_builder(struct slide *s, struct umbra_fmt fmt) {
+    struct slug_slide *st = (struct slug_slide *)s;
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
+    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
+                      y = umbra_f32_from_i32(b, umbra_y(b));
+    slug_build_draw(s, 0, b, dst_ptr, fmt, x, y);
+    return b;
 }
 
 static void slug_prepare(struct slide *s, struct umbra_backend *be,
                          struct umbra_fmt fmt) {
     struct slug_slide *st = (struct slug_slide *)s;
-    umbra_program_free(st->acc_prog);
-    st->acc_prog = be->compile(be, st->acc_ir);
-    umbra_program_free(st->draw_prog);
+    umbra_program_free(st->prog);
     st->fmt = fmt;
-    {
-        struct umbra_builder *b = umbra_draw_builder(
-        NULL,            coverage_winding,       &st->wind_uniform,
-            umbra_shader_color,     &st->color,
-            umbra_blend_srcover,    NULL,
-            &st->dst_buf,           fmt);
-        struct umbra_flat_ir *ir = umbra_flat_ir(b);
-        umbra_builder_free(b);
-        st->draw_prog = be->compile(be, ir);
-        umbra_flat_ir_free(ir);
-    }
+    struct umbra_builder *b = slug_builder(s, fmt);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    st->prog = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
     slide_bg_prepare(be, fmt, st->w, st->h);
+}
+
+static void slug_animate(struct slide *s, double secs) {
+    struct slug_slide *st = (struct slug_slide *)s;
+    slide_perspective_matrix(&st->mat, (float)secs, st->w, st->h,
+                             (int)st->slug.w, (int)st->slug.h);
 }
 
 static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct slug_slide *st = (struct slug_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    int w = st->w, h = st->h;
-
-    size_t const wind_row = (size_t)w * sizeof(float);
-    __builtin_memset((char *)st->wind_buf + (size_t)t * wind_row, 0,
-                     (size_t)(b - t) * wind_row);
-
-    slide_perspective_matrix(&st->au.mat, (float)secs, w, h,
-                             (int)st->slug.w, (int)st->slug.h);
-    st->au.bw = st->slug.w;
-    st->au.bh = st->slug.h;
-    {
-        int const n = st->slug.count;
-        __builtin_memcpy(&st->au.n_curves, &n, 4);
-    }
-
-    st->acc_prog->queue(st->acc_prog, l, t, r, b);
-
+    slug_animate(s, secs);
     st->dst_buf = (struct umbra_buf){
-        .ptr=buf, .count=w * h * st->fmt.planes, .stride=w,
+        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
     };
-    st->draw_prog->queue(st->draw_prog, l, t, r, b);
+    st->prog->queue(st->prog, l, t, r, b);
+}
+
+static int slug_one_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
+                                      struct umbra_builder **out, int max) {
+    if (max < 1) { return 0; }
+    out[0] = slug_builder(s, fmt);
+    return out[0] ? 1 : 0;
 }
 
 static void slug_free_slide(struct slide *s) {
     struct slug_slide *st = (struct slug_slide *)s;
     slug_free(&st->slug);
-    free(st->wind_buf);
-    umbra_program_free(st->acc_prog);
-    umbra_flat_ir_free(st->acc_ir);
-    umbra_program_free(st->draw_prog);
+    umbra_program_free(st->prog);
     free(st);
-}
-
-static int slug_one_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
-                                      struct umbra_builder **out, int max) {
-    (void)fmt;
-    if (max < 1) { return 0; }
-    struct slug_slide *st = (struct slug_slide *)s;
-    out[0] = slug_build(&st->curves_buf, &st->au, &st->wind_uniform);
-    return out[0] ? 1 : 0;
 }
 
 SLIDE(slide_slug_wind_loop) {
@@ -646,6 +630,8 @@ SLIDE(slide_slug_wind_loop) {
         .draw = slug_draw,
         .free = slug_free_slide,
         .get_builders = slug_one_pass_get_builders,
+        .build_draw   = slug_build_draw,
+        .animate      = slug_animate,
     };
     return &st->base;
 }

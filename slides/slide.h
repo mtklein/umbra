@@ -12,15 +12,18 @@
 // Partially landed:
 //   * build_draw exists and lives alongside prepare/draw/get_builders.
 //   * persp_slide, cov_null_slide, text_slide (bitmap and SDF bitmap), all 5
-//     blend variants, all 8 gradient variants, and the swatch grid implement
-//     it.  Swatch is the first multi-program user (10 programs).
+//     blend variants, all 8 gradient variants, the swatch grid, and slug's
+//     one-pass variant implement it.  Swatch is the first multi-program user
+//     (10 programs).  Slug one-pass folds the winding loop into a single
+//     coverage fn with no intermediate buffer.
 //   * The overview consumes it (loops build_draw(i) until it returns 0).
 //
 // Still ahead:
-//   * Migrate slug (two-pass accumulator + draw -- the multi-program
-//     build_draw(i) contract fits, it's just not wired yet) and the sdf
-//     slides (need a tile-culled sibling path -- see TODO in
-//     slides/overview.c).
+//   * Migrate slug's two-pass accumulator + draw (the multi-program
+//     build_draw(i) contract fits the shape, but the framework still needs
+//     per-frame plumbing for the N_curves dispatches with varying j uniform
+//     and for zeroing the intermediate wind buffer) and the sdf slides (need
+//     a tile-culled sibling path -- see TODO in slides/overview.c).
 //   * Once every slide has a build_draw, retire prepare / draw /
 //     get_builders and have every driver just loop over slide->build_draw.
 

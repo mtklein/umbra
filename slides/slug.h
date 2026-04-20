@@ -15,20 +15,10 @@ struct slug_acc_uniforms {
     int                 :32;
 };
 
-struct slug_uniforms {
-    struct umbra_matrix mat; int :32;
-    float               bw, bh;
-    float               n_curves;
-    int                 :32;
-};
-
 struct slug_curves    slug_extract  (char const *text, float font_size);
 void                  slug_free     (struct slug_curves *sc);
 struct umbra_builder* slug_build_acc(struct umbra_buf const *curves,
                                      struct slug_acc_uniforms const *uni,
-                                     struct umbra_buf const *wind);
-struct umbra_builder* slug_build    (struct umbra_buf const *curves,
-                                     struct slug_uniforms const *uni,
                                      struct umbra_buf const *wind);
 
 // Coverage from winding count buffer used by 2-pass Slug, ctx is an umbra_buf*.
