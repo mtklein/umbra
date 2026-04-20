@@ -43,8 +43,10 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
 // Shared state for every SDF slide in this file.  Each slide embeds this as
 // its first field so (struct slide *) casts hit sdf_common.base and
 // (struct sdf_common *) casts work too.  Slides fill sdf_fn/sdf_ctx/color
-// in their ctor and are otherwise driven by sdf_common_{prepare,draw,...}
-// and the shared slide_runtime embedded here.
+// in their ctor and are otherwise driven by the shared build_sdf_draw
+// and get_builders hooks below.  `rt` stays embedded because
+// sdf_common_get_builders binds its dst_buf/cov_buf/grid as stable
+// backing storage for the inspection path.
 struct sdf_common {
     struct slide          base;
     int                   w, h;
@@ -67,24 +69,6 @@ static void sdf_common_build_draw(struct slide *s,
                          umbra_shader_color,  &c->color,
                          umbra_blend_srcover, NULL);
     umbra_build_sdf_bounds(b_bounds, cov_ptr, ix, iy, c->sdf_fn, c->sdf_ctx);
-}
-
-static void sdf_common_prepare(struct slide *s,
-                               struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct sdf_common *c = (struct sdf_common *)s;
-    slide_runtime_cleanup(&c->rt);
-    slide_runtime_compile(&c->rt, s, c->w, c->h, be, fmt, NULL);
-    slide_bg_prepare(be, fmt, c->w, c->h);
-}
-
-static void sdf_common_draw(struct slide *s, double secs,
-                            int l, int t, int r, int b, void *buf) {
-    struct sdf_common *c = (struct sdf_common *)s;
-    slide_bg_draw(s->bg, l, t, r, b, buf);
-    c->rt.dst_buf = (struct umbra_buf){
-        .ptr = buf, .count = c->w * c->h * c->rt.fmt.planes, .stride = c->w,
-    };
-    slide_runtime_draw(&c->rt, s, secs, l, t, r, b);
 }
 
 static int sdf_common_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -122,11 +106,9 @@ static void sdf_common_free(struct slide *s) {
     free(s);
 }
 
-// Convenience to spread the five shared slide-fn pointers across every SLIDE
+// Convenience to spread the shared slide-fn pointers across every SLIDE
 // macro below.
 #define SDF_COMMON_HOOKS                        \
-    .prepare        = sdf_common_prepare,       \
-    .draw           = sdf_common_draw,          \
     .get_builders   = sdf_common_get_builders,  \
     .build_sdf_draw = sdf_common_build_draw
 
