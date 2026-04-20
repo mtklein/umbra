@@ -40,11 +40,6 @@ void umbra_matrix_mul(struct umbra_matrix *out,
                       struct umbra_matrix const *a,
                       struct umbra_matrix const *b);
 
-struct umbra_bitmap {
-    struct umbra_buf buf;
-    int              w,h;
-};
-
 typedef umbra_color_val32 umbra_load(struct umbra_builder*, umbra_ptr);
 umbra_load umbra_load_8888,
            umbra_load_565,
