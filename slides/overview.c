@@ -93,7 +93,6 @@ static void compute_cell_matrix(struct umbra_matrix *out, int col, int row,
     };
 }
 
-
 static void overview_init(struct slide *s, int w, int h) {
     struct overview_slide *st = (struct overview_slide *)s;
     st->w = w;

@@ -104,7 +104,6 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
     ok here;
 }
 
-
 TEST(test_perspective_text) {
     enum { BW = 16, BH = 8 };
     uint16_t bmp[BW * BH];

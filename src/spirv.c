@@ -1119,7 +1119,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     B.c_0f = spv_const_f32(&B, 0.0f);
     B.c_allones = spv_const_u32(&B, 0xFFFFFFFFu);
 
-
     // gl_GlobalInvocationID
     B.v_global_id = spv_id(&B);
     spv_op(&B.globals, SpvOpVariable, 4);

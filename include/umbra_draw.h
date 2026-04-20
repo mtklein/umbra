@@ -45,7 +45,6 @@ extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_fp16,
                               umbra_fmt_fp16_planar;
 
-
 // 3x3 matrix transform with perspective divide.
 umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const*,
                                               struct umbra_builder*,
@@ -55,7 +54,6 @@ typedef umbra_val32 umbra_coverage(void *ctx, struct umbra_builder*,
                                    umbra_val32 x, umbra_val32 y);
 // Cover a rectangle; ctx is umbra_rect*.
 umbra_coverage umbra_coverage_rect;
-
 
 typedef umbra_color_val32 umbra_shader(void *ctx, struct umbra_builder*,
                                        umbra_val32 x, umbra_val32 y);
@@ -140,7 +138,6 @@ struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_ma
                                          struct umbra_buf *dst,
                                          struct umbra_fmt  dst_fmt);
 
-
 // Dispatch grid: l/t origin and tile size shared between the bounds program
 // (bound as uniforms) and umbra_sdf_dispatch (writes before queue).
 struct umbra_sdf_grid { float base_x, base_y, tile_w, tile_h; };
@@ -183,7 +180,6 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
 void umbra_sdf_draw_queue(struct umbra_sdf_draw*, int l, int t, int r, int b,
                           struct umbra_buf dst);
 void umbra_sdf_draw_free(struct umbra_sdf_draw*);
-
 
 // Adapt an umbra_sdf as umbra_coverage.
 //
