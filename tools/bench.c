@@ -166,11 +166,12 @@ static void print_ns_header(int be_mask) {
     printf("%-*s", TITLE_W, "ns/px");
     _Bool first = 1;
     for (int d = 0; d < ND; d++) {
-        if (!(be_mask & (1 << disp_idx[d]))) { continue; }
-        if (!first) { printf("%*s", GAP, ""); }
-        first = 0;
-        if (disp_gpu[d]) { printf("%*s%*s", VAL_W, disp_name[d], CPU_W, "cpu%"); }
-        else             { printf("%*s", VAL_W, disp_name[d]); }
+        if (be_mask & (1 << disp_idx[d])) {
+            if (!first) { printf("%*s", GAP, ""); }
+            first = 0;
+            if (disp_gpu[d]) { printf("%*s%*s", VAL_W, disp_name[d], CPU_W, "cpu%"); }
+            else             { printf("%*s", VAL_W, disp_name[d]); }
+        }
     }
     printf("\n");
 }
@@ -179,11 +180,12 @@ static void print_compile_header(int be_mask) {
     printf("\n%-*s ", TITLE_W, "compile \xc2\xb5s");
     _Bool first = 1;
     for (int d = 0; d < ND; d++) {
-        if (!(be_mask & (1 << disp_idx[d]))) { continue; }
-        if (!first) { printf("%*s", GAP, ""); }
-        first = 0;
-        if (disp_gpu[d]) { printf("%*s%*s", VAL_W, disp_name[d], CPU_W, ""); }
-        else             { printf("%*s", VAL_W, disp_name[d]); }
+        if (be_mask & (1 << disp_idx[d])) {
+            if (!first) { printf("%*s", GAP, ""); }
+            first = 0;
+            if (disp_gpu[d]) { printf("%*s%*s", VAL_W, disp_name[d], CPU_W, ""); }
+            else             { printf("%*s", VAL_W, disp_name[d]); }
+        }
     }
     printf("\n");
 }
@@ -202,20 +204,21 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
     _Bool first = 1;
     for (int d = 0; d < ND; d++) {
         int bi = disp_idx[d];
-        if (!(be_mask & (1 << bi))) { continue; }
-        if (!first) { printf("%*s", GAP, ""); }
-        first = 0;
-        if (ns_px[bi] < 0) {
-            printf("%*s", VAL_W + (disp_gpu[d] ? CPU_W : 0), "-");
-            continue;
-        }
-        print_fixed(VAL_W, 2, ns_px[bi]);
-        if (disp_gpu[d]) {
-            if (gpu[bi] >= 0 && ns_px[bi] > 0) {
-                int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
-                printf("%*d", CPU_W, pct);
+        if (be_mask & (1 << bi)) {
+            if (!first) { printf("%*s", GAP, ""); }
+            first = 0;
+            if (ns_px[bi] < 0) {
+                printf("%*s", VAL_W + (disp_gpu[d] ? CPU_W : 0), "-");
             } else {
-                printf("%*s", CPU_W, "");
+                print_fixed(VAL_W, 2, ns_px[bi]);
+                if (disp_gpu[d]) {
+                    if (gpu[bi] >= 0 && ns_px[bi] > 0) {
+                        int pct = 100 - (int)(gpu[bi] / ns_px[bi] * 100 + 0.5);
+                        printf("%*d", CPU_W, pct);
+                    } else {
+                        printf("%*s", CPU_W, "");
+                    }
+                }
             }
         }
     }
@@ -223,11 +226,12 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
     _Bool anomaly = 0;
     for (int d = 0; d + 1 < ND; d++) {
         int a = disp_idx[d], b = disp_idx[d + 1];
-        if (!(be_mask & (1 << a)) || !(be_mask & (1 << b))) { continue; }
-        if (ns_px[a] < 0 || ns_px[b] < 0) { continue; }
-        int ra = (int)(ns_px[a] * 100 + 0.5);
-        int rb = (int)(ns_px[b] * 100 + 0.5);
-        if (ra > rb) { anomaly = 1; }
+        if ((be_mask & (1 << a)) && (be_mask & (1 << b))
+                && ns_px[a] >= 0 && ns_px[b] >= 0) {
+            int ra = (int)(ns_px[a] * 100 + 0.5);
+            int rb = (int)(ns_px[b] * 100 + 0.5);
+            if (ra > rb) { anomaly = 1; }
+        }
     }
     if (anomaly) { printf(" !"); }
     printf("\n");
@@ -284,43 +288,49 @@ int main(int argc, char *argv[]) {
 
     for (int si = 0; si < ns; si++) {
         struct slide *s = slide_get(si);
-        if (!s->build_draw && !s->build_sdf_draw) { continue; }
-        if (match && !strstr(s->title, match)) { continue; }
+        if ((s->build_draw || s->build_sdf_draw)
+                && (!match || strstr(s->title, match))) {
+            size_t const bpp    = fmt.bpp;
+            size_t const planes = (size_t)fmt.planes;
+            void        *buf    = calloc((size_t)(W * H) * planes, bpp);
 
-        size_t const bpp    = fmt.bpp;
-        size_t const planes = (size_t)fmt.planes;
-        void        *buf    = calloc((size_t)(W * H) * planes, bpp);
-
-        double ns_px[5] = {-1, -1, -1, -1, -1};
-        double gpu[5]   = {-1, -1, -1, -1, -1};
-        struct umbra_backend_stats bstats[5] = {{0}};
-        for (int bi = 0; bi < nb; bi++) {
-            if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
-            struct slide_runtime *rt = slide_runtime(s, W, H, bes[bi], fmt, NULL);
-            struct slide_bg      *bg = slide_bg(bes[bi], fmt);
-            rt->dst_buf = (struct umbra_buf){.ptr=buf, .count=W*H*fmt.planes, .stride=W};
-            struct slide_draw_ctx sctx = {.s=s, .rt=rt, .bg=bg, .secs=0.0, .w=W, .h=H};
-            ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
-                              &gpu[bi], &bstats[bi]);
-            slide_bg_free(bg);
-            slide_runtime_free(rt);
-        }
-        any_anomaly |= print_row(s->title, ns_px, gpu, be_mask);
-        if (verbose) {
-            for (int d = 0; d < ND; d++) {
-                int bi = disp_idx[d];
-                if (!(be_mask & (1 << bi)) || ns_px[bi] < 0) { continue; }
-                struct umbra_backend_stats const *st = &bstats[bi];
-                double const us_per = st->dispatches
-                    ? st->gpu_sec / st->dispatches * 1e6 : 0;
-                fprintf(stderr, "  %s: %.3fms gpu"
-                                " \xc3\xb7 %d dispatches"
-                                " = %.0f \xc2\xb5s/dispatch\n",
-                        disp_name[d], st->gpu_sec * 1e3,
-                        st->dispatches, us_per);
+            double ns_px[5] = {-1, -1, -1, -1, -1};
+            double gpu[5]   = {-1, -1, -1, -1, -1};
+            struct umbra_backend_stats bstats[5] = {{0}};
+            for (int bi = 0; bi < nb; bi++) {
+                if ((be_mask & (1 << bi)) && bes[bi]) {
+                    struct slide_runtime *rt = slide_runtime(s, W, H, bes[bi], fmt, NULL);
+                    struct slide_bg      *bg = slide_bg(bes[bi], fmt);
+                    rt->dst_buf = (struct umbra_buf){
+                        .ptr=buf, .count=W*H*fmt.planes, .stride=W,
+                    };
+                    struct slide_draw_ctx sctx = {
+                        .s=s, .rt=rt, .bg=bg, .secs=0.0, .w=W, .h=H,
+                    };
+                    ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
+                                      &gpu[bi], &bstats[bi]);
+                    slide_bg_free(bg);
+                    slide_runtime_free(rt);
+                }
             }
+            any_anomaly |= print_row(s->title, ns_px, gpu, be_mask);
+            if (verbose) {
+                for (int d = 0; d < ND; d++) {
+                    int bi = disp_idx[d];
+                    if ((be_mask & (1 << bi)) && ns_px[bi] >= 0) {
+                        struct umbra_backend_stats const *st = &bstats[bi];
+                        double const us_per = st->dispatches
+                            ? st->gpu_sec / st->dispatches * 1e6 : 0;
+                        fprintf(stderr, "  %s: %.3fms gpu"
+                                        " \xc3\xb7 %d dispatches"
+                                        " = %.0f \xc2\xb5s/dispatch\n",
+                                disp_name[d], st->gpu_sec * 1e3,
+                                st->dispatches, us_per);
+                    }
+                }
+            }
+            free(buf);
         }
-        free(buf);
     }
 
     // Compile-time benchmarks.
@@ -329,63 +339,63 @@ int main(int argc, char *argv[]) {
 
         for (int si = 0; si < ns; si++) {
             struct slide *s = slide_get(si);
-            if (!s->build_draw && !s->build_sdf_draw) { continue; }
-            if (match && !strstr(s->title, match) && !strstr("compile", match)) {
-                continue;
-            }
-
-            double us_call[5] = {-1, -1, -1, -1, -1};
-            struct slide_runtime *rt = calloc(1, sizeof *rt);
-            for (int bi = 0; bi < nb; bi++) {
-                if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
-                compile_all_builders(rt, s, fmt, bes[bi]);
-
-                int    iters   = 1;
-                double t_pilot = 0;
-                for (int pi = 0; pi < 20; pi++) {
-                    double const start = now();
-                    for (int it = 0; it < iters; it++) {
+            if ((s->build_draw || s->build_sdf_draw)
+                    && (!match || strstr(s->title, match) || strstr("compile", match))) {
+                double us_call[5] = {-1, -1, -1, -1, -1};
+                struct slide_runtime *rt = calloc(1, sizeof *rt);
+                for (int bi = 0; bi < nb; bi++) {
+                    if ((be_mask & (1 << bi)) && bes[bi]) {
                         compile_all_builders(rt, s, fmt, bes[bi]);
-                    }
-                    t_pilot = now() - start;
-                    if (t_pilot >= target_secs / 2) { break; }
-                    iters *= 2;
-                }
-                int const cal = (int)((double)iters * target_secs / t_pilot);
-                if (cal > iters) { iters = cal; }
 
-                double best = 0;
-                double total = 0;
-                for (int k = 0; k < samples; k++) {
-                    double const start = now();
-                    for (int it = 0; it < iters; it++) {
-                        compile_all_builders(rt, s, fmt, bes[bi]);
+                        int    iters   = 1;
+                        double t_pilot = 0;
+                        for (int pi = 0; pi < 20; pi++) {
+                            double const start = now();
+                            for (int it = 0; it < iters; it++) {
+                                compile_all_builders(rt, s, fmt, bes[bi]);
+                            }
+                            t_pilot = now() - start;
+                            if (t_pilot >= target_secs / 2) { break; }
+                            iters *= 2;
+                        }
+                        int const cal = (int)((double)iters * target_secs / t_pilot);
+                        if (cal > iters) { iters = cal; }
+
+                        double best = 0;
+                        double total = 0;
+                        for (int k = 0; k < samples; k++) {
+                            double const start = now();
+                            for (int it = 0; it < iters; it++) {
+                                compile_all_builders(rt, s, fmt, bes[bi]);
+                            }
+                            double const dt = now() - start;
+                            if (k == 0 || dt < best) { best = dt; }
+                            total += dt;
+                            if (total >= (double)samples * target_secs) { break; }
+                        }
+                        us_call[bi] = best / (double)iters * 1e6;
                     }
-                    double const dt = now() - start;
-                    if (k == 0 || dt < best) { best = dt; }
-                    total += dt;
-                    if (total >= (double)samples * target_secs) { break; }
                 }
-                us_call[bi] = best / (double)iters * 1e6;
-            }
-            slide_runtime_free(rt);
-            printf("%-*s", TITLE_W, s->title);
-            _Bool first = 1;
-            for (int d = 0; d < ND; d++) {
-                int bi = disp_idx[d];
-                if (!(be_mask & (1 << bi))) { continue; }
-                if (!first) { printf("%*s", GAP, ""); }
-                first = 0;
-                if (us_call[bi] < 0) {
-                    printf("%*s", VAL_W + (disp_gpu[d] ? CPU_W : 0), "-");
-                } else if (disp_gpu[d]) {
-                    print_fixed(VAL_W, 1, us_call[bi]);
-                    printf("%*s", CPU_W, "");
-                } else {
-                    print_fixed(VAL_W, 1, us_call[bi]);
+                slide_runtime_free(rt);
+                printf("%-*s", TITLE_W, s->title);
+                _Bool first = 1;
+                for (int d = 0; d < ND; d++) {
+                    int bi = disp_idx[d];
+                    if (be_mask & (1 << bi)) {
+                        if (!first) { printf("%*s", GAP, ""); }
+                        first = 0;
+                        if (us_call[bi] < 0) {
+                            printf("%*s", VAL_W + (disp_gpu[d] ? CPU_W : 0), "-");
+                        } else if (disp_gpu[d]) {
+                            print_fixed(VAL_W, 1, us_call[bi]);
+                            printf("%*s", CPU_W, "");
+                        } else {
+                            print_fixed(VAL_W, 1, us_call[bi]);
+                        }
+                    }
                 }
+                printf("\n");
             }
-            printf("\n");
         }
     }
 
