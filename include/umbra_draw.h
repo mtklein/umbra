@@ -72,20 +72,6 @@ extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_fp16,
                               umbra_fmt_fp16_planar;
 
-// Effects emit IR into a builder.  Any uniforms registered with
-// umbra_bind_uniforms() must outlive the builder, flat_ir, and program.  These are
-// function types (not pointer types), so declarations read as
-// `umbra_blend umbra_blend_src, umbra_blend_srcover, ...;` and struct fields
-// carrying them write as `umbra_shader *inner_fn`.
-typedef umbra_color_val32 umbra_shader   (void *ctx, struct umbra_builder*,
-                                          umbra_val32 x, umbra_val32 y);
-typedef umbra_val32       umbra_coverage (void *ctx, struct umbra_builder*,
-                                          umbra_val32 x, umbra_val32 y);
-typedef umbra_interval    umbra_sdf      (void *ctx, struct umbra_builder*,
-                                          umbra_interval x, umbra_interval y);
-typedef umbra_color_val32 umbra_blend    (void *ctx, struct umbra_builder*,
-                                          umbra_color_val32 src,
-                                          umbra_color_val32 dst);
 
 // Perspective transform: the matrix's 9 floats are re-read each dispatch
 // through a bound uniforms span, then applied as
@@ -97,11 +83,27 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const*,
                                               struct umbra_builder*,
                                               umbra_val32 x, umbra_val32 y);
 
-// Shade a single color; ctx is an umbra_color*.
-umbra_shader umbra_shader_color;
+typedef umbra_val32 umbra_coverage(void *ctx, struct umbra_builder*,
+                                   umbra_val32 x, umbra_val32 y);
+umbra_coverage umbra_coverage_rect;  // Cover a rectangle; ctx is umbra_rect*.
 
-// ctx=NULL for all these blend functions.
-umbra_blend umbra_blend_src,
+
+typedef umbra_color_val32 umbra_shader(void *ctx, struct umbra_builder*,
+                                       umbra_val32 x, umbra_val32 y);
+umbra_shader umbra_shader_color;  // Shade a single color; ctx is umbra_color*.
+
+// Supersample a wrapped shader; ctx is struct umbra_supersample*.
+struct umbra_supersample {
+    umbra_shader *inner_fn;
+    void         *inner_ctx;
+    int           samples, :32;
+};
+umbra_shader umbra_shader_supersample;
+
+typedef umbra_color_val32 umbra_blend(void *ctx, struct umbra_builder*,
+                                      umbra_color_val32 src,
+                                      umbra_color_val32 dst);
+umbra_blend umbra_blend_src,     // ctx=NULL for all these blend functions.
             umbra_blend_srcover,
             umbra_blend_dstover,
             umbra_blend_multiply;
@@ -138,6 +140,10 @@ struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_ma
                                          umbra_blend    , void *blend_ctx,
                                          struct umbra_buf *dst,
                                          struct umbra_fmt  dst_fmt);
+
+// SDF where f(x,y)<0 -> inside, defined over intervals.
+typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
+                                 umbra_interval x, umbra_interval y);
 
 // Draw using an umbra_sdf as coverage.  hard_edge=1 gives a binary mask;
 // hard_edge=0 clamps -sdf into [0, 1] for a 1px AA ramp.
@@ -177,17 +183,4 @@ struct umbra_coverage_from_sdf {
 };
 umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder*,
                                      umbra_val32 x, umbra_val32 y);
-
-// Supersample a wrapped shader.
-struct umbra_supersample {
-    umbra_shader *inner_fn;
-    void         *inner_ctx;
-    int           samples, :32;
-};
-umbra_color_val32 umbra_shader_supersample(void *umbra_supersample, struct umbra_builder*,
-                                            umbra_val32 x, umbra_val32 y);
-
-// Cover a rectangle, ctx is an umbra_rect*.
-umbra_val32 umbra_coverage_rect(void *umbra_rect, struct umbra_builder*,
-                                 umbra_val32 x, umbra_val32 y);
 
