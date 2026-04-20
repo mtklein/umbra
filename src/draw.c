@@ -287,12 +287,6 @@ void umbra_build_sdf_bounds(struct umbra_builder *b,
     umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));
 }
 
-// TODO: add a second `covered` program alongside `draw` for tiles where the
-// SDF is entirely inside the shape.  bounds already tags such tiles as
-// UMBRA_SDF_TILE_FULL; the fast path dispatches `covered` (shader+blend at
-// cov=1, no per-pixel SDF eval) instead of `draw`.  `covered` would be built
-// like `draw` but with umbra_build_draw (no SDF coverage adapter).
-
 static _Bool matrix_is_affine(struct umbra_matrix const *m) {
     return m->p0 == 0.0f && m->p1 == 0.0f && m->p2 == 1.0f;
 }

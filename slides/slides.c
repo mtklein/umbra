@@ -113,10 +113,6 @@ void slide_bg_cleanup(void) {
     bg_w = bg_h = 0;
 }
 
-// TODO: query per-backend dispatch_granularity instead of this global
-// compromise (same note as src/draw.c's QUEUE_MIN_TILE).
-enum { SLIDE_TILE = 512 };
-
 static struct umbra_builder* runtime_draw_builder(
         struct slide *s, struct umbra_buf *dst,
         struct umbra_fmt fmt,
@@ -195,9 +191,11 @@ struct slide_runtime* slide_runtime(struct slide *s,
     return rt;
 }
 
+// TODO: query per-backend dispatch_granularity instead of this global compromise.
+enum { SLIDE_TILE = 512 };
+
 void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
                         double secs, int l, int t, int r, int b) {
-    if (!rt->draw) { return; }
     if (s->animate) { s->animate(s, secs); }
 
     if (rt->bounds) {
