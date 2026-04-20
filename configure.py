@@ -159,7 +159,6 @@ DUMPS = [
     ('sdf_text',                        2),
     ('sdf_n_gon',                       2),
     ('slug',                            1),
-    ('overview',                        1),
 ]
 
 
