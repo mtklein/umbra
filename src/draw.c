@@ -286,11 +286,19 @@ void umbra_build_sdf_draw(struct umbra_builder *b,
 }
 
 void umbra_build_sdf_bounds(struct umbra_builder *b,
-                            umbra_ptr lo,
+                            umbra_ptr cov,
                             umbra_interval x, umbra_interval y,
                             umbra_sdf sdf_fn, void *sdf_ctx) {
     umbra_interval const f = sdf_fn(sdf_ctx, b, x, y);
-    umbra_store_32(b, lo, f.lo);
+    umbra_val32 const zero_f = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const partial = umbra_lt_f32(b, f.lo, zero_f),
+                      full    = umbra_lt_f32(b, f.hi, zero_f);
+    umbra_val32 const none_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_NONE),
+                      partial_i = umbra_imm_i32(b, UMBRA_SDF_TILE_PARTIAL),
+                      full_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_FULL);
+    umbra_val32 const base = umbra_sel_32(b, partial, partial_i, none_i);
+    umbra_val32 const tri  = umbra_sel_32(b, full,    full_i,    base);
+    umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));
 }
 
 struct grid_params {
@@ -301,11 +309,11 @@ struct umbra_sdf_draw {
     struct umbra_program          *draw;
     struct umbra_program          *bounds;
     struct umbra_backend          *bounds_be;
-    float                         *lo;
+    uint16_t                      *cov;
     struct grid_params             grid;
-    int                            lo_cap;
+    int                            cov_cap;
     int                            :32;
-    struct umbra_buf               lo_buf;
+    struct umbra_buf               cov_buf;
     struct umbra_buf               draw_dst_buf;
 };
 
@@ -372,7 +380,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     struct umbra_builder *bb = umbra_builder();
     umbra_ptr const g   = umbra_bind_uniforms(bb, &d->grid,
                                                   (int)(sizeof d->grid / 4));
-    umbra_ptr const dst = umbra_bind_buf(bb, &d->lo_buf);
+    umbra_ptr const dst = umbra_bind_buf(bb, &d->cov_buf);
     umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
                       base_y = umbra_uniform_32(bb, g, 1),
                       tile_w = umbra_uniform_32(bb, g, 2),
@@ -423,14 +431,14 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
         .tile_w = (float)QUEUE_MIN_TILE,
         .tile_h = (float)QUEUE_MIN_TILE,
     };
-    if (tiles > d->lo_cap) {
-        d->lo = realloc(d->lo, (size_t)tiles * sizeof(float));
-        d->lo_cap = tiles;
+    if (tiles > d->cov_cap) {
+        d->cov = realloc(d->cov, (size_t)tiles * sizeof *d->cov);
+        d->cov_cap = tiles;
     }
-    __builtin_memset(d->lo, 0, (size_t)tiles * sizeof(float));
-    d->lo_buf = (struct umbra_buf){.ptr = d->lo, .count = tiles, .stride = xt};
+    __builtin_memset(d->cov, 0, (size_t)tiles * sizeof *d->cov);
+    d->cov_buf = (struct umbra_buf){.ptr = d->cov, .count = tiles, .stride = xt};
     d->bounds->queue(d->bounds, 0, 0, xt, yt);
-    float *lo = d->lo;
+    uint16_t const *cov = d->cov;
 
     // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
 
@@ -456,7 +464,7 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
     // the analogous specialization-constant path.
     for (int ty = 0; ty < yt; ty++) {
         for (int tx = 0; tx < xt; tx++) {
-            if (lo[ty * xt + tx] < 0) {
+            if (cov[ty * xt + tx] != UMBRA_SDF_TILE_NONE) {
                 int const tl = l + tx * QUEUE_MIN_TILE,
                           tt = t + ty * QUEUE_MIN_TILE,
                           tr = tl + QUEUE_MIN_TILE < r ? tl + QUEUE_MIN_TILE : r,
@@ -473,7 +481,7 @@ void umbra_sdf_draw_free(struct umbra_sdf_draw *d) {
         umbra_program_free(d->draw);
         umbra_program_free(d->bounds);
         umbra_backend_free(d->bounds_be);
-        free(d->lo);
+        free(d->cov);
         free(d);
     }
 }

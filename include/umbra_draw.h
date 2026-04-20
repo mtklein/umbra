@@ -107,10 +107,18 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 
-// Evaluate SDF f(x,y) and store f.lo to lo.
-// TODO: also store f.hi to use for fully-covered tile tests
+// Tile coverage class stored by umbra_build_sdf_bounds (one uint16 per tile).
+// Ordered so `cov > 0` means "draw the tile" and `cov == FULL` means "skip the
+// per-pixel SDF eval fast path (TODO)."
+enum {
+    UMBRA_SDF_TILE_NONE    = 0,  // f.lo >= 0: tile entirely outside
+    UMBRA_SDF_TILE_PARTIAL = 1,  // f.lo <  0, f.hi >= 0: edge tile, needs the full draw program
+    UMBRA_SDF_TILE_FULL    = 2,  // f.hi <  0: tile entirely inside
+};
+
+// Evaluate SDF f(x,y) and store a uint16 umbra_sdf_tile classification to cov.
 void umbra_build_sdf_bounds(struct umbra_builder*,
-                            umbra_ptr lo,
+                            umbra_ptr cov,
                             umbra_interval x, umbra_interval y,
                             umbra_sdf, void *sdf_ctx);
 
