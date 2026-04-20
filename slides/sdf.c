@@ -51,13 +51,20 @@ struct csg_slide {
     enum csg_op op;
     int pad;
 
-    umbra_color               color;
-    struct two_circle_sdf     sdf;
-    umbra_sdf                 *sdf_fn;
+    umbra_color            color;
+    struct two_circle_sdf  sdf;
+    umbra_sdf             *sdf_fn;
 
-    struct umbra_fmt          fmt;
-    struct umbra_sdf_draw    *disp;
-    struct umbra_buf          dst_buf;
+    struct umbra_fmt       fmt;
+    struct umbra_program  *draw_prog;
+    struct umbra_program  *bounds_prog;
+    struct umbra_backend  *bounds_be;
+    struct umbra_sdf_grid  grid;
+    struct umbra_buf       dst_buf;
+    struct umbra_buf       cov_buf;
+    uint16_t              *cov;
+    int                    cov_cap;
+    int                    :32;
 };
 
 static void two_circle_gather(struct umbra_builder *b, void *ctx,
@@ -112,15 +119,66 @@ static void csg_init(struct slide *s, int w, int h) {
     st->h = h;
 }
 
+static void csg_build_sdf_draw(struct slide *s,
+                               struct umbra_builder *b_draw,
+                               umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                               umbra_val32 x, umbra_val32 y,
+                               struct umbra_builder *b_bounds,
+                               umbra_ptr cov_ptr,
+                               umbra_interval ix, umbra_interval iy) {
+    struct csg_slide *st = (struct csg_slide *)s;
+    umbra_build_sdf_draw(b_draw, dst_ptr, fmt, x, y,
+                         st->sdf_fn, &st->sdf, 1,
+                         umbra_shader_color,  &st->color,
+                         umbra_blend_srcover, NULL);
+    umbra_build_sdf_bounds(b_bounds, cov_ptr, ix, iy, st->sdf_fn, &st->sdf);
+}
+
+enum { CSG_TILE = 512 };
+
+static void csg_builders(struct slide *s, struct umbra_fmt fmt,
+                         struct umbra_builder **out_draw,
+                         struct umbra_builder **out_bounds) {
+    struct csg_slide *st = (struct csg_slide *)s;
+
+    struct umbra_builder *db = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(db, &st->dst_buf);
+    umbra_val32 const x = umbra_f32_from_i32(db, umbra_x(db)),
+                      y = umbra_f32_from_i32(db, umbra_y(db));
+
+    struct umbra_builder *bb = umbra_builder();
+    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &st->cov_buf);
+    umbra_interval ix, iy;
+    umbra_sdf_tile_intervals(bb, &st->grid, NULL, &ix, &iy);
+
+    csg_build_sdf_draw(s, db, dst_ptr, fmt, x, y, bb, cov_ptr, ix, iy);
+
+    *out_draw   = db;
+    *out_bounds = bb;
+}
+
 static void csg_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct csg_slide *st = (struct csg_slide *)s;
-    umbra_sdf_draw_free(st->disp);
-    st->fmt  = fmt;
-    st->disp = umbra_sdf_draw(be, NULL,                              st->sdf_fn,         &st->sdf,
-                              0,
-                              umbra_shader_color, &st->color,
-                              umbra_blend_srcover, NULL,
-                              fmt);
+    umbra_program_free(st->draw_prog);
+    umbra_program_free(st->bounds_prog);
+    umbra_backend_free(st->bounds_be);
+    st->fmt = fmt;
+
+    struct umbra_builder *db, *bb;
+    csg_builders(s, fmt, &db, &bb);
+
+    struct umbra_flat_ir *dir = umbra_flat_ir(db);
+    umbra_builder_free(db);
+    st->draw_prog = be->compile(be, dir);
+    umbra_flat_ir_free(dir);
+
+    struct umbra_flat_ir *bir = umbra_flat_ir(bb);
+    umbra_builder_free(bb);
+    st->bounds_be = umbra_backend_jit();
+    if (!st->bounds_be) { st->bounds_be = umbra_backend_interp(); }
+    st->bounds_prog = st->bounds_be->compile(st->bounds_be, bir);
+    umbra_flat_ir_free(bir);
+
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
@@ -128,32 +186,34 @@ static void csg_draw(struct slide *s, double secs, int l, int t, int r, int b, v
     struct csg_slide *st = (struct csg_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
     two_circle_orbit(&st->sdf, (float)secs, st->w, st->h);
-    umbra_sdf_draw_queue(st->disp, l, t, r, b, (struct umbra_buf){
+    st->dst_buf = (struct umbra_buf){
         .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
-    });
+    };
+    int const xt = (r - l + CSG_TILE - 1) / CSG_TILE,
+              yt = (b - t + CSG_TILE - 1) / CSG_TILE,
+              tiles = xt * yt;
+    if (tiles > st->cov_cap) {
+        st->cov     = realloc(st->cov, (size_t)tiles * sizeof *st->cov);
+        st->cov_cap = tiles;
+    }
+    st->cov_buf = (struct umbra_buf){.ptr = st->cov, .count = tiles, .stride = xt};
+    umbra_sdf_dispatch(st->bounds_prog, st->draw_prog, &st->grid, &st->cov_buf,
+                       CSG_TILE, l, t, r, b);
 }
 
 static int csg_get_builders(struct slide *s, struct umbra_fmt fmt,
                             struct umbra_builder **out, int max) {
-    if (max < 1) { return 0; }
-    struct csg_slide *st = (struct csg_slide *)s;
-    struct umbra_coverage_from_sdf cov = {
-        .sdf_fn    = st->sdf_fn,
-        .sdf_ctx   = &st->sdf,
-        .hard_edge = 0,
-    };
-    out[0] = umbra_draw_builder(
-        NULL,
-                                umbra_coverage_from_sdf, &cov,
-                                umbra_shader_color,      &st->color,
-                                umbra_blend_srcover,     NULL,
-                                &st->dst_buf,            fmt);
-    return out[0] ? 1 : 0;
+    if (max < 2) { return 0; }
+    csg_builders(s, fmt, &out[0], &out[1]);
+    return 2;
 }
 
 static void csg_free(struct slide *s) {
     struct csg_slide *st = (struct csg_slide *)s;
-    umbra_sdf_draw_free(st->disp);
+    umbra_program_free(st->draw_prog);
+    umbra_program_free(st->bounds_prog);
+    umbra_backend_free(st->bounds_be);
+    free(st->cov);
     free(st);
 }
 
@@ -175,7 +235,8 @@ static struct slide* make_csg(char const *title, float const bg[4], float const 
         .prepare = csg_prepare,
         .draw = csg_draw,
         .free = csg_free,
-        .get_builders = csg_get_builders,
+        .get_builders  = csg_get_builders,
+        .build_sdf_draw = csg_build_sdf_draw,
     };
     return &st->base;
 }

@@ -52,6 +52,23 @@ struct slide {
                        umbra_ptr dst_ptr, struct umbra_fmt fmt,
                        umbra_val32 x, umbra_val32 y);
 
+    // SDF sibling of build_draw: fill b_draw with the pixel-side draw IR
+    // (sdf coverage + shader + blend) and b_bounds with the tile-side
+    // interval-evaluation IR.  dst_ptr and cov_ptr are already bound on
+    // their respective builders.  (x, y) are the post-transform dispatch
+    // coords; (ix, iy) are the matching tile-extent intervals.  The slide
+    // may layer its own transforms before calling umbra_build_sdf_draw /
+    // umbra_build_sdf_bounds.  Consumers compile both programs and drive
+    // them via umbra_sdf_dispatch.  NULL means the slide has no SDF
+    // composable path.
+    void (*build_sdf_draw)(struct slide*,
+                           struct umbra_builder *b_draw,
+                           umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                           umbra_val32 x, umbra_val32 y,
+                           struct umbra_builder *b_bounds,
+                           umbra_ptr cov_ptr,
+                           umbra_interval ix, umbra_interval iy);
+
     // Update animation state (e.g. per-frame matrix uniforms) without
     // emitting any GPU/CPU work.  NULL means static.
     void  (*animate)(struct slide*, double secs);
