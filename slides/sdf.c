@@ -42,28 +42,17 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
 
 // Shared state for every SDF slide in this file.  Each slide embeds this as
 // its first field so (struct slide *) casts hit sdf_common.base and
-// (struct sdf_common *) casts work too.  Slides fill sdf_fn/sdf_ctx/color in
-// their ctor and are otherwise driven by sdf_common_{prepare,draw,...}.
+// (struct sdf_common *) casts work too.  Slides fill sdf_fn/sdf_ctx/color
+// in their ctor and are otherwise driven by sdf_common_{prepare,draw,...}
+// and the shared slide_runtime embedded here.
 struct sdf_common {
-    struct slide           base;
-    int                    w, h;
-    umbra_color            color;
-    umbra_sdf             *sdf_fn;
-    void                  *sdf_ctx;
-
-    struct umbra_fmt       fmt;
-    struct umbra_program  *draw_prog;
-    struct umbra_program  *bounds_prog;
-    struct umbra_backend  *bounds_be;
-    struct umbra_sdf_grid  grid;
-    struct umbra_buf       dst_buf;
-    struct umbra_buf       cov_buf;
-    uint16_t              *cov;
-    int                    cov_cap;
-    int                    :32;
+    struct slide          base;
+    int                   w, h;
+    umbra_color           color;
+    umbra_sdf            *sdf_fn;
+    void                 *sdf_ctx;
+    struct slide_runtime  rt;
 };
-
-enum { SDF_TILE = 512 };
 
 static void sdf_common_build_draw(struct slide *s,
                                   struct umbra_builder *b_draw,
@@ -80,50 +69,11 @@ static void sdf_common_build_draw(struct slide *s,
     umbra_build_sdf_bounds(b_bounds, cov_ptr, ix, iy, c->sdf_fn, c->sdf_ctx);
 }
 
-static void sdf_common_builders(struct slide *s, struct umbra_fmt fmt,
-                                struct umbra_builder **out_draw,
-                                struct umbra_builder **out_bounds) {
-    struct sdf_common *c = (struct sdf_common *)s;
-
-    struct umbra_builder *db = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(db, &c->dst_buf);
-    umbra_val32 const x = umbra_f32_from_i32(db, umbra_x(db)),
-                      y = umbra_f32_from_i32(db, umbra_y(db));
-
-    struct umbra_builder *bb = umbra_builder();
-    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &c->cov_buf);
-    umbra_interval ix, iy;
-    umbra_sdf_tile_intervals(bb, &c->grid, NULL, &ix, &iy);
-
-    sdf_common_build_draw(s, db, dst_ptr, fmt, x, y, bb, cov_ptr, ix, iy);
-
-    *out_draw   = db;
-    *out_bounds = bb;
-}
-
 static void sdf_common_prepare(struct slide *s,
                                struct umbra_backend *be, struct umbra_fmt fmt) {
     struct sdf_common *c = (struct sdf_common *)s;
-    umbra_program_free(c->draw_prog);
-    umbra_program_free(c->bounds_prog);
-    umbra_backend_free(c->bounds_be);
-    c->fmt = fmt;
-
-    struct umbra_builder *db, *bb;
-    sdf_common_builders(s, fmt, &db, &bb);
-
-    struct umbra_flat_ir *dir = umbra_flat_ir(db);
-    umbra_builder_free(db);
-    c->draw_prog = be->compile(be, dir);
-    umbra_flat_ir_free(dir);
-
-    struct umbra_flat_ir *bir = umbra_flat_ir(bb);
-    umbra_builder_free(bb);
-    c->bounds_be = umbra_backend_jit();
-    if (!c->bounds_be) { c->bounds_be = umbra_backend_interp(); }
-    c->bounds_prog = c->bounds_be->compile(c->bounds_be, bir);
-    umbra_flat_ir_free(bir);
-
+    slide_runtime_cleanup(&c->rt);
+    slide_runtime_compile(&c->rt, s, c->w, c->h, be, fmt, NULL);
     slide_bg_prepare(be, fmt, c->w, c->h);
 }
 
@@ -131,37 +81,40 @@ static void sdf_common_draw(struct slide *s, double secs,
                             int l, int t, int r, int b, void *buf) {
     struct sdf_common *c = (struct sdf_common *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    if (s->animate) { s->animate(s, secs); }
-    c->dst_buf = (struct umbra_buf){
-        .ptr = buf, .count = c->w * c->h * c->fmt.planes, .stride = c->w,
+    c->rt.dst_buf = (struct umbra_buf){
+        .ptr = buf, .count = c->w * c->h * c->rt.fmt.planes, .stride = c->w,
     };
-    int const xt = (r - l + SDF_TILE - 1) / SDF_TILE,
-              yt = (b - t + SDF_TILE - 1) / SDF_TILE,
-              tiles = xt * yt;
-    if (tiles > c->cov_cap) {
-        c->cov     = realloc(c->cov, (size_t)tiles * sizeof *c->cov);
-        c->cov_cap = tiles;
-    }
-    c->cov_buf = (struct umbra_buf){.ptr = c->cov, .count = tiles, .stride = xt};
-    umbra_sdf_dispatch(c->bounds_prog, c->draw_prog, &c->grid, &c->cov_buf,
-                       SDF_TILE, l, t, r, b);
+    slide_runtime_draw(&c->rt, s, secs, l, t, r, b);
 }
 
 static int sdf_common_get_builders(struct slide *s, struct umbra_fmt fmt,
                                    struct umbra_builder **out, int max) {
     if (max < 2) { return 0; }
-    sdf_common_builders(s, fmt, &out[0], &out[1]);
+    struct sdf_common *c = (struct sdf_common *)s;
+
+    struct umbra_builder *db = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(db, &c->rt.dst_buf);
+    umbra_val32 const x = umbra_f32_from_i32(db, umbra_x(db)),
+                      y = umbra_f32_from_i32(db, umbra_y(db));
+
+    struct umbra_builder *bb = umbra_builder();
+    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &c->rt.cov_buf);
+    umbra_interval ix, iy;
+    umbra_sdf_tile_intervals(bb, &c->rt.grid, NULL, &ix, &iy);
+
+    sdf_common_build_draw(s, db, dst_ptr, fmt, x, y, bb, cov_ptr, ix, iy);
+
+    out[0] = db;
+    out[1] = bb;
     return 2;
 }
 
-// Release everything sdf_common owns, but leave the outer slide alloc alone --
-// slides with extra state call this from their own free() and then free(s).
+// Release everything sdf_common owns, but leave the outer slide alloc alone
+// -- slides with extra state call this from their own free() and then
+// free(s).
 static void sdf_common_cleanup(struct slide *s) {
     struct sdf_common *c = (struct sdf_common *)s;
-    umbra_program_free(c->draw_prog);
-    umbra_program_free(c->bounds_prog);
-    umbra_backend_free(c->bounds_be);
-    free(c->cov);
+    slide_runtime_cleanup(&c->rt);
 }
 
 static void sdf_common_free(struct slide *s) {
