@@ -56,12 +56,6 @@ typedef struct asm_arm64 Buf;
 
 // X0=l, X1=t, X2=r, X3=b, X4=buf.
 // X0=col_end, X1=l, X2=buf, X9=col, X14=row.
-// TODO: should the RA (src/ra.{h,c}) own GPRs too, not just V regs? These
-// hand-picked assignments (plus the x86 mirror in jit_x86.c) are unchecked by
-// anything — a new op that quietly clobbers XT/XP/etc. would just miscompile.
-// RA already tracks lifetimes, eviction, and pinning for V regs; extending it
-// to a second register class with its own pool and max_reg would let XP/XT/
-// scratch etc. come out of a managed pool instead of this by-hand table.
 enum {
     XWIDTH = 1,   // x0_col (reset XCOL at row boundary)
     XBUF   = 2,
