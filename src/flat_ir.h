@@ -56,7 +56,7 @@ struct umbra_builder {
 struct umbra_flat_ir {
     struct ir_inst           *inst;
     int                       insts,      // Total instruction count.
-                              preamble;   // Fence: inst[0..preamble) are uniform, [preamble..) vary.
+                              preamble;   // inst[0..preamble) are uniform, [preamble..) varying.
     int                       loop_begin, // Instruction index of op_loop_begin, or -1.
                               loop_end;   // Instruction index of op_loop_end,   or -1.
     int                       vars, pad;

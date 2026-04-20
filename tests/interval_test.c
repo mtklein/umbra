@@ -233,8 +233,8 @@ TEST(interval_exact_stays_exact) {
 TEST(interval_loop) {
     // Compute max(a[i]*x - b[i]) over i=0..2 with x as an interval.
     // Data: a={1, -1, 0.5}, b={2, 1, 3}, stored interleaved as [a0,b0,a1,b1,a2,b2].
-    // For x=[0,4]: i=0: [0-2, 4-2]=[−2,2], i=1: [−4-1, 0-1]=[−5,−1], i=2: [0-3, 2-3]=[−3,−1]
-    // max = [−2, 2].
+    // For x=[0,4]: i=0: [0-2, 4-2]=[−2,2], i=1: [−4-1, 0-1]=[−5,−1],
+    //              i=2: [0-3, 2-3]=[−3,−1]; max = [−2, 2].
 
     // Fixed uniform layout: struct with {data: umbra_buf, n: float, x: float[2]}.
     struct uni {

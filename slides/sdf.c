@@ -148,9 +148,15 @@ static struct slide* make_csg(char const *title, umbra_color color, enum csg_op 
     return &st->common.base;
 }
 
-SLIDE(slide_sdf_union)     { return make_csg("SDF Union",        (umbra_color){0.2f, 0.8f, 0.4f, 1}, CSG_UNION); }
-SLIDE(slide_sdf_intersect) { return make_csg("SDF Intersection", (umbra_color){0.8f, 0.4f, 0.2f, 1}, CSG_INTERSECT); }
-SLIDE(slide_sdf_difference){ return make_csg("SDF Difference",   (umbra_color){0.4f, 0.2f, 0.8f, 1}, CSG_DIFFERENCE); }
+SLIDE(slide_sdf_union) {
+    return make_csg("SDF Union",        (umbra_color){0.2f, 0.8f, 0.4f, 1}, CSG_UNION);
+}
+SLIDE(slide_sdf_intersect) {
+    return make_csg("SDF Intersection", (umbra_color){0.8f, 0.4f, 0.2f, 1}, CSG_INTERSECT);
+}
+SLIDE(slide_sdf_difference) {
+    return make_csg("SDF Difference",   (umbra_color){0.4f, 0.2f, 0.8f, 1}, CSG_DIFFERENCE);
+}
 
 // Circle.
 
