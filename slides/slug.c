@@ -11,15 +11,6 @@
 #define UNI_SLOT(type, field) \
     ((int)(__builtin_offsetof(type, field) / 4))
 
-umbra_val32 coverage_winding(void *ctx, struct umbra_builder *b,
-                             umbra_val32 x, umbra_val32 y) {
-    struct umbra_buf const *self = ctx;
-    (void)x; (void)y;
-    umbra_ptr const w = umbra_bind_buf(b, self);
-    umbra_val32 const raw = umbra_load_32(b, w);
-    return umbra_min_f32(b, umbra_abs_f32(b, raw), umbra_imm_f32(b, 1.0f));
-}
-
 struct slug_cov_uniforms {
     float bw, bh;
     int   n_curves;
@@ -35,6 +26,24 @@ struct slug_cov_ctx {
 // signed scanline crossings at (x, y), clamp |acc| into [0, 1].  Returns 0
 // outside [0, bw) x [0, bh) so the loop work doesn't contribute outside the
 // glyph bounds.  ctx is a struct slug_cov_ctx*.
+//
+// TODO: wrong at some animation steps and/or at large canvas sizes.  Observed
+// by resizing the demo window: small sizes showed rare pixel flicker (easy to
+// dismiss as noise); large sizes clearly mis-render slug past the animation
+// step we capture in dumps/.  Every backend (interp, jit, metal, vulkan, wgpu)
+// shows the same wrongness -- so it's not a backend issue, it's this winding
+// algorithm.  Candidates to investigate:
+//   - quadratic root conditioning when a is small but is_quad is still true
+//     (the ep=1/65536 threshold may be too tight or too loose for the scaled
+//     coordinates at large canvases).
+//   - division by pw (perspective divide) when pw is near zero or negative,
+//     which can happen off-screen at large matrix tilt angles.
+//   - the half-open [z, o) interval for t1/t2 combined with the >0 test on x1/x2
+//     can drop or double-count curves that pass exactly through the scanline
+//     start.
+//   - direction (dy1/dy2) sign picked at the exact root sometimes differs from
+//     the actual curve-crossing sign, giving cancelling winding contributions
+//     that shouldn't cancel.
 static umbra_val32 coverage_slug_winding(void *vctx, struct umbra_builder *b,
                                          umbra_val32 x, umbra_val32 y) {
     struct slug_cov_ctx const *ctx = vctx;
@@ -245,282 +254,6 @@ void slug_free(struct slug_curves *sc) {
     *sc = (struct slug_curves){0};
 }
 
-// Uniform layout: buf[0] holds a `struct slug_acc_uniforms` or
-// `struct slug_uniforms`; dst at buf[1].
-
-// TODO: this rasterizer is wrong at some animation steps and/or at large canvas
-// sizes.  Observed by resizing the demo window: small sizes showed rare pixel
-// flicker (easy to dismiss as noise); large sizes clearly mis-render slug past
-// the animation step we capture in dumps/.  Every backend (interp, jit, metal,
-// vulkan, wgpu) shows the same wrongness, and both the one-pass loop variant
-// (coverage_slug_winding above) and the two-pass accumulator (this function)
-// agree -- so it's not a backend issue, it's the shared winding algorithm.
-//
-// Candidates to investigate:
-//   - quadratic root conditioning when a is small but is_quad is still true
-//     (the ep=1/65536 threshold may be too tight or too loose for the scaled
-//     coordinates at large canvases).
-//   - division by pw (perspective divide) when pw is near zero or negative,
-//     which can happen off-screen at large matrix tilt angles.
-//   - the half-open [z, o) interval for t1/t2 combined with the >0 test on x1/x2
-//     can drop or double-count curves that pass exactly through the scanline
-//     start.
-//   - direction (dy1/dy2) sign picked at the exact root sometimes differs from
-//     the actual curve-crossing sign, giving cancelling winding contributions
-//     that shouldn't cancel.
-//
-// Both slug_build_acc and coverage_slug_winding above duplicate this math --
-// fix them together (or factor into a shared emit helper before fixing).
-
-struct umbra_builder* slug_build_acc(struct umbra_buf const *curves_buf,
-                                     struct slug_acc_uniforms const *uni,
-                                     struct umbra_buf const *wind_buf) {
-    struct umbra_builder *b = umbra_builder();
-
-    umbra_ptr const u      = umbra_bind_uniforms(b, uni, (int)(sizeof *uni / 4));
-    umbra_ptr const curves = umbra_bind_buf (b, curves_buf);
-    umbra_ptr const wind   = umbra_bind_buf (b, wind_buf);
-
-    umbra_val32 xf = umbra_f32_from_i32(b, umbra_x(b));
-    umbra_val32 yf = umbra_f32_from_i32(b, umbra_y(b));
-
-    int const mbase = UNI_SLOT(struct slug_acc_uniforms, mat);
-    umbra_matrix_val32 const m = {
-        .sx = umbra_uniform_32(b, u, mbase + 0),
-        .kx = umbra_uniform_32(b, u, mbase + 1),
-        .tx = umbra_uniform_32(b, u, mbase + 2),
-        .ky = umbra_uniform_32(b, u, mbase + 3),
-        .sy = umbra_uniform_32(b, u, mbase + 4),
-        .ty = umbra_uniform_32(b, u, mbase + 5),
-        .p0 = umbra_uniform_32(b, u, mbase + 6),
-        .p1 = umbra_uniform_32(b, u, mbase + 7),
-        .p2 = umbra_uniform_32(b, u, mbase + 8),
-    };
-    umbra_val32 bw = umbra_uniform_32(b, u, UNI_SLOT(struct slug_acc_uniforms, bw));
-    umbra_val32 bh = umbra_uniform_32(b, u, UNI_SLOT(struct slug_acc_uniforms, bh));
-
-    umbra_point_val32 const g = umbra_apply_matrix(b, m, xf, yf);
-    umbra_val32 gx = g.x, gy = g.y;
-
-    umbra_val32 z  = umbra_imm_f32(b, 0.0f);
-    umbra_val32 o  = umbra_imm_f32(b, 1.0f);
-    umbra_val32 tw = umbra_imm_f32(b, 2.0f);
-    umbra_val32 ep = umbra_imm_f32(b, 1.0f/65536.0f);
-
-    umbra_val32 in = umbra_and_32(b,
-        umbra_and_32(b,
-            umbra_le_f32(b, z, gx),
-            umbra_lt_f32(b, gx, bw)),
-        umbra_and_32(b,
-            umbra_le_f32(b, z, gy),
-            umbra_lt_f32(b, gy, bh)));
-
-    umbra_val32 j = umbra_uniform_32(b, u, UNI_SLOT(struct slug_acc_uniforms, j));
-    umbra_val32 k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));
-
-    umbra_val32 p0x = umbra_gather_32(b, curves, k),
-                p0y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 1))),
-                p1x = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 2))),
-                p1y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 3))),
-                p2x = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 4))),
-                p2y = umbra_gather_32(b, curves, umbra_add_i32(b, k, umbra_imm_i32(b, 5)));
-
-    umbra_val32 q0y = umbra_sub_f32(b, p0y, gy);
-    umbra_val32 q1y = umbra_sub_f32(b, p1y, gy);
-    umbra_val32 q2y = umbra_sub_f32(b, p2y, gy);
-
-    umbra_val32 a = umbra_add_f32(b,
-        umbra_sub_f32(b, q0y,
-            umbra_mul_f32(b, tw, q1y)), q2y);
-    umbra_val32 bv = umbra_sub_f32(b, q0y, q1y);
-
-    umbra_val32 disc = umbra_sub_f32(b,
-        umbra_mul_f32(b, bv, bv),
-        umbra_mul_f32(b, a, q0y));
-    umbra_val32 ok = umbra_le_f32(b, z, disc);
-    umbra_val32 sd = umbra_sqrt_f32(b, umbra_max_f32(b, disc, z));
-
-    umbra_val32 abs_a = umbra_abs_f32(b, a);
-    umbra_val32 is_quad = umbra_lt_f32(b, ep, abs_a);
-
-    umbra_val32 ia = umbra_div_f32(b, o, umbra_sel_32(b, is_quad, a, o));
-
-    umbra_val32 qt1 = umbra_mul_f32(b, umbra_sub_f32(b, bv, sd), ia);
-    umbra_val32 qt2 = umbra_mul_f32(b, umbra_add_f32(b, bv, sd), ia);
-
-    umbra_val32 abs_bv = umbra_abs_f32(b, bv);
-    umbra_val32 lt = umbra_div_f32(b, q0y,
-                         umbra_sel_32(b, umbra_lt_f32(b, ep, abs_bv),
-                                     umbra_mul_f32(b, tw, bv), o));
-
-    umbra_val32 t1 = umbra_sel_32(b, is_quad, qt1, lt);
-    umbra_val32 t2 = qt2;
-
-    umbra_val32 t1ok = umbra_and_32(b, ok, umbra_and_32(b, umbra_le_f32(b, z, t1),
-                                                            umbra_lt_f32(b, t1, o)));
-    umbra_val32 t2ok = umbra_and_32(b, umbra_and_32(b, ok, is_quad),
-                                       umbra_and_32(b, umbra_le_f32(b, z, t2),
-                                                       umbra_lt_f32(b, t2, o)));
-
-    umbra_val32 q0x = umbra_sub_f32(b, p0x, gx);
-    umbra_val32 q1x = umbra_sub_f32(b, p1x, gx);
-    umbra_val32 q2x = umbra_sub_f32(b, p2x, gx);
-    umbra_val32 ax = umbra_add_f32(b, umbra_sub_f32(b, q0x, umbra_mul_f32(b, tw, q1x)), q2x);
-    umbra_val32 bx = umbra_mul_f32(b, tw, umbra_sub_f32(b, q1x, q0x));
-
-    umbra_val32 x1 = umbra_add_f32(b,
-                         umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ax, t1), bx), t1),
-                         q0x);
-    umbra_val32 x2 = umbra_add_f32(b,
-                         umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ax, t2), bx), t2),
-                         q0x);
-
-    umbra_val32 dy1 = umbra_sub_f32(b, umbra_mul_f32(b, a, t1), bv);
-    umbra_val32 dy2 = umbra_sub_f32(b, umbra_mul_f32(b, a, t2), bv);
-
-    umbra_val32 po = umbra_imm_f32(b, 1.0f);
-    umbra_val32 no = umbra_imm_f32(b, -1.0f);
-
-    umbra_val32 dir1 = umbra_sel_32(b, umbra_lt_f32(b, z, dy1), po,
-                           umbra_sel_32(b, umbra_lt_f32(b, dy1, z), no, z));
-    umbra_val32 dir2 = umbra_sel_32(b, umbra_lt_f32(b, z, dy2), po,
-                           umbra_sel_32(b, umbra_lt_f32(b, dy2, z), no, z));
-
-    umbra_val32 w1 = umbra_sel_32(b, umbra_and_32(b, t1ok, umbra_lt_f32(b, z, x1)), dir1, z);
-    umbra_val32 w2 = umbra_sel_32(b, umbra_and_32(b, t2ok, umbra_lt_f32(b, z, x2)), dir2, z);
-
-    umbra_val32 dw = umbra_sel_32(b, in, umbra_add_f32(b, w1, w2), z);
-
-    umbra_val32 acc = umbra_load_32(b, wind);
-    acc = umbra_add_f32(b, acc, dw);
-    umbra_store_32(b, wind, acc);
-
-    return b;
-}
-
-struct slug_two_pass_slide {
-    struct slide base;
-
-    struct slug_curves        slug;
-    struct umbra_buf          curves_buf;
-    int                       w, h;
-    float                    *wind_buf;
-    struct umbra_buf          wind_uniform;
-    struct slug_acc_uniforms  au;
-    struct umbra_flat_ir     *acc_ir;
-    struct umbra_program     *acc_prog;
-
-    umbra_color               color;
-    struct umbra_fmt          fmt;
-    struct umbra_program     *draw_prog;
-    struct umbra_buf          dst_buf;
-};
-
-static void slug_two_pass_init(struct slide *s, int w, int h) {
-    struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    st->w = w;
-    st->h = h;
-    st->slug = slug_extract("Slug", (float)h * 0.3125f);
-    st->curves_buf = (struct umbra_buf){
-        .ptr = st->slug.data, .count = st->slug.count * 6,
-    };
-    st->wind_buf = malloc((size_t)w * (size_t)h * sizeof(float));
-    st->wind_uniform = (struct umbra_buf){
-        .ptr = st->wind_buf, .count = w * h, .stride = w,
-    };
-
-    struct umbra_builder *b = slug_build_acc(&st->curves_buf, &st->au, &st->wind_uniform);
-    st->acc_ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-}
-
-static void slug_two_pass_prepare(struct slide *s,
-                                  struct umbra_backend *be,
-                                  struct umbra_fmt fmt) {
-    struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    umbra_program_free(st->acc_prog);
-    st->acc_prog = be->compile(be, st->acc_ir);
-    umbra_program_free(st->draw_prog);
-    st->fmt = fmt;
-    {
-        struct umbra_builder *b = umbra_draw_builder(
-        NULL,            coverage_winding,       &st->wind_uniform,
-            umbra_shader_color,     &st->color,
-            umbra_blend_srcover,    NULL,
-            &st->dst_buf,           fmt);
-        struct umbra_flat_ir *ir = umbra_flat_ir(b);
-        umbra_builder_free(b);
-        st->draw_prog = be->compile(be, ir);
-        umbra_flat_ir_free(ir);
-    }
-    slide_bg_prepare(be, fmt, st->w, st->h);
-}
-
-static void slug_two_pass_draw(struct slide *s, double secs, int l, int t, int r, int b,
-                               void *buf) {
-    struct slug_two_pass_slide           *st = (struct slug_two_pass_slide *)s;
-    slide_bg_draw(s->bg, l, t, r, b, buf);
-    struct umbra_program *acc = st->acc_prog;
-    int w = st->w, h = st->h;
-
-    size_t const wind_row = (size_t)w * sizeof(float);
-    __builtin_memset((char *)st->wind_buf + (size_t)t * wind_row, 0,
-                     (size_t)(b - t) * wind_row);
-
-    slide_perspective_matrix(&st->au.mat, (float)secs, w, h,
-                             (int)st->slug.w, (int)st->slug.h);
-    st->au.bw = st->slug.w;
-    st->au.bh = st->slug.h;
-
-    for (int j = 0; j < st->slug.count; j++) {
-        __builtin_memcpy(&st->au.j, &j, 4);
-        acc->queue(acc, l, t, r, b);
-    }
-
-    st->dst_buf = (struct umbra_buf){
-        .ptr=buf, .count=w * h * st->fmt.planes, .stride=w,
-    };
-    st->draw_prog->queue(st->draw_prog, l, t, r, b);
-}
-
-static int slug_two_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
-                                      struct umbra_builder **out, int max) {
-    if (max < 2) { return 0; }
-    struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    out[0] = slug_build_acc(&st->curves_buf, &st->au, &st->wind_uniform);
-    out[1] = umbra_draw_builder(
-        NULL,        coverage_winding,       &st->wind_uniform,
-        umbra_shader_color,     &st->color,
-        umbra_blend_srcover,    NULL,
-        &st->dst_buf,           fmt);
-    return 2;
-}
-
-static void slug_two_pass_free(struct slide *s) {
-    struct slug_two_pass_slide *st = (struct slug_two_pass_slide *)s;
-    slug_free(&st->slug);
-    free(st->wind_buf);
-    umbra_program_free(st->acc_prog);
-    umbra_flat_ir_free(st->acc_ir);
-    umbra_program_free(st->draw_prog);
-    free(st);
-}
-
-SLIDE(slide_slug_wind) {
-    struct slug_two_pass_slide *st = calloc(1, sizeof *st);
-    st->color = (umbra_color){0.2f, 1.0f, 0.6f, 1.0f};
-    st->base = (struct slide){
-        .title = "Slug (two-pass)",
-        .bg = {0.12f, 0.04f, 0.04f, 1},
-        .init = slug_two_pass_init,
-        .prepare = slug_two_pass_prepare,
-        .draw = slug_two_pass_draw,
-        .free = slug_two_pass_free,
-        .get_builders = slug_two_pass_get_builders,
-    };
-    return &st->base;
-}
-
 struct slug_slide {
     struct slide base;
 
@@ -619,11 +352,11 @@ static void slug_free_slide(struct slide *s) {
     free(st);
 }
 
-SLIDE(slide_slug_wind_loop) {
+SLIDE(slide_slug) {
     struct slug_slide *st = calloc(1, sizeof *st);
     st->color = (umbra_color){0.2f, 1.0f, 0.6f, 1.0f};
     st->base = (struct slide){
-        .title = "Slug (one-pass)",
+        .title = "Slug",
         .bg = {0.12f, 0.04f, 0.04f, 1},
         .init = slug_init,
         .prepare = slug_prepare,

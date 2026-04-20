@@ -5,7 +5,6 @@
 #include "../slides/slide.h"
 #include "../slides/coverage.h"
 #include "../slides/text.h"
-#include "../slides/slug.h"
 #include "../src/count.h"
 #include <math.h>
 #include <stdint.h>
@@ -105,78 +104,6 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
     ok here;
 }
 
-TEST(test_slug_rect) {
-    static float rect[] = {
-         5, 5,  5,20,  5,35,
-         5,35, 30,35, 55,35,
-        55,35, 55,20, 55, 5,
-        55, 5, 30, 5,  5, 5,
-    };
-
-    struct umbra_buf curves_buf = {.ptr=rect, .count=count(rect)};
-
-    umbra_color color = {1,1,1,1};
-    float wind_buf[W * H];
-    __builtin_memset(wind_buf, 0, sizeof wind_buf);
-
-    struct umbra_buf wind_uniform = {.ptr=wind_buf, .count=count(wind_buf), .stride=W};
-
-    struct slug_acc_uniforms au = {
-        .mat    = {1,0,0, 0,1,0, 0,0,1},
-        .bw     = 60, .bh = 40,
-    };
-
-    struct umbra_builder *ab = slug_build_acc(&curves_buf, &au, &wind_uniform);
-    struct umbra_flat_ir *air =
-        umbra_flat_ir(ab);
-    umbra_builder_free(ab);
-    struct umbra_backend *be =
-        umbra_backend_interp();
-    struct umbra_program *acc =
-        be->compile(be, air);
-    umbra_flat_ir_free(air);
-
-    struct umbra_buf dst_slot = {0};
-    struct umbra_builder *bld = umbra_draw_builder(
-        NULL,        coverage_winding,       &wind_uniform,
-        umbra_shader_color,     &color,
-        umbra_blend_srcover,    NULL,
-        &dst_slot,              umbra_fmt_8888);
-    struct umbra_flat_ir *ir =
-        umbra_flat_ir(bld);
-    umbra_builder_free(bld);
-    struct umbra_program *interp =
-        be->compile(be, ir);
-    umbra_flat_ir_free(ir);
-
-    uint32_t pixels[W * H];
-    for (int i = 0; i < W * H; i++) {
-        pixels[i] = 0xff000000;
-    }
-
-    for (int j = 0; j < 4; j++) {
-        __builtin_memcpy(&au.j, &j, 4);
-        acc->queue(acc, 0, 0, W, H);
-    }
-    be->flush(be);
-
-    dst_slot = (struct umbra_buf){.ptr=pixels, .count=W * H, .stride=W};
-    interp->queue(interp, 0, 0, W, H);
-    be->flush(be);
-
-    uint32_t bg = 0xff000000;
-    uint32_t fg = 0xffffffff;
-    pixels[20*W + 30] == fg here;
-    pixels[20*W +  2] == bg here;
-    pixels[20*W + 58] == bg here;
-    pixels[ 2*W + 30] == bg here;
-    pixels[38*W + 30] == bg here;
-    pixels[20*W + 70] == bg here;
-
-    umbra_program_free(acc);
-    umbra_program_free(interp);
-    umbra_backend_free(be);
-}
 
 TEST(test_perspective_text) {
     enum { BW = 16, BH = 8 };

@@ -1,6 +1,5 @@
 #define _POSIX_C_SOURCE 200809L
 #include "../slides/slide.h"
-#include "../slides/slug.h"
 #include "../include/umbra.h"
 #include "../include/umbra_draw.h"
 #include "../src/count.h"
@@ -28,15 +27,6 @@ static void slide_draw(void *vctx) {
     struct slide_draw_ctx *c = vctx;
     c->s->draw(c->s, c->secs, 0, 0, c->w, c->h, c->buf);
     c->secs += 1.0 / 60.0;
-}
-
-struct prog_draw_ctx {
-    struct umbra_program *p;
-    int                   w, h;
-};
-static void prog_draw(void *vctx) {
-    struct prog_draw_ctx *c = vctx;
-    c->p->queue(c->p, 0, 0, c->w, c->h);
 }
 
 // Doubling pilot + min-of-K timing.
@@ -319,44 +309,6 @@ int main(int argc, char *argv[]) {
             }
         }
         free(buf);
-    }
-
-    if (!match || strstr("slug accumulator (1 curve)", match)) {
-        struct slug_curves       sc  = slug_extract("Slug", (float)H * 0.3125f);
-        struct umbra_buf         curves_buf = {.ptr=sc.data, .count=sc.count * 6};
-        float *wind = calloc((size_t)(W * H), 4);
-        struct umbra_buf wind_buf = {.ptr=wind, .count=W * H};
-        struct slug_acc_uniforms au = {0};
-        slide_perspective_matrix(&au.mat, 0.0f, W, H, (int)sc.w, (int)sc.h);
-        au.bw     = sc.w;
-        au.bh     = sc.h;
-        { int32_t z = 0; __builtin_memcpy(&au.j, &z, 4); }
-
-        struct umbra_builder    *bld = slug_build_acc(&curves_buf, &au, &wind_buf);
-        struct umbra_flat_ir *ir = umbra_flat_ir(bld);
-        umbra_builder_free(bld);
-
-        struct umbra_program *progs[5];
-        for (int bi = 0; bi < nb; bi++) {
-            progs[bi] = bes[bi] ? bes[bi]->compile(bes[bi], ir) : NULL;
-        }
-        umbra_flat_ir_free(ir);
-
-        double ns_px[5] = {-1, -1, -1, -1, -1};
-        double gpu[5]   = {-1, -1, -1, -1, -1};
-        for (int bi = 0; bi < nb; bi++) {
-            if (!(be_mask & (1 << bi)) || !progs[bi]) { continue; }
-            struct prog_draw_ctx pctx = {.p=progs[bi], .w=W, .h=H};
-            ns_px[bi] = bench(prog_draw, &pctx, bes[bi], W, H, samples, target_secs,
-                              &gpu[bi], NULL);
-        }
-        any_anomaly |= print_row("Slug Accumulator (1 curve)", ns_px, gpu, be_mask);
-
-        for (int bi = 0; bi < nb; bi++) {
-            umbra_program_free(progs[bi]);
-        }
-        free(wind);
-        slug_free(&sc);
     }
 
     // Compile-time benchmarks.
