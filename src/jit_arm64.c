@@ -66,7 +66,7 @@ enum {
     XWIDTH = 1,   // x0_col (reset XCOL at row boundary)
     XBUF   = 2,
     XP     = 8,
-    XCOL   = 9,   // column counter (was XI)
+    XCOL   = 9,   // column counter
     XT     = 10,
     XH     = 11,
     XW     = 12,
@@ -74,7 +74,6 @@ enum {
     XY     = 14,
     XS     = 15,
 };
-#define XI XCOL
 
 static void load_ptr(Buf *c, int p, int *last_ptr, int elem_shift) {
     if (*last_ptr != p) {
@@ -529,9 +528,9 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 2);
             if (scalar) {
-                put(c, LDR_sx(lo(s.rd), XP, XI));
+                put(c, LDR_sx(lo(s.rd), XP, XCOL));
             } else {
-                put(c, LSL_xi(XT, XI, 2));
+                put(c, LSL_xi(XT, XCOL, 2));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, LDP_qi(lo(s.rd), hi(s.rd), XT, 0));
             }
@@ -542,10 +541,10 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr            p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 1);
             if (scalar) {
-                put(c, LDRH_wr(XT, XP, XI));
+                put(c, LDRH_wr(XT, XP, XCOL));
                 put(c, DUP_4s_w(lo(s.rd), XT));
             } else {
-                put(c, LSL_xi(XT, XI, 1));
+                put(c, LSL_xi(XT, XCOL, 1));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, LDR_di(lo(s.rd), XT, 0));
                 put(c, LDR_di(hi(s.rd), XT, 1));
@@ -661,9 +660,9 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 2);
             if (scalar) {
-                put(c, STR_sx(lo(ry), XP, XI));
+                put(c, STR_sx(lo(ry), XP, XCOL));
             } else {
-                put(c, LSL_xi(XT, XI, 2));
+                put(c, LSL_xi(XT, XCOL, 2));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, STP_qi(lo(ry), hi(ry), XT, 0));
             }
@@ -678,14 +677,14 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t r2 = ra_alloc(ra, sl, ns);
             int8_t r3 = ra_alloc(ra, sl, ns);
             if (scalar) {
-                put(c, LSL_xi(XT, XI, 3));
+                put(c, LSL_xi(XT, XCOL, 3));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, LDR_hi(lo(s0.rd), XT, 0));
                 put(c, LDR_hi(lo(r1),    XT, 1));
                 put(c, LDR_hi(lo(r2),    XT, 2));
                 put(c, LDR_hi(lo(r3),    XT, 3));
             } else {
-                put(c, LSL_xi(XT, XI, 3));
+                put(c, LSL_xi(XT, XCOL, 3));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, LD4_4h(0, XT));
                 put(c, ORR_16b(lo(s0.rd), 0, 0));
@@ -719,15 +718,15 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, LSR_xi(XT, XT, 1));
             }
             if (scalar) {
-                put(c, LDR_hx(lo(s0.rd), XP, XI));
+                put(c, LDR_hx(lo(s0.rd), XP, XCOL));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(lo(r1), XP, XI));
+                put(c, LDR_hx(lo(r1), XP, XCOL));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(lo(r2), XP, XI));
+                put(c, LDR_hx(lo(r2), XP, XCOL));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, LDR_hx(lo(r3), XP, XI));
+                put(c, LDR_hx(lo(r3), XP, XCOL));
             } else {
-                put(c, LSL_xi(XM, XI, 1));
+                put(c, LSL_xi(XM, XCOL, 1));
                 put(c, ADD_xr(XM, XP, XM));
                 put(c, LDR_di(lo(s0.rd), XM, 0));
                 put(c, LDR_di(hi(s0.rd), XM, 1));
@@ -762,7 +761,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, ZIP1_8h(lo(t), lo(rr), lo(rg)));
                 put(c, ZIP1_8h(lo(px), lo(rb), lo(ra_v)));
                 put(c, ZIP1_4s(lo(z), lo(t), lo(px)));
-                put(c, LSL_xi(XT, XI, 3));
+                put(c, LSL_xi(XT, XCOL, 3));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, STR_di(lo(z), XT, 0));
                 ra_return_reg(ra, z);
@@ -773,7 +772,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, ORR_16b(1, lo(rg),   lo(rg)));
                 put(c, ORR_16b(2, lo(rb),  lo(rb)));
                 put(c, ORR_16b(3, lo(ra_v), lo(ra_v)));
-                put(c, LSL_xi(XT, XI, 3));
+                put(c, LSL_xi(XT, XCOL, 3));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, ST4_4h(0, XT));
                 put(c, ORR_16b(0, hi(rr),   hi(rr)));
@@ -802,15 +801,15 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, LSR_xi(XT, XT, 1));
             }
             if (scalar) {
-                put(c, STR_hx(lo(rr), XP, XI));
+                put(c, STR_hx(lo(rr), XP, XCOL));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_hx(lo(rg), XP, XI));
+                put(c, STR_hx(lo(rg), XP, XCOL));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_hx(lo(rb), XP, XI));
+                put(c, STR_hx(lo(rb), XP, XCOL));
                 put(c, ADD_xr(XP, XP, XT));
-                put(c, STR_hx(lo(ra_v), XP, XI));
+                put(c, STR_hx(lo(ra_v), XP, XCOL));
             } else {
-                put(c, LSL_xi(XM, XI, 1));
+                put(c, LSL_xi(XM, XCOL, 1));
                 put(c, ADD_xr(XM, XP, XM));
                 put(c, STR_di(lo(rr), XM, 0));
                 put(c, STR_di(hi(rr), XM, 1));
@@ -842,7 +841,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 int8_t px   = ra_alloc(ra, sl, ns);
                 int8_t mask = ra_alloc(ra, sl, ns);
                 put(c, MOVI_4s(lo(mask), 0xFF, 0));
-                put(c, LDR_sx(lo(px), XP, XI));
+                put(c, LDR_sx(lo(px), XP, XCOL));
                 put(c, AND_16b(lo(s0.rd), lo(px), lo(mask)));
                 put(c, USHR_4s_imm(lo(r1), lo(px), 8));  put(c, AND_16b(lo(r1), lo(r1), lo(mask)));
                 put(c, USHR_4s_imm(lo(r2), lo(px), 16)); put(c, AND_16b(lo(r2), lo(r2), lo(mask)));
@@ -850,7 +849,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 ra_return_reg(ra, mask);
                 ra_return_reg(ra, px);
             } else {
-                put(c, LSL_xi(XT, XI, 2));
+                put(c, LSL_xi(XT, XCOL, 2));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, LD4_8b(0, XT));
                 // V0=R(8xu8), V1=G, V2=B, V3=A.  Widen u8->u16->u32.
@@ -885,7 +884,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, SHL_4s_imm(lo(t), lo(rg), 8));    put(c, ORR_16b(lo(px), lo(rr), lo(t)));
                 put(c, SHL_4s_imm(lo(t), lo(rb), 16));  put(c, ORR_16b(lo(px), lo(px), lo(t)));
                 put(c, SHL_4s_imm(lo(t), lo(ra_v), 24)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
-                put(c, STR_sx(lo(px), XP, XI));
+                put(c, STR_sx(lo(px), XP, XCOL));
                 ra_return_reg(ra, t);
                 ra_return_reg(ra, px);
             } else {
@@ -898,7 +897,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, XTN_8b(2, 2));
                 put(c, XTN_4h(3, lo(ra_v))); put(c, W(XTN_4h(3, hi(ra_v))));
                 put(c, XTN_8b(3, 3));
-                put(c, LSL_xi(XT, XI, 2));
+                put(c, LSL_xi(XT, XCOL, 2));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, ST4_8b(0, XT));
             }
@@ -913,9 +912,9 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 1);
             if (scalar) {
-                put(c, STR_hx(lo(ry), XP, XI));
+                put(c, STR_hx(lo(ry), XP, XCOL));
             } else {
-                put(c, LSL_xi(XT, XI, 1));
+                put(c, LSL_xi(XT, XCOL, 1));
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, STR_di(lo(ry), XT, 0));
                 put(c, STR_di(hi(ry), XT, 1));
