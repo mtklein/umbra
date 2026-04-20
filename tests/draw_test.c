@@ -1573,24 +1573,19 @@ TEST(test_solid_src_fp16_planar) {
     test_backends_free(&B);
 }
 
-TEST(test_coverage_rect_tail_matrix) {
+// Property-style sweep over the shape that produced the original bug:
+// dispatch widths that straddle the K=8 SIMD/tail split, heights > 1 so
+// the row loop is exercised, and rect boundaries that land at each
+// meaningful position (before SIMD, mid-SIMD, on the SIMD/tail seam,
+// mid-tail).  For every combination, every backend must match the
+// interpreter pixel for pixel.
+static void coverage_rect_tail_matrix_case(int W, int H) {
     struct umbra_buf dst_slot = {0};
-    // Property-style sweep over the shape that produced the original bug:
-    // dispatch widths that straddle the K=8 SIMD/tail split, heights > 1 so
-    // the row loop is exercised, and rect boundaries that land at each
-    // meaningful position (before SIMD, mid-SIMD, on the SIMD/tail seam,
-    // mid-tail).  For every combination, every backend must match the
-    // interpreter pixel for pixel.
-    int   const widths[]  = {8, 9, 10, 15, 16, 17};
-    int   const heights[] = {2, 3};
     float const rect_ls[] = {0.0f, 4.0f, 8.0f, 9.0f};
     float const rect_rs[] = {8.0f, 10.0f, 16.0f, 17.0f};
 
-    for (int wi = 0; wi < count(widths);  wi++) {
-    for (int hi = 0; hi < count(heights); hi++) {
     for (int li = 0; li < count(rect_ls); li++) {
     for (int ri = 0; ri < count(rect_rs); ri++) {
-        int   const W = widths[wi], H = heights[hi];
         float const l = rect_ls[li], r = rect_rs[ri];
         if (l < r) {
             umbra_color color = {1, 0, 0, 1};
@@ -1619,8 +1614,20 @@ TEST(test_coverage_rect_tail_matrix) {
             }
             test_backends_free(&B);
         }
-    }}}}
+    }}
 }
+
+#define RECT_TAIL_MATRIX_CASE(W, H)                            \
+    TEST(test_coverage_rect_tail_matrix_w##W##_h##H) {         \
+        coverage_rect_tail_matrix_case(W, H);                  \
+    }
+RECT_TAIL_MATRIX_CASE( 8, 2) RECT_TAIL_MATRIX_CASE( 8, 3)
+RECT_TAIL_MATRIX_CASE( 9, 2) RECT_TAIL_MATRIX_CASE( 9, 3)
+RECT_TAIL_MATRIX_CASE(10, 2) RECT_TAIL_MATRIX_CASE(10, 3)
+RECT_TAIL_MATRIX_CASE(15, 2) RECT_TAIL_MATRIX_CASE(15, 3)
+RECT_TAIL_MATRIX_CASE(16, 2) RECT_TAIL_MATRIX_CASE(16, 3)
+RECT_TAIL_MATRIX_CASE(17, 2) RECT_TAIL_MATRIX_CASE(17, 3)
+#undef RECT_TAIL_MATRIX_CASE
 
 TEST(test_coverage_rect_tail_srcover_fp16_planar) {
     struct umbra_buf dst_slot = {0};
