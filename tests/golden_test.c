@@ -43,24 +43,27 @@ static void free_pipes(void) {
     }
 }
 
-static void render_slide(int slide_idx, struct umbra_backend *be,
-                         struct umbra_fmt fmt, void *pixbuf) {
-    struct slide *s = slide_get(slide_idx);
-    s->prepare(s, be, fmt);
-    s->draw(s, 0, 0, 0, W, H, pixbuf);
-}
-
 static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
     struct slide *s = slide_get(slide_idx);
 
     size_t const rb = (size_t)W * fmt.bpp;
     size_t const pixbuf_sz = rb * H * (size_t)fmt.planes;
 
+    struct slide_runtime rt[NUM_BACKENDS] = {0};
     void *pbuf[NUM_BACKENDS] = {0};
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
         pbuf[bi] = calloc(1, pixbuf_sz);
-        render_slide(slide_idx, bes[bi], fmt, pbuf[bi]);
+
+        slide_runtime_compile(&rt[bi], s, W, H, bes[bi], fmt, NULL);
+        slide_bg_prepare(bes[bi], fmt, W, H);
+
+        slide_bg_draw(s->bg, 0, 0, W, H, pbuf[bi]);
+        rt[bi].dst_buf = (struct umbra_buf){
+            .ptr=pbuf[bi], .count=W * H * fmt.planes, .stride=W,
+        };
+        slide_runtime_draw(&rt[bi], s, 0, 0, 0, W, H);
+
         bes[bi]->flush(bes[bi]);
     }
 
@@ -99,6 +102,7 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        slide_runtime_cleanup(&rt[bi]);
         free(pbuf[bi]);
     }
     ok here;
