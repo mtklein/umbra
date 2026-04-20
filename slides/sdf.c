@@ -55,7 +55,7 @@ static void sdf_common_build_draw(struct slide *s,
                                   umbra_val32 x, umbra_val32 y) {
     struct sdf_common *c = (struct sdf_common *)s;
     umbra_build_sdf_draw(b, dst_ptr, fmt, x, y,
-                         s->sdf_fn, s->sdf_ctx, 1,
+                         s->sdf_fn, s->sdf_ctx,
                          umbra_shader_color,  &c->color,
                          umbra_blend_srcover, NULL);
 }

@@ -1720,9 +1720,9 @@ static umbra_interval test_rect_fn(void *ctx, struct umbra_builder *b,
 }
 
 TEST(test_sdf_dispatch_rect) {
-    enum { W = 8, H = 4 };
+    enum { W = 8, H = 8 };
     umbra_color color = {1, 0, 0, 1};
-    umbra_rect  rect  = {1.0f, 1.0f, 7.0f, 3.0f};
+    umbra_rect  rect  = {2.0f, 2.0f, 6.0f, 6.0f};
 
     struct umbra_backend *bes[NUM_BACKENDS] = {
         umbra_backend_interp(), umbra_backend_jit(),
@@ -1740,7 +1740,7 @@ TEST(test_sdf_dispatch_rect) {
             umbra_val32 const dx = umbra_f32_from_i32(db, umbra_x(db)),
                               dy = umbra_f32_from_i32(db, umbra_y(db));
             umbra_build_sdf_draw(db, dst_ptr, umbra_fmt_8888, dx, dy,
-                                 test_rect_fn,        &rect, 0,
+                                 test_rect_fn,        &rect,
                                  umbra_shader_color,  &color,
                                  umbra_blend_srcover, NULL);
             struct umbra_flat_ir *dir = umbra_flat_ir(db);
@@ -1763,11 +1763,11 @@ TEST(test_sdf_dispatch_rect) {
             for (int y = 0; y < H; y++) {
                 for (int x = 0; x < W; x++) {
                     uint32_t const px = dst[y * W + x];
-                    if (x >= 3 && x <= 5 && y == 2) {
+                    if (x >= 3 && x <= 4 && y >= 3 && y <= 4) {
                         (px & 0xFF)         == 0xFF here;
                         ((px >> 24) & 0xFF) == 0xFF here;
                     }
-                    if (x == 0 || x == 7 || y == 0 || y == 3) {
+                    if (x == 0 || x == 7 || y == 0 || y == 7) {
                         px == 0 here;
                     }
                 }
@@ -1821,7 +1821,7 @@ TEST(test_sdf_dispatch_tiling) {
     umbra_val32 const tx     = umbra_f32_from_i32(db, umbra_x(db)),
                       ty     = umbra_f32_from_i32(db, umbra_y(db));
     umbra_build_sdf_draw(db, td_dst, umbra_fmt_8888, tx, ty,
-                         test_circle_fn,      &sdf, 0,
+                         test_circle_fn,      &sdf,
                          umbra_shader_color,  &color,
                          umbra_blend_srcover, NULL);
     struct umbra_flat_ir *dir = umbra_flat_ir(db);
@@ -1840,7 +1840,7 @@ TEST(test_sdf_dispatch_tiling) {
     umbra_val32 const fx   = umbra_f32_from_i32(fb, umbra_x(fb)),
                       fy   = umbra_f32_from_i32(fb, umbra_y(fb));
     umbra_build_sdf_draw(fb, fdst, umbra_fmt_8888, fx, fy,
-                         test_circle_fn,      &sdf, 0,
+                         test_circle_fn,      &sdf,
                          umbra_shader_color,  &color,
                          umbra_blend_srcover, NULL);
     struct umbra_flat_ir *fir = umbra_flat_ir(fb);

@@ -101,12 +101,12 @@ typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
                                  umbra_interval x, umbra_interval y);
 
 // Like umbra_build_draw() but using an SDF for coverage.
-// Set aa_quality=0 for a hard edge, or >0 for increasing effort spent on AA quality.
-// TODO: remove hard edge option, always use cov ≈ -lo / (hi-lo)
+// TODO: switch AA from cov = clamp(-f, 0, 1) at pixel center to
+// cov ≈ -lo / (hi - lo) over the pixel box.
 void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                           umbra_val32 x, umbra_val32 y,
-                          umbra_sdf   , void *sdf_ctx, int aa_quality,
+                          umbra_sdf   , void *sdf_ctx,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 

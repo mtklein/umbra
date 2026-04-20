@@ -199,7 +199,6 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
 struct coverage_from_sdf {
     umbra_sdf *sdf_fn;
     void      *sdf_ctx;
-    int        hard_edge, :32;
 };
 
 static umbra_val32 coverage_from_sdf(void *ctx, struct umbra_builder *b,
@@ -211,10 +210,6 @@ static umbra_val32 coverage_from_sdf(void *ctx, struct umbra_builder *b,
     umbra_val32 const f = self->sdf_fn(self->sdf_ctx, b,
                                        (umbra_interval){xc, xc},
                                        (umbra_interval){yc, yc}).lo;
-    if (self->hard_edge) {
-        return umbra_sel_32(b, umbra_lt_f32(b, f, umbra_imm_f32(b, 0.0f)),
-                            umbra_imm_f32(b, 1.0f), umbra_imm_f32(b, 0.0f));
-    }
     return umbra_min_f32(b, umbra_imm_f32(b, 1.0f),
                          umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
                                        umbra_sub_f32(b, umbra_imm_f32(b, 0.0f), f)));
@@ -223,13 +218,12 @@ static umbra_val32 coverage_from_sdf(void *ctx, struct umbra_builder *b,
 void umbra_build_sdf_draw(struct umbra_builder *b,
                           umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                           umbra_val32 x, umbra_val32 y,
-                          umbra_sdf sdf_fn, void *sdf_ctx, int aa_quality,
+                          umbra_sdf sdf_fn, void *sdf_ctx,
                           umbra_shader shader_fn, void *shader_ctx,
                           umbra_blend  blend_fn,  void *blend_ctx) {
     struct coverage_from_sdf cov = {
-        .sdf_fn    = sdf_fn,
-        .sdf_ctx   = sdf_ctx,
-        .hard_edge = aa_quality == 0,
+        .sdf_fn  = sdf_fn,
+        .sdf_ctx = sdf_ctx,
     };
     umbra_build_draw(b, dst_ptr, dst_fmt, x, y,
                      coverage_from_sdf, &cov,
