@@ -142,6 +142,9 @@ static void dump_backends_free(struct dump_backends *db) {
     }
 }
 
+static void dump_builder(struct dump_backends *db,
+                         char const *dir, struct umbra_builder *b);
+
 static void dump_ir(struct dump_backends *db,
                     char const *dir, struct umbra_flat_ir *ir) {
     char p[256];
@@ -187,6 +190,7 @@ static void dump_builder(struct dump_backends *db,
     dump_ir(db, dir, ir);
     umbra_flat_ir_free(ir);
 }
+
 
 static void slugify(char const *title, char *out, size_t sz) {
     int n = snprintf(out, sz, "dumps/");
@@ -269,26 +273,21 @@ int main(void) {
 
     for (int i = 0; i < slide_count(); i++) {
         struct slide *s = slide_get(i);
-        if (!s->draw) { continue; }
         char dir[128];
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
 
-        // Prepare before get_builders: slides may build their effect state
-        // (e.g. overview's per-cell programs) during prepare.
-        if (s->prepare) { s->prepare(s, be, umbra_fmt_fp16); }
-
-        struct umbra_builder *builders[16];
-        int nb = s->get_builders
-               ? s->get_builders(s, umbra_fmt_fp16, builders, count(builders))
-               : 0;
+        struct slide_runtime rt = {0};
+        struct umbra_builder *builders[2] = {0};
+        int const nb = slide_builders(&rt, s, umbra_fmt_fp16, NULL,
+                                      builders, count(builders));
         for (int j = 0; j < nb; j++) {
-            if (!builders[j]) { continue; }
             char sub[256];
             snprintf(sub, sizeof sub, "%s/%d", dir, j);
             mkdir(sub, 0755);
             dump_builder(&db, sub, builders[j]);
         }
+        slide_runtime_cleanup(&rt);
 
         render_hdr(dir, i, be);
     }

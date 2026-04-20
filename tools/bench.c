@@ -109,12 +109,12 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     return best / px * 1e9;
 }
 
-static void compile_all_builders(struct slide *s, struct umbra_fmt fmt,
+static void compile_all_builders(struct slide_runtime *rt, struct slide *s,
+                                 struct umbra_fmt fmt,
                                  struct umbra_backend *be) {
-    struct umbra_builder *builders[16];
-    int nb = s->get_builders ? s->get_builders(s, fmt, builders, count(builders)) : 0;
+    struct umbra_builder *builders[2] = {0};
+    int const nb = slide_builders(rt, s, fmt, NULL, builders, count(builders));
     for (int j = 0; j < nb; j++) {
-        if (!builders[j]) { continue; }
         struct umbra_flat_ir *ir = umbra_flat_ir(builders[j]);
         umbra_builder_free(builders[j]);
         struct umbra_program *p = be->compile(be, ir);
@@ -322,22 +322,23 @@ int main(int argc, char *argv[]) {
 
         for (int si = 0; si < ns; si++) {
             struct slide *s = slide_get(si);
-            if (!s->get_builders) { continue; }
+            if (!s->build_draw && !s->build_sdf_draw) { continue; }
             if (match && !strstr(s->title, match) && !strstr("compile", match)) {
                 continue;
             }
 
             double us_call[5] = {-1, -1, -1, -1, -1};
+            struct slide_runtime rt = {0};
             for (int bi = 0; bi < nb; bi++) {
                 if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
-                compile_all_builders(s, fmt, bes[bi]);
+                compile_all_builders(&rt, s, fmt, bes[bi]);
 
                 int    iters   = 1;
                 double t_pilot = 0;
                 for (int pi = 0; pi < 20; pi++) {
                     double const start = now();
                     for (int it = 0; it < iters; it++) {
-                        compile_all_builders(s, fmt, bes[bi]);
+                        compile_all_builders(&rt, s, fmt, bes[bi]);
                     }
                     t_pilot = now() - start;
                     if (t_pilot >= target_secs / 2) { break; }
@@ -351,7 +352,7 @@ int main(int argc, char *argv[]) {
                 for (int k = 0; k < samples; k++) {
                     double const start = now();
                     for (int it = 0; it < iters; it++) {
-                        compile_all_builders(s, fmt, bes[bi]);
+                        compile_all_builders(&rt, s, fmt, bes[bi]);
                     }
                     double const dt = now() - start;
                     if (k == 0 || dt < best) { best = dt; }
@@ -360,6 +361,7 @@ int main(int argc, char *argv[]) {
                 }
                 us_call[bi] = best / (double)iters * 1e6;
             }
+            slide_runtime_cleanup(&rt);
             printf("%-*s", TITLE_W, s->title);
             _Bool first = 1;
             for (int d = 0; d < ND; d++) {
