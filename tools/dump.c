@@ -72,7 +72,7 @@ static struct umbra_builder* build_srcover(void) {
 #define JIT_EXT "avx2"
 #endif
 
-static char const *mvk_dump_dir = "/tmp/umbra_mvk_dump";
+static char const *const mvk_dump_dir = "/tmp/umbra_mvk_dump";
 
 static void clear_dir(char const *path) {
     DIR *d = opendir(path);
