@@ -1387,6 +1387,51 @@ TEST(test_solid_src_fp16_planar) {
     test_backends_free(&B);
 }
 
+TEST(test_coverage_rect_tail_matrix) {
+    // Property-style sweep over the shape that produced the original bug:
+    // dispatch widths that straddle the K=8 SIMD/tail split, heights > 1 so
+    // the row loop is exercised, and rect boundaries that land at each
+    // meaningful position (before SIMD, mid-SIMD, on the SIMD/tail seam,
+    // mid-tail).  For every combination, every backend must match the
+    // interpreter pixel for pixel.
+    int   const widths[]  = {8, 9, 10, 15, 16, 17};
+    int   const heights[] = {2, 3};
+    float const rect_ls[] = {0.0f, 4.0f, 8.0f, 9.0f};
+    float const rect_rs[] = {8.0f, 10.0f, 16.0f, 17.0f};
+
+    for (int wi = 0; wi < count(widths);  wi++) {
+    for (int hi = 0; hi < count(heights); hi++) {
+    for (int li = 0; li < count(rect_ls); li++) {
+    for (int ri = 0; ri < count(rect_rs); ri++) {
+        int   const W = widths[wi], H = heights[hi];
+        float const l = rect_ls[li], r = rect_rs[ri];
+        if (l >= r) { continue; }
+
+        umbra_color color = {1, 0, 0, 1};
+        umbra_rect  rect  = {l, 0.0f, r, (float)H};
+        struct draw_backends B = make_draw(umbra_draw_builder(
+            NULL,        umbra_coverage_rect, &rect,
+            umbra_shader_color,  &color,
+            umbra_blend_srcover, NULL,
+            umbra_fmt_8888));
+
+        // Interp (bi=0) is always available; use it as the oracle and check
+        // every other backend that compiled against its output.
+        uint32_t ref[32 * 4] = {0};
+        run_draw(&B, 0, W, H,
+                 (struct umbra_buf[]){ {.ptr=ref, .count=W*H, .stride=W} }) here;
+        for (int bi = 1; bi < NUM_BACKENDS; bi++) {
+            uint32_t dst[32 * 4] = {0};
+            if (!run_draw(&B, bi, W, H,
+                          (struct umbra_buf[]){ {.ptr=dst, .count=W*H, .stride=W} })) {
+                continue;
+            }
+            for (int i = 0; i < W*H; i++) { dst[i] == ref[i] here; }
+        }
+        cleanup_draw(&B);
+    }}}}
+}
+
 TEST(test_coverage_rect_tail_srcover_fp16_planar) {
     // Regression: after a tail iteration runs (dispatch width not a multiple
     // of K=8), the JIT was leaving preamble registers (uniforms and the 0.0
