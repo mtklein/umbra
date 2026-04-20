@@ -78,44 +78,47 @@ static char const *const mvk_dump_dir = "/tmp/umbra_mvk_dump";
 
 static void clear_dir(char const *path) {
     DIR *d = opendir(path);
-    if (!d) { return; }
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        if (e->d_name[0] == '.') { continue; }
-        char fp[1280];
-        snprintf(fp, sizeof fp, "%s/%s", path, e->d_name);
-        unlink(fp);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            if (e->d_name[0] != '.') {
+                char fp[1280];
+                snprintf(fp, sizeof fp, "%s/%s", path, e->d_name);
+                unlink(fp);
+            }
+        }
+        closedir(d);
     }
-    closedir(d);
 }
 
 static void grab_mvk_msl(char const *dir) {
     DIR *d = opendir(mvk_dump_dir);
-    if (!d) { return; }
-    struct dirent *e;
-    while ((e = readdir(d))) {
-        size_t n = strlen(e->d_name);
-        if (n > 6 && strcmp(e->d_name + n - 6, ".metal") == 0) {
-            char src[1280], dst[256];
-            snprintf(src, sizeof src, "%s/%s", mvk_dump_dir, e->d_name);
-            snprintf(dst, sizeof dst, "%s/vulkan.msl", dir);
-            FILE *in = fopen(src, "r");
-            if (in) {
-                FILE *out = atomic_open(dst);
-                if (out) {
-                    char buf[4096];
-                    size_t r;
-                    while ((r = fread(buf, 1, sizeof buf, in)) > 0) {
-                        fwrite(buf, 1, r, out);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d))) {
+            size_t n = strlen(e->d_name);
+            if (n > 6 && strcmp(e->d_name + n - 6, ".metal") == 0) {
+                char src[1280], dst[256];
+                snprintf(src, sizeof src, "%s/%s", mvk_dump_dir, e->d_name);
+                snprintf(dst, sizeof dst, "%s/vulkan.msl", dir);
+                FILE *in = fopen(src, "r");
+                if (in) {
+                    FILE *out = atomic_open(dst);
+                    if (out) {
+                        char buf[4096];
+                        size_t r;
+                        while ((r = fread(buf, 1, sizeof buf, in)) > 0) {
+                            fwrite(buf, 1, r, out);
+                        }
+                        atomic_close(out, dst);
                     }
-                    atomic_close(out, dst);
+                    fclose(in);
                 }
-                fclose(in);
+                break;
             }
-            break;
         }
+        closedir(d);
     }
-    closedir(d);
 }
 
 struct dump_backends {
@@ -158,23 +161,23 @@ static void dump_ir(struct dump_backends *db,
     }
 
     for (int i = 0; i < db->n; i++) {
-        if (!db->be[i]) { continue; }
+        if (db->be[i]) {
+            if (i == db->vulkan_idx) {
+                clear_dir(mvk_dump_dir);
+            }
 
-        if (i == db->vulkan_idx) {
-            clear_dir(mvk_dump_dir);
-        }
+            struct umbra_program *prog = db->be[i]->compile(db->be[i], ir);
+            if (prog) {
+                snprintf(p, sizeof p, "%s/%s", dir, db->ext[i]);
+                FILE *f = atomic_open(p);
+                if (prog->dump) { prog->dump(prog, f); }
+                atomic_close(f, p);
+                umbra_program_free(prog);
 
-        struct umbra_program *prog = db->be[i]->compile(db->be[i], ir);
-        if (!prog) { continue; }
-
-        snprintf(p, sizeof p, "%s/%s", dir, db->ext[i]);
-        FILE *f = atomic_open(p);
-        if (prog->dump) { prog->dump(prog, f); }
-        atomic_close(f, p);
-        umbra_program_free(prog);
-
-        if (i == db->vulkan_idx) {
-            grab_mvk_msl(dir);
+                if (i == db->vulkan_idx) {
+                    grab_mvk_msl(dir);
+                }
+            }
         }
     }
 }
