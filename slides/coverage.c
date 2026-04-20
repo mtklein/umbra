@@ -206,8 +206,6 @@ struct text_slide {
     struct coverage_bitmap2d bmp;
     umbra_coverage          *coverage_fn;
 
-    struct umbra_fmt      fmt;
-    struct umbra_program *prog;
     struct umbra_buf      dst_buf;
 };
 
@@ -242,29 +240,6 @@ static struct umbra_builder* text_builder(struct slide *s, struct umbra_fmt fmt)
     return b;
 }
 
-static void text_prepare(struct slide *s, struct umbra_backend *be,
-                         struct umbra_fmt fmt) {
-    struct text_slide *st = (struct text_slide *)s;
-    umbra_program_free(st->prog);
-    st->fmt = fmt;
-    struct umbra_builder *b = text_builder(s, fmt);
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    st->prog = be->compile(be, ir);
-    umbra_flat_ir_free(ir);
-    slide_bg_prepare(be, fmt, st->w, st->h);
-}
-
-static void text_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
-    struct text_slide *st = (struct text_slide *)s;
-    (void)secs;
-    slide_bg_draw(s->bg, l, t, r, b, buf);
-    st->dst_buf = (struct umbra_buf){
-        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
-    };
-    st->prog->queue(st->prog, l, t, r, b);
-}
-
 static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
@@ -272,11 +247,7 @@ static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
     return 1;
 }
 
-static void text_free(struct slide *s) {
-    struct text_slide *st = (struct text_slide *)s;
-    umbra_program_free(st->prog);
-    free(st);
-}
+static void text_free(struct slide *s) { free(s); }
 
 SLIDE(slide_coverage_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
@@ -287,8 +258,6 @@ SLIDE(slide_coverage_bitmap) {
         .title = "Coverage (8-bit bitmap)",
         .bg = {0.18f, 0.1f, 0.1f, 1},
         .init = text_init,
-        .prepare = text_prepare,
-        .draw = text_draw,
         .free = text_free,
         .get_builders = text_get_builders,
         .build_draw   = text_build_draw,
@@ -305,8 +274,6 @@ SLIDE(slide_coverage_sdf_bitmap) {
         .title = "Coverage (SDF bitmap)",
         .bg = {0.18f, 0.1f, 0.1f, 1},
         .init = text_init,
-        .prepare = text_prepare,
-        .draw = text_draw,
         .free = text_free,
         .get_builders = text_get_builders,
         .build_draw   = text_build_draw,
@@ -326,8 +293,6 @@ struct persp_slide {
     struct coverage_bitmap2d  bmp;
     struct umbra_matrix       mat; int :32;
 
-    struct umbra_fmt          fmt;
-    struct umbra_program     *prog;
     struct umbra_buf          dst_buf;
 };
 
@@ -363,33 +328,10 @@ static struct umbra_builder* persp_builder(struct slide *s, struct umbra_fmt fmt
     return b;
 }
 
-static void persp_prepare(struct slide *s, struct umbra_backend *be,
-                          struct umbra_fmt fmt) {
-    struct persp_slide *st = (struct persp_slide *)s;
-    umbra_program_free(st->prog);
-    st->fmt = fmt;
-    struct umbra_builder *b = persp_builder(s, fmt);
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    st->prog = be->compile(be, ir);
-    umbra_flat_ir_free(ir);
-    slide_bg_prepare(be, fmt, st->w, st->h);
-}
-
 static void persp_animate(struct slide *s, double secs) {
     struct persp_slide *st = (struct persp_slide *)s;
     slide_perspective_matrix(&st->mat, (float)secs, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
-}
-
-static void persp_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
-    struct persp_slide *st = (struct persp_slide *)s;
-    slide_bg_draw(s->bg, l, t, r, b, buf);
-    persp_animate(s, secs);
-    st->dst_buf = (struct umbra_buf){
-        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
-    };
-    st->prog->queue(st->prog, l, t, r, b);
 }
 
 static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -399,11 +341,7 @@ static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
     return 1;
 }
 
-static void persp_free(struct slide *s) {
-    struct persp_slide *st = (struct persp_slide *)s;
-    umbra_program_free(st->prog);
-    free(st);
-}
+static void persp_free(struct slide *s) { free(s); }
 
 SLIDE(slide_coverage_bitmap_matrix) {
     struct persp_slide *st = calloc(1, sizeof *st);
@@ -413,8 +351,6 @@ SLIDE(slide_coverage_bitmap_matrix) {
         .title = "Coverage (8-bit bitmap + matrix)",
         .bg = {0.12f, 0.04f, 0.04f, 1},
         .init = persp_init,
-        .prepare = persp_prepare,
-        .draw = persp_draw,
         .free = persp_free,
         .get_builders = persp_get_builders,
         .build_draw   = persp_build_draw,
@@ -431,9 +367,6 @@ struct cov_null_slide {
     int w, h;
 
     umbra_color           color;
-    struct umbra_fmt      fmt;
-    struct umbra_flat_ir *ir;
-    struct umbra_program *prog;
     struct umbra_buf      dst_buf;
 };
 
@@ -463,30 +396,6 @@ static struct umbra_builder* cov_null_builder(struct slide *s, struct umbra_fmt 
     return b;
 }
 
-static void cov_null_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct cov_null_slide *st = (struct cov_null_slide *)s;
-    if (st->fmt.name != fmt.name || !st->ir) {
-        st->fmt = fmt;
-        umbra_flat_ir_free(st->ir);
-        struct umbra_builder *b = cov_null_builder(s, fmt);
-        st->ir = umbra_flat_ir(b);
-        umbra_builder_free(b);
-    }
-    umbra_program_free(st->prog);
-    st->prog = be->compile(be, st->ir);
-    slide_bg_prepare(be, fmt, st->w, st->h);
-}
-
-static void cov_null_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
-    struct cov_null_slide *st = (struct cov_null_slide *)s;
-    (void)secs;
-    slide_bg_draw(s->bg, l, t, r, b, buf);
-    st->dst_buf = (struct umbra_buf){
-        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
-    };
-    st->prog->queue(st->prog, l, t, r, b);
-}
-
 static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
                                  struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
@@ -494,12 +403,7 @@ static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
     return 1;
 }
 
-static void cov_null_free(struct slide *s) {
-    struct cov_null_slide *st = (struct cov_null_slide *)s;
-    umbra_program_free(st->prog);
-    umbra_flat_ir_free(st->ir);
-    free(st);
-}
+static void cov_null_free(struct slide *s) { free(s); }
 
 SLIDE(slide_coverage_null) {
     struct cov_null_slide *st = calloc(1, sizeof *st);
@@ -508,8 +412,6 @@ SLIDE(slide_coverage_null) {
         .title = "Coverage NULL",
         .bg = {1, 1, 1, 1},
         .init = cov_null_init,
-        .prepare = cov_null_prepare,
-        .draw = cov_null_draw,
         .free = cov_null_free,
         .get_builders = cov_null_get_builders,
         .build_draw   = cov_null_build_draw,

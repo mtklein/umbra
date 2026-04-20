@@ -276,9 +276,6 @@ struct grad_slide {
     umbra_shader          *shader_fn;
     void                 *shader_ctx;
 
-    struct umbra_fmt      fmt;
-    struct umbra_flat_ir *ir;
-    struct umbra_program *prog;
     struct umbra_buf      dst_buf;
 };
 
@@ -308,28 +305,6 @@ static struct umbra_builder* grad_builder(struct slide *s, struct umbra_fmt fmt)
     return b;
 }
 
-static void grad_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct grad_slide *st = (struct grad_slide *)s;
-    if (st->fmt.name != fmt.name || !st->ir) {
-        st->fmt = fmt;
-        umbra_flat_ir_free(st->ir);
-        struct umbra_builder *b = grad_builder(s, fmt);
-        st->ir = umbra_flat_ir(b);
-        umbra_builder_free(b);
-    }
-    umbra_program_free(st->prog);
-    st->prog = be->compile(be, st->ir);
-}
-
-static void grad_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
-    struct grad_slide *st = (struct grad_slide *)s;
-    (void)secs;
-    st->dst_buf = (struct umbra_buf){
-        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
-    };
-    st->prog->queue(st->prog, l, t, r, b);
-}
-
 static int grad_get_builders(struct slide *s, struct umbra_fmt fmt,
                              struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
@@ -339,8 +314,6 @@ static int grad_get_builders(struct slide *s, struct umbra_fmt fmt,
 
 static void grad_free(struct slide *s) {
     struct grad_slide *st = (struct grad_slide *)s;
-    umbra_program_free(st->prog);
-    umbra_flat_ir_free(st->ir);
     free(st->colors_data);
     free(st->pos_data);
     free(st->lut_data);
@@ -353,8 +326,6 @@ static struct grad_slide* make_grad(char const *title) {
         .title        = title,
         .bg           = {0, 0, 0, 1},
         .init         = grad_init,
-        .prepare      = grad_prepare,
-        .draw         = grad_draw,
         .free         = grad_free,
         .get_builders = grad_get_builders,
         .build_draw   = grad_build_draw,

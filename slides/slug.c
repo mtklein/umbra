@@ -265,8 +265,6 @@ struct slug_slide {
     struct umbra_matrix      mat; int :32;
 
     umbra_color              color;
-    struct umbra_fmt         fmt;
-    struct umbra_program    *prog;
     struct umbra_buf         dst_buf;
 };
 
@@ -307,33 +305,10 @@ static struct umbra_builder* slug_builder(struct slide *s, struct umbra_fmt fmt)
     return b;
 }
 
-static void slug_prepare(struct slide *s, struct umbra_backend *be,
-                         struct umbra_fmt fmt) {
-    struct slug_slide *st = (struct slug_slide *)s;
-    umbra_program_free(st->prog);
-    st->fmt = fmt;
-    struct umbra_builder *b = slug_builder(s, fmt);
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    st->prog = be->compile(be, ir);
-    umbra_flat_ir_free(ir);
-    slide_bg_prepare(be, fmt, st->w, st->h);
-}
-
 static void slug_animate(struct slide *s, double secs) {
     struct slug_slide *st = (struct slug_slide *)s;
     slide_perspective_matrix(&st->mat, (float)secs, st->w, st->h,
                              (int)st->slug.w, (int)st->slug.h);
-}
-
-static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
-    struct slug_slide *st = (struct slug_slide *)s;
-    slide_bg_draw(s->bg, l, t, r, b, buf);
-    slug_animate(s, secs);
-    st->dst_buf = (struct umbra_buf){
-        .ptr=buf, .count=st->w * st->h * st->fmt.planes, .stride=st->w,
-    };
-    st->prog->queue(st->prog, l, t, r, b);
 }
 
 static int slug_get_builders(struct slide *s, struct umbra_fmt fmt,
@@ -346,7 +321,6 @@ static int slug_get_builders(struct slide *s, struct umbra_fmt fmt,
 static void slug_free_slide(struct slide *s) {
     struct slug_slide *st = (struct slug_slide *)s;
     slug_free(&st->slug);
-    umbra_program_free(st->prog);
     free(st);
 }
 
@@ -357,8 +331,6 @@ SLIDE(slide_slug) {
         .title = "Slug",
         .bg = {0.12f, 0.04f, 0.04f, 1},
         .init = slug_init,
-        .prepare = slug_prepare,
-        .draw = slug_draw,
         .free = slug_free_slide,
         .get_builders = slug_get_builders,
         .build_draw   = slug_build_draw,

@@ -60,8 +60,6 @@ struct swatch_slide {
     struct umbra_buf      colors_buf;
     struct swatch_ctx     ctx;
 
-    struct umbra_fmt      fmt;
-    struct umbra_program *prog;
     struct umbra_buf      dst_buf;
 };
 
@@ -100,26 +98,6 @@ static struct umbra_builder* swatch_builder(struct slide *s, struct umbra_fmt fm
     return b;
 }
 
-static void swatch_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
-    struct swatch_slide *st = (struct swatch_slide *)s;
-    st->fmt = fmt;
-    umbra_program_free(st->prog);
-    struct umbra_builder *b = swatch_builder(s, fmt);
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    st->prog = be->compile(be, ir);
-    umbra_flat_ir_free(ir);
-}
-
-static void swatch_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
-    struct swatch_slide *st = (struct swatch_slide *)s;
-    (void)secs;
-    st->dst_buf = (struct umbra_buf){
-        .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
-    };
-    st->prog->queue(st->prog, l, t, r, b);
-}
-
 static int swatch_get_builders(struct slide *s, struct umbra_fmt fmt,
                                struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
@@ -127,11 +105,7 @@ static int swatch_get_builders(struct slide *s, struct umbra_fmt fmt,
     return 1;
 }
 
-static void swatch_free(struct slide *s) {
-    struct swatch_slide *st = (struct swatch_slide *)s;
-    umbra_program_free(st->prog);
-    free(st);
-}
+static void swatch_free(struct slide *s) { free(s); }
 
 SLIDE(slide_swatch) {
     struct swatch_slide *st = calloc(1, sizeof *st);
@@ -139,8 +113,6 @@ SLIDE(slide_swatch) {
         .title        = "Color Swatches",
         .bg           = {0, 0, 0, 1},
         .init         = swatch_init,
-        .prepare      = swatch_prepare,
-        .draw         = swatch_draw,
         .free         = swatch_free,
         .get_builders = swatch_get_builders,
         .build_draw   = swatch_build_draw,
