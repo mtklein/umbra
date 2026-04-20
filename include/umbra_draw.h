@@ -125,10 +125,10 @@ void umbra_build_sdf_bounds(struct umbra_builder*,
 // TODO: remove umbra_draw_builder.  A thin convenience wrapper around
 // umbra_build_draw: umbra_builder() + umbra_bind_buf(dst) + umbra_f32_from_i32
 // of umbra_x / umbra_y + optional umbra_transform_perspective +
-// umbra_build_draw -- exactly the four lines this wrapper inlines.  Only
-// remaining callers are the SDF path (slides/sdf.c via umbra_coverage_from_sdf,
-// and src/draw.c inside umbra_sdf_draw); both go away with the SDF rework,
-// and this prototype + definition go with them.
+// umbra_build_draw -- exactly the four lines this wrapper inlines.  The
+// only remaining caller is tests/draw_test.c's draw_builder_shim, which
+// dozens of TESTs go through.  Migrate the shim and delete this
+// prototype + definition.
 //
 // Creates a fresh builder, initializes (x, y) from the dispatch, applies
 // umbra_transform_perspective through transform_mat (if non-NULL), and
@@ -169,11 +169,10 @@ void umbra_sdf_dispatch(struct umbra_program *bounds,
                         struct umbra_buf *cov,
                         int tile_size, int l, int t, int r, int b);
 
-// TODO: remove.  Convenience wrapper around umbra_sdf_dispatcher that also
-// builds the draw program, binding a dst slot inside the wrapper so
-// callers can swap dst per queue.  Callers should migrate to building the
-// draw program themselves (via umbra_build_sdf_draw on their own dst slot)
-// and creating a dispatcher around it.
+// TODO: remove.  Convenience wrapper that builds a draw program against an
+// internal dst slot and drives it via umbra_sdf_dispatch.  Callers should
+// migrate to building the draw program themselves (via umbra_build_sdf_draw
+// on their own dst slot) and calling umbra_sdf_dispatch directly.
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
                                       struct umbra_matrix const *transform_mat,
                                       umbra_sdf, void *sdf_ctx,
