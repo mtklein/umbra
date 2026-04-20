@@ -2,27 +2,40 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
-// TODO: drive every slide through .build_draw + .animate so the drivers
-// (bench, demo, dump, golden tests, overview) can stop knowing anything
-// about slide internals.  Each driver creates a builder, binds its chosen
-// dst, initializes (x, y) from the dispatch, optionally pre-applies a
-// viewport transform, calls build_draw, and takes it from there (compile,
-// dispatch, dump, time, pairwise-compare).
+// TODO: drive every slide through .build_draw / .build_sdf_draw + .animate
+// so the drivers (bench, demo, dump, golden tests, overview) can stop
+// knowing anything about slide internals.  Each driver owns a
+// slide_runtime (see below), compiles a slide into it with its chosen
+// backend + format + optional viewport transform, and per-frame updates
+// runtime->dst_buf and calls slide_runtime_draw.  No driver should call
+// slide->prepare / slide->draw / slide->get_builders.
 //
-// Partially landed:
-//   * build_draw exists and lives alongside prepare/draw/get_builders.
-//   * persp_slide, cov_null_slide, text_slide (bitmap and SDF bitmap), all 5
-//     blend variants, all 8 gradient variants, the swatch grid, and slug
-//     implement it.  Slug folds the winding loop into a single coverage fn
-//     with no intermediate buffer.  Swatch packs ten colors into a gather
-//     buffer so its grid is still one program.
-//   * The overview consumes it (calls build_draw once per slide).
+// Landed:
+//   * build_draw and build_sdf_draw contracts exist; every slide
+//     implements one.  Non-SDF: persp, cov_null, text (bitmap + SDF
+//     bitmap), 5 blend, 8 gradient, swatch, slug.  SDF: csg x3, circle,
+//     ring, rounded_rect, capsule, halfplane, sdf_text, n_gon.  Slug
+//     folds the winding loop into a single coverage fn; swatch gathers
+//     ten colors so its grid stays one program.
+//   * slide_runtime helper (below) owns compile + dispatch for either
+//     flavor.  Overview uses it per cell.  sdf_common embeds it, so all
+//     10 SDF slides route their prepare/draw through it.
 //
 // Still ahead:
-//   * Migrate the sdf slides (need a tile-culled sibling path -- see TODO in
-//     slides/overview.c).
-//   * Once every slide has a build_draw, retire prepare / draw /
-//     get_builders and have every driver just call slide->build_draw.
+//   * Migrate non-SDF slide state (prog/fmt/dst_buf in each *_slide
+//     struct) to embed slide_runtime too; their _prepare / _draw
+//     shrink to thin wrappers that call slide_runtime_compile / draw.
+//     ~30-line win per slide; mechanical.
+//   * Migrate top-level drivers (dump.c, bench.c, demo.c, golden_test.c)
+//     to create their own slide_runtime and call slide_runtime_compile /
+//     draw directly instead of s->prepare / s->draw.
+//   * Overview is a driver for its sub-slides; its overview_prepare does
+//     non-compile setup (overlay buf, cell grid) beyond slide_runtime.
+//     Move that to overview_init or keep a specialized prepare -- design
+//     call needed before the hook retires.
+//   * Once every callsite routes through slide_runtime + build_draw /
+//     build_sdf_draw directly, delete .prepare / .draw / .get_builders
+//     hooks from struct slide and the thin wrappers in each slide file.
 
 struct slide {
     char const     *title;
