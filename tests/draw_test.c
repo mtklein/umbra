@@ -1428,8 +1428,9 @@ TEST(test_565_round_trip) {
     umbra_flat_ir_free(ir);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!test_backends_run(&B, bi, W565, 1)) { continue; }
-        for (int i = 0; i < W565; i++) { dst[i] == src[i] here; }
+        if (test_backends_run(&B, bi, W565, 1)) {
+            for (int i = 0; i < W565; i++) { dst[i] == src[i] here; }
+        }
     }
     test_backends_free(&B);
 }
@@ -1454,8 +1455,9 @@ TEST(test_1010102_round_trip) {
     umbra_flat_ir_free(ir);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!test_backends_run(&B, bi, 7, 1)) { continue; }
-        for (int i = 0; i < 7; i++) { dst[i] == src[i] here; }
+        if (test_backends_run(&B, bi, 7, 1)) {
+            for (int i = 0; i < 7; i++) { dst[i] == src[i] here; }
+        }
     }
     test_backends_free(&B);
 }
@@ -1478,8 +1480,9 @@ TEST(test_fp16_planar_round_trip) {
     umbra_flat_ir_free(ir);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!test_backends_run(&B, bi, WP, 1)) { continue; }
-        for (int i = 0; i < WP * 4; i++) { equiv((float)dst[i], (float)src[i]) here; }
+        if (test_backends_run(&B, bi, WP, 1)) {
+            for (int i = 0; i < WP * 4; i++) { equiv((float)dst[i], (float)src[i]) here; }
+        }
     }
     test_backends_free(&B);
 }
@@ -1503,8 +1506,9 @@ TEST(test_solid_src_565) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint16_t dst[4] = {0};
         dst_slot = (struct umbra_buf){.ptr=dst, .count=4};
-        if (!test_backends_run(&B, bi, 4, 1)) { continue; }
-        for (int i = 0; i < 4; i++) { dst[i] == 0xF800 here; }
+        if (test_backends_run(&B, bi, 4, 1)) {
+            for (int i = 0; i < 4; i++) { dst[i] == 0xF800 here; }
+        }
     }
     test_backends_free(&B);
 }
@@ -1528,9 +1532,10 @@ TEST(test_solid_src_1010102) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {0};
         dst_slot = (struct umbra_buf){.ptr=dst, .count=4};
-        if (!test_backends_run(&B, bi, 4, 1)) { continue; }
-        uint32_t expect = (1023u << 10) | (3u << 30);
-        for (int i = 0; i < 4; i++) { dst[i] == expect here; }
+        if (test_backends_run(&B, bi, 4, 1)) {
+            uint32_t expect = (1023u << 10) | (3u << 30);
+            for (int i = 0; i < 4; i++) { dst[i] == expect here; }
+        }
     }
     test_backends_free(&B);
 }
@@ -1556,12 +1561,13 @@ TEST(test_solid_src_fp16_planar) {
         __fp16 dst[WFP * 4];
         __builtin_memset(dst, 0, sizeof dst);
         dst_slot = (struct umbra_buf){.ptr=dst, .count=WFP * 4, .stride=WFP};
-        if (!test_backends_run(&B, bi, WFP, 1)) { continue; }
-        for (int i = 0; i < WFP; i++) {
-            equiv((float)dst[i + WFP*0], 0.0f) here;
-            equiv((float)dst[i + WFP*1], 0.0f) here;
-            equiv((float)dst[i + WFP*2], 1.0f) here;
-            equiv((float)dst[i + WFP*3], 1.0f) here;
+        if (test_backends_run(&B, bi, WFP, 1)) {
+            for (int i = 0; i < WFP; i++) {
+                equiv((float)dst[i + WFP*0], 0.0f) here;
+                equiv((float)dst[i + WFP*1], 0.0f) here;
+                equiv((float)dst[i + WFP*2], 1.0f) here;
+                equiv((float)dst[i + WFP*3], 1.0f) here;
+            }
         }
     }
     test_backends_free(&B);
@@ -1586,34 +1592,33 @@ TEST(test_coverage_rect_tail_matrix) {
     for (int ri = 0; ri < count(rect_rs); ri++) {
         int   const W = widths[wi], H = heights[hi];
         float const l = rect_ls[li], r = rect_rs[ri];
-        if (l >= r) { continue; }
+        if (l < r) {
+            umbra_color color = {1, 0, 0, 1};
+            umbra_rect  rect  = {l, 0.0f, r, (float)H};
+            struct umbra_builder *builder = umbra_builder();
+            umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+            umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
+                              dy = umbra_f32_from_i32(builder, umbra_y(builder));
+            umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                             umbra_coverage_rect, &rect,
+                             umbra_shader_color,  &color,
+                             umbra_blend_srcover, NULL);
+            struct test_backends B = make(builder);
 
-        umbra_color color = {1, 0, 0, 1};
-        umbra_rect  rect  = {l, 0.0f, r, (float)H};
-        struct umbra_builder *builder = umbra_builder();
-        umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
-        umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
-                          dy = umbra_f32_from_i32(builder, umbra_y(builder));
-        umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
-                         umbra_coverage_rect, &rect,
-                         umbra_shader_color,  &color,
-                         umbra_blend_srcover, NULL);
-        struct test_backends B = make(builder);
-
-        // Interp (bi=0) is always available; use it as the oracle and check
-        // every other backend that compiled against its output.
-        uint32_t ref[32 * 4] = {0};
-        dst_slot = (struct umbra_buf){.ptr=ref, .count=W*H, .stride=W};
-        test_backends_run(&B, 0, W, H) here;
-        for (int bi = 1; bi < NUM_BACKENDS; bi++) {
-            uint32_t dst[32 * 4] = {0};
-            dst_slot = (struct umbra_buf){.ptr=dst, .count=W*H, .stride=W};
-            if (!test_backends_run(&B, bi, W, H)) {
-                continue;
+            // Interp (bi=0) is always available; use it as the oracle and check
+            // every other backend that compiled against its output.
+            uint32_t ref[32 * 4] = {0};
+            dst_slot = (struct umbra_buf){.ptr=ref, .count=W*H, .stride=W};
+            test_backends_run(&B, 0, W, H) here;
+            for (int bi = 1; bi < NUM_BACKENDS; bi++) {
+                uint32_t dst[32 * 4] = {0};
+                dst_slot = (struct umbra_buf){.ptr=dst, .count=W*H, .stride=W};
+                if (test_backends_run(&B, bi, W, H)) {
+                    for (int i = 0; i < W*H; i++) { dst[i] == ref[i] here; }
+                }
             }
-            for (int i = 0; i < W*H; i++) { dst[i] == ref[i] here; }
+            test_backends_free(&B);
         }
-        test_backends_free(&B);
     }}}}
 }
 
@@ -1719,51 +1724,51 @@ TEST(test_sdf_dispatch_rect) {
     };
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        if (!bes[bi]) { continue; }
+        if (bes[bi]) {
+            struct umbra_buf dst_slot = {0};
 
-        struct umbra_buf dst_slot = {0};
+            // Draw program on the target backend.
+            struct umbra_builder *db = umbra_builder();
+            umbra_ptr   const dst_ptr = umbra_bind_buf(db, &dst_slot);
+            umbra_val32 const dx = umbra_f32_from_i32(db, umbra_x(db)),
+                              dy = umbra_f32_from_i32(db, umbra_y(db));
+            umbra_build_sdf_draw(db, dst_ptr, umbra_fmt_8888, dx, dy,
+                                 test_rect_fn,        &rect, 0,
+                                 umbra_shader_color,  &color,
+                                 umbra_blend_srcover, NULL);
+            struct umbra_flat_ir *dir = umbra_flat_ir(db);
+            umbra_builder_free(db);
+            struct umbra_program *draw = bes[bi]->compile(bes[bi], dir);
+            umbra_flat_ir_free(dir);
+            draw != NULL here;
 
-        // Draw program on the target backend.
-        struct umbra_builder *db = umbra_builder();
-        umbra_ptr   const dst_ptr = umbra_bind_buf(db, &dst_slot);
-        umbra_val32 const dx = umbra_f32_from_i32(db, umbra_x(db)),
-                          dy = umbra_f32_from_i32(db, umbra_y(db));
-        umbra_build_sdf_draw(db, dst_ptr, umbra_fmt_8888, dx, dy,
-                             test_rect_fn,        &rect, 0,
-                             umbra_shader_color,  &color,
-                             umbra_blend_srcover, NULL);
-        struct umbra_flat_ir *dir = umbra_flat_ir(db);
-        umbra_builder_free(db);
-        struct umbra_program *draw = bes[bi]->compile(bes[bi], dir);
-        umbra_flat_ir_free(dir);
-        draw != NULL here;
+            struct umbra_builder *bb = umbra_builder();
+            struct umbra_sdf_bounds_program *bounds =
+                umbra_sdf_bounds_program(bb, NULL, test_rect_fn, &rect);
+            umbra_builder_free(bb);
 
-        struct umbra_builder *bb = umbra_builder();
-        struct umbra_sdf_bounds_program *bounds =
-            umbra_sdf_bounds_program(bb, NULL, test_rect_fn, &rect);
-        umbra_builder_free(bb);
+            uint32_t dst[W * H];
+            __builtin_memset(dst, 0, sizeof dst);
+            dst_slot = (struct umbra_buf){.ptr = dst, .count = W * H, .stride = W};
+            umbra_sdf_dispatch(bounds, draw, 0, 0, W, H);
+            bes[bi]->flush(bes[bi]);
 
-        uint32_t dst[W * H];
-        __builtin_memset(dst, 0, sizeof dst);
-        dst_slot = (struct umbra_buf){.ptr = dst, .count = W * H, .stride = W};
-        umbra_sdf_dispatch(bounds, draw, 0, 0, W, H);
-        bes[bi]->flush(bes[bi]);
-
-        for (int y = 0; y < H; y++) {
-            for (int x = 0; x < W; x++) {
-                uint32_t const px = dst[y * W + x];
-                if (x >= 3 && x <= 5 && y == 2) {
-                    (px & 0xFF)         == 0xFF here;
-                    ((px >> 24) & 0xFF) == 0xFF here;
-                }
-                if (x == 0 || x == 7 || y == 0 || y == 3) {
-                    px == 0 here;
+            for (int y = 0; y < H; y++) {
+                for (int x = 0; x < W; x++) {
+                    uint32_t const px = dst[y * W + x];
+                    if (x >= 3 && x <= 5 && y == 2) {
+                        (px & 0xFF)         == 0xFF here;
+                        ((px >> 24) & 0xFF) == 0xFF here;
+                    }
+                    if (x == 0 || x == 7 || y == 0 || y == 3) {
+                        px == 0 here;
+                    }
                 }
             }
-        }
 
-        umbra_program_free(draw);
-        umbra_sdf_bounds_program_free(bounds);
+            umbra_program_free(draw);
+            umbra_sdf_bounds_program_free(bounds);
+        }
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -1906,13 +1911,14 @@ TEST(test_metal_loop_gather) {
     };
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        if (!bes[bi]) { continue; }
-        struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
-        out = 0;
-        prog->queue(prog, 0, 0, 1, 1);
-        bes[bi]->flush(bes[bi]);
-        equiv(out, 60.0f) here;
-        umbra_program_free(prog);
+        if (bes[bi]) {
+            struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
+            out = 0;
+            prog->queue(prog, 0, 0, 1, 1);
+            bes[bi]->flush(bes[bi]);
+            equiv(out, 60.0f) here;
+            umbra_program_free(prog);
+        }
     }
 
     umbra_flat_ir_free(ir);
