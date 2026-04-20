@@ -2,40 +2,33 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
-// TODO: drive every slide through .build_draw / .build_sdf_draw + .animate
-// so the drivers (bench, demo, dump, golden tests, overview) can stop
-// knowing anything about slide internals.  Each driver owns a
-// slide_runtime (see below), compiles a slide into it with its chosen
-// backend + format + optional viewport transform, and per-frame updates
-// runtime->dst_buf and calls slide_runtime_draw.  No driver should call
-// slide->prepare / slide->draw / slide->get_builders.
+// TODO: rename the remaining .prepare / .draw hook slots to reflect that
+// only custom slides (overview today) use them -- every leaf now goes
+// through .build_draw or .build_sdf_draw + slide_runtime.  Candidate:
+// .custom_prepare / .custom_draw.  While renaming, swap .draw's
+// `void *buf` for `struct umbra_buf dst` so the hook matches the typed
+// destination that slide_runtime already carries.
+//
+// Drivers (bench, dump, demo, golden_test) already branch on
+// (build_draw || build_sdf_draw) to pick the slide_runtime path vs. the
+// prepare/draw fallback; the rename is just signal -- code shape stays
+// the same.
 //
 // Landed:
-//   * build_draw and build_sdf_draw contracts exist; every slide
-//     implements one.  Non-SDF: persp, cov_null, text (bitmap + SDF
-//     bitmap), 5 blend, 8 gradient, swatch, slug.  SDF: csg x3, circle,
-//     ring, rounded_rect, capsule, halfplane, sdf_text, n_gon.  Slug
-//     folds the winding loop into a single coverage fn; swatch gathers
-//     ten colors so its grid stays one program.
-//   * slide_runtime helper (below) owns compile + dispatch for either
-//     flavor.  Overview uses it per cell.  sdf_common embeds it, so all
-//     10 SDF slides route their prepare/draw through it.
-//
-// Still ahead:
-//   * Migrate non-SDF slide state (prog/fmt/dst_buf in each *_slide
-//     struct) to embed slide_runtime too; their _prepare / _draw
-//     shrink to thin wrappers that call slide_runtime_compile / draw.
-//     ~30-line win per slide; mechanical.
-//   * Migrate top-level drivers (dump.c, bench.c, demo.c, golden_test.c)
-//     to create their own slide_runtime and call slide_runtime_compile /
-//     draw directly instead of s->prepare / s->draw.
-//   * Overview is a driver for its sub-slides; its overview_prepare does
-//     non-compile setup (overlay buf, cell grid) beyond slide_runtime.
-//     Move that to overview_init or keep a specialized prepare -- design
-//     call needed before the hook retires.
-//   * Once every callsite routes through slide_runtime + build_draw /
-//     build_sdf_draw directly, delete .prepare / .draw / .get_builders
-//     hooks from struct slide and the thin wrappers in each slide file.
+//   * build_draw / build_sdf_draw contracts for every leaf.  Non-SDF:
+//     5 blend, swatch, persp, cov_null, 2 text (bitmap + SDF bitmap),
+//     8 gradient, slug.  SDF: csg x3, circle, ring, rounded_rect,
+//     capsule, halfplane, sdf_text, n_gon.
+//   * slide_runtime owns compile + dispatch for either flavor; every
+//     driver drives leaves through it.  Overview uses one per cell.
+//   * slide_builders(rt, s, fmt, pre, out, max) is the inspection
+//     entry point for dump / bench compile-bench / demo's saved_ir.
+//   * Dead state removed from every leaf: per-slide umbra_fmt,
+//     umbra_program*, cached umbra_flat_ir, dst_buf, and the
+//     _prepare / _draw / _get_builders / _builder functions.
+//     sdf_common shrank to {base, w, h, color, sdf_fn, sdf_ctx}.
+//   * .get_builders hook slot deleted from struct slide.  Overview
+//     emits only overview.hdr now -- the per-cell shader dump is gone.
 
 struct slide {
     char const     *title;
