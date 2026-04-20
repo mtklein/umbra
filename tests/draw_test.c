@@ -1640,8 +1640,10 @@ TEST(test_sdf_dispatch_rect) {
         umbra_flat_ir_free(dir);
         draw != NULL here;
 
+        struct umbra_builder *bb = umbra_builder();
         struct umbra_sdf_bounds_program *bounds =
-            umbra_sdf_bounds_program(umbra_sdf_bounds_builder(NULL, test_rect_fn, &rect));
+            umbra_sdf_bounds_program(bb, NULL, test_rect_fn, &rect);
+        umbra_builder_free(bb);
 
         uint32_t dst[W * H];
         __builtin_memset(dst, 0, sizeof dst);
@@ -1717,8 +1719,10 @@ TEST(test_sdf_dispatch_tiling) {
     struct umbra_program *tiled = be->compile(be, dir);
     umbra_flat_ir_free(dir);
 
+    struct umbra_builder *bb = umbra_builder();
     struct umbra_sdf_bounds_program *bounds =
-        umbra_sdf_bounds_program(umbra_sdf_bounds_builder(NULL, test_circle_fn, &sdf));
+        umbra_sdf_bounds_program(bb, NULL, test_circle_fn, &sdf);
+    umbra_builder_free(bb);
 
     // Flat reference: same shader+coverage, no tiling.
     struct umbra_builder *fb = umbra_builder();

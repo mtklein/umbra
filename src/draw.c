@@ -195,33 +195,6 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
     return (umbra_point_val32){xp, yp};
 }
 
-// Interval affine transform, used only by umbra_sdf_draw's bounds program.
-// Interval perspective is unavailable by design: umbra_interval_div_f32
-// cannot safely handle a zero-straddling divisor and we don't expect to
-// tile-dispatch anything but affine transforms.  Callers gate on the matrix
-// being affine (p0 == p1 == 0 && p2 == 1) and route through this helper,
-// which just emits the six-parameter affine form -- no divide.
-static void transform_affine_interval(struct umbra_matrix const *mat,
-                                      struct umbra_builder *b,
-                                      umbra_interval *x, umbra_interval *y) {
-    umbra_ptr const u = umbra_bind_uniforms(b, mat, (int)(sizeof *mat / 4));
-    umbra_interval const sx = umbra_interval_exact(umbra_uniform_32(b, u, M_SX)),
-                         kx = umbra_interval_exact(umbra_uniform_32(b, u, M_KX)),
-                         tx = umbra_interval_exact(umbra_uniform_32(b, u, M_TX)),
-                         ky = umbra_interval_exact(umbra_uniform_32(b, u, M_KY)),
-                         sy = umbra_interval_exact(umbra_uniform_32(b, u, M_SY)),
-                         ty = umbra_interval_exact(umbra_uniform_32(b, u, M_TY));
-    umbra_interval const xp =
-        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, sx, *x),
-                                                            umbra_interval_mul_f32(b, kx, *y)),
-                                  tx);
-    umbra_interval const yp =
-        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, ky, *x),
-                                                            umbra_interval_mul_f32(b, sy, *y)),
-                                  ty);
-    *x = xp;
-    *y = yp;
-}
 
 struct coverage_from_sdf {
     umbra_sdf *sdf_fn;
@@ -283,14 +256,10 @@ struct umbra_sdf_bounds_program {
                           tile_w, tile_h;
 };
 
-static _Bool matrix_is_affine(struct umbra_matrix const *m) {
-    return m->p0 == 0.0f && m->p1 == 0.0f && m->p2 == 1.0f;
-}
-
-// Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()).
+// Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()), sourced from
+// the bounds program's grid uniforms.
 static void sdf_tile_intervals(struct umbra_builder *bb,
                                struct umbra_sdf_bounds_program *bounds,
-                               struct umbra_matrix const *transform_mat,
                                umbra_interval *ix, umbra_interval *iy) {
     umbra_ptr const g = umbra_bind_uniforms(bb, &bounds->base_x, 4);
     umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
@@ -308,20 +277,41 @@ static void sdf_tile_intervals(struct umbra_builder *bb,
         umbra_add_f32(bb, base_y, umbra_mul_f32(bb, yf, tile_h)),
         umbra_add_f32(bb, base_y, umbra_mul_f32(bb, umbra_add_f32(bb, yf, one), tile_h)),
     };
-    if (transform_mat && matrix_is_affine(transform_mat)) {
-        transform_affine_interval(transform_mat, bb, ix, iy);
-    }
 }
 
-struct umbra_sdf_bounds_builder umbra_sdf_bounds_builder(
-        struct umbra_matrix const *transform,
-        umbra_sdf sdf_fn, void *sdf_ctx) {
+static void apply_affine_interval(struct umbra_affine const *a,
+                                  struct umbra_builder *b,
+                                  umbra_interval *x, umbra_interval *y) {
+    umbra_ptr const u = umbra_bind_uniforms(b, a, (int)(sizeof *a / 4));
+    umbra_interval const sx = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
+                         kx = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
+                         tx = umbra_interval_exact(umbra_uniform_32(b, u, 2)),
+                         ky = umbra_interval_exact(umbra_uniform_32(b, u, 3)),
+                         sy = umbra_interval_exact(umbra_uniform_32(b, u, 4)),
+                         ty = umbra_interval_exact(umbra_uniform_32(b, u, 5));
+    umbra_interval const xp =
+        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, sx, *x),
+                                                            umbra_interval_mul_f32(b, kx, *y)),
+                                  tx);
+    umbra_interval const yp =
+        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, ky, *x),
+                                                            umbra_interval_mul_f32(b, sy, *y)),
+                                  ty);
+    *x = xp;
+    *y = yp;
+}
+
+struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *b,
+                                                          struct umbra_affine const *transform,
+                                                          umbra_sdf sdf_fn, void *sdf_ctx) {
     struct umbra_sdf_bounds_program *bounds = calloc(1, sizeof *bounds);
-    struct umbra_builder *b = umbra_builder();
 
     umbra_ptr const cov = umbra_bind_buf(b, &bounds->cov_buf);
     umbra_interval x, y;
-    sdf_tile_intervals(b, bounds, transform, &x, &y);
+    sdf_tile_intervals(b, bounds, &x, &y);
+    if (transform) {
+        apply_affine_interval(transform, b, &x, &y);
+    }
 
     // Emit the tri-state constants BEFORE calling sdf_fn so any matching
     // constants the sdf also needs (e.g. imm 0/1 as index offsets inside an
@@ -342,23 +332,19 @@ struct umbra_sdf_bounds_builder umbra_sdf_bounds_builder(
     umbra_val32 const tri  = umbra_sel_32(b, full,    full_i,    base);
     umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));
 
-    return (struct umbra_sdf_bounds_builder){.builder = b, .bounds = bounds};
-}
-
-struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_sdf_bounds_builder bb) {
-    struct umbra_flat_ir *ir = umbra_flat_ir(bb.builder);
-    umbra_builder_free(bb.builder);
-
-    bb.bounds->be = umbra_backend_jit();
-    if (!bb.bounds->be) { bb.bounds->be = umbra_backend_interp(); }
-    bb.bounds->prog = bb.bounds->be->compile(bb.bounds->be, ir);
+    // Snapshot + compile internally.  Leave `b` alive; caller owns its
+    // lifetime and may inspect/dump/recompile after this returns.
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    bounds->be = umbra_backend_jit();
+    if (!bounds->be) { bounds->be = umbra_backend_interp(); }
+    bounds->prog = bounds->be->compile(bounds->be, ir);
     umbra_flat_ir_free(ir);
 
-    if (!bb.bounds->prog) {
-        umbra_sdf_bounds_program_free(bb.bounds);
+    if (!bounds->prog) {
+        umbra_sdf_bounds_program_free(bounds);
         return NULL;
     }
-    return bb.bounds;
+    return bounds;
 }
 
 void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {

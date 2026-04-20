@@ -290,13 +290,14 @@ int main(void) {
             dump_builder(&db, sub, draw);
         }
         if (s->build_sdf_draw) {
-            struct umbra_sdf_bounds_builder bb =
-                umbra_sdf_bounds_builder(NULL, s->sdf_fn, s->sdf_ctx);
+            struct umbra_builder *bb = umbra_builder();
+            struct umbra_sdf_bounds_program *bounds =
+                umbra_sdf_bounds_program(bb, NULL, s->sdf_fn, s->sdf_ctx);
             char sub[256];
             snprintf(sub, sizeof sub, "%s/1", dir);
             mkdir(sub, 0755);
-            dump_builder(&db, sub, bb.builder);
-            umbra_sdf_bounds_program_free(bb.bounds);
+            dump_builder(&db, sub, bb);    // consumes bb; binding targets live in `bounds`
+            umbra_sdf_bounds_program_free(bounds);
         }
 
         render_hdr(dir, i, be);

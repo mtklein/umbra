@@ -54,7 +54,7 @@ umbra_interval umbra_interval_mul_f32(struct umbra_builder *b,
 // bounds.
 //
 // No consumer today needs it: the SDF bounds program is affine-only
-// (transform_affine_interval in src/draw.c emits no divide), and the other
+// (the struct umbra_affine path in src/draw.c emits no divide), and the other
 // interval ops don't introduce division.  But the op is part
 // of our public interval library, so figure out the right behavior before
 // a caller shows up that would be hurt.  Candidates: return (-inf, +inf)

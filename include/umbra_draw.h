@@ -17,6 +17,10 @@ struct umbra_matrix {
           ky, sy, ty,
           p0, p1, p2;
 };
+struct umbra_affine {
+    float sx, kx, tx,
+          ky, sy, ty;
+};
 
 typedef umbra_color_val32 umbra_load(struct umbra_builder*, umbra_ptr);
 umbra_load umbra_load_8888,
@@ -106,33 +110,14 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 
-// SDF bounds programs build in two steps:
-//   1. umbra_sdf_bounds_builder() emits the bounds IR into a fresh umbra_builder
-//      and allocates the per-dispatch binding storage.
-//   2. umbra_sdf_bounds_program() consumes the builder and compiles on a
-//      backend picked internally (jit when available, else interp).
-//
-// The split exists so tooling can inspect/compile the IR on arbitrary backends
-// between the two steps.  If you use .builder yourself, you still own .bounds
-// and must free it via umbra_sdf_bounds_program_free() once the IR and any
-// compiled programs derived from it have been freed.
-struct umbra_sdf_bounds_program;
-struct umbra_sdf_bounds_builder {
-    struct umbra_builder            *builder;
-    struct umbra_sdf_bounds_program *bounds;
-};
-
-struct umbra_sdf_bounds_builder  umbra_sdf_bounds_builder(
-    struct umbra_matrix const *transform,
-    umbra_sdf, void *sdf_ctx);
-struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_sdf_bounds_builder);
-
-// Tolerates NULL and partially-constructed state.
-void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program*);
-
-// Use the bounds program's coverage results to intelligently dispatch
-// draw->queue() calls, skipping any uncovered rectangles.
+// Use an SDF bounds program to intelligently dispatch draw->queue() calls for a
+// draw program built by umbra_build_sdf_draw() from the same SDF, skipping
+// uncovered rectangles.  Optional affine coordinate transform.
 // TODO: use a draw that skips per-pixel SDF eval when TILE_FULL.
-void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
-                        struct umbra_program            *draw,
-                        int l, int t, int r, int b);
+struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder*,
+                                                          struct umbra_affine const *transform,
+                                                          umbra_sdf, void *sdf_ctx);
+void   umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program*);
+void   umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
+                          struct umbra_program            *draw,
+                          int l, int t, int r, int b);

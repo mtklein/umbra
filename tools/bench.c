@@ -113,24 +113,21 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
     return best / px * 1e9;
 }
 
-static void compile_builder_on(struct umbra_builder *b, struct umbra_backend *be) {
+// Time draw-side compile only.  Bounds-side compile is excluded: its builder
+// is owned by umbra_sdf_bounds_program() which compiles internally (on jit),
+// so a per-backend timing loop can't cleanly isolate the target backend's
+// compile cost.  Draw compile is where the interesting cross-backend signal
+// lives anyway.
+static void compile_all_builders(struct slide_runtime *rt, struct slide *s,
+                                 struct umbra_fmt fmt,
+                                 struct umbra_backend *be) {
+    struct umbra_builder *b = slide_draw_builder(s, &rt->dst_buf, fmt, NULL);
     if (!b) { return; }
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     struct umbra_program *p = be->compile(be, ir);
     umbra_program_free(p);
     umbra_flat_ir_free(ir);
-}
-
-static void compile_all_builders(struct slide_runtime *rt, struct slide *s,
-                                 struct umbra_fmt fmt,
-                                 struct umbra_backend *be) {
-    compile_builder_on(slide_draw_builder(s, &rt->dst_buf, fmt, NULL), be);
-    if (s->build_sdf_draw) {
-        struct umbra_sdf_bounds_builder bb = umbra_sdf_bounds_builder(NULL, s->sdf_fn, s->sdf_ctx);
-        compile_builder_on(bb.builder, be);
-        umbra_sdf_bounds_program_free(bb.bounds);
-    }
 }
 
 static _Bool streq(char const *a, char const *b) { return strcmp(a, b) == 0; }
