@@ -1387,6 +1387,46 @@ TEST(test_solid_src_fp16_planar) {
     test_backends_free(&B);
 }
 
+TEST(test_coverage_rect_tail_srcover_fp16_planar) {
+    // Regression: after a tail iteration runs (dispatch width not a multiple
+    // of K=8), the JIT was leaving preamble registers (uniforms and the 0.0
+    // imm constant) clobbered.  The next row's first SIMD iter then compared
+    // x against garbage, producing wrong coverage on every row past the
+    // first.  Rect x in [8,18), y in [1,3), dispatched 18x3 so each row has
+    // both SIMD iters and a 2-col tail.
+    umbra_color color = {1, 0, 0, 1};
+    umbra_rect rect = {8.0f, 1.0f, 18.0f, 3.0f};
+    struct draw_backends B = make_draw(umbra_draw_builder(
+        NULL,        umbra_coverage_rect, &rect,
+        umbra_shader_color,  &color,
+        umbra_blend_srcover, NULL,
+        umbra_fmt_fp16_planar));
+
+    enum { W = 18, H = 3 };
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        __fp16 dst[W * H * 4];
+        for (int i = 0; i < W * H * 4; i++) { dst[i] = (__fp16)0.0f; }
+        if (run_draw(&B, bi, W, H, (struct umbra_buf[]){
+                {.ptr=dst, .count=W * H * 4, .stride=W},
+            })) {
+            for (int y = 0; y < H; y++) {
+                for (int x = 0; x < W; x++) {
+                    _Bool const inside = x >= 8 && x < 18 && y >= 1 && y < 3;
+                    float const r = (float)dst[y*W + x + W*H*0],
+                                g = (float)dst[y*W + x + W*H*1],
+                                b = (float)dst[y*W + x + W*H*2],
+                                a = (float)dst[y*W + x + W*H*3];
+                    equiv(r, inside ? 1.0f : 0.0f) here;
+                    equiv(g, 0.0f) here;
+                    equiv(b, 0.0f) here;
+                    equiv(a, inside ? 1.0f : 0.0f) here;
+                }
+            }
+        }
+    }
+    cleanup_draw(&B);
+}
+
 TEST(test_srcover_fp16_planar) {
     umbra_color color = {0, 0.5f, 0, 0.5f};
     struct draw_backends B =

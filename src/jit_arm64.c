@@ -392,14 +392,22 @@ struct jit_program* jit_program(struct jit_backend *be,
     // LDR XT, [SP] -- load saved end_row
     put(&c, LDR_xi(XT, 31, 0));
     put(&c, CMP_xr(XY, XT));
-    int const br_more_rows = c.words;
-    put(&c, Bcond(0xb, 0));  // B.LT -> more rows
+    int const br_done_all = c.words;
+    put(&c, Bcond(0xa, 0));  // B.GE -> done_all (no more rows)
+
+    // Re-emit preamble so the next row's SIMD iter starts with uniforms in
+    // the registers it expects: the tail body clobbers them, and the SIMD
+    // body's end-of-loop fills are skipped when we enter the tail.
+    ra_reset_pool(ra);
+    for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
+    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
+    put(&c, B(loop_top - c.words));
+
+    int const done_all = c.words;
+    c.word[br_done_all] = Bcond(0xa, done_all - br_done_all);
 
     // Restore stack (saved end_row)
     put(&c, LDP_post(0, 15, 31, 2));
-
-    // Patch: B.LT -> loop_top
-    c.word[br_more_rows] = Bcond(0xb, loop_top - br_more_rows);
 
     put(&c, ADD_xi(31, 29, 0));
     // Restore callee-saved Q8-Q15 from [FP-128, FP) using negative offsets.

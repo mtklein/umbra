@@ -395,11 +395,22 @@ struct jit_program* jit_program(struct jit_backend *be,
     add_ri(&c, XY, 1);
     mov_rr(&c, XI, XWIDTH);
     cmp_rr(&c, XY, XH_X86);
-    int const br_more_rows = jcc(&c, 0x0c);    // JL -> more rows
+    int const br_done_all = jcc(&c, 0x0d);    // JGE -> done_all (no more rows)
+
+    // Re-emit preamble so the next row's SIMD iter starts with uniforms in
+    // the registers it expects: the tail body clobbers them, and the SIMD
+    // body's end-of-loop fills are skipped when we enter the tail.
+    ra_reset_pool(ra);
+    for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
+    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
     {
-        int32_t const rel = (int32_t)(loop_top - (br_more_rows + 4));
-        __builtin_memcpy(c.byte + br_more_rows, &rel, 4);
+        int     const j   = jmp(&c);
+        int32_t const rel = (int32_t)(loop_top - (j + 4));
+        __builtin_memcpy(c.byte + j, &rel, 4);
     }
+
+    // done_all:
+    patch_jcc(&c, br_done_all);
 
     {
         int const total = ns + ir->vars;
