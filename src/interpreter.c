@@ -200,8 +200,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 
     int max_ptr = -1;
     for (int i = 0; i < ir->insts; i++) {
-        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits >= 0
-                                       && max_ptr < ir->inst[i].ptr.bits) {
+        if (op_has_ptr(ir->inst[i].op) && max_ptr < ir->inst[i].ptr.bits) {
             max_ptr = ir->inst[i].ptr.bits;
         }
     }
