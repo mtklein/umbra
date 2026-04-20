@@ -278,52 +278,52 @@ static void wgpu_wait_frame(int frame, void *ctx) {
 }
 
 static void wgpu_submit_cmdbuf(struct wgpu_backend *be) {
-    if (!be->batch_enc) { return; }
+    if (be->batch_enc) {
+        wgpuComputePassEncoderEnd(be->batch_pass);
+        wgpuComputePassEncoderRelease(be->batch_pass);
+        be->batch_pass = NULL;
 
-    wgpuComputePassEncoderEnd(be->batch_pass);
-    wgpuComputePassEncoderRelease(be->batch_pass);
-    be->batch_pass = NULL;
+        uint32_t const base = (uint32_t)be->uni_pool.cur * 2;
+        uint64_t const off  = (uint64_t)be->uni_pool.cur * TS_RESOLVE_ALIGN;
+        wgpuCommandEncoderResolveQuerySet(be->batch_enc, be->ts_query,
+                                          base, 2, be->ts_resolve, off);
+        wgpuCommandEncoderCopyBufferToBuffer(be->batch_enc,
+            be->ts_resolve, off, be->ts_staging, off, 2 * sizeof(uint64_t));
 
-    uint32_t const base = (uint32_t)be->uni_pool.cur * 2;
-    uint64_t const off  = (uint64_t)be->uni_pool.cur * TS_RESOLVE_ALIGN;
-    wgpuCommandEncoderResolveQuerySet(be->batch_enc, be->ts_query,
-                                      base, 2, be->ts_resolve, off);
-    wgpuCommandEncoderCopyBufferToBuffer(be->batch_enc,
-        be->ts_resolve, off, be->ts_staging, off, 2 * sizeof(uint64_t));
+        WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(be->batch_enc, NULL);
+        wgpuCommandEncoderRelease(be->batch_enc);
+        be->batch_enc = NULL;
 
-    WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(be->batch_enc, NULL);
-    wgpuCommandEncoderRelease(be->batch_enc);
-    be->batch_enc = NULL;
-
-    // Bulk-upload all ring data accumulated since the last submit.
-    // Ring alloc copies into the chunk's shadow buffer; one QueueWriteBuffer
-    // per chunk replaces the N per-dispatch uploads that were here before.
-    {
-        struct uniform_ring *rings[2] = {
-            &be->uni_pool        .rings[be->uni_pool        .cur],
-            &be->uni_pool_uniform.rings[be->uni_pool_uniform.cur],
-        };
-        for (int r = 0; r < 2; r++) {
-            struct uniform_ring *ring = rings[r];
-            for (int i = 0; i < ring->n; i++) {
-                if (ring->chunks[i].used) {
-                    struct wgpu_ring_chunk *wc = ring->chunks[i].handle;
-                    wgpuQueueWriteBuffer(be->queue, wc->buf, 0,
-                                         ring->chunks[i].mapped, ring->chunks[i].used);
-                    be->total_upload_bytes += ring->chunks[i].used;
+        // Bulk-upload all ring data accumulated since the last submit.
+        // Ring alloc copies into the chunk's shadow buffer; one QueueWriteBuffer
+        // per chunk replaces the N per-dispatch uploads that were here before.
+        {
+            struct uniform_ring *rings[2] = {
+                &be->uni_pool        .rings[be->uni_pool        .cur],
+                &be->uni_pool_uniform.rings[be->uni_pool_uniform.cur],
+            };
+            for (int r = 0; r < 2; r++) {
+                struct uniform_ring *ring = rings[r];
+                for (int i = 0; i < ring->n; i++) {
+                    if (ring->chunks[i].used) {
+                        struct wgpu_ring_chunk *wc = ring->chunks[i].handle;
+                        wgpuQueueWriteBuffer(be->queue, wc->buf, 0,
+                                             ring->chunks[i].mapped, ring->chunks[i].used);
+                        be->total_upload_bytes += ring->chunks[i].used;
+                    }
                 }
             }
         }
+
+        int cur = be->uni_pool.cur;
+        be->frame_submitted[cur] =
+            wgpuQueueSubmitForIndex(be->queue, 1, &cmd);
+        wgpuCommandBufferRelease(cmd);
+        be->frame_has_work[cur] = 1;
+
+        uniform_ring_pool_rotate(&be->uni_pool);
+        uniform_ring_pool_rotate(&be->uni_pool_uniform);
     }
-
-    int cur = be->uni_pool.cur;
-    be->frame_submitted[cur] =
-        wgpuQueueSubmitForIndex(be->queue, 1, &cmd);
-    wgpuCommandBufferRelease(cmd);
-    be->frame_has_work[cur] = 1;
-
-    uniform_ring_pool_rotate(&be->uni_pool);
-    uniform_ring_pool_rotate(&be->uni_pool_uniform);
 }
 
 static void wgpu_flush(struct umbra_backend *base) {

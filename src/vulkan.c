@@ -215,36 +215,37 @@ static void vk_cache_download(gpu_buf buf, void *host, size_t bytes, void *ctx) 
 static gpu_buf vk_cache_import(void *host, size_t bytes, void *ctx) {
     struct vk_backend *v = ctx;
     VkDeviceSize align = v->host_import_align;
-    if (!align || !host || ((uintptr_t)host % align) != 0) { return (gpu_buf){0}; }
-    VkDeviceSize sz = (VkDeviceSize)bytes;
-    if (sz < 4) { sz = 4; }
-    VkDeviceSize import_sz = (sz + align - 1) & ~(align - 1);
-    VkBuffer buf_vk = create_buffer(v->device, import_sz);
-    VkMemoryRequirements req;
-    vkGetBufferMemoryRequirements(v->device, buf_vk, &req);
-    VkImportMemoryHostPointerInfoEXT imp = {
-        .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
-        .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
-        .pHostPointer = host,
-    };
-    VkMemoryAllocateInfo ai = {
-        .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-        .pNext = &imp,
-        .allocationSize = import_sz > req.size ? import_sz : req.size,
-        .memoryTypeIndex = v->mem_type_host_import,
-    };
-    VkDeviceMemory mem = VK_NULL_HANDLE;
-    if (vkAllocateMemory(v->device, &ai, 0, &mem) == VK_SUCCESS &&
-        vkBindBufferMemory(v->device, buf_vk, mem, 0) == VK_SUCCESS) {
-        struct vk_buf_handle *h = malloc(sizeof *h);
-        h->buf    = buf_vk;
-        h->mem    = mem;
-        h->mapped = host;
-        return (gpu_buf){.ptr = h, .size = bytes};
+    if (align && host && ((uintptr_t)host % align) == 0) {
+        VkDeviceSize sz = (VkDeviceSize)bytes;
+        if (sz < 4) { sz = 4; }
+        VkDeviceSize import_sz = (sz + align - 1) & ~(align - 1);
+        VkBuffer buf_vk = create_buffer(v->device, import_sz);
+        VkMemoryRequirements req;
+        vkGetBufferMemoryRequirements(v->device, buf_vk, &req);
+        VkImportMemoryHostPointerInfoEXT imp = {
+            .sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT,
+            .handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT,
+            .pHostPointer = host,
+        };
+        VkMemoryAllocateInfo ai = {
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .pNext = &imp,
+            .allocationSize = import_sz > req.size ? import_sz : req.size,
+            .memoryTypeIndex = v->mem_type_host_import,
+        };
+        VkDeviceMemory mem = VK_NULL_HANDLE;
+        if (vkAllocateMemory(v->device, &ai, 0, &mem) == VK_SUCCESS &&
+            vkBindBufferMemory(v->device, buf_vk, mem, 0) == VK_SUCCESS) {
+            struct vk_buf_handle *h = malloc(sizeof *h);
+            h->buf    = buf_vk;
+            h->mem    = mem;
+            h->mapped = host;
+            return (gpu_buf){.ptr = h, .size = bytes};
+        }
+        // Import failed — fall back.
+        if (mem) { vkFreeMemory(v->device, mem, 0); }
+        vkDestroyBuffer(v->device, buf_vk, 0);
     }
-    // Import failed — fall back.
-    if (mem) { vkFreeMemory(v->device, mem, 0); }
-    vkDestroyBuffer(v->device, buf_vk, 0);
     return (gpu_buf){0};
 }
 
@@ -586,30 +587,31 @@ static void vk_wait_frame(int frame, void *ctx) {
 // vk_wait_frame on the new cur (only blocks if its prior cmdbuf is still
 // running) and resets that ring. Cache entries stay live across rotation.
 static void vk_submit_cmdbuf(struct vk_backend *v) {
-    if (!v->batch_cmd) { return; }
-    double const t0 = now();
+    if (v->batch_cmd) {
+        double const t0 = now();
 
-    if (v->ts_pool) {
-        vkCmdWriteTimestamp(v->batch_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
-                            v->ts_pool, (uint32_t)v->uni_pool.cur * 2 + 1);
+        if (v->ts_pool) {
+            vkCmdWriteTimestamp(v->batch_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                                v->ts_pool, (uint32_t)v->uni_pool.cur * 2 + 1);
+        }
+        vkEndCommandBuffer(v->batch_cmd);
+
+        VkSubmitInfo si = {
+            .sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount=1,
+            .pCommandBuffers=&v->batch_cmd,
+        };
+        vkQueueSubmit(v->queue, 1, &si, v->frame_fences[v->uni_pool.cur]);
+        v->submit_time_accum += now() - t0;
+        v->total_submits++;
+
+        v->frame_committed[v->uni_pool.cur] = v->batch_cmd;
+        v->batch_cmd                        = VK_NULL_HANDLE;
+        v->batch_has_dispatch               = 0;
+        dispatch_overlap_reset(&v->overlap);
+
+        uniform_ring_pool_rotate(&v->uni_pool);
     }
-    vkEndCommandBuffer(v->batch_cmd);
-
-    VkSubmitInfo si = {
-        .sType=VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .commandBufferCount=1,
-        .pCommandBuffers=&v->batch_cmd,
-    };
-    vkQueueSubmit(v->queue, 1, &si, v->frame_fences[v->uni_pool.cur]);
-    v->submit_time_accum += now() - t0;
-    v->total_submits++;
-
-    v->frame_committed[v->uni_pool.cur] = v->batch_cmd;
-    v->batch_cmd                        = VK_NULL_HANDLE;
-    v->batch_has_dispatch               = 0;
-    dispatch_overlap_reset(&v->overlap);
-
-    uniform_ring_pool_rotate(&v->uni_pool);
 }
 
 static void vk_flush(struct umbra_backend *be) {

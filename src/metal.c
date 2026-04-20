@@ -1155,13 +1155,16 @@ static void metal_cache_download(gpu_buf buf, void *host, size_t bytes, void *ct
 static gpu_buf metal_cache_import(void *host, size_t bytes, void *ctx) {
     struct metal_backend *be = ctx;
     size_t page = (size_t)getpagesize();
-    if (!host || ((uintptr_t)host % page) != 0) { return (gpu_buf){0}; }
-    size_t import_sz = (bytes + page - 1) & ~(page - 1);
-    id buf = msg_vuup(
-        be->device, sel("newBufferWithBytesNoCopy:length:options:deallocator:"),
-        host, (NSUInteger)import_sz, (NSUInteger)MTLResourceStorageModeShared, (id)0);
-    if (!buf) { return (gpu_buf){0}; }
-    return (gpu_buf){.ptr = (void*)buf, .size = bytes};
+    if (host && ((uintptr_t)host % page) == 0) {
+        size_t import_sz = (bytes + page - 1) & ~(page - 1);
+        id buf = msg_vuup(
+            be->device, sel("newBufferWithBytesNoCopy:length:options:deallocator:"),
+            host, (NSUInteger)import_sz, (NSUInteger)MTLResourceStorageModeShared, (id)0);
+        if (buf) {
+            return (gpu_buf){.ptr = (void*)buf, .size = bytes};
+        }
+    }
+    return (gpu_buf){0};
 }
 
 static void metal_cache_release(gpu_buf buf, void *ctx) {
@@ -1278,18 +1281,19 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
 }
 
 static void metal_submit_cmdbuf(struct metal_backend *be) {
-    if (!be->batch_cmdbuf) { return; }
-    double const t0 = now();
-    void *pool = objc_autoreleasePoolPush();
-    {
-        (void)msg((id)be->batch_cmdbuf, sel("commit"));
+    if (be->batch_cmdbuf) {
+        double const t0 = now();
+        void *pool = objc_autoreleasePoolPush();
+        {
+            (void)msg((id)be->batch_cmdbuf, sel("commit"));
+        }
+        objc_autoreleasePoolPop(pool);
+        be->submit_time_accum += now() - t0;
+        be->total_submits++;
+        be->frame_committed[be->uni_pool.cur] = be->batch_cmdbuf;
+        be->batch_cmdbuf                      = NULL;
+        uniform_ring_pool_rotate(&be->uni_pool);
     }
-    objc_autoreleasePoolPop(pool);
-    be->submit_time_accum += now() - t0;
-    be->total_submits++;
-    be->frame_committed[be->uni_pool.cur] = be->batch_cmdbuf;
-    be->batch_cmdbuf                      = NULL;
-    uniform_ring_pool_rotate(&be->uni_pool);
 }
 
 static void metal_flush(struct metal_backend *be) {
@@ -1334,14 +1338,16 @@ static void free_metal(struct umbra_program *prog) {
 static struct umbra_program* compile_metal(struct umbra_backend           *be,
                                            IR const *ir) {
     struct metal_program *p = metal_program((struct metal_backend*)be, ir);
-    if (!p) { return NULL; }
-    p->base = (struct umbra_program){
-        .queue   = run_metal,
-        .dump    = dump_metal,
-        .free    = free_metal,
-        .backend = be,
-    };
-    return &p->base;
+    if (p) {
+        p->base = (struct umbra_program){
+            .queue   = run_metal,
+            .dump    = dump_metal,
+            .free    = free_metal,
+            .backend = be,
+        };
+        return &p->base;
+    }
+    return NULL;
 }
 static void flush_be_metal(struct umbra_backend *be) { metal_flush((struct metal_backend*)be); }
 static void free_be_metal(struct umbra_backend *be) {
