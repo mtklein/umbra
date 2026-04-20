@@ -15,6 +15,8 @@ buffers, which become visible after a backend `flush()`.
 
 Contributing
 ------------
+The user has final say on all decisions, particularly policy and design.
+
 Never push to origin without the user's explicit permission.
 Always create new commits; never amend commits.
 
