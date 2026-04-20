@@ -182,10 +182,15 @@ static void csg_prepare(struct slide *s, struct umbra_backend *be, struct umbra_
     slide_bg_prepare(be, fmt, st->w, st->h);
 }
 
+static void csg_animate(struct slide *s, double secs) {
+    struct csg_slide *st = (struct csg_slide *)s;
+    two_circle_orbit(&st->sdf, (float)secs, st->w, st->h);
+}
+
 static void csg_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
     struct csg_slide *st = (struct csg_slide *)s;
     slide_bg_draw(s->bg, l, t, r, b, buf);
-    two_circle_orbit(&st->sdf, (float)secs, st->w, st->h);
+    csg_animate(s, secs);
     st->dst_buf = (struct umbra_buf){
         .ptr = buf, .count = st->w * st->h * st->fmt.planes, .stride = st->w,
     };
@@ -235,8 +240,9 @@ static struct slide* make_csg(char const *title, float const bg[4], float const 
         .prepare = csg_prepare,
         .draw = csg_draw,
         .free = csg_free,
-        .get_builders  = csg_get_builders,
+        .get_builders   = csg_get_builders,
         .build_sdf_draw = csg_build_sdf_draw,
+        .animate        = csg_animate,
     };
     return &st->base;
 }
