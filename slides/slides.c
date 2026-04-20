@@ -1,5 +1,4 @@
 #include "slide.h"
-#include "text.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -52,8 +51,6 @@ static void add_slide(struct slide *s, int w, int h) {
 }
 
 void slides_init(int w, int h) {
-    text_shared_init(w, h, (float)h * 0.15f);
-
     count = 0;
     for (int i = 0; i < registry_count; i++) {
         add_slide(registry[i](), w, h);
@@ -65,7 +62,6 @@ void slides_cleanup(void) {
     for (int i = 0; i < count; i++) {
         if (all[i]->free) { all[i]->free(all[i]); }
     }
-    text_shared_cleanup();
     slide_bg_cleanup();
     count = 0;
 }

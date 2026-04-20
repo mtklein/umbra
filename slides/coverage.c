@@ -178,19 +178,6 @@ void text_cov_free(struct text_cov *tc) {
     tc->data = NULL;
 }
 
-static struct text_cov shared_bitmap, shared_sdf;
-
-void text_shared_init(int w, int h, float font_size) {
-    shared_bitmap = text_rasterize(w, h, font_size, 0);
-    shared_sdf    = text_rasterize(w, h, font_size, 1);
-}
-void text_shared_cleanup(void) {
-    text_cov_free(&shared_bitmap);
-    text_cov_free(&shared_sdf);
-}
-struct text_cov* text_shared_bitmap(void) { return &shared_bitmap; }
-struct text_cov* text_shared_sdf   (void) { return &shared_sdf; }
-
 // Coverage (8-bit bitmap) and Coverage (SDF bitmap): sample a glyph-mask
 // through coverage_bitmap2d / coverage_sdf2d so the slide composes under an
 // outer transform (e.g. the overview's cell matrix).  When the slide stands
@@ -199,7 +186,8 @@ struct text_cov* text_shared_sdf   (void) { return &shared_sdf; }
 struct text_slide {
     struct slide base;
 
-    struct text_cov *tc;
+    struct text_cov          tc;
+    _Bool                    sdf; int :24, :32;
 
     umbra_color              color;
     struct coverage_bitmap2d bmp;
@@ -208,10 +196,11 @@ struct text_slide {
 
 static void text_init(struct slide *s) {
     struct text_slide *st = (struct text_slide *)s;
+    st->tc = text_rasterize(s->w, s->h, (float)s->h * 0.15f, st->sdf);
     st->bmp = (struct coverage_bitmap2d){
-        .buf = {.ptr = st->tc->data, .count = st->tc->w * st->tc->h},
-        .w   = st->tc->w,
-        .h   = st->tc->h,
+        .buf = {.ptr = st->tc.data, .count = st->tc.w * st->tc.h},
+        .w   = st->tc.w,
+        .h   = st->tc.h,
     };
 }
 
@@ -225,11 +214,15 @@ static void text_build_draw(struct slide *s, struct umbra_builder *b,
                      umbra_blend_srcover, NULL);
 }
 
-static void text_free(struct slide *s) { free(s); }
+static void text_free(struct slide *s) {
+    struct text_slide *st = (struct text_slide *)s;
+    text_cov_free(&st->tc);
+    free(s);
+}
 
 SLIDE(slide_coverage_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
-    st->tc          = text_shared_bitmap();
+    st->sdf         = 0;
     st->color       = (umbra_color){1.0f, 1.0f, 1.0f, 1.0f};
     st->coverage_fn = coverage_bitmap2d;
     st->base = (struct slide){
@@ -244,7 +237,7 @@ SLIDE(slide_coverage_bitmap) {
 
 SLIDE(slide_coverage_sdf_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
-    st->tc          = text_shared_sdf();
+    st->sdf         = 1;
     st->color       = (umbra_color){0.2f, 0.8f, 1.0f, 1.0f};
     st->coverage_fn = coverage_sdf2d;
     st->base = (struct slide){
@@ -262,7 +255,7 @@ SLIDE(slide_coverage_sdf_bitmap) {
 struct persp_slide {
     struct slide base;
 
-    struct text_cov *bitmap;
+    struct text_cov           bitmap;
 
     umbra_color               color;
     struct coverage_bitmap2d  bmp;
@@ -271,10 +264,11 @@ struct persp_slide {
 
 static void persp_init(struct slide *s) {
     struct persp_slide *st = (struct persp_slide *)s;
+    st->bitmap = text_rasterize(s->w, s->h, (float)s->h * 0.15f, 0);
     st->bmp = (struct coverage_bitmap2d){
-        .buf = {.ptr = st->bitmap->data, .count = st->bitmap->w * st->bitmap->h},
-        .w   = st->bitmap->w,
-        .h   = st->bitmap->h,
+        .buf = {.ptr = st->bitmap.data, .count = st->bitmap.w * st->bitmap.h},
+        .w   = st->bitmap.w,
+        .h   = st->bitmap.h,
     };
 }
 
@@ -292,14 +286,17 @@ static void persp_build_draw(struct slide *s, struct umbra_builder *b,
 static void persp_animate(struct slide *s, double secs) {
     struct persp_slide *st = (struct persp_slide *)s;
     slide_perspective_matrix(&st->mat, (float)secs, s->w, s->h,
-                             st->bitmap->w, st->bitmap->h);
+                             st->bitmap.w, st->bitmap.h);
 }
 
-static void persp_free(struct slide *s) { free(s); }
+static void persp_free(struct slide *s) {
+    struct persp_slide *st = (struct persp_slide *)s;
+    text_cov_free(&st->bitmap);
+    free(s);
+}
 
 SLIDE(slide_coverage_bitmap_matrix) {
     struct persp_slide *st = calloc(1, sizeof *st);
-    st->bitmap = text_shared_bitmap();
     st->color  = (umbra_color){1.0f, 0.8f, 0.2f, 1.0f};
     st->base = (struct slide){
         .title = "Coverage (8-bit bitmap + matrix)",
