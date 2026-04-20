@@ -137,9 +137,9 @@ static void runtime_sdf_builders(
     }
 
     struct umbra_builder *bb = umbra_builder();
-    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &rt->cov_buf);
+    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &rt->bounds.cov_buf);
     umbra_interval ix, iy;
-    umbra_sdf_tile_intervals(bb, &rt->grid, pre, &ix, &iy);
+    umbra_sdf_tile_intervals(bb, &rt->bounds.grid, pre, &ix, &iy);
 
     s->build_sdf_draw(s, db, dst_ptr, fmt, x, y, bb, cov_ptr, ix, iy);
 
@@ -167,9 +167,9 @@ struct slide_runtime* slide_runtime(struct slide *s,
 
         struct umbra_flat_ir *bir = umbra_flat_ir(bb);
         umbra_builder_free(bb);
-        struct umbra_backend *bounds_be = umbra_backend_jit();
-        if (!bounds_be) { bounds_be = umbra_backend_interp(); }
-        rt->bounds = bounds_be->compile(bounds_be, bir);
+        rt->bounds_be = umbra_backend_jit();
+        if (!rt->bounds_be) { rt->bounds_be = umbra_backend_interp(); }
+        rt->bounds.prog = rt->bounds_be->compile(rt->bounds_be, bir);
         umbra_flat_ir_free(bir);
     } else if (s->build_draw) {
         struct umbra_builder *b = runtime_draw_builder(s, &rt->dst_buf, fmt, pre);
@@ -181,25 +181,12 @@ struct slide_runtime* slide_runtime(struct slide *s,
     return rt;
 }
 
-// TODO: query per-backend dispatch_granularity instead of this global compromise.
-enum { SLIDE_TILE = 512 };
-
 void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
                         double secs, int l, int t, int r, int b) {
     if (s->animate) { s->animate(s, secs); }
 
-    if (rt->bounds) {
-        int const T  = SLIDE_TILE,
-                  xt = (r - l + T - 1) / T,
-                  yt = (b - t + T - 1) / T,
-                  tiles = xt * yt;
-        if (tiles > rt->cov_cap) {
-            rt->cov     = realloc(rt->cov, (size_t)tiles * sizeof *rt->cov);
-            rt->cov_cap = tiles;
-        }
-        rt->cov_buf = (struct umbra_buf){.ptr = rt->cov, .count = tiles, .stride = xt};
-        umbra_sdf_dispatch(rt->bounds, rt->draw, &rt->grid, &rt->cov_buf,
-                           T, l, t, r, b);
+    if (rt->bounds.prog) {
+        umbra_sdf_dispatch(&rt->bounds, rt->draw, l, t, r, b);
     } else {
         rt->draw->queue(rt->draw, l, t, r, b);
     }
@@ -207,11 +194,9 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
 
 void slide_runtime_free(struct slide_runtime *rt) {
     if (rt) {
-        struct umbra_backend *bounds_be = rt->bounds ? rt->bounds->backend : NULL;
         umbra_program_free(rt->draw);
-        umbra_program_free(rt->bounds);
-        umbra_backend_free(bounds_be);
-        free(rt->cov);
+        umbra_sdf_bounds_free(&rt->bounds);
+        umbra_backend_free(rt->bounds_be);
         free(rt);
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 #include "umbra.h"
 #include "umbra_interval.h"
+#include <stdint.h>
 
 typedef struct { float       x, y; } umbra_point;
 typedef struct { umbra_val32 x, y; } umbra_point_val32;
@@ -129,11 +130,26 @@ void umbra_sdf_tile_intervals(struct umbra_builder*,
                               struct umbra_matrix const *transform,
                               umbra_interval *ix, umbra_interval *iy);
 
+// A bounds program plus the storage it needs between dispatches: the grid
+// uniform it was built against, the cov buffer it writes tile classifications
+// into, and our running capacity for that buffer.  Bind &bounds.grid /
+// &bounds.cov_buf when building the bounds IR; after compile stash the program
+// in bounds.prog; then just call umbra_sdf_dispatch().
+struct umbra_sdf_bounds {
+    struct umbra_program *prog;
+    struct umbra_sdf_grid grid;
+    struct umbra_buf      cov_buf;
+    uint16_t             *cov;
+    int                   cov_cap, :32;
+};
+
+// Frees bounds->prog and bounds->cov.  Does not free the struct itself —
+// callers usually embed one.
+void umbra_sdf_bounds_free(struct umbra_sdf_bounds*);
+
 // Use the bounds program's coverage results to intelligently dispatch
 // draw->queue() calls, skipping any uncovered rectangles.
 // TODO: use a draw that skips per-pixel SDF eval when TILE_FULL.
-void umbra_sdf_dispatch(struct umbra_program *bounds,
-                        struct umbra_program *draw,
-                        struct umbra_sdf_grid *grid,
-                        struct umbra_buf *cov,
-                        int tile_size, int l, int t, int r, int b);
+void umbra_sdf_dispatch(struct umbra_sdf_bounds *bounds,
+                        struct umbra_program    *draw,
+                        int l, int t, int r, int b);

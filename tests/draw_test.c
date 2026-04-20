@@ -1610,7 +1610,7 @@ static umbra_interval test_rect_fn(void *ctx, struct umbra_builder *b,
 }
 
 TEST(test_sdf_dispatch_rect) {
-    enum { W = 8, H = 4, T = 512 };
+    enum { W = 8, H = 4 };
     umbra_color color = {1, 0, 0, 1};
     umbra_rect  rect  = {1.0f, 1.0f, 7.0f, 3.0f};
 
@@ -1623,9 +1623,8 @@ TEST(test_sdf_dispatch_rect) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
 
-        struct umbra_sdf_grid grid = {0};
-        struct umbra_buf      dst_slot = {0};
-        struct umbra_buf      cov_buf  = {0};
+        struct umbra_sdf_bounds bounds   = {0};
+        struct umbra_buf        dst_slot = {0};
 
         // Draw program on the target backend.
         struct umbra_builder *db = umbra_builder();
@@ -1644,25 +1643,21 @@ TEST(test_sdf_dispatch_rect) {
 
         // Bounds program on jit (or interp).
         struct umbra_builder *bb = umbra_builder();
-        umbra_ptr      const cov_ptr = umbra_bind_buf(bb, &cov_buf);
+        umbra_ptr      const cov_ptr = umbra_bind_buf(bb, &bounds.cov_buf);
         umbra_interval ix, iy;
-        umbra_sdf_tile_intervals(bb, &grid, NULL, &ix, &iy);
+        umbra_sdf_tile_intervals(bb, &bounds.grid, NULL, &ix, &iy);
         umbra_build_sdf_bounds(bb, cov_ptr, ix, iy, test_rect_fn, &rect);
         struct umbra_flat_ir *bir = umbra_flat_ir(bb);
         umbra_builder_free(bb);
         struct umbra_backend *bounds_be = umbra_backend_jit();
         if (!bounds_be) { bounds_be = umbra_backend_interp(); }
-        struct umbra_program *bounds = bounds_be->compile(bounds_be, bir);
+        bounds.prog = bounds_be->compile(bounds_be, bir);
         umbra_flat_ir_free(bir);
 
-        int const xt = (W + T - 1) / T,
-                  yt = (H + T - 1) / T;
-        uint16_t cov[1] = {0};          // xt*yt == 1 for W,H <= T
         uint32_t dst[W * H];
         __builtin_memset(dst, 0, sizeof dst);
-        dst_slot = (struct umbra_buf){.ptr = dst, .count = W * H,  .stride = W };
-        cov_buf  = (struct umbra_buf){.ptr = cov, .count = xt * yt, .stride = xt};
-        umbra_sdf_dispatch(bounds, draw, &grid, &cov_buf, T, 0, 0, W, H);
+        dst_slot = (struct umbra_buf){.ptr = dst, .count = W * H, .stride = W};
+        umbra_sdf_dispatch(&bounds, draw, 0, 0, W, H);
         bes[bi]->flush(bes[bi]);
 
         for (int y = 0; y < H; y++) {
@@ -1679,7 +1674,7 @@ TEST(test_sdf_dispatch_rect) {
         }
 
         umbra_program_free(draw);
-        umbra_program_free(bounds);
+        umbra_sdf_bounds_free(&bounds);
         umbra_backend_free(bounds_be);
     }
 
@@ -1708,9 +1703,8 @@ static umbra_interval test_circle_fn(void *ctx, struct umbra_builder *b,
 }
 
 TEST(test_sdf_dispatch_tiling) {
-    // Canvas larger than QUEUE_MIN_TILE (512) so the grid has multiple tiles.
-    // Circle at (512, 384) r=180 covers ~4 of ~6 tiles on 1024x768 with 512px tiles.
-    enum { W = 1024, H = 768, T = 512 };
+    // Canvas larger than the SDF tile size so the grid has multiple tiles.
+    enum { W = 1024, H = 768 };
 
     struct test_circle_state sdf   = {.cx = 512, .cy = 384, .r = 180};
     umbra_color              color = {1, 0, 0, 1};
@@ -1718,10 +1712,9 @@ TEST(test_sdf_dispatch_tiling) {
     struct umbra_backend *be = umbra_backend_jit();
     if (!be) { be = umbra_backend_interp(); }
 
-    struct umbra_sdf_grid grid            = {0};
-    struct umbra_buf      tiled_dst_slot  = {0};
-    struct umbra_buf      flat_dst_slot   = {0};
-    struct umbra_buf      cov_buf         = {0};
+    struct umbra_sdf_bounds bounds         = {0};
+    struct umbra_buf        tiled_dst_slot = {0};
+    struct umbra_buf        flat_dst_slot  = {0};
 
     // Tiled draw program.
     struct umbra_builder *db = umbra_builder();
@@ -1739,15 +1732,15 @@ TEST(test_sdf_dispatch_tiling) {
 
     // Bounds program on jit (or interp).
     struct umbra_builder *bb = umbra_builder();
-    umbra_ptr      const cov_ptr = umbra_bind_buf(bb, &cov_buf);
+    umbra_ptr      const cov_ptr = umbra_bind_buf(bb, &bounds.cov_buf);
     umbra_interval ix, iy;
-    umbra_sdf_tile_intervals(bb, &grid, NULL, &ix, &iy);
+    umbra_sdf_tile_intervals(bb, &bounds.grid, NULL, &ix, &iy);
     umbra_build_sdf_bounds(bb, cov_ptr, ix, iy, test_circle_fn, &sdf);
     struct umbra_flat_ir *bir = umbra_flat_ir(bb);
     umbra_builder_free(bb);
     struct umbra_backend *bounds_be = umbra_backend_jit();
     if (!bounds_be) { bounds_be = umbra_backend_interp(); }
-    struct umbra_program *bounds = bounds_be->compile(bounds_be, bir);
+    bounds.prog = bounds_be->compile(bounds_be, bir);
     umbra_flat_ir_free(bir);
 
     // Flat reference: same shader+coverage, no tiling.
@@ -1767,12 +1760,8 @@ TEST(test_sdf_dispatch_tiling) {
     uint32_t *tiled_buf = calloc(W * H, sizeof *tiled_buf);
     uint32_t *flat_buf  = calloc(W * H, sizeof *flat_buf);
 
-    int const xt = (W + T - 1) / T,
-              yt = (H + T - 1) / T;
-    uint16_t *cov = calloc((size_t)(xt * yt), sizeof *cov);
-    tiled_dst_slot = (struct umbra_buf){.ptr = tiled_buf, .count = W * H,  .stride = W };
-    cov_buf        = (struct umbra_buf){.ptr = cov,       .count = xt * yt, .stride = xt};
-    umbra_sdf_dispatch(bounds, tiled, &grid, &cov_buf, T, 0, 0, W, H);
+    tiled_dst_slot = (struct umbra_buf){.ptr = tiled_buf, .count = W * H, .stride = W};
+    umbra_sdf_dispatch(&bounds, tiled, 0, 0, W, H);
 
     flat_dst_slot = (struct umbra_buf){.ptr = flat_buf, .count = W * H, .stride = W};
     flat->queue(flat, 0, 0, W, H);
@@ -1786,12 +1775,11 @@ TEST(test_sdf_dispatch_tiling) {
     }
     mismatches == 0 here;
 
-    free(cov);
     free(flat_buf);
     free(tiled_buf);
     umbra_program_free(flat);
     umbra_program_free(tiled);
-    umbra_program_free(bounds);
+    umbra_sdf_bounds_free(&bounds);
     umbra_backend_free(bounds_be);
     umbra_backend_free(be);
 }

@@ -55,17 +55,13 @@ void             slide_bg_draw(struct slide_bg*, umbra_color,
 void             slide_bg_free(struct slide_bg*);
 
 struct slide_runtime {
-    struct umbra_program *draw;
-    struct umbra_program *bounds;      // NULL for non-SDF; owns its backend
-    uint16_t             *cov;
+    struct umbra_program   *draw;
+    struct umbra_sdf_bounds bounds;    // .prog == NULL for non-SDF; owns its backend
+    struct umbra_backend   *bounds_be; // backend that compiled bounds.prog
 
-    struct umbra_fmt      fmt;
-    int                   w, h;
-    struct umbra_sdf_grid grid;
-    struct umbra_buf      dst_buf;
-    struct umbra_buf      cov_buf;
-    int                   cov_cap;
-    int                   :32;
+    struct umbra_fmt        fmt;
+    int                     w, h;
+    struct umbra_buf        dst_buf;
 };
 
 struct slide_runtime* slide_runtime(struct slide*, int w, int h,

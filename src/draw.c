@@ -1,6 +1,7 @@
 #include "../include/umbra_draw.h"
 
 #include <stdint.h>
+#include <stdlib.h>
 
 static umbra_val32 pack_unorm(struct umbra_builder *b, umbra_val32 ch, umbra_val32 scale) {
     umbra_val32 const zero = umbra_imm_f32(b, 0.0f),
@@ -316,28 +317,41 @@ void umbra_sdf_tile_intervals(struct umbra_builder *bb,
     }
 }
 
-// TODO: decisions about tile size should be made by umbra_sdf_dispatch(),
-//       not its callers.  and does carrying that through simplify anything
-//       else, e.g. sdf grid or cov buffer managmenet becomes internal?
-void umbra_sdf_dispatch(struct umbra_program *bounds,
-                        struct umbra_program *draw,
-                        struct umbra_sdf_grid *grid,
-                        struct umbra_buf *cov,
-                        int tile_size, int l, int t, int r, int b) {
-    int const T  = tile_size,
+void umbra_sdf_bounds_free(struct umbra_sdf_bounds *b) {
+    if (b) {
+        umbra_program_free(b->prog);
+        free(b->cov);
+        b->prog    = NULL;
+        b->cov     = NULL;
+        b->cov_cap = 0;
+    }
+}
+
+// TODO: query per-backend dispatch_granularity instead of a global compromise.
+enum { UMBRA_SDF_TILE = 512 };
+
+void umbra_sdf_dispatch(struct umbra_sdf_bounds *bounds,
+                        struct umbra_program    *draw,
+                        int l, int t, int r, int b) {
+    int const T  = UMBRA_SDF_TILE,
               xt = (r - l + T - 1) / T,
               yt = (b - t + T - 1) / T,
               tiles = xt * yt;
 
-    *grid = (struct umbra_sdf_grid){
+    if (tiles > bounds->cov_cap) {
+        bounds->cov     = realloc(bounds->cov, (size_t)tiles * sizeof *bounds->cov);
+        bounds->cov_cap = tiles;
+    }
+    bounds->grid = (struct umbra_sdf_grid){
         .base_x = (float)l, .base_y = (float)t,
         .tile_w = (float)T, .tile_h = (float)T,
     };
-    cov->count  = tiles;
-    cov->stride = xt;
-    __builtin_memset(cov->ptr, 0, (size_t)tiles * sizeof(uint16_t));
-    bounds->queue(bounds, 0, 0, xt, yt);
-    uint16_t const *c = cov->ptr;
+    bounds->cov_buf = (struct umbra_buf){
+        .ptr = bounds->cov, .count = tiles, .stride = xt,
+    };
+    __builtin_memset(bounds->cov, 0, (size_t)tiles * sizeof *bounds->cov);
+    bounds->prog->queue(bounds->prog, 0, 0, xt, yt);
+    uint16_t const *c = bounds->cov;
 
     // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
 
