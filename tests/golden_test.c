@@ -122,12 +122,15 @@ TEST(test_perspective_text) {
     struct umbra_matrix mat = {1,0,0, 0,1,0, 0,0,1};
 
     struct umbra_buf dst_slot = {0};
-    struct umbra_builder *bld = umbra_draw_builder(
-        &mat,
-        coverage_bitmap2d,           &sampler,
-        umbra_shader_color,          &color,
-        umbra_blend_srcover,         NULL,
-        &dst_slot,                   umbra_fmt_8888);
+    struct umbra_builder *bld = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(bld, &dst_slot);
+    umbra_val32 const bx = umbra_f32_from_i32(bld, umbra_x(bld)),
+                      by = umbra_f32_from_i32(bld, umbra_y(bld));
+    umbra_point_val32 const bp = umbra_transform_perspective(&mat, bld, bx, by);
+    umbra_build_draw(bld, dst_ptr, umbra_fmt_8888, bp.x, bp.y,
+                     coverage_bitmap2d,   &sampler,
+                     umbra_shader_color,  &color,
+                     umbra_blend_srcover, NULL);
     struct umbra_flat_ir *ir =
         umbra_flat_ir(bld);
     umbra_builder_free(bld);
@@ -161,12 +164,15 @@ TEST(test_perspective_text) {
         .h   = tc.h,
     };
 
-    bld = umbra_draw_builder(
-        &mat2,
-        coverage_bitmap2d,           &sampler2,
-        umbra_shader_color,          &hc2,
-        umbra_blend_srcover,         NULL,
-        &dst_slot,                   umbra_fmt_8888);
+    bld = umbra_builder();
+    umbra_ptr const dst_ptr2 = umbra_bind_buf(bld, &dst_slot);
+    umbra_val32 const b2x = umbra_f32_from_i32(bld, umbra_x(bld)),
+                      b2y = umbra_f32_from_i32(bld, umbra_y(bld));
+    umbra_point_val32 const bp2 = umbra_transform_perspective(&mat2, bld, b2x, b2y);
+    umbra_build_draw(bld, dst_ptr2, umbra_fmt_8888, bp2.x, bp2.y,
+                     coverage_bitmap2d,   &sampler2,
+                     umbra_shader_color,  &hc2,
+                     umbra_blend_srcover, NULL);
     ir = umbra_flat_ir(bld);
     umbra_builder_free(bld);
     interp = be->compile(be, ir);

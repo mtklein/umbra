@@ -80,11 +80,14 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
         bg_fmt = fmt;
         bg_w   = w;
         bg_h   = h;
-        struct umbra_builder *b = umbra_draw_builder(
-        NULL,            NULL,               NULL,
-            umbra_shader_color, &bg_color,
-            NULL,               NULL,
-            &bg_dst_buf,        fmt);
+        struct umbra_builder *b = umbra_builder();
+        umbra_ptr const dst = umbra_bind_buf(b, &bg_dst_buf);
+        umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
+                          y = umbra_f32_from_i32(b, umbra_y(b));
+        umbra_build_draw(b, dst, fmt, x, y,
+                         NULL,               NULL,
+                         umbra_shader_color, &bg_color,
+                         NULL,               NULL);
         bg_ir = umbra_flat_ir(b);
         umbra_builder_free(b);
     }

@@ -216,12 +216,14 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     }
 
     umbra_program_free(st->overlay_prog);
-    struct umbra_builder *ob = umbra_draw_builder(
-        NULL,
-        coverage_bitmap,     &st->overlay_buf,
-        umbra_shader_color,  &st->overlay_color,
-        umbra_blend_srcover, NULL,
-        &st->out_buf,        fmt);
+    struct umbra_builder *ob = umbra_builder();
+    umbra_ptr const ob_dst = umbra_bind_buf(ob, &st->out_buf);
+    umbra_val32 const ob_x = umbra_f32_from_i32(ob, umbra_x(ob)),
+                      ob_y = umbra_f32_from_i32(ob, umbra_y(ob));
+    umbra_build_draw(ob, ob_dst, fmt, ob_x, ob_y,
+                     coverage_bitmap,     &st->overlay_buf,
+                     umbra_shader_color,  &st->overlay_color,
+                     umbra_blend_srcover, NULL);
     struct umbra_flat_ir *oir = umbra_flat_ir(ob);
     umbra_builder_free(ob);
     st->overlay_prog = be->compile(be, oir);

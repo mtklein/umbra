@@ -98,9 +98,9 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const*,
                                               umbra_val32 x, umbra_val32 y);
 
 // Shade a single color; ctx is an umbra_color*.
-umbra_color_val32 umbra_shader_color(void *umbra_color, struct umbra_builder*,
-                                     umbra_val32 x, umbra_val32 y);
+umbra_shader umbra_shader_color;
 
+// ctx=NULL for all these blend functions.
 umbra_blend umbra_blend_src,
             umbra_blend_srcover,
             umbra_blend_dstover,
@@ -121,24 +121,14 @@ void umbra_build_draw(struct umbra_builder*,
                       umbra_shader  , void *shader_ctx,
                       umbra_blend   , void *blend_ctx);
 
-// TODO: remove umbra_draw_builder.  It is a thin convenience wrapper around
-// umbra_build_draw that survives only so legacy call sites (slide code that
-// hasn't migrated to build_draw yet, plus umbra_sdf_draw's internal draw
-// program) don't all have to be rewritten at once.  Steady state is every
-// caller does it themselves: umbra_builder() + umbra_bind_buf(dst) +
-// umbra_f32_from_i32 of umbra_x / umbra_y + optional
-// umbra_transform_perspective + umbra_build_draw -- exactly the same four
-// lines this wrapper inlines.  Delete this prototype and src/draw.c's
-// definition once the last caller is gone.
+// TODO: remove umbra_draw_builder.  A thin convenience wrapper around
+// umbra_build_draw: umbra_builder() + umbra_bind_buf(dst) + umbra_f32_from_i32
+// of umbra_x / umbra_y + optional umbra_transform_perspective +
+// umbra_build_draw -- exactly the four lines this wrapper inlines.  Only
+// remaining callers are the SDF path (slides/sdf.c via umbra_coverage_from_sdf,
+// and src/draw.c inside umbra_sdf_draw); both go away with the SDF rework,
+// and this prototype + definition go with them.
 //
-// Current callers to migrate first:
-//   * slides/color.c, slides/slug.c, slides/sdf.c, slides/blend.c,
-//     slides/slides.c bg program, slides/overview.c overlay program (each
-//     will typically migrate alongside its own slide->build_draw conversion)
-//   * tests/draw_test.c draw_builder_shim (every TEST using the shim)
-//   * tests/golden_test.c
-//   * src/draw.c inside umbra_sdf_draw (easy -- open-codes the same four
-//     lines).
 // Creates a fresh builder, initializes (x, y) from the dispatch, applies
 // umbra_transform_perspective through transform_mat (if non-NULL), and
 // dispatches to umbra_build_draw.
@@ -173,6 +163,13 @@ void umbra_sdf_draw_free(struct umbra_sdf_draw*);
 
 
 // Adapt an umbra_sdf as umbra_coverage.
+//
+// TRAP: evaluates the SDF per pixel with no tile culling.  That throws away
+// the whole point of SDF coverage -- umbra_sdf_draw exists specifically to
+// build a separate interval bounds program that culls empty tiles before the
+// draw program touches them.  Only used today because slides/sdf.c still
+// goes through umbra_draw_builder; both will be replaced by a build_sdf_draw
+// contract that keeps the bounds-program pair intact.
 struct umbra_coverage_from_sdf {
     umbra_sdf *sdf_fn;
     void      *sdf_ctx;

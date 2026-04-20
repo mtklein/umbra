@@ -14,8 +14,17 @@ static struct umbra_builder* draw_builder_shim(
         umbra_shader    sh,  void *sh_ctx,
         umbra_blend     bl,  void *bl_ctx,
         struct umbra_fmt fmt) {
-    return umbra_draw_builder(xf_mat, cov, cov_ctx, sh, sh_ctx, bl, bl_ctx,
-                              &draw_dst_slot, fmt);
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const dst = umbra_bind_buf(b, &draw_dst_slot);
+    umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
+                y = umbra_f32_from_i32(b, umbra_y(b));
+    if (xf_mat) {
+        umbra_point_val32 const p = umbra_transform_perspective(xf_mat, b, x, y);
+        x = p.x;
+        y = p.y;
+    }
+    umbra_build_draw(b, dst, fmt, x, y, cov, cov_ctx, sh, sh_ctx, bl, bl_ctx);
+    return b;
 }
 #define umbra_draw_builder draw_builder_shim
 
