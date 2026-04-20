@@ -305,78 +305,46 @@ struct grid_params {
     float base_x, base_y, tile_w, tile_h;
 };
 
-struct umbra_sdf_draw {
-    struct umbra_program          *draw;
-    struct umbra_program          *bounds;
-    struct umbra_backend          *bounds_be;
-    uint16_t                      *cov;
-    struct grid_params             grid;
-    int                            cov_cap;
-    int                            :32;
-    struct umbra_buf               cov_buf;
-    struct umbra_buf               draw_dst_buf;
+struct umbra_sdf_dispatcher {
+    struct umbra_program *draw;       // caller-supplied, we take ownership
+    struct umbra_program *bounds;     // NULL if transform_mat is perspective (no tile culling)
+    struct umbra_backend *bounds_be;
+    uint16_t             *cov;
+    struct grid_params    grid;
+    int                   cov_cap, tile_size;
+    struct umbra_buf      cov_buf;
 };
 
 // TODO: add a second `covered` program alongside `draw` for tiles where the
-// SDF is entirely inside the shape.  SDF convention is f<0 inside, so:
-//   bounds.hi < 0 -> tile fully covered -> dispatch `covered` (shader+blend at cov=1)
-//   bounds.lo < 0 -> some chance of coverage -> dispatch `draw` (current behavior)
-//   else          -> skip tile
-// `covered` would be built like `draw` but without the SDF coverage adapter,
-// skipping per-pixel SDF evaluation entirely.  Prerequisites:
-//   - bounds program must also emit f.hi; currently only f.lo is stored.
-//   - bounds_buf grows a second float* output; allocate/free in _queue.
-//   - tile loop in umbra_sdf_draw_queue branches on hi<0 vs lo<0.
-
-// TODO: query per-backend dispatch_granularity instead of this one global
-// compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
-enum { QUEUE_MIN_TILE = 512 };
+// SDF is entirely inside the shape.  bounds already tags such tiles as
+// UMBRA_SDF_TILE_FULL; the fast path dispatches `covered` (shader+blend at
+// cov=1, no per-pixel SDF eval) instead of `draw`.  `covered` would be built
+// like `draw` but with umbra_build_draw (no SDF coverage adapter).
 
 static _Bool matrix_is_affine(struct umbra_matrix const *m) {
     return m->p0 == 0.0f && m->p1 == 0.0f && m->p2 == 1.0f;
 }
 
-struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
-                                      struct umbra_matrix const *transform_mat,
-                                      umbra_sdf sdf_fn, void *sdf_ctx,
-                                      _Bool hard_edge,
-                                      umbra_shader shader_fn, void *shader_ctx,
-                                      umbra_blend blend_fn, void *blend_ctx,
-                                      struct umbra_fmt fmt) {
-    struct umbra_sdf_draw *d = calloc(1, sizeof *d);
-
-    // Build the draw program: dispatch coords -> optional transform -> sdf coverage + shader + blend.
-    {
-        struct umbra_builder *db = umbra_builder();
-        umbra_ptr const dst_ptr = umbra_bind_buf(db, &d->draw_dst_buf);
-        umbra_val32 x = umbra_f32_from_i32(db, umbra_x(db)),
-                    y = umbra_f32_from_i32(db, umbra_y(db));
-        if (transform_mat) {
-            umbra_point_val32 const p = umbra_transform_perspective(transform_mat, db, x, y);
-            x = p.x;
-            y = p.y;
-        }
-        umbra_build_sdf_draw(db, dst_ptr, fmt, x, y,
-                             sdf_fn, sdf_ctx, hard_edge ? 0 : 1,
-                             shader_fn, shader_ctx,
-                             blend_fn,  blend_ctx);
-        struct umbra_flat_ir *dir = umbra_flat_ir(db);
-        umbra_builder_free(db);
-        d->draw = be->compile(be, dir);
-        umbra_flat_ir_free(dir);
-        if (!d->draw) { free(d); return NULL; }
-    }
+struct umbra_sdf_dispatcher* umbra_sdf_dispatcher(
+        umbra_sdf sdf_fn, void *sdf_ctx,
+        struct umbra_matrix const *transform_mat,
+        struct umbra_program *draw,
+        int tile_size) {
+    if (!draw) { return NULL; }
+    struct umbra_sdf_dispatcher *d = calloc(1, sizeof *d);
+    d->draw      = draw;
+    d->tile_size = tile_size;
 
     // Gate the bounds program on affine-only transforms.  We don't support
     // tile-culled dispatch under perspective: the interval divide would be
     // unsound on horizon-crossing tiles, and perspective-sdf isn't a use
-    // case we have.  Non-affine transforms skip the bounds program and fall
-    // back to a full-rect dispatch in _queue.
+    // case we have.  Non-affine transforms skip bounds and fall back to a
+    // full-rect dispatch in queue().
     _Bool const build_bounds = !transform_mat || matrix_is_affine(transform_mat);
     if (!build_bounds) { return d; }
 
     // Build the bounds program: evaluate the sdf over tile-extent intervals.
-    // x() and y() are tile indices.
+    // umbra_x() / umbra_y() are tile indices.
     struct umbra_builder *bb = umbra_builder();
     umbra_ptr const g   = umbra_bind_uniforms(bb, &d->grid,
                                                   (int)(sizeof d->grid / 4));
@@ -410,29 +378,25 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
     return d;
 }
 
-void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
-                          int l, int t, int r, int b, struct umbra_buf dst) {
+void umbra_sdf_dispatcher_queue(struct umbra_sdf_dispatcher *d,
+                                int l, int t, int r, int b) {
     if (!d) { return; }
     if (!d->bounds) {
         // Perspective transform: tile-culling bounds are unsound; dispatch full rect.
-        d->draw_dst_buf = dst;
         d->draw->queue(d->draw, l, t, r, b);
         return;
     }
-    int const w  = r - l,
-              h  = b - t,
-              xt = (w + QUEUE_MIN_TILE - 1) / QUEUE_MIN_TILE,
-              yt = (h + QUEUE_MIN_TILE - 1) / QUEUE_MIN_TILE;
-    int const tiles = xt * yt;
+    int const T  = d->tile_size,
+              xt = (r - l + T - 1) / T,
+              yt = (b - t + T - 1) / T,
+              tiles = xt * yt;
 
     d->grid = (struct grid_params){
-        .base_x = (float)l,
-        .base_y = (float)t,
-        .tile_w = (float)QUEUE_MIN_TILE,
-        .tile_h = (float)QUEUE_MIN_TILE,
+        .base_x = (float)l, .base_y = (float)t,
+        .tile_w = (float)T, .tile_h = (float)T,
     };
     if (tiles > d->cov_cap) {
-        d->cov = realloc(d->cov, (size_t)tiles * sizeof *d->cov);
+        d->cov     = realloc(d->cov, (size_t)tiles * sizeof *d->cov);
         d->cov_cap = tiles;
     }
     __builtin_memset(d->cov, 0, (size_t)tiles * sizeof *d->cov);
@@ -442,47 +406,96 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw *d,
 
     // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
 
-    // TODO: once we have a better handle on the ideal tile shapes (QUEUE_MIN_TILE
-    // is currently a global compromise), try compiling per-tile SDF draw programs
+    // TODO: once we have a better handle on the ideal tile shapes (tile_size
+    // is still a global compromise), try compiling per-tile SDF draw programs
     // so the IR can fold in l/t/r/b as constants rather than reading them as
-    // uniforms each dispatch.  The SDF's build() currently has no compile-time
-    // knowledge of tile bounds — they arrive through the queue() args consumed
-    // by umbra_x()/umbra_y() at runtime.  Per-tile specialization would let e.g.
-    // axis-aligned SDFs fold the half-plane clips away entirely, and generally
+    // uniforms each dispatch.  Per-tile specialization would let e.g. axis-
+    // aligned SDFs fold their half-plane clips away entirely, and generally
     // shrink the per-pixel work near tile edges.
     //
-    // Cost: we'd build-and-cache N (or N*M) variants of the draw program instead
-    // of one.  Worth it if tile count is small and per-pixel savings are large.
-    // The existing umbra_builder dedup/CSE handles most of the redundancy across
-    // variants; the compile path is the dominating unknown.
+    // Cost: build-and-cache N (or N*M) variants of the draw program instead
+    // of one.  Worth it if tile count is small and per-pixel savings are
+    // large.  Existing builder dedup/CSE handles most of the redundancy
+    // across variants; the compile path is the dominating unknown.
     //
     // Metal function constants (MTLFunctionConstantValues) are a plausible
-    // vehicle here: one source shader with bounds declared as function
-    // constants, specialized per-tile at pipeline creation.  Would let the
-    // Metal backend share source across tile variants instead of generating
-    // N separate MSL strings.  Check whether the Vulkan SPIR-V backend wants
-    // the analogous specialization-constant path.
+    // vehicle here: one source shader with bounds as function constants,
+    // specialized per-tile at pipeline creation.  Vulkan/SPIR-V has
+    // analogous specialization constants.
     for (int ty = 0; ty < yt; ty++) {
         for (int tx = 0; tx < xt; tx++) {
             if (cov[ty * xt + tx] != UMBRA_SDF_TILE_NONE) {
-                int const tl = l + tx * QUEUE_MIN_TILE,
-                          tt = t + ty * QUEUE_MIN_TILE,
-                          tr = tl + QUEUE_MIN_TILE < r ? tl + QUEUE_MIN_TILE : r,
-                          tb = tt + QUEUE_MIN_TILE < b ? tt + QUEUE_MIN_TILE : b;
-                d->draw_dst_buf = dst;
+                int const tl = l + tx * T,
+                          tt = t + ty * T,
+                          tr = tl + T < r ? tl + T : r,
+                          tb = tt + T < b ? tt + T : b;
                 d->draw->queue(d->draw, tl, tt, tr, tb);
             }
         }
     }
 }
 
-void umbra_sdf_draw_free(struct umbra_sdf_draw *d) {
+void umbra_sdf_dispatcher_free(struct umbra_sdf_dispatcher *d) {
     if (d) {
         umbra_program_free(d->draw);
         umbra_program_free(d->bounds);
         umbra_backend_free(d->bounds_be);
         free(d->cov);
         free(d);
+    }
+}
+
+// TODO: query per-backend dispatch_granularity instead of this one global
+// compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
+enum { QUEUE_MIN_TILE = 512 };
+
+struct umbra_sdf_draw {
+    struct umbra_sdf_dispatcher *d;
+    struct umbra_buf             draw_dst_buf;
+};
+
+struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
+                                      struct umbra_matrix const *transform_mat,
+                                      umbra_sdf sdf_fn, void *sdf_ctx,
+                                      _Bool hard_edge,
+                                      umbra_shader shader_fn, void *shader_ctx,
+                                      umbra_blend blend_fn, void *blend_ctx,
+                                      struct umbra_fmt fmt) {
+    struct umbra_sdf_draw *w = calloc(1, sizeof *w);
+    struct umbra_builder *db = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(db, &w->draw_dst_buf);
+    umbra_val32 x = umbra_f32_from_i32(db, umbra_x(db)),
+                y = umbra_f32_from_i32(db, umbra_y(db));
+    if (transform_mat) {
+        umbra_point_val32 const p = umbra_transform_perspective(transform_mat, db, x, y);
+        x = p.x;
+        y = p.y;
+    }
+    umbra_build_sdf_draw(db, dst_ptr, fmt, x, y,
+                         sdf_fn, sdf_ctx, hard_edge ? 0 : 1,
+                         shader_fn, shader_ctx,
+                         blend_fn,  blend_ctx);
+    struct umbra_flat_ir *ir = umbra_flat_ir(db);
+    umbra_builder_free(db);
+    struct umbra_program *draw = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
+
+    w->d = umbra_sdf_dispatcher(sdf_fn, sdf_ctx, transform_mat, draw, QUEUE_MIN_TILE);
+    if (!w->d) { free(w); return NULL; }
+    return w;
+}
+
+void umbra_sdf_draw_queue(struct umbra_sdf_draw *w,
+                          int l, int t, int r, int b, struct umbra_buf dst) {
+    if (!w) { return; }
+    w->draw_dst_buf = dst;
+    umbra_sdf_dispatcher_queue(w->d, l, t, r, b);
+}
+
+void umbra_sdf_draw_free(struct umbra_sdf_draw *w) {
+    if (w) {
+        umbra_sdf_dispatcher_free(w->d);
+        free(w);
     }
 }
 

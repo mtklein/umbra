@@ -141,17 +141,29 @@ struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_ma
                                          struct umbra_fmt  dst_fmt);
 
 
-// Draw using an umbra_sdf as coverage.  hard_edge=1 gives a binary mask;
-// hard_edge=0 clamps -sdf into [0, 1] for a 1px AA ramp.
-//
-// If transform is non-NULL, its matrix is applied before the sdf (draw and
-// bounds programs both see transformed coordinates).  Affine matrices at
-// build time (p0 == p1 == 0 && p2 == 1) keep the tile-culling bounds program;
-// perspective matrices skip bounds and fall back to a single full-rect
-// dispatch -- tile culling is affine-only by design.  This is a build-time
-// decision: if you need an affine-gated sdf_draw, keep the perspective row
-// zero for the lifetime of the program.
-// TODO: _Bool hard_edge -> int quality
+// Drive a tile-culled SDF dispatch.  The dispatcher owns a caller-supplied
+// compiled draw program (built via umbra_build_sdf_draw), builds+compiles
+// its own bounds program from the same sdf (via umbra_build_sdf_bounds +
+// tile-extent intervals), and at queue() iterates tile_size x tile_size
+// tiles: bounds classifies each tile and the draw program fires on every
+// non-NONE tile.  transform_mat matches the transform the caller applied
+// in the draw IR (so bounds sees the same coordinate space); NULL or
+// affine keeps tile culling, perspective falls back to full-rect dispatch.
+// Whatever dst_buf the draw program was bound to at build time is where
+// it draws -- update that buf before each queue() as usual.
+struct umbra_sdf_dispatcher* umbra_sdf_dispatcher(
+        umbra_sdf, void *sdf_ctx,
+        struct umbra_matrix const *transform_mat,
+        struct umbra_program *draw,            // takes ownership
+        int tile_size);
+void umbra_sdf_dispatcher_queue(struct umbra_sdf_dispatcher*, int l, int t, int r, int b);
+void umbra_sdf_dispatcher_free (struct umbra_sdf_dispatcher*);
+
+// TODO: remove.  Convenience wrapper around umbra_sdf_dispatcher that also
+// builds the draw program, binding a dst slot inside the wrapper so
+// callers can swap dst per queue.  Callers should migrate to building the
+// draw program themselves (via umbra_build_sdf_draw on their own dst slot)
+// and creating a dispatcher around it.
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
                                       struct umbra_matrix const *transform_mat,
                                       umbra_sdf, void *sdf_ctx,
