@@ -215,12 +215,12 @@ TEST(test_golden_slides) {
 
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (be) {
-        float    color[4] = {0, 0, 0, 1};
-        uint32_t pixel    = 0;
+        umbra_color color = {0, 0, 0, 1};
+        uint32_t    pixel = 0;
         struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
         struct umbra_builder *bld = umbra_builder();
-        umbra_ptr const cu = umbra_bind_uniforms(bld, color, count(color)),
+        umbra_ptr const cu = umbra_bind_uniforms(bld, &color, (int)(sizeof color / 4)),
                           pp = umbra_bind_buf(bld, &pixel_buf);
         umbra_color_val32 c = {
             umbra_uniform_32(bld, cu, 0),
@@ -240,7 +240,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
 
         int const N = 12000;
         for (int i = 0; i < N; i++) {
-            color[0] = (float)((i & 0xff) / 255.0f);
+            color.r = (float)((i & 0xff) / 255.0f);
             p->queue(p, 0, 0, 1, 1);
         }
         be->flush(be);

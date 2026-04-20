@@ -134,7 +134,7 @@ static void csg_animate(struct slide *s, double secs) {
     st->sdf.r2  = r_orbit;
 }
 
-static struct slide* make_csg(char const *title, float const color[4], enum csg_op op) {
+static struct slide* make_csg(char const *title, umbra_color color, enum csg_op op) {
     umbra_sdf *build = NULL;
     if (op == CSG_UNION)      { build = csg_union_build; }
     if (op == CSG_INTERSECT)  { build = csg_intersect_build; }
@@ -142,7 +142,7 @@ static struct slide* make_csg(char const *title, float const color[4], enum csg_
 
     struct csg_slide *st = calloc(1, sizeof *st);
     st->op               = op;
-    st->common.color     = (umbra_color){color[0], color[1], color[2], color[3]};
+    st->common.color     = color;
     st->common.sdf_fn    = build;
     st->common.sdf_ctx   = &st->sdf;
     st->common.base      = (struct slide){
@@ -155,9 +155,9 @@ static struct slide* make_csg(char const *title, float const color[4], enum csg_
     return &st->common.base;
 }
 
-SLIDE(slide_sdf_union)     { return make_csg("SDF Union",        (float[]){0.2f, 0.8f, 0.4f, 1}, CSG_UNION); }
-SLIDE(slide_sdf_intersect) { return make_csg("SDF Intersection", (float[]){0.8f, 0.4f, 0.2f, 1}, CSG_INTERSECT); }
-SLIDE(slide_sdf_difference){ return make_csg("SDF Difference",   (float[]){0.4f, 0.2f, 0.8f, 1}, CSG_DIFFERENCE); }
+SLIDE(slide_sdf_union)     { return make_csg("SDF Union",        (umbra_color){0.2f, 0.8f, 0.4f, 1}, CSG_UNION); }
+SLIDE(slide_sdf_intersect) { return make_csg("SDF Intersection", (umbra_color){0.8f, 0.4f, 0.2f, 1}, CSG_INTERSECT); }
+SLIDE(slide_sdf_difference){ return make_csg("SDF Difference",   (umbra_color){0.4f, 0.2f, 0.8f, 1}, CSG_DIFFERENCE); }
 
 // Circle.
 

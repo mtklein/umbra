@@ -98,8 +98,8 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
     bg_prog = be->compile(be, bg_ir);
 }
 
-void slide_bg_draw(float const bg[4], int l, int t, int r, int b, void *buf) {
-    bg_color = (umbra_color){bg[0], bg[1], bg[2], bg[3]};
+void slide_bg_draw(umbra_color bg, int l, int t, int r, int b, void *buf) {
+    bg_color = bg;
     bg_dst_buf = (struct umbra_buf){
         .ptr=buf, .count=bg_w * bg_h * bg_fmt.planes, .stride=bg_w,
     };

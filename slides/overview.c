@@ -183,7 +183,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         .stride = w,
     };
 
-    float const placeholder_bg[4] = {0.094f, 0.094f, 0.094f, 1};
+    umbra_color const placeholder_bg = {0.094f, 0.094f, 0.094f, 1};
 
     for (int idx = 0; idx < st->n_cells; idx++) {
         struct cell *c = &st->cells[idx];
@@ -202,7 +202,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         // would accumulate without a fresh bg each frame; placeholders just
         // need something visible.  Empty slots (idx >= n_real, c->sub NULL)
         // get a neutral dark gray.
-        float const *bg = c->sub ? c->sub->bg : placeholder_bg;
+        umbra_color const bg = c->sub ? c->sub->bg : placeholder_bg;
         slide_bg_draw(bg, xl, yt, xr, yb, buf);
 
         if (c->sub && c->rt.draw) {

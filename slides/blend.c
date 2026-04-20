@@ -50,15 +50,15 @@ static void blend_animate(struct slide *s, double secs) {
 
 static void blend_free(struct slide *s) { free(s); }
 
-static struct slide* make_blend(char const *title, float const bg[4], float const color[4],
+static struct slide* make_blend(char const *title, umbra_color bg, umbra_color color,
                                 umbra_blend blend) {
     struct blend_slide *st = calloc(1, sizeof *st);
-    st->color    = (umbra_color){color[0], color[1], color[2], color[3]};
+    st->color    = color;
     st->rect     = (umbra_rect){0, 0, 0, 0};
     st->blend_fn = blend;
     st->base = (struct slide){
         .title = title,
-        .bg = {bg[0], bg[1], bg[2], bg[3]},
+        .bg = bg,
         .init = blend_init,
         .free = blend_free,
         .build_draw   = blend_build_draw,
@@ -68,31 +68,31 @@ static struct slide* make_blend(char const *title, float const bg[4], float cons
 }
 
 SLIDE(slide_blend_src) {
-    return make_blend("Blend Src", (float[]){0.125f, 0.125f, 0.125f, 1},
-                      (float[]){0.0f, 0.6f, 1.0f, 1.0f},
+    return make_blend("Blend Src", (umbra_color){0.125f, 0.125f, 0.125f, 1},
+                      (umbra_color){0.0f, 0.6f, 1.0f, 1.0f},
                       umbra_blend_src);
 }
 
 SLIDE(slide_blend_srcover) {
-    return make_blend("Blend Srcover", (float[]){0, 1, 0, 1},
-                      (float[]){0.45f, 0.0f, 0.0f, 0.5f},
+    return make_blend("Blend Srcover", (umbra_color){0, 1, 0, 1},
+                      (umbra_color){0.45f, 0.0f, 0.0f, 0.5f},
                       umbra_blend_srcover);
 }
 
 SLIDE(slide_blend_dstover) {
-    return make_blend("Blend Dstover", (float[]){0, 0.5f, 0, 0.75f},
-                      (float[]){0.0f, 0.0f, 0.9f, 0.9f},
+    return make_blend("Blend Dstover", (umbra_color){0, 0.5f, 0, 0.75f},
+                      (umbra_color){0.0f, 0.0f, 0.9f, 0.9f},
                       umbra_blend_dstover);
 }
 
 SLIDE(slide_blend_multiply) {
-    return make_blend("Blend Multiply", (float[]){0.125f, 0.25f, 0.5f, 1},
-                      (float[]){1.0f, 0.5f, 0.0f, 1.0f},
+    return make_blend("Blend Multiply", (umbra_color){0.125f, 0.25f, 0.5f, 1},
+                      (umbra_color){1.0f, 0.5f, 0.0f, 1.0f},
                       umbra_blend_multiply);
 }
 
 SLIDE(slide_blend_null) {
-    return make_blend("Blend NULL", (float[]){0, 0, 0, 1},
-                      (float[]){0.9f, 0.4f, 0.1f, 1.0f},
+    return make_blend("Blend NULL", (umbra_color){0, 0, 0, 1},
+                      (umbra_color){0.9f, 0.4f, 0.1f, 1.0f},
                       NULL);
 }

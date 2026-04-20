@@ -7,7 +7,7 @@
 
 struct slide {
     char const     *title;
-    float           bg[4];
+    umbra_color     bg;
     int             w, h;
 
     void (*init)   (struct slide*);
@@ -53,16 +53,14 @@ void          slides_cleanup     (void);
 void slide_perspective_matrix(struct umbra_matrix *out, float t, int sw, int sh, int bw, int bh);
 
 void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h);
-void slide_bg_draw   (float const bg[4], int l, int t, int r, int b, void *buf);
+void slide_bg_draw   (umbra_color bg, int l, int t, int r, int b, void *buf);
 void slide_bg_cleanup(void);
 
 // Compiled state for one slide on one backend + format.
-//
-// Update `dst_buf` before each slide_runtime_draw to point at the current frame's output.
 struct slide_runtime {
     struct umbra_program *draw;
     struct umbra_program *bounds;      // NULL for non-SDF slides
-    struct umbra_backend *bounds_be;   // owned (SDF only)
+    struct umbra_backend *bounds_be;   // owned (SDF only);  TODO: why not use bounds->backend?
     uint16_t             *cov;
 
     struct umbra_fmt      fmt;
@@ -74,6 +72,8 @@ struct slide_runtime {
     int                   :32;
 };
 
+// TODO: struct slide_runtime* slide_runtime(struct slide*, ...)
+//       and slide_runtime_free(struct slide_runtime*)
 void slide_runtime_compile(struct slide_runtime*, struct slide*,
                            int w, int h,
                            struct umbra_backend*, struct umbra_fmt,
