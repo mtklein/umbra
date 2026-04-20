@@ -18,21 +18,6 @@ struct umbra_matrix {
           p0, p1, p2;
 };
 
-typedef struct {
-    umbra_val32 sx, kx, tx,
-                ky, sy, ty,
-                p0, p1, p2;
-} umbra_matrix_val32;
-
-// Apply a 3x3 perspective matrix (with operands already loaded as umbra_val32s)
-// to (x, y).  Emits w = p0*x + p1*y + p2; x' = (sx*x + kx*y + tx) / w;
-// y' = (ky*x + sy*y + ty) / w.  Shared between umbra_transform_perspective
-// (binds the matrix as uniforms for the caller) and internal impls that load
-// the operands differently (e.g. slug's build functions which read them out
-// of a larger uniform block).
-umbra_point_val32 umbra_apply_matrix(struct umbra_builder*, umbra_matrix_val32,
-                                      umbra_val32 x, umbra_val32 y);
-
 typedef umbra_color_val32 umbra_load(struct umbra_builder*, umbra_ptr);
 umbra_load umbra_load_8888,
            umbra_load_565,

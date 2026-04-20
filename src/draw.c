@@ -195,19 +195,31 @@ enum {
 umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
                                               struct umbra_builder *b,
                                               umbra_val32 x, umbra_val32 y) {
-    umbra_ptr const u = umbra_bind_uniforms(b, mat, (int)(sizeof *mat / 4));
-    umbra_matrix_val32 const m = {
-        .sx = umbra_uniform_32(b, u, M_SX),
-        .kx = umbra_uniform_32(b, u, M_KX),
-        .tx = umbra_uniform_32(b, u, M_TX),
-        .ky = umbra_uniform_32(b, u, M_KY),
-        .sy = umbra_uniform_32(b, u, M_SY),
-        .ty = umbra_uniform_32(b, u, M_TY),
-        .p0 = umbra_uniform_32(b, u, M_P0),
-        .p1 = umbra_uniform_32(b, u, M_P1),
-        .p2 = umbra_uniform_32(b, u, M_P2),
-    };
-    return umbra_apply_matrix(b, m, x, y);
+    umbra_ptr const u  = umbra_bind_uniforms(b, mat, (int)(sizeof *mat / 4));
+    umbra_val32 const sx = umbra_uniform_32(b, u, M_SX),
+                      kx = umbra_uniform_32(b, u, M_KX),
+                      tx = umbra_uniform_32(b, u, M_TX),
+                      ky = umbra_uniform_32(b, u, M_KY),
+                      sy = umbra_uniform_32(b, u, M_SY),
+                      ty = umbra_uniform_32(b, u, M_TY),
+                      p0 = umbra_uniform_32(b, u, M_P0),
+                      p1 = umbra_uniform_32(b, u, M_P1),
+                      p2 = umbra_uniform_32(b, u, M_P2);
+    umbra_val32 const w =
+        umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, p0, x),
+                                          umbra_mul_f32(b, p1, y)),
+                         p2);
+    umbra_val32 const xp =
+        umbra_div_f32(b, umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, sx, x),
+                                                           umbra_mul_f32(b, kx, y)),
+                                          tx),
+                         w);
+    umbra_val32 const yp =
+        umbra_div_f32(b, umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ky, x),
+                                                           umbra_mul_f32(b, sy, y)),
+                                          ty),
+                         w);
+    return (umbra_point_val32){xp, yp};
 }
 
 // Interval affine transform, used only by umbra_sdf_draw's bounds program.
@@ -236,25 +248,6 @@ static void transform_affine_interval(struct umbra_matrix const *mat,
                                   ty);
     *x = xp;
     *y = yp;
-}
-
-umbra_point_val32 umbra_apply_matrix(struct umbra_builder *b, umbra_matrix_val32 m,
-                                      umbra_val32 x, umbra_val32 y) {
-    umbra_val32 const w =
-        umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, m.p0, x),
-                                          umbra_mul_f32(b, m.p1, y)),
-                         m.p2);
-    umbra_val32 const xp =
-        umbra_div_f32(b, umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, m.sx, x),
-                                                           umbra_mul_f32(b, m.kx, y)),
-                                          m.tx),
-                         w);
-    umbra_val32 const yp =
-        umbra_div_f32(b, umbra_add_f32(b, umbra_add_f32(b, umbra_mul_f32(b, m.ky, x),
-                                                           umbra_mul_f32(b, m.sy, y)),
-                                          m.ty),
-                         w);
-    return (umbra_point_val32){xp, yp};
 }
 
 umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder *b,
