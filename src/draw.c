@@ -264,38 +264,21 @@ void umbra_build_sdf_draw(struct umbra_builder *b,
                      blend_fn,  blend_ctx);
 }
 
-void umbra_build_sdf_bounds(struct umbra_builder *b,
-                            umbra_ptr cov,
-                            umbra_interval x, umbra_interval y,
-                            umbra_sdf sdf_fn, void *sdf_ctx) {
-    // Emit the tri-state constants BEFORE calling sdf_fn so any matching
-    // constants the sdf also needs (e.g. imm 0/1 as index offsets inside an
-    // SDF loop) CSE onto these outer definitions.  Otherwise CSE puts the
-    // imm inside the first-use loop body, and Metal / SPIRV-Cross won't
-    // hoist scalar constants across loop scope -- later uses outside the
-    // loop reference a variable declared inside it and fail to compile.
-    umbra_val32 const zero_f    = umbra_imm_f32(b, 0.0f);
-    umbra_val32 const none_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_NONE);
-    umbra_val32 const partial_i = umbra_imm_i32(b, UMBRA_SDF_TILE_PARTIAL);
-    umbra_val32 const full_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_FULL);
-
-    umbra_interval const f = sdf_fn(sdf_ctx, b, x, y);
-
-    umbra_val32 const partial = umbra_lt_f32(b, f.lo, zero_f),
-                      full    = umbra_lt_f32(b, f.hi, zero_f);
-    umbra_val32 const base = umbra_sel_32(b, partial, partial_i, none_i);
-    umbra_val32 const tri  = umbra_sel_32(b, full,    full_i,    base);
-    umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));
-}
+enum umbra_sdf_tile {
+    UMBRA_SDF_TILE_NONE    = 0x0000,  // f.lo >= 0: tile entirely outside
+    UMBRA_SDF_TILE_PARTIAL = 0x0001,  // f.lo <  0, f.hi >= 0: edge tile, needs per-pixel SDF eval
+    UMBRA_SDF_TILE_FULL    = 0x0002,  // f.hi <  0: tile entirely inside
+};
 
 static _Bool matrix_is_affine(struct umbra_matrix const *m) {
     return m->p0 == 0.0f && m->p1 == 0.0f && m->p2 == 1.0f;
 }
 
-void umbra_sdf_tile_intervals(struct umbra_builder *bb,
-                              struct umbra_sdf_grid *grid,
-                              struct umbra_matrix const *transform_mat,
-                              umbra_interval *ix, umbra_interval *iy) {
+// Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()).
+static void sdf_tile_intervals(struct umbra_builder *bb,
+                               struct umbra_sdf_grid *grid,
+                               struct umbra_matrix const *transform_mat,
+                               umbra_interval *ix, umbra_interval *iy) {
     umbra_ptr const g = umbra_bind_uniforms(bb, grid, (int)(sizeof *grid / 4));
     umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
                       base_y = umbra_uniform_32(bb, g, 1),
@@ -315,6 +298,35 @@ void umbra_sdf_tile_intervals(struct umbra_builder *bb,
     if (transform_mat && matrix_is_affine(transform_mat)) {
         transform_affine_interval(transform_mat, bb, ix, iy);
     }
+}
+
+void umbra_build_sdf_bounds(struct umbra_builder *b,
+                            struct umbra_sdf_bounds *bounds,
+                            struct umbra_matrix const *transform,
+                            umbra_sdf sdf_fn, void *sdf_ctx) {
+    umbra_ptr const cov = umbra_bind_buf(b, &bounds->cov_buf);
+
+    umbra_interval x, y;
+    sdf_tile_intervals(b, &bounds->grid, transform, &x, &y);
+
+    // Emit the tri-state constants BEFORE calling sdf_fn so any matching
+    // constants the sdf also needs (e.g. imm 0/1 as index offsets inside an
+    // SDF loop) CSE onto these outer definitions.  Otherwise CSE puts the
+    // imm inside the first-use loop body, and Metal / SPIRV-Cross won't
+    // hoist scalar constants across loop scope -- later uses outside the
+    // loop reference a variable declared inside it and fail to compile.
+    umbra_val32 const zero_f    = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const none_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_NONE);
+    umbra_val32 const partial_i = umbra_imm_i32(b, UMBRA_SDF_TILE_PARTIAL);
+    umbra_val32 const full_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_FULL);
+
+    umbra_interval const f = sdf_fn(sdf_ctx, b, x, y);
+
+    umbra_val32 const partial = umbra_lt_f32(b, f.lo, zero_f),
+                      full    = umbra_lt_f32(b, f.hi, zero_f);
+    umbra_val32 const base = umbra_sel_32(b, partial, partial_i, none_i);
+    umbra_val32 const tri  = umbra_sel_32(b, full,    full_i,    base);
+    umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));
 }
 
 void umbra_sdf_bounds_free(struct umbra_sdf_bounds *b) {

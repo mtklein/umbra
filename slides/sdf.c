@@ -56,15 +56,15 @@ static void sdf_common_build_draw(struct slide *s,
                                   struct umbra_builder *b_draw,
                                   umbra_ptr dst_ptr, struct umbra_fmt fmt,
                                   umbra_val32 x, umbra_val32 y,
-                                  struct umbra_builder *b_bounds,
-                                  umbra_ptr cov_ptr,
-                                  umbra_interval ix, umbra_interval iy) {
+                                  struct umbra_builder      *b_bounds,
+                                  struct umbra_sdf_bounds   *bounds,
+                                  struct umbra_matrix const *transform) {
     struct sdf_common *c = (struct sdf_common *)s;
     umbra_build_sdf_draw(b_draw, dst_ptr, fmt, x, y,
                          c->sdf_fn, c->sdf_ctx, 1,
                          umbra_shader_color,  &c->color,
                          umbra_blend_srcover, NULL);
-    umbra_build_sdf_bounds(b_bounds, cov_ptr, ix, iy, c->sdf_fn, c->sdf_ctx);
+    umbra_build_sdf_bounds(b_bounds, bounds, transform, c->sdf_fn, c->sdf_ctx);
 }
 
 static void sdf_common_free(struct slide *s) { free(s); }

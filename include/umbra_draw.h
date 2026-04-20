@@ -99,6 +99,7 @@ typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
 
 // Like umbra_build_draw() but using an SDF for coverage.
 // Set aa_quality=0 for a hard edge, or >0 for increasing effort spent on AA quality.
+// TODO: remove hard edge option, always use cov ≈ -lo / (hi-lo)
 void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                           umbra_val32 x, umbra_val32 y,
@@ -106,35 +107,16 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 
-// Tile coverage class stored by umbra_build_sdf_bounds (one uint16 per tile).
-// Ordered so `cov > 0` means "draw the tile" and `cov == FULL` permits a fast
-// path skipping per-pixel SDF evaluation.
-enum umbra_sdf_tile {
-    UMBRA_SDF_TILE_NONE    = 0x0000,  // f.lo >= 0: tile entirely outside
-    UMBRA_SDF_TILE_PARTIAL = 0x0001,  // f.lo <  0, f.hi >= 0: edge tile, needs per-pixel SDF eval
-    UMBRA_SDF_TILE_FULL    = 0x0002,  // f.hi <  0: tile entirely inside
-};
-
-// Evaluate SDF f(x,y) storing a uint16 umbra_sdf_tile classification to cov.
-void umbra_build_sdf_bounds(struct umbra_builder*,
-                            umbra_ptr cov,
-                            umbra_interval x, umbra_interval y,
-                            umbra_sdf, void *sdf_ctx);
-
-// Dispatch grid uniforms used by umbra_sdf_dispatch() and the bounds program.
-struct umbra_sdf_grid { float base_x, base_y, tile_w, tile_h; };
-
-// Produce (ix, iy) covering the tile at  (umbra_x(), umbra_y()).
-void umbra_sdf_tile_intervals(struct umbra_builder*,
-                              struct umbra_sdf_grid *grid,
-                              struct umbra_matrix const *transform,
-                              umbra_interval *ix, umbra_interval *iy);
-
 // A bounds program plus the storage it needs between dispatches: the grid
-// uniform it was built against, the cov buffer it writes tile classifications
-// into, and our running capacity for that buffer.  Bind &bounds.grid /
-// &bounds.cov_buf when building the bounds IR; after compile stash the program
-// in bounds.prog; then just call umbra_sdf_dispatch().
+// uniforms it was built against, the cov buffer it writes tile classifications
+// into, and our running capacity for that buffer.  Pass the bounds struct to
+// umbra_build_sdf_bounds(), compile the resulting IR, stash the program in
+// bounds.prog, then call umbra_sdf_dispatch().
+//
+// `grid` carries the per-dispatch (base, tile_w/h) uniforms the bounds program
+// reads; dispatch fills them in each call.  The layout is an ABI detail of the
+// bounds program; don't poke at the fields.
+struct umbra_sdf_grid { float base_x, base_y, tile_w, tile_h; };
 struct umbra_sdf_bounds {
     struct umbra_program *prog;
     struct umbra_sdf_grid grid;
@@ -142,6 +124,16 @@ struct umbra_sdf_bounds {
     uint16_t             *cov;
     int                   cov_cap, :32;
 };
+
+// Build an SDF bounds IR that classifies each tile at (umbra_x, umbra_y) into
+// the uint16 TILE_NONE / TILE_PARTIAL / TILE_FULL enum and writes it to
+// bounds->cov_buf.  Binds bounds->cov_buf (storage) and bounds->grid (uniforms)
+// on the builder.  `transform`, if non-NULL, composes an affine pre-transform
+// onto the per-tile intervals.
+void umbra_build_sdf_bounds(struct umbra_builder*,
+                            struct umbra_sdf_bounds *bounds,
+                            struct umbra_matrix const *transform,
+                            umbra_sdf, void *sdf_ctx);
 
 // Frees bounds->prog and bounds->cov.  Does not free the struct itself —
 // callers usually embed one.

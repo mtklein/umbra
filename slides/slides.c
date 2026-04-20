@@ -137,11 +137,7 @@ static void runtime_sdf_builders(
     }
 
     struct umbra_builder *bb = umbra_builder();
-    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &rt->bounds.cov_buf);
-    umbra_interval ix, iy;
-    umbra_sdf_tile_intervals(bb, &rt->bounds.grid, pre, &ix, &iy);
-
-    s->build_sdf_draw(s, db, dst_ptr, fmt, x, y, bb, cov_ptr, ix, iy);
+    s->build_sdf_draw(s, db, dst_ptr, fmt, x, y, bb, &rt->bounds, pre);
 
     *out_draw   = db;
     *out_bounds = bb;

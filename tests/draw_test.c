@@ -1643,10 +1643,7 @@ TEST(test_sdf_dispatch_rect) {
 
         // Bounds program on jit (or interp).
         struct umbra_builder *bb = umbra_builder();
-        umbra_ptr      const cov_ptr = umbra_bind_buf(bb, &bounds.cov_buf);
-        umbra_interval ix, iy;
-        umbra_sdf_tile_intervals(bb, &bounds.grid, NULL, &ix, &iy);
-        umbra_build_sdf_bounds(bb, cov_ptr, ix, iy, test_rect_fn, &rect);
+        umbra_build_sdf_bounds(bb, &bounds, NULL, test_rect_fn, &rect);
         struct umbra_flat_ir *bir = umbra_flat_ir(bb);
         umbra_builder_free(bb);
         struct umbra_backend *bounds_be = umbra_backend_jit();
@@ -1732,10 +1729,7 @@ TEST(test_sdf_dispatch_tiling) {
 
     // Bounds program on jit (or interp).
     struct umbra_builder *bb = umbra_builder();
-    umbra_ptr      const cov_ptr = umbra_bind_buf(bb, &bounds.cov_buf);
-    umbra_interval ix, iy;
-    umbra_sdf_tile_intervals(bb, &bounds.grid, NULL, &ix, &iy);
-    umbra_build_sdf_bounds(bb, cov_ptr, ix, iy, test_circle_fn, &sdf);
+    umbra_build_sdf_bounds(bb, &bounds, NULL, test_circle_fn, &sdf);
     struct umbra_flat_ir *bir = umbra_flat_ir(bb);
     umbra_builder_free(bb);
     struct umbra_backend *bounds_be = umbra_backend_jit();

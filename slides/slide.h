@@ -22,9 +22,9 @@ struct slide {
                            umbra_ptr dst_ptr, struct umbra_fmt fmt,
                            umbra_val32 x, umbra_val32 y,
 
-                           struct umbra_builder *b_bounds,
-                           umbra_ptr cov_ptr,
-                           umbra_interval ix, umbra_interval iy);
+                           struct umbra_builder       *b_bounds,
+                           struct umbra_sdf_bounds    *bounds,
+                           struct umbra_matrix const  *transform);
 
     void  (*animate)(struct slide*, double secs);
 };

@@ -50,10 +50,8 @@ TEST(test_jit_compiles_sdf_bounds_with_affine_transform) {
     struct umbra_backend *be = umbra_backend_jit();
     if (!be) { return; }  // non-JIT platform: nothing to reproduce
 
-    struct umbra_sdf_grid grid = {0};
-    uint16_t              cov[4] = {0};
-    struct umbra_buf      cov_buf = {.ptr = cov, .count = 4, .stride = 2};
-    struct umbra_matrix   cell_mat = {
+    struct umbra_sdf_bounds bounds   = {0};
+    struct umbra_matrix     cell_mat = {
         .sx = 5.0f, .kx = 0, .tx = -10.0f,
         .ky = 0,    .sy = 5.0f, .ty = -20.0f,
         .p0 = 0,    .p1 = 0,    .p2 = 1,
@@ -61,12 +59,7 @@ TEST(test_jit_compiles_sdf_bounds_with_affine_transform) {
     struct two_circle sdf = {100, 100, 50, 200, 200, 50};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const cov_ptr = umbra_bind_buf(b, &cov_buf);
-
-    umbra_interval ix, iy;
-    umbra_sdf_tile_intervals(b, &grid, &cell_mat, &ix, &iy);
-
-    umbra_build_sdf_bounds(b, cov_ptr, ix, iy, two_circle_union, &sdf);
+    umbra_build_sdf_bounds(b, &bounds, &cell_mat, two_circle_union, &sdf);
 
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
