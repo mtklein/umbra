@@ -89,21 +89,21 @@ static void free_pipes(void) {
 
 static int                    max_threads;
 static int                    n_threads = 1;
-static struct umbra_program **xtra_progs;
+static struct umbra_program **extra_progs;
 static struct umbra_flat_ir *saved_ir;
 
-static void free_xtra(void) {
+static void free_extra(void) {
     for (int t = 1; t < max_threads; t++) {
-        umbra_program_free(xtra_progs[t]);
-        xtra_progs[t] = NULL;
+        umbra_program_free(extra_progs[t]);
+        extra_progs[t] = NULL;
     }
 }
 
-static void rebuild_xtra(int backend) {
-    free_xtra();
+static void rebuild_extra(int backend) {
+    free_extra();
     if (saved_ir && n_threads > 1 && bes[backend]) {
         for (int t = 1; t < n_threads; t++) {
-            xtra_progs[t] = bes[backend]->compile(bes[backend], saved_ir);
+            extra_progs[t] = bes[backend]->compile(bes[backend], saved_ir);
         }
     }
 }
@@ -243,7 +243,7 @@ int main(void) {
     max_threads = SDL_GetNumLogicalCPUCores();
     if (max_threads < 1) { max_threads = 1; }
     struct thread_pool *pool = thread_pool(max_threads);
-    xtra_progs = calloc((size_t)max_threads, sizeof *xtra_progs);
+    extra_progs = calloc((size_t)max_threads, sizeof *extra_progs);
 
     bes[0] = umbra_backend_interp();
     bes[1] = umbra_backend_jit();
@@ -296,7 +296,7 @@ int main(void) {
                 texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA64_FLOAT,
                                             SDL_TEXTUREACCESS_STREAMING, W, H);
                 build_slide_fmt(slide_get(cur_slide), cur_fmt, W, H);
-                rebuild_xtra(cur_backend);
+                rebuild_extra(cur_backend);
             } else if (ev.type == SDL_EVENT_KEY_DOWN) {
                 int next = cur_slide;
                 if (ev.key.key == SDLK_RIGHT || ev.key.key == SDLK_SPACE) {
@@ -310,16 +310,16 @@ int main(void) {
                         s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]);
                     }
                     rebuild_rt(s, cur_fmt, W, H);
-                    rebuild_xtra(cur_backend);
+                    rebuild_extra(cur_backend);
                 } else if (ev.key.key == SDLK_C) {
                     cur_fmt = (cur_fmt + 1) % NUM_FMTS;
                     build_slide_fmt(slide_get(cur_slide), cur_fmt, W, H);
                     cur_backend = pick_backend(cur_backend);
-                    rebuild_xtra(cur_backend);
+                    rebuild_extra(cur_backend);
                 } else if (ev.key.key == SDLK_COMMA) {
-                    if (n_threads > 1) { n_threads--; rebuild_xtra(cur_backend); }
+                    if (n_threads > 1) { n_threads--; rebuild_extra(cur_backend); }
                 } else if (ev.key.key == SDLK_PERIOD) {
-                    if (n_threads < max_threads) { n_threads++; rebuild_xtra(cur_backend); }
+                    if (n_threads < max_threads) { n_threads++; rebuild_extra(cur_backend); }
                 } else if (ev.key.key == SDLK_V) {
                     vsync = !vsync;
                     SDL_SetRenderVSync(renderer, vsync ? 1 : 0);
@@ -332,7 +332,7 @@ int main(void) {
                     cur_slide = next;
                     build_slide_fmt(slide_get(cur_slide), cur_fmt, W, H);
                     cur_backend = pick_backend(cur_backend);
-                    rebuild_xtra(cur_backend);
+                    rebuild_extra(cur_backend);
                 }
                 update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps,
                              n_threads);
@@ -373,7 +373,7 @@ int main(void) {
                 int y1 = y0 + sh > H ? H : y0 + sh;
                 work[t] = (struct tile_work){s, secs, 0, y0, W, y1, dst};
             }
-            if (nt <= 1 || !xtra_progs[1]->queue_is_threadsafe) {
+            if (nt <= 1 || !extra_progs[1]->queue_is_threadsafe) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
             } else {
                 struct work_group wg = {.pool = pool};
@@ -456,8 +456,8 @@ int main(void) {
 
     free(pixbuf);
     thread_pool_free(pool);
-    free_xtra();
-    free(xtra_progs);
+    free_extra();
+    free(extra_progs);
     umbra_flat_ir_free(saved_ir);
     slide_runtime_free(slide_rt);
     slide_bg_free(slide_bg_cur);
