@@ -8,20 +8,19 @@ struct spill_record {
     int reg, slot;
 };
 
-// TODO: thread these through as normal values instead of using globals
-static struct spill_record spills[256], fills[256];
-static int                 nspills, nfills;
+struct records {
+    struct spill_record spills[256], fills[256];
+    int                 nspills, nfills;
+};
 
 static void test_spill(int reg, int slot, void *ctx) {
-    (void)ctx;
-    spills[nspills++] = (struct spill_record){reg, slot};
+    struct records *r = ctx;
+    r->spills[r->nspills++] = (struct spill_record){reg, slot};
 }
 static void test_fill(int reg, int slot, void *ctx) {
-    (void)ctx;
-    fills[nfills++] = (struct spill_record){reg, slot};
+    struct records *r = ctx;
+    r->fills[r->nfills++] = (struct spill_record){reg, slot};
 }
-
-static void reset_records(void) { nspills = nfills = 0; }
 
 static struct umbra_flat_ir* make_ir(int n, int pre) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
@@ -50,6 +49,7 @@ static void free_ir(struct umbra_flat_ir *ir) {
 
 TEST(test_basic_alloc_free) {
     static int8_t const pool[] = {10, 11, 12, 13};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 4,
@@ -57,13 +57,12 @@ TEST(test_basic_alloc_free) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = make_ir(3, 0);
     struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[3] = {-1, -1, -1};
     int                       ns = 0;
-    reset_records();
 
     // pool[0] popped first (LIFO)
     int8_t r0 = ra_alloc(ra, sl, &ns);
@@ -73,13 +72,13 @@ TEST(test_basic_alloc_free) {
     r0 == 10 here;
     r1 == 11 here;
     r2 == 12 here;
-    nspills == 0 here;
+    rec.nspills == 0 here;
 
     ra_assign(ra, 1, r1);
     ra_free_reg(ra, 1);
     int8_t r3 = ra_alloc(ra, sl, &ns);
     r3 == r1 here;
-    nspills == 0 here;
+    rec.nspills == 0 here;
 
     ra_destroy(ra);
     free_ir(ir);
@@ -87,6 +86,7 @@ TEST(test_basic_alloc_free) {
 
 TEST(test_eviction_belady) {
     static int8_t const pool[] = {5, 6};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 2,
@@ -94,13 +94,12 @@ TEST(test_eviction_belady) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = make_ir(5, 0);
     struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
-    reset_records();
 
     ra_set_last_use(ra, 0, 4);
     ra_set_last_use(ra, 1, 2);
@@ -112,8 +111,8 @@ TEST(test_eviction_belady) {
 
     // evicts value 0 (farthest last_use=4)
     int8_t r2 = ra_alloc(ra, sl, &ns);
-    nspills == 1 here;
-    spills[0].reg == r0 here;
+    rec.nspills == 1 here;
+    rec.spills[0].reg == r0 here;
     r2 == r0 here;
     ra_reg(ra, 0) == -1 here;
     sl[0] >= 0 here;
@@ -125,6 +124,7 @@ TEST(test_eviction_belady) {
 TEST(test_dead_value_evicted_first) {
     // dead values (last_use=-1) evicted first
     static int8_t const pool[] = {5, 6};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 2,
@@ -132,13 +132,12 @@ TEST(test_dead_value_evicted_first) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = make_ir(5, 0);
     struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
-    reset_records();
 
     ra_set_last_use(ra, 0, -1);
     ra_set_last_use(ra, 1, 3);
@@ -149,8 +148,8 @@ TEST(test_dead_value_evicted_first) {
     ra_assign(ra, 1, r1);
 
     int8_t r2 = ra_alloc(ra, sl, &ns);
-    nspills == 1 here;
-    spills[0].reg == r0 here;
+    rec.nspills == 1 here;
+    rec.spills[0].reg == r0 here;
     r2 == r0 here;
     ra_reg(ra, 1) == r1 here;
 
@@ -160,6 +159,7 @@ TEST(test_dead_value_evicted_first) {
 
 TEST(test_ensure_and_fill) {
     static int8_t const pool[] = {5, 6};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 2,
@@ -167,13 +167,12 @@ TEST(test_ensure_and_fill) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = make_ir(5, 0);
     struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[5] = {-1, -1, -1, -1, -1};
     int                       ns = 0;
-    reset_records();
 
     ra_set_last_use(ra, 0, 4);
     ra_set_last_use(ra, 1, 2);
@@ -186,17 +185,17 @@ TEST(test_ensure_and_fill) {
 
     int8_t r2 = ra_alloc(ra, sl, &ns);
     ra_assign(ra, 2, r2);
-    nspills == 1 here;
+    rec.nspills == 1 here;
 
     int8_t r0b = ra_ensure(ra, sl, &ns, 0);
-    nfills == 1 here;
-    fills[0].slot == sl[0] here;
+    rec.nfills == 1 here;
+    rec.fills[0].slot == sl[0] here;
     r0b >= 0 here;
     ra_reg(ra, 0) == r0b here;
 
     int8_t r0c = ra_ensure(ra, sl, &ns, 0);
     r0c == r0b here;
-    nfills == 1 here;
+    rec.nfills == 1 here;
 
     ra_destroy(ra);
     free_ir(ir);
@@ -204,6 +203,7 @@ TEST(test_ensure_and_fill) {
 
 TEST(test_claim) {
     static int8_t const pool[] = {5, 6, 7};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 3,
@@ -211,13 +211,12 @@ TEST(test_claim) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = make_ir(4, 0);
     struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[4] = {-1, -1, -1, -1};
     int                       ns = 0;
-    reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
     ra_assign(ra, 0, r0);
@@ -226,7 +225,7 @@ TEST(test_claim) {
     r1 == r0 here;
     ra_reg(ra, 0) == -1 here;
     ra_reg(ra, 1) == r0 here;
-    nspills == 0 here;
+    rec.nspills == 0 here;
 
     ra_destroy(ra);
     free_ir(ir);
@@ -235,6 +234,7 @@ TEST(test_claim) {
 TEST(test_last_use_preamble) {
     // preamble used in varying: last_use = n
     static int8_t const pool[] = {5, 6, 7};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 3,
@@ -242,7 +242,7 @@ TEST(test_last_use_preamble) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = make_ir(4, 2);
     struct ra                *ra = ra_create(ir, &cfg);
@@ -257,6 +257,7 @@ TEST(test_last_use_preamble) {
 TEST(test_many_values_stress) {
     // many values, few registers, lots of spills
     static int8_t const pool[] = {0, 1, 2};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 3,
@@ -264,7 +265,7 @@ TEST(test_many_values_stress) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     int                       n = 20;
     struct umbra_flat_ir *ir = make_ir(n, 0);
@@ -272,7 +273,6 @@ TEST(test_many_values_stress) {
     int                      *sl = calloc((size_t)n, sizeof *sl);
     for (int i = 0; i < n; i++) { sl[i] = -1; }
     int ns = 0;
-    reset_records();
 
     for (int i = 0; i < n; i++) {
         int8_t r = ra_alloc(ra, sl, &ns);
@@ -280,7 +280,7 @@ TEST(test_many_values_stress) {
         ra_assign(ra, i, r);
     }
 
-    nspills == 17 here;
+    rec.nspills == 17 here;
 
     int in_reg = 0;
     for (int i = 0; i < n; i++) {
@@ -289,9 +289,9 @@ TEST(test_many_values_stress) {
     in_reg == 3 here;
 
     // ensure all: 17 spilled trigger fills
-    reset_records();
+    rec = (struct records){0};
     for (int i = 0; i < n; i++) { ra_ensure(ra, sl, &ns, i); }
-    nfills > 0 here;
+    rec.nfills > 0 here;
 
     ra_destroy(ra);
     free(sl);
@@ -300,6 +300,7 @@ TEST(test_many_values_stress) {
 
 TEST(test_step_alloc) {
     static int8_t const pool[] = {5, 6, 7, 8};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 4,
@@ -307,13 +308,12 @@ TEST(test_step_alloc) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = make_ir(3, 0);
     struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[3] = {-1, -1, -1};
     int                       ns = 0;
-    reset_records();
 
     struct ra_step s0 = ra_step_alloc(ra, sl, &ns, 0);
     s0.rd >= 0 here;
@@ -323,7 +323,7 @@ TEST(test_step_alloc) {
     s1.rd >= 0 here;
     s1.rd != s0.rd here;
     ra_reg(ra, 1) == s1.rd here;
-    nspills == 0 here;
+    rec.nspills == 0 here;
 
     ra_destroy(ra);
     free_ir(ir);
@@ -331,6 +331,7 @@ TEST(test_step_alloc) {
 
 TEST(test_step_unary) {
     static int8_t const pool[] = {5, 6, 7, 8};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 4,
@@ -338,7 +339,7 @@ TEST(test_step_unary) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(2, sizeof *ir->inst);
@@ -353,7 +354,6 @@ TEST(test_step_unary) {
     struct ra *ra = ra_create(ir, &cfg);
     int        sl[2] = {-1, -1};
     int        ns = 0;
-    reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
     ra_assign(ra, 0, r0);
@@ -365,7 +365,7 @@ TEST(test_step_unary) {
     s.rd == r0 here;
     ra_reg(ra, 1) == s.rd here;
     ra_reg(ra, 0) == -1 here;
-    nspills == 0 here;
+    rec.nspills == 0 here;
 
     ra_destroy(ra);
     free(ir->inst);
@@ -374,6 +374,7 @@ TEST(test_step_unary) {
 
 TEST(test_step_unary_alive) {
     static int8_t const pool[] = {5, 6, 7, 8};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 4,
@@ -381,7 +382,7 @@ TEST(test_step_unary_alive) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
@@ -399,7 +400,6 @@ TEST(test_step_unary_alive) {
     struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
-    reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
     ra_assign(ra, 0, r0);
@@ -427,13 +427,14 @@ TEST(test_step_unary_pins_inputs_and_dest) {
     // the bw-1 / bh-1 clamp values revert to bw / bh, which let the gather
     // index reach bw*bh and run one element off the end of the bitmap.
     static int8_t const pool[] = {5, 6, 7};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 3,
         .max_reg = 10,
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
 
     // 4 values:
@@ -459,7 +460,6 @@ TEST(test_step_unary_pins_inputs_and_dest) {
     struct ra *ra = ra_create(ir, &cfg);
     int        sl[4] = {-1, -1, -1, -1};
     int        ns = 0;
-    reset_records();
 
     // Last-use schedule: inst[0] used latest (so it's the eviction target
     // during the rd allocation), inst[1] (rx) alive past i=3, inst[3] (rd)
@@ -502,6 +502,7 @@ TEST(test_step_unary_pins_inputs_and_dest) {
 
 TEST(test_step_alu) {
     static int8_t const pool[] = {5, 6, 7, 8};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 4,
@@ -509,7 +510,7 @@ TEST(test_step_alu) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
@@ -527,7 +528,6 @@ TEST(test_step_alu) {
     struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
-    reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
     ra_assign(ra, 0, r0);
@@ -554,9 +554,10 @@ TEST(test_step_alu_square_add_x_dies_y_lives) {
     // role from fma).  When x dies at the op but y is still live past it,
     // the dest should claim x's register (destructive fold into x).
     static int8_t const pool[] = {5, 6, 7, 8};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool, .nregs = 4, .max_reg = 10,
-        .spill = test_spill, .fill = test_fill, .ctx = 0,
+        .spill = test_spill, .fill = test_fill, .ctx = &rec,
     };
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
@@ -574,7 +575,6 @@ TEST(test_step_alu_square_add_x_dies_y_lives) {
     struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
-    reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
     int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
@@ -589,7 +589,7 @@ TEST(test_step_alu_square_add_x_dies_y_lives) {
     s.rd == r0 here;           // claimed x's register
     ra_reg(ra, 2) == r0 here;
     ra_reg(ra, 1) == r1 here;  // y still in place
-    nspills == 0 here;
+    rec.nspills == 0 here;
 
     ra_destroy(ra);
     free(ir->inst);
@@ -601,9 +601,10 @@ TEST(test_step_alu_square_add_both_live) {
     // register is free to reclaim, so the dest falls back to a fresh
     // allocation.
     static int8_t const pool[] = {5, 6, 7, 8};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool, .nregs = 4, .max_reg = 10,
-        .spill = test_spill, .fill = test_fill, .ctx = 0,
+        .spill = test_spill, .fill = test_fill, .ctx = &rec,
     };
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
@@ -621,7 +622,6 @@ TEST(test_step_alu_square_add_both_live) {
     struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
-    reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
     int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
@@ -639,7 +639,7 @@ TEST(test_step_alu_square_add_both_live) {
     ra_reg(ra, 0) == r0 here;  // both operands retained
     ra_reg(ra, 1) == r1 here;
     ra_reg(ra, 2) == s.rd here;
-    nspills == 0 here;
+    rec.nspills == 0 here;
 
     ra_destroy(ra);
     free(ir->inst);
@@ -657,13 +657,14 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
     // collapsing s.rd onto s.scratch and silently corrupting the
     // would-be-spilled value.
     static int8_t const pool[] = {0, 1, 2};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 3,
         .max_reg = 3,
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
 
     // 4 vals: three imms occupy the pool, then a shr_u32 (op that
@@ -687,7 +688,6 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
     struct ra *ra = ra_create(ir, &cfg);
     int        sl[4] = {-1, -1, -1, -1};
     int        ns = 0;
-    reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
     int8_t r1 = ra_alloc(ra, sl, &ns); ra_assign(ra, 1, r1);
@@ -726,6 +726,7 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
 
 TEST(test_step_alu_scratch) {
     static int8_t const pool[] = {5, 6, 7, 8};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 4,
@@ -733,7 +734,7 @@ TEST(test_step_alu_scratch) {
 
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
@@ -751,7 +752,6 @@ TEST(test_step_alu_scratch) {
     struct ra *ra = ra_create(ir, &cfg);
     int        sl[3] = {-1, -1, -1};
     int        ns = 0;
-    reset_records();
 
     int8_t r0 = ra_alloc(ra, sl, &ns);
     ra_assign(ra, 0, r0);
@@ -779,19 +779,19 @@ TEST(test_sparse_pool_eviction) {
     // confused a register id with its pool index would mis-skip an
     // eviction candidate or pick a register outside the pool.
     static int8_t const pool[] = {1, 4, 9};
+    struct records rec = {0};
     struct ra_config    cfg = {
         .pool = pool,
         .nregs = 3,
         .max_reg = 16,
         .spill = test_spill,
         .fill = test_fill,
-        .ctx = 0,
+        .ctx = &rec,
     };
     struct umbra_flat_ir *ir = make_ir(4, 0);
     struct ra                *ra = ra_create(ir, &cfg);
     int                       sl[4] = {-1, -1, -1, -1};
     int                       ns = 0;
-    reset_records();
 
     // LIFO fast-path: pool[0]=1 first, then 4, then 9.
     int8_t r0 = ra_alloc(ra, sl, &ns); ra_assign(ra, 0, r0);
@@ -811,8 +811,8 @@ TEST(test_sparse_pool_eviction) {
     ra_set_last_use(ra, 2, 3);
 
     int8_t r3 = ra_alloc(ra, sl, &ns);
-    nspills == 1 here;
-    spills[0].reg == 4 here;
+    rec.nspills == 1 here;
+    rec.spills[0].reg == 4 here;
     r3 == 4 here;
     ra_reg(ra, 1) == -1 here;
     sl[1] >= 0 here;
@@ -830,12 +830,14 @@ TEST(test_evict_live_before_loop) {
     ir->inst[5].x = (val){.id = 2};
     ir->inst[5].y = (val){.id = 3};
 
+    struct records rec = {0};
     struct ra_config cfg = {
         .pool    = pool,
         .nregs   = 3,
         .max_reg = 3,
         .spill   = test_spill,
         .fill    = test_fill,
+        .ctx     = &rec,
     };
     int sl[8];
     __builtin_memset(sl, -1, sizeof sl);
@@ -850,12 +852,12 @@ TEST(test_evict_live_before_loop) {
     ra_reg(ra, 2) >= 0 here;
     ra_reg(ra, 3) >= 0 here;
 
-    reset_records();
+    rec = (struct records){0};
     ra_evict_live_before(ra, sl, &ns, 4);
 
     ra_reg(ra, 2) == -1 here;
     sl[2] >= 0 here;
-    nspills >= 1 here;
+    rec.nspills >= 1 here;
 
     ra_destroy(ra);
     free_ir(ir);
