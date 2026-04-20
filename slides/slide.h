@@ -13,16 +13,16 @@
 //   * build_draw exists and lives alongside prepare/draw/get_builders.
 //   * persp_slide, cov_null_slide, text_slide (bitmap and SDF bitmap), all 5
 //     blend variants, all 8 gradient variants, the swatch grid, and slug
-//     implement it.  Swatch is the first multi-program user (10 programs).
-//     Slug folds the winding loop into a single coverage fn with no
-//     intermediate buffer.
-//   * The overview consumes it (loops build_draw(i) until it returns 0).
+//     implement it.  Slug folds the winding loop into a single coverage fn
+//     with no intermediate buffer.  Swatch packs ten colors into a gather
+//     buffer so its grid is still one program.
+//   * The overview consumes it (calls build_draw once per slide).
 //
 // Still ahead:
 //   * Migrate the sdf slides (need a tile-culled sibling path -- see TODO in
 //     slides/overview.c).
 //   * Once every slide has a build_draw, retire prepare / draw /
-//     get_builders and have every driver just loop over slide->build_draw.
+//     get_builders and have every driver just call slide->build_draw.
 
 struct slide {
     char const     *title;
@@ -36,9 +36,8 @@ struct slide {
     int (*get_builders)(struct slide*, struct umbra_fmt,
                         struct umbra_builder **out, int max);
 
-    // Fill builder `b` with the slide's i'th draw IR and return 1, or return
-    // 0 to signal "no more programs" (i == n_programs).  Consumers loop
-    // i = 0, 1, ... compiling and dispatching each program in order.
+    // Fill builder `b` with the slide's draw IR.  Consumers compile the
+    // result and dispatch it.
     //
     // `dst_ptr` is already bound on `b` (via umbra_bind_buf) and is the final
     // destination; `fmt` is its format.  `(x, y)` are the post-transform
@@ -49,9 +48,9 @@ struct slide {
     //
     // NULL means the slide has no composable draw path; consumers fall back
     // to the slide's own prepare/draw cycle or a placeholder.
-    _Bool (*build_draw)(struct slide*, int i, struct umbra_builder *b,
-                        umbra_ptr dst_ptr, struct umbra_fmt fmt,
-                        umbra_val32 x, umbra_val32 y);
+    void (*build_draw)(struct slide*, struct umbra_builder *b,
+                       umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                       umbra_val32 x, umbra_val32 y);
 
     // Update animation state (e.g. per-frame matrix uniforms) without
     // emitting any GPU/CPU work.  NULL means static.

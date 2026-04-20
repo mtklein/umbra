@@ -94,6 +94,26 @@ void umbra_build_draw(struct umbra_builder*,
                       umbra_shader  , void *shader_ctx,
                       umbra_blend   , void *blend_ctx);
 
+// SDF where f(x,y)<0 -> inside, defined over intervals.
+typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
+                                 umbra_interval x, umbra_interval y);
+
+// Like umbra_build_draw() but using an SDF for coverage.
+// Set aa_quality=0 for a hard edge, or >0 for increasing effort spent on AA quality.
+void umbra_build_sdf_draw(struct umbra_builder*,
+                          umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
+                          umbra_val32 x, umbra_val32 y,
+                          umbra_sdf   , void *sdf_ctx, int aa_quality,
+                          umbra_shader, void *shader_ctx,
+                          umbra_blend , void *blend_ctx);
+
+// Evaluate SDF f(x,y) and store f.lo to lo.
+// TODO: also store f.hi to use for fully-covered tile tests
+void umbra_build_sdf_bounds(struct umbra_builder*,
+                            umbra_ptr lo,
+                            umbra_interval x, umbra_interval y,
+                            umbra_sdf, void *sdf_ctx);
+
 // TODO: remove umbra_draw_builder.  A thin convenience wrapper around
 // umbra_build_draw: umbra_builder() + umbra_bind_buf(dst) + umbra_f32_from_i32
 // of umbra_x / umbra_y + optional umbra_transform_perspective +
@@ -112,9 +132,6 @@ struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_ma
                                          struct umbra_buf *dst,
                                          struct umbra_fmt  dst_fmt);
 
-// SDF where f(x,y)<0 -> inside, defined over intervals.
-typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
-                                 umbra_interval x, umbra_interval y);
 
 // Draw using an umbra_sdf as coverage.  hard_edge=1 gives a binary mask;
 // hard_edge=0 clamps -sdf into [0, 1] for a 1px AA ramp.

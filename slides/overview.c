@@ -14,11 +14,10 @@ static uint8_t const font3x5[10][5] = {
 // in the IR, so matrices compose through the built-in uniforms rebind each
 // dispatch rather than through any CPU-side composition.
 struct cell {
-    struct slide              *sub;          // NULL = placeholder
-    struct umbra_matrix        cell_mat;   int :32;  // cell -> canvas, fixed at prepare
-    struct umbra_program     **progs;
-    int                        n_progs, col, row;
-    int                        :32;
+    struct slide         *sub;          // NULL = placeholder
+    struct umbra_matrix   cell_mat;   int :32;  // cell -> canvas, fixed at prepare
+    struct umbra_program *prog;
+    int                   col, row;
 };
 
 struct overview_slide {
@@ -92,12 +91,10 @@ static void compute_cell_matrix(struct umbra_matrix *out, int col, int row,
     };
 }
 
-// Build the per-cell IR for the sub-slide's i'th program: overview binds
-// dst, applies cell_mat to the dispatch coords, then hands control to the
-// sub-slide's build_draw which layers on whatever transforms it wants before
-// calling umbra_build_draw.  Returns NULL when the sub-slide has no i'th
-// program.
-static struct umbra_builder* build_cell_program(struct slide *sub, int i,
+// Build the per-cell IR: overview binds dst, applies cell_mat to the
+// dispatch coords, then hands control to the sub-slide's build_draw which
+// layers on whatever transforms it wants before calling umbra_build_draw.
+static struct umbra_builder* build_cell_program(struct slide *sub,
                                                 struct umbra_matrix const *cell_mat,
                                                 struct umbra_buf *dst,
                                                 struct umbra_fmt fmt) {
@@ -106,11 +103,8 @@ static struct umbra_builder* build_cell_program(struct slide *sub, int i,
     umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
                       y = umbra_f32_from_i32(b, umbra_y(b));
     umbra_point_val32 const p = umbra_transform_perspective(cell_mat, b, x, y);
-    if (sub->build_draw(sub, i, b, dst_ptr, fmt, p.x, p.y)) {
-        return b;
-    }
-    umbra_builder_free(b);
-    return NULL;
+    sub->build_draw(sub, b, dst_ptr, fmt, p.x, p.y);
+    return b;
 }
 
 static void overview_init(struct slide *s, int w, int h) {
@@ -153,9 +147,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 
     if (st->cells) {
         for (int i = 0; i < st->n_cells; i++) {
-            struct cell *c = &st->cells[i];
-            for (int j = 0; j < c->n_progs; j++) { umbra_program_free(c->progs[j]); }
-            free(c->progs);
+            umbra_program_free(st->cells[i].prog);
         }
         free(st->cells);
     }
@@ -201,18 +193,12 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         // c->progs[k]->queue.
         if (!sub->build_draw) { continue; }
 
-        for (int k = 0; ; k++) {
-            struct umbra_builder *b = build_cell_program(sub, k, &c->cell_mat,
-                                                          &st->out_buf, fmt);
-            if (!b) { break; }
-            struct umbra_flat_ir *ir = umbra_flat_ir(b);
-            umbra_builder_free(b);
-            struct umbra_program *p = be->compile(be, ir);
-            umbra_flat_ir_free(ir);
-            if (!p) { break; }
-            c->progs = realloc(c->progs, (size_t)(c->n_progs + 1) * sizeof *c->progs);
-            c->progs[c->n_progs++] = p;
-        }
+        struct umbra_builder *b = build_cell_program(sub, &c->cell_mat,
+                                                     &st->out_buf, fmt);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        umbra_builder_free(b);
+        c->prog = be->compile(be, ir);
+        umbra_flat_ir_free(ir);
     }
 
     umbra_program_free(st->overlay_prog);
@@ -263,14 +249,12 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         float const *bg = c->sub ? c->sub->bg : placeholder_bg;
         slide_bg_draw(bg, xl, yt, xr, yb, buf);
 
-        if (c->sub && c->n_progs) {
-            // Refresh animated uniforms -- the cell programs read the sub's
+        if (c->sub && c->prog) {
+            // Refresh animated uniforms -- the cell program reads the sub's
             // matrices as uniforms at dispatch time, so mutating them here
             // is enough; no recompile.
             if (c->sub->animate) { c->sub->animate(c->sub, secs); }
-            for (int k = 0; k < c->n_progs; k++) {
-                c->progs[k]->queue(c->progs[k], xl, yt, xr, yb);
-            }
+            c->prog->queue(c->prog, xl, yt, xr, yb);
         }
     }
 
@@ -282,18 +266,12 @@ static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
                                  struct umbra_builder **out, int max) {
     struct overview_slide *st = (struct overview_slide *)s;
     if (max < 1 || st->n_cells == 0) { return 0; }
-    // Return the first live cell's program builders as representatives.
+    // Return the first live cell's program builder as a representative.
     for (int i = 0; i < st->n_cells; i++) {
         struct cell *c = &st->cells[i];
-        if (!c->sub || !c->n_progs || !c->sub->build_draw) { continue; }
-        int n = 0;
-        for (int k = 0; k < max; k++) {
-            struct umbra_builder *b = build_cell_program(c->sub, k, &c->cell_mat,
-                                                          &st->out_buf, fmt);
-            if (!b) { break; }
-            out[n++] = b;
-        }
-        return n;
+        if (!c->sub || !c->prog || !c->sub->build_draw) { continue; }
+        out[0] = build_cell_program(c->sub, &c->cell_mat, &st->out_buf, fmt);
+        return 1;
     }
     return 0;
 }
@@ -304,9 +282,7 @@ static void overview_free(struct slide *s) {
     free(st->overlay);
     if (st->cells) {
         for (int i = 0; i < st->n_cells; i++) {
-            struct cell *c = &st->cells[i];
-            for (int j = 0; j < c->n_progs; j++) { umbra_program_free(c->progs[j]); }
-            free(c->progs);
+            umbra_program_free(st->cells[i].prog);
         }
         free(st->cells);
     }

@@ -286,17 +286,15 @@ static void slug_init(struct slide *s, int w, int h) {
     };
 }
 
-static _Bool slug_build_draw(struct slide *s, int i, struct umbra_builder *b,
-                             umbra_ptr dst_ptr, struct umbra_fmt fmt,
-                             umbra_val32 x, umbra_val32 y) {
-    if (i != 0) { return 0; }
+static void slug_build_draw(struct slide *s, struct umbra_builder *b,
+                            umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                            umbra_val32 x, umbra_val32 y) {
     struct slug_slide *st = (struct slug_slide *)s;
     umbra_point_val32 const p = umbra_transform_perspective(&st->mat, b, x, y);
     umbra_build_draw(b, dst_ptr, fmt, p.x, p.y,
                      coverage_slug_winding, &st->cov_ctx,
                      umbra_shader_color,    &st->color,
                      umbra_blend_srcover,   NULL);
-    return 1;
 }
 
 static struct umbra_builder* slug_builder(struct slide *s, struct umbra_fmt fmt) {
@@ -305,7 +303,7 @@ static struct umbra_builder* slug_builder(struct slide *s, struct umbra_fmt fmt)
     umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
     umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
                       y = umbra_f32_from_i32(b, umbra_y(b));
-    slug_build_draw(s, 0, b, dst_ptr, fmt, x, y);
+    slug_build_draw(s, b, dst_ptr, fmt, x, y);
     return b;
 }
 
@@ -338,11 +336,11 @@ static void slug_draw(struct slide *s, double secs, int l, int t, int r, int b, 
     st->prog->queue(st->prog, l, t, r, b);
 }
 
-static int slug_one_pass_get_builders(struct slide *s, struct umbra_fmt fmt,
-                                      struct umbra_builder **out, int max) {
+static int slug_get_builders(struct slide *s, struct umbra_fmt fmt,
+                             struct umbra_builder **out, int max) {
     if (max < 1) { return 0; }
     out[0] = slug_builder(s, fmt);
-    return out[0] ? 1 : 0;
+    return 1;
 }
 
 static void slug_free_slide(struct slide *s) {
@@ -362,7 +360,7 @@ SLIDE(slide_slug) {
         .prepare = slug_prepare,
         .draw = slug_draw,
         .free = slug_free_slide,
-        .get_builders = slug_one_pass_get_builders,
+        .get_builders = slug_get_builders,
         .build_draw   = slug_build_draw,
         .animate      = slug_animate,
     };
