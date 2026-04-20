@@ -2,17 +2,11 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
-// TODO: rename the remaining .prepare / .draw hook slots to reflect that
-// only custom slides (overview today) use them -- every leaf now goes
-// through .build_draw or .build_sdf_draw + slide_runtime.  Candidate:
-// .custom_prepare / .custom_draw.  While renaming, swap .draw's
-// `void *buf` for `struct umbra_buf dst` so the hook matches the typed
-// destination that slide_runtime already carries.
-//
-// Drivers (bench, dump, demo, golden_test) already branch on
-// (build_draw || build_sdf_draw) to pick the slide_runtime path vs. the
-// prepare/draw fallback; the rename is just signal -- code shape stays
-// the same.
+// TODO: swap .draw's `void *buf` for `struct umbra_buf dst` so the hook
+// matches the typed destination that slide_runtime already carries.
+// Only overview uses .prepare / .draw today -- every leaf goes through
+// .build_draw or .build_sdf_draw + slide_runtime -- so this is a small
+// patch touching overview_draw and the driver fallbacks.
 //
 // Landed:
 //   * build_draw / build_sdf_draw contracts for every leaf.  Non-SDF:
