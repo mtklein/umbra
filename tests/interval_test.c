@@ -2,6 +2,7 @@
 #include "../include/umbra_interval.h"
 #include "../src/flat_ir.h"
 #include "test.h"
+#include <math.h>
 #include <stdlib.h>
 
 typedef struct { float lo, hi; } iv;
@@ -117,6 +118,21 @@ TEST(interval_div) {
              (iv){2.0f/3, 6}) here;
     iv_equiv(eval_binary(umbra_interval_div_f32, (iv){-4,2}, (iv){2,5}),
              (iv){-2, 1}) here;
+    iv_equiv(eval_binary(umbra_interval_div_f32, (iv){1,2}, (iv){-3,-1}),
+             (iv){-2, -1.0f/3}) here;
+}
+
+TEST(interval_div_straddles_zero) {
+    iv_equiv(eval_binary(umbra_interval_div_f32, (iv){2,3}, (iv){-1,1}),
+             (iv){-INFINITY, INFINITY}) here;
+    iv_equiv(eval_binary(umbra_interval_div_f32, (iv){-2,5}, (iv){-1,2}),
+             (iv){-INFINITY, INFINITY}) here;
+    iv_equiv(eval_binary(umbra_interval_div_f32, (iv){1,2}, (iv){0,3}),
+             (iv){-INFINITY, INFINITY}) here;
+    iv_equiv(eval_binary(umbra_interval_div_f32, (iv){1,2}, (iv){-3,0}),
+             (iv){-INFINITY, INFINITY}) here;
+    iv_equiv(eval_binary(umbra_interval_div_f32, (iv){1,2}, (iv){0,0}),
+             (iv){-INFINITY, INFINITY}) here;
 }
 
 static iv eval_square(iv a) {

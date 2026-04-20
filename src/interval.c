@@ -1,4 +1,5 @@
 #include "../include/umbra_interval.h"
+#include <math.h>
 
 static _Bool exact(umbra_interval a) { return a.lo.id == a.hi.id; }
 
@@ -45,30 +46,28 @@ umbra_interval umbra_interval_mul_f32(struct umbra_builder *b,
     };
 }
 
-// TODO: unsound on zero-straddling divisors.  The {1/c.hi, 1/c.lo} recip
-// here assumes c is sign-consistent (all positive or all negative).  If
-// c.lo < 0 < c.hi the true set {a/x : x in c} is unbounded -- for example
-// [2, 3] / [-1, 1] = (-inf, -2] U [2, +inf) -- but this op returns a narrow
-// finite interval like [-3, 3] that does NOT enclose the truth.  Any caller
-// that could end up here with a zero-straddling divisor gets silently wrong
-// bounds.
-//
-// No consumer today needs it: the SDF bounds program is affine-only
-// (the struct umbra_affine path in src/draw.c emits no divide), and the other
-// interval ops don't introduce division.  But the op is part
-// of our public interval library, so figure out the right behavior before
-// a caller shows up that would be hurt.  Candidates: return (-inf, +inf)
-// and harden every other interval op against NaN from later 0*inf; or a
-// saturating +-FLT_MAX at the divide; or simply make it a precondition
-// that the divisor be sign-consistent.
+// If c straddles or touches zero the true set {a/x : x in c} is unbounded,
+// so we collapse to (-inf, +inf) rather than the misleadingly narrow
+// {1/c.hi, 1/c.lo} recip that only holds when c is sign-consistent.
+// Downstream ops are not hardened against NaN from later 0*inf; consumers
+// must tolerate infinite bounds propagating through.
 umbra_interval umbra_interval_div_f32(struct umbra_builder *b,
                                       umbra_interval a, umbra_interval c) {
     if (exact(a) && exact(c)) {
         return umbra_interval_exact(umbra_div_f32(b, a.lo, c.lo));
     }
-    umbra_interval const recip = {umbra_div_f32(b, umbra_imm_f32(b, 1.0f), c.hi),
-                                  umbra_div_f32(b, umbra_imm_f32(b, 1.0f), c.lo)};
-    return umbra_interval_mul_f32(b, a, recip);
+    umbra_val32 const zero    = umbra_imm_f32(b, 0.0f),
+                      one     = umbra_imm_f32(b, 1.0f),
+                      neg_inf = umbra_imm_f32(b, -INFINITY),
+                      pos_inf = umbra_imm_f32(b,  INFINITY),
+                      lo_pos  = umbra_lt_f32 (b, zero, c.lo),
+                      hi_neg  = umbra_lt_f32 (b, c.hi, zero),
+                      nonstr  = umbra_or_32  (b, lo_pos, hi_neg);
+    umbra_interval const recip = {umbra_div_f32(b, one, c.hi),
+                                  umbra_div_f32(b, one, c.lo)};
+    umbra_interval const m = umbra_interval_mul_f32(b, a, recip);
+    return (umbra_interval){umbra_sel_32(b, nonstr, m.lo, neg_inf),
+                            umbra_sel_32(b, nonstr, m.hi, pos_inf)};
 }
 
 umbra_interval umbra_interval_min_f32(struct umbra_builder *b,
