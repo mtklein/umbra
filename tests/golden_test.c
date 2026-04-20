@@ -129,20 +129,18 @@ TEST(test_perspective_text) {
     struct umbra_matrix mat = {1,0,0, 0,1,0, 0,0,1};
 
     struct umbra_buf dst_slot = {0};
-    struct umbra_builder *bld = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(bld, &dst_slot);
-    umbra_val32 const bx = umbra_f32_from_i32(bld, umbra_x(bld)),
-                      by = umbra_f32_from_i32(bld, umbra_y(bld));
-    umbra_point_val32 const bp = umbra_transform_perspective(&mat, bld, bx, by);
-    umbra_build_draw(bld, dst_ptr, umbra_fmt_8888, bp.x, bp.y,
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, &dst_slot);
+    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
+                      y = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_point_val32 const p = umbra_transform_perspective(&mat, b, x, y);
+    umbra_build_draw(b, dst_ptr, umbra_fmt_8888, p.x, p.y,
                      coverage_bitmap2d,   &sampler,
                      umbra_shader_color,  &color,
                      umbra_blend_srcover, NULL);
-    struct umbra_flat_ir *ir =
-        umbra_flat_ir(bld);
-    umbra_builder_free(bld);
-    struct umbra_program *interp =
-        be->compile(be, ir);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    struct umbra_program *interp = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
     uint32_t pixels[BW];
@@ -171,17 +169,17 @@ TEST(test_perspective_text) {
         .h   = tc.h,
     };
 
-    bld = umbra_builder();
-    umbra_ptr const dst_ptr2 = umbra_bind_buf(bld, &dst_slot);
-    umbra_val32 const b2x = umbra_f32_from_i32(bld, umbra_x(bld)),
-                      b2y = umbra_f32_from_i32(bld, umbra_y(bld));
-    umbra_point_val32 const bp2 = umbra_transform_perspective(&mat2, bld, b2x, b2y);
-    umbra_build_draw(bld, dst_ptr2, umbra_fmt_8888, bp2.x, bp2.y,
+    b = umbra_builder();
+    umbra_ptr const dst_ptr2 = umbra_bind_buf(b, &dst_slot);
+    umbra_val32 const x2 = umbra_f32_from_i32(b, umbra_x(b)),
+                      y2 = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_point_val32 const p2 = umbra_transform_perspective(&mat2, b, x2, y2);
+    umbra_build_draw(b, dst_ptr2, umbra_fmt_8888, p2.x, p2.y,
                      coverage_bitmap2d,   &sampler2,
                      umbra_shader_color,  &hc2,
                      umbra_blend_srcover, NULL);
-    ir = umbra_flat_ir(bld);
-    umbra_builder_free(bld);
+    ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
     interp = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
@@ -223,18 +221,18 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         uint32_t    pixel = 0;
         struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
-        struct umbra_builder *bld = umbra_builder();
-        umbra_ptr const cu = umbra_bind_uniforms(bld, &color, (int)(sizeof color / 4)),
-                          pp = umbra_bind_buf(bld, &pixel_buf);
+        struct umbra_builder *b = umbra_builder();
+        umbra_ptr const cu = umbra_bind_uniforms(b, &color, (int)(sizeof color / 4)),
+                        pp = umbra_bind_buf(b, &pixel_buf);
         umbra_color_val32 c = {
-            umbra_uniform_32(bld, cu, 0),
-            umbra_uniform_32(bld, cu, 1),
-            umbra_uniform_32(bld, cu, 2),
-            umbra_uniform_32(bld, cu, 3),
+            umbra_uniform_32(b, cu, 0),
+            umbra_uniform_32(b, cu, 1),
+            umbra_uniform_32(b, cu, 2),
+            umbra_uniform_32(b, cu, 3),
         };
-        umbra_store_8888(bld, pp, c);
-        struct umbra_flat_ir *ir = umbra_flat_ir(bld);
-        umbra_builder_free(bld);
+        umbra_store_8888(b, pp, c);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        umbra_builder_free(b);
 
         struct umbra_program *p = be->compile(be, ir);
         umbra_flat_ir_free(ir);
@@ -338,18 +336,18 @@ TEST(test_wgpu_misc) {
         uint32_t pixel           = 0;
         struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
-        struct umbra_builder *bld = umbra_builder();
-        umbra_ptr const cu = umbra_bind_uniforms(bld, uniform_data, count(uniform_data)),
-                          pp = umbra_bind_buf(bld, &pixel_buf);
+        struct umbra_builder *b = umbra_builder();
+        umbra_ptr const cu = umbra_bind_uniforms(b, uniform_data, count(uniform_data)),
+                        pp = umbra_bind_buf(b, &pixel_buf);
         umbra_color_val32 c = {
-            umbra_uniform_32(bld, cu, 0),
-            umbra_imm_f32(bld, 0.0f),
-            umbra_imm_f32(bld, 0.0f),
-            umbra_imm_f32(bld, 1.0f),
+            umbra_uniform_32(b, cu, 0),
+            umbra_imm_f32(b, 0.0f),
+            umbra_imm_f32(b, 0.0f),
+            umbra_imm_f32(b, 1.0f),
         };
-        umbra_store_8888(bld, pp, c);
-        struct umbra_flat_ir *ir = umbra_flat_ir(bld);
-        umbra_builder_free(bld);
+        umbra_store_8888(b, pp, c);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        umbra_builder_free(b);
 
         struct umbra_program *p = be->compile(be, ir);
         umbra_flat_ir_free(ir);
