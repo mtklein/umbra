@@ -2380,30 +2380,34 @@ TEST(test_umbra_uniforms_interp) {
 
 TEST(test_umbra_uniforms_metal) {
     struct umbra_backend *be = umbra_backend_metal();
-    if (!be) { return; }
-    run_umbra_uniforms_test(be);
-    umbra_backend_free(be);
+    if (be) {
+        run_umbra_uniforms_test(be);
+        umbra_backend_free(be);
+    }
 }
 
 TEST(test_umbra_uniforms_jit) {
     struct umbra_backend *be = umbra_backend_jit();
-    if (!be) { return; }
-    run_umbra_uniforms_test(be);
-    umbra_backend_free(be);
+    if (be) {
+        run_umbra_uniforms_test(be);
+        umbra_backend_free(be);
+    }
 }
 
 TEST(test_umbra_uniforms_vulkan) {
     struct umbra_backend *be = umbra_backend_vulkan();
-    if (!be) { return; }
-    run_umbra_uniforms_test(be);
-    umbra_backend_free(be);
+    if (be) {
+        run_umbra_uniforms_test(be);
+        umbra_backend_free(be);
+    }
 }
 
 TEST(test_umbra_uniforms_wgpu) {
     struct umbra_backend *be = umbra_backend_wgpu();
-    if (!be) { return; }
-    run_umbra_uniforms_test(be);
-    umbra_backend_free(be);
+    if (be) {
+        run_umbra_uniforms_test(be);
+        umbra_backend_free(be);
+    }
 }
 
 TEST(test_program_null_guards) {
