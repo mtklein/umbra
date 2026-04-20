@@ -141,9 +141,15 @@ struct slide_runtime* slide_runtime(struct slide *s,
     }
 
     if (s->build_sdf_draw) {
+        struct umbra_affine aff;
+        if (pre) {
+            aff = (struct umbra_affine){
+                pre->sx, pre->kx, pre->tx,
+                pre->ky, pre->sy, pre->ty,
+            };
+        }
         struct umbra_builder *bb = umbra_builder();
-        rt->bounds = umbra_sdf_bounds_program(bb,
-                                              (struct umbra_affine const *)pre,
+        rt->bounds = umbra_sdf_bounds_program(bb, pre ? &aff : NULL,
                                               s->sdf_fn, s->sdf_ctx);
         umbra_builder_free(bb);
     }
