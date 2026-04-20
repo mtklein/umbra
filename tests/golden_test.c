@@ -14,13 +14,13 @@
 
 enum { W = 128, H = 96 };
 
-static char const *backend_name[NUM_BACKENDS] = {
+static char const *const backend_name[NUM_BACKENDS] = {
     "interp", "jit", "metal", "vulkan", "wgpu",
 };
 
 static struct umbra_backend *bes[NUM_BACKENDS];
 
-static struct umbra_fmt const *all_fmts[] = {
+static struct umbra_fmt const *const all_fmts[] = {
     &umbra_fmt_8888,
     &umbra_fmt_565,
     &umbra_fmt_1010102,
