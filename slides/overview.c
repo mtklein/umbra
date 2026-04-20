@@ -144,17 +144,14 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
                   y0 = c->row * ch;
         if (idx < n_real) {
             draw_number(st->overlay, s->w, x0 + 2, y0 + 2, idx + 1);
+
+            struct slide *sub = slide_get(idx);
+            c->sub = sub;
+            if (sub->prepare) { sub->prepare(sub, be, fmt); }
+            c->rt = slide_runtime(sub, s->w, s->h, be, fmt, &c->cell_mat);
         } else {
             draw_xbox(st->overlay, s->w, x0, y0, cw, ch);
         }
-
-        if (idx >= n_real) { continue; }  // empty slot (no slide)
-
-        struct slide *sub = slide_get(idx);
-        c->sub = sub;
-        if (sub->prepare) { sub->prepare(sub, be, fmt); }
-
-        c->rt = slide_runtime(sub, s->w, s->h, be, fmt, &c->cell_mat);
     }
 
     umbra_program_free(st->overlay_prog);
@@ -189,20 +186,21 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
                   x1 = (c->col + 1 == st->cols) ? w : x0 + st->cw,
                   y1 = (c->row + 1 == st->rows) ? h : y0 + st->ch;
 
-        if (y1 <= t || y0 >= b) { continue; }
-        int const yt = y0 > t ? y0 : t,
-                  yb = y1 < b ? y1 : b;
+        if (y1 > t && y0 < b) {
+            int const yt = y0 > t ? y0 : t,
+                      yb = y1 < b ? y1 : b;
 
-        // Paint the cell's background first -- live cells use srcover that
-        // would accumulate without a fresh bg each frame; placeholders just
-        // need something visible.  Empty slots (idx >= n_real, c->sub NULL)
-        // get a neutral dark gray.
-        umbra_color const bg = c->sub ? c->sub->bg : placeholder_bg;
-        slide_bg_draw(st->bg, bg, x0, yt, x1, yb, dst);
+            // Paint the cell's background first -- live cells use srcover that
+            // would accumulate without a fresh bg each frame; placeholders just
+            // need something visible.  Empty slots (idx >= n_real, c->sub NULL)
+            // get a neutral dark gray.
+            umbra_color const bg = c->sub ? c->sub->bg : placeholder_bg;
+            slide_bg_draw(st->bg, bg, x0, yt, x1, yb, dst);
 
-        if (c->sub && c->rt && c->rt->draw) {
-            c->rt->dst_buf = st->out_buf;
-            slide_runtime_draw(c->rt, c->sub, secs, x0, yt, x1, yb);
+            if (c->sub && c->rt && c->rt->draw) {
+                c->rt->dst_buf = st->out_buf;
+                slide_runtime_draw(c->rt, c->sub, secs, x0, yt, x1, yb);
+            }
         }
     }
 
