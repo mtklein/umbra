@@ -316,6 +316,9 @@ void umbra_sdf_tile_intervals(struct umbra_builder *bb,
     }
 }
 
+// TODO: decisions about tile size should be made by umbra_sdf_dispatch(),
+//       not its callers.  and does carrying that through simplify anything
+//       else, e.g. sdf grid or cov buffer managmenet becomes internal?
 void umbra_sdf_dispatch(struct umbra_program *bounds,
                         struct umbra_program *draw,
                         struct umbra_sdf_grid *grid,
