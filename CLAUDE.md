@@ -2,9 +2,9 @@ Overview
 --------
 Umbra is a CPU/GPU pipeline JIT that promises bit-identical results across all
 its backends.  `umbra_builder` binds buffers and composes simple ops into a
-linear `umbra_flat_ir`, which `umbra_backend` compiles into an `umbra_program`.
-`program->queue(l,t,r,b)` dispatches work against the bound buffers, which
-become visible after a backend `flush()`.
+linear `umbra_flat_ir`, which an `umbra_backend` compiles into an
+`umbra_program`.  `program->queue(l,t,r,b)` dispatches work against the bound
+buffers, which become visible after a backend `flush()`.
 
   - `include/*` - public API, identifiers prefixed with `umbra_`.
   - `src/*`     - implementation, no `umbra_` prefix.
