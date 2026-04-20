@@ -180,9 +180,9 @@ void slide_runtime_compile(struct slide_runtime *rt, struct slide *s,
 
         struct umbra_flat_ir *bir = umbra_flat_ir(bb);
         umbra_builder_free(bb);
-        rt->bounds_be = umbra_backend_jit();
-        if (!rt->bounds_be) { rt->bounds_be = umbra_backend_interp(); }
-        rt->bounds = rt->bounds_be->compile(rt->bounds_be, bir);
+        struct umbra_backend *bounds_be = umbra_backend_jit();
+        if (!bounds_be) { bounds_be = umbra_backend_interp(); }
+        rt->bounds = bounds_be->compile(bounds_be, bir);
         umbra_flat_ir_free(bir);
     } else if (s->build_draw) {
         struct umbra_builder *b = runtime_draw_builder(s, &rt->dst_buf, fmt, pre);
@@ -216,9 +216,10 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
 }
 
 void slide_runtime_cleanup(struct slide_runtime *rt) {
+    struct umbra_backend *bounds_be = rt->bounds ? rt->bounds->backend : NULL;
     umbra_program_free(rt->draw);
     umbra_program_free(rt->bounds);
-    umbra_backend_free(rt->bounds_be);
+    umbra_backend_free(bounds_be);
     free(rt->cov);
     *rt = (struct slide_runtime){0};
 }

@@ -59,8 +59,7 @@ void slide_bg_cleanup(void);
 // Compiled state for one slide on one backend + format.
 struct slide_runtime {
     struct umbra_program *draw;
-    struct umbra_program *bounds;      // NULL for non-SDF slides
-    struct umbra_backend *bounds_be;   // owned (SDF only);  TODO: why not use bounds->backend?
+    struct umbra_program *bounds;      // NULL for non-SDF; owns its backend
     uint16_t             *cov;
 
     struct umbra_fmt      fmt;
@@ -82,14 +81,15 @@ void slide_runtime_draw   (struct slide_runtime*, struct slide*,
                            double secs, int l, int t, int r, int b);
 void slide_runtime_cleanup(struct slide_runtime*);
 
-// Build builders for the slide's composable draw path(s) for inspection.
+// Builders for the slide's composable draw paths for inspection.
 // Uses `rt` as backing storage for bind sites -- rt must outlive any
 // program compiled from the returned builders' IR.  Returns:
 //   1 for build_draw slides      (out[0] = draw builder)
 //   2 for build_sdf_draw slides  (out[0] = draw builder, out[1] = bounds builder)
 //   0 for slides with neither    (custom slides like overview)
-// Caller owns the returned builders and must umbra_builder_free each
-// (typically after converting to umbra_flat_ir).
+// Caller owns the returned builders.
+// TODO: struct slide_builders { struct umbra_builder *draw, *bounds; }
+//       struct slide_builders slide_builders(...)
 int slide_builders(struct slide_runtime *rt, struct slide*,
                    struct umbra_fmt, struct umbra_matrix const *pre,
                    struct umbra_builder **out, int max);
