@@ -118,10 +118,25 @@ static void tile_factor(int n, int *cols, int *rows) {
 
 static int cur_backend;
 
-static void build_slide_fmt(struct slide *s, int fmt) {
-    if (bes[cur_backend]) {
+static struct slide_runtime slide_rt;
+
+static _Bool is_leaf(struct slide const *s) {
+    return s->build_draw || s->build_sdf_draw;
+}
+
+static void rebuild_rt(struct slide *s, int fmt, int W, int H) {
+    slide_runtime_cleanup(&slide_rt);
+    if (!bes[cur_backend] || !is_leaf(s)) { return; }
+    slide_runtime_compile(&slide_rt, s, W, H,
+                          bes[cur_backend], *fmt_enums[fmt], NULL);
+    slide_bg_prepare(bes[cur_backend], *fmt_enums[fmt], W, H);
+}
+
+static void build_slide_fmt(struct slide *s, int fmt, int W, int H) {
+    if (bes[cur_backend] && !is_leaf(s)) {
         s->prepare(s, bes[cur_backend], *fmt_enums[fmt]);
     }
+    rebuild_rt(s, fmt, W, H);
     umbra_flat_ir_free(saved_ir);
     {
         struct umbra_builder *b = NULL;
@@ -185,7 +200,11 @@ struct tile_work {
 
 static void tile_fn(void *arg) {
     struct tile_work *tw = arg;
-    tw->s->draw(tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b, tw->buf);
+    if (is_leaf(tw->s)) {
+        slide_runtime_draw(&slide_rt, tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b);
+    } else {
+        tw->s->draw(tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b, tw->buf);
+    }
 }
 
 int main(void) {
@@ -235,7 +254,7 @@ int main(void) {
     int cur_slide = slide_count() - 1;
     int cur_fmt = FMT_FP16;
     cur_backend = pick_backend(2);
-    build_slide_fmt(slide_get(cur_slide), cur_fmt);
+    build_slide_fmt(slide_get(cur_slide), cur_fmt, W, H);
 
     SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA64_FLOAT,
                                              SDL_TEXTUREACCESS_STREAMING, W, H);
@@ -272,7 +291,7 @@ int main(void) {
                 SDL_DestroyTexture(texture);
                 texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA64_FLOAT,
                                             SDL_TEXTUREACCESS_STREAMING, W, H);
-                build_slide_fmt(slide_get(cur_slide), cur_fmt);
+                build_slide_fmt(slide_get(cur_slide), cur_fmt, W, H);
                 rebuild_xtra(cur_backend);
             } else if (ev.type == SDL_EVENT_KEY_DOWN) {
                 int next = cur_slide;
@@ -283,11 +302,14 @@ int main(void) {
                 } else if (ev.key.key == SDLK_B) {
                     cur_backend = next_backend(cur_backend);
                     struct slide *s = slide_get(cur_slide);
-                    if (bes[cur_backend]) { s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]); }
+                    if (bes[cur_backend] && !is_leaf(s)) {
+                        s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]);
+                    }
+                    rebuild_rt(s, cur_fmt, W, H);
                     rebuild_xtra(cur_backend);
                 } else if (ev.key.key == SDLK_C) {
                     cur_fmt = (cur_fmt + 1) % NUM_FMTS;
-                    build_slide_fmt(slide_get(cur_slide), cur_fmt);
+                    build_slide_fmt(slide_get(cur_slide), cur_fmt, W, H);
                     cur_backend = pick_backend(cur_backend);
                     rebuild_xtra(cur_backend);
                 } else if (ev.key.key == SDLK_COMMA) {
@@ -304,7 +326,7 @@ int main(void) {
                 }
                 if (next != cur_slide) {
                     cur_slide = next;
-                    build_slide_fmt(slide_get(cur_slide), cur_fmt);
+                    build_slide_fmt(slide_get(cur_slide), cur_fmt, W, H);
                     cur_backend = pick_backend(cur_backend);
                     rebuild_xtra(cur_backend);
                 }
@@ -320,7 +342,15 @@ int main(void) {
         int    planes = fmt_enums[cur_fmt]->planes;
         size_t plane_gap = planes > 1 ? (size_t)W * (size_t)H * bpp : 0;
 
-        if (s->prepare) { s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]); }
+        if (!is_leaf(s) && s->prepare) {
+            s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]);
+        }
+        if (is_leaf(s)) {
+            slide_rt.dst_buf = (struct umbra_buf){
+                .ptr=pixbuf, .count=W*H*planes, .stride=W,
+            };
+            slide_bg_draw(s->bg, 0, 0, W, H, pixbuf);
+        }
 
         {
             int nt = n_threads;
@@ -422,6 +452,7 @@ int main(void) {
     free_xtra();
     free(xtra_progs);
     umbra_flat_ir_free(saved_ir);
+    slide_runtime_cleanup(&slide_rt);
     free_pipes();
     slides_cleanup();
     for (int i = 0; i < NUM_BACKENDS; i++) { umbra_backend_free(bes[i]); }
