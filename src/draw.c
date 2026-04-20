@@ -301,20 +301,6 @@ void umbra_build_sdf_bounds(struct umbra_builder *b,
     umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));
 }
 
-struct grid_params {
-    float base_x, base_y, tile_w, tile_h;
-};
-
-struct umbra_sdf_dispatcher {
-    struct umbra_program *draw;       // caller-supplied, we take ownership
-    struct umbra_program *bounds;     // NULL if transform_mat is perspective (no tile culling)
-    struct umbra_backend *bounds_be;
-    uint16_t             *cov;
-    struct grid_params    grid;
-    int                   cov_cap, tile_size;
-    struct umbra_buf      cov_buf;
-};
-
 // TODO: add a second `covered` program alongside `draw` for tiles where the
 // SDF is entirely inside the shape.  bounds already tags such tiles as
 // UMBRA_SDF_TILE_FULL; the fast path dispatches `covered` (shader+blend at
@@ -325,84 +311,54 @@ static _Bool matrix_is_affine(struct umbra_matrix const *m) {
     return m->p0 == 0.0f && m->p1 == 0.0f && m->p2 == 1.0f;
 }
 
-struct umbra_sdf_dispatcher* umbra_sdf_dispatcher(
-        umbra_sdf sdf_fn, void *sdf_ctx,
-        struct umbra_matrix const *transform_mat,
-        struct umbra_program *draw,
-        int tile_size) {
-    if (!draw) { return NULL; }
-    struct umbra_sdf_dispatcher *d = calloc(1, sizeof *d);
-    d->draw      = draw;
-    d->tile_size = tile_size;
-
-    // Gate the bounds program on affine-only transforms.  We don't support
-    // tile-culled dispatch under perspective: the interval divide would be
-    // unsound on horizon-crossing tiles, and perspective-sdf isn't a use
-    // case we have.  Non-affine transforms skip bounds and fall back to a
-    // full-rect dispatch in queue().
-    _Bool const build_bounds = !transform_mat || matrix_is_affine(transform_mat);
-    if (!build_bounds) { return d; }
-
-    // Build the bounds program: evaluate the sdf over tile-extent intervals.
-    // umbra_x() / umbra_y() are tile indices.
-    struct umbra_builder *bb = umbra_builder();
-    umbra_ptr const g   = umbra_bind_uniforms(bb, &d->grid,
-                                                  (int)(sizeof d->grid / 4));
-    umbra_ptr const dst = umbra_bind_buf(bb, &d->cov_buf);
+void umbra_sdf_tile_intervals(struct umbra_builder *bb,
+                              struct umbra_sdf_grid *grid,
+                              struct umbra_matrix const *transform_mat,
+                              umbra_interval *ix, umbra_interval *iy) {
+    umbra_ptr const g = umbra_bind_uniforms(bb, grid, (int)(sizeof *grid / 4));
     umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
                       base_y = umbra_uniform_32(bb, g, 1),
                       tile_w = umbra_uniform_32(bb, g, 2),
                       tile_h = umbra_uniform_32(bb, g, 3);
     umbra_val32 const xf = umbra_f32_from_i32(bb, umbra_x(bb)),
                       yf = umbra_f32_from_i32(bb, umbra_y(bb));
-    umbra_interval x = {umbra_add_f32(bb, base_x, umbra_mul_f32(bb, xf, tile_w)),
-                        umbra_add_f32(bb, base_x,
-                            umbra_mul_f32(bb, umbra_add_f32(bb, xf,
-                                umbra_imm_f32(bb, 1.0f)), tile_w))},
-                   y = {umbra_add_f32(bb, base_y, umbra_mul_f32(bb, yf, tile_h)),
-                        umbra_add_f32(bb, base_y,
-                            umbra_mul_f32(bb, umbra_add_f32(bb, yf,
-                                umbra_imm_f32(bb, 1.0f)), tile_h))};
-    if (transform_mat) { transform_affine_interval(transform_mat, bb, &x, &y); }
-
-    umbra_build_sdf_bounds(bb, dst, x, y, sdf_fn, sdf_ctx);
-
-    struct umbra_flat_ir *bir = umbra_flat_ir(bb);
-    umbra_builder_free(bb);
-    struct umbra_backend *bounds_be = umbra_backend_jit();
-    if (!bounds_be) { bounds_be = umbra_backend_interp(); }
-    d->bounds    = bounds_be->compile(bounds_be, bir);
-    d->bounds_be = bounds_be;
-    umbra_flat_ir_free(bir);
-
-    return d;
+    umbra_val32 const one = umbra_imm_f32(bb, 1.0f);
+    *ix = (umbra_interval){
+        umbra_add_f32(bb, base_x, umbra_mul_f32(bb, xf, tile_w)),
+        umbra_add_f32(bb, base_x, umbra_mul_f32(bb, umbra_add_f32(bb, xf, one), tile_w)),
+    };
+    *iy = (umbra_interval){
+        umbra_add_f32(bb, base_y, umbra_mul_f32(bb, yf, tile_h)),
+        umbra_add_f32(bb, base_y, umbra_mul_f32(bb, umbra_add_f32(bb, yf, one), tile_h)),
+    };
+    if (transform_mat && matrix_is_affine(transform_mat)) {
+        transform_affine_interval(transform_mat, bb, ix, iy);
+    }
 }
 
-void umbra_sdf_dispatcher_queue(struct umbra_sdf_dispatcher *d,
-                                int l, int t, int r, int b) {
-    if (!d) { return; }
-    if (!d->bounds) {
-        // Perspective transform: tile-culling bounds are unsound; dispatch full rect.
-        d->draw->queue(d->draw, l, t, r, b);
+void umbra_sdf_dispatch(struct umbra_program *bounds,
+                        struct umbra_program *draw,
+                        struct umbra_sdf_grid *grid,
+                        struct umbra_buf *cov,
+                        int tile_size, int l, int t, int r, int b) {
+    if (!bounds) {
+        draw->queue(draw, l, t, r, b);
         return;
     }
-    int const T  = d->tile_size,
+    int const T  = tile_size,
               xt = (r - l + T - 1) / T,
               yt = (b - t + T - 1) / T,
               tiles = xt * yt;
 
-    d->grid = (struct grid_params){
+    *grid = (struct umbra_sdf_grid){
         .base_x = (float)l, .base_y = (float)t,
         .tile_w = (float)T, .tile_h = (float)T,
     };
-    if (tiles > d->cov_cap) {
-        d->cov     = realloc(d->cov, (size_t)tiles * sizeof *d->cov);
-        d->cov_cap = tiles;
-    }
-    __builtin_memset(d->cov, 0, (size_t)tiles * sizeof *d->cov);
-    d->cov_buf = (struct umbra_buf){.ptr = d->cov, .count = tiles, .stride = xt};
-    d->bounds->queue(d->bounds, 0, 0, xt, yt);
-    uint16_t const *cov = d->cov;
+    cov->count  = tiles;
+    cov->stride = xt;
+    __builtin_memset(cov->ptr, 0, (size_t)tiles * sizeof(uint16_t));
+    bounds->queue(bounds, 0, 0, xt, yt);
+    uint16_t const *c = cov->ptr;
 
     // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
 
@@ -424,24 +380,14 @@ void umbra_sdf_dispatcher_queue(struct umbra_sdf_dispatcher *d,
     // analogous specialization constants.
     for (int ty = 0; ty < yt; ty++) {
         for (int tx = 0; tx < xt; tx++) {
-            if (cov[ty * xt + tx] != UMBRA_SDF_TILE_NONE) {
+            if (c[ty * xt + tx] != UMBRA_SDF_TILE_NONE) {
                 int const tl = l + tx * T,
                           tt = t + ty * T,
                           tr = tl + T < r ? tl + T : r,
                           tb = tt + T < b ? tt + T : b;
-                d->draw->queue(d->draw, tl, tt, tr, tb);
+                draw->queue(draw, tl, tt, tr, tb);
             }
         }
-    }
-}
-
-void umbra_sdf_dispatcher_free(struct umbra_sdf_dispatcher *d) {
-    if (d) {
-        umbra_program_free(d->draw);
-        umbra_program_free(d->bounds);
-        umbra_backend_free(d->bounds_be);
-        free(d->cov);
-        free(d);
     }
 }
 
@@ -450,8 +396,15 @@ void umbra_sdf_dispatcher_free(struct umbra_sdf_dispatcher *d) {
 enum { QUEUE_MIN_TILE = 512 };
 
 struct umbra_sdf_draw {
-    struct umbra_sdf_dispatcher *d;
-    struct umbra_buf             draw_dst_buf;
+    struct umbra_program *draw;
+    struct umbra_program *bounds;
+    struct umbra_backend *bounds_be;   // owns its own jit backend for bounds
+    struct umbra_sdf_grid grid;
+    struct umbra_buf      cov_buf;
+    struct umbra_buf      draw_dst_buf;
+    uint16_t             *cov;
+    int                   cov_cap;
+    int                   :32;
 };
 
 struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
@@ -462,26 +415,44 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                       umbra_blend blend_fn, void *blend_ctx,
                                       struct umbra_fmt fmt) {
     struct umbra_sdf_draw *w = calloc(1, sizeof *w);
-    struct umbra_builder *db = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(db, &w->draw_dst_buf);
-    umbra_val32 x = umbra_f32_from_i32(db, umbra_x(db)),
-                y = umbra_f32_from_i32(db, umbra_y(db));
-    if (transform_mat) {
-        umbra_point_val32 const p = umbra_transform_perspective(transform_mat, db, x, y);
-        x = p.x;
-        y = p.y;
-    }
-    umbra_build_sdf_draw(db, dst_ptr, fmt, x, y,
-                         sdf_fn, sdf_ctx, hard_edge ? 0 : 1,
-                         shader_fn, shader_ctx,
-                         blend_fn,  blend_ctx);
-    struct umbra_flat_ir *ir = umbra_flat_ir(db);
-    umbra_builder_free(db);
-    struct umbra_program *draw = be->compile(be, ir);
-    umbra_flat_ir_free(ir);
 
-    w->d = umbra_sdf_dispatcher(sdf_fn, sdf_ctx, transform_mat, draw, QUEUE_MIN_TILE);
-    if (!w->d) { free(w); return NULL; }
+    // Draw program: caller coords -> optional transform -> sdf coverage + shader + blend.
+    {
+        struct umbra_builder *db = umbra_builder();
+        umbra_ptr const dst_ptr = umbra_bind_buf(db, &w->draw_dst_buf);
+        umbra_val32 x = umbra_f32_from_i32(db, umbra_x(db)),
+                    y = umbra_f32_from_i32(db, umbra_y(db));
+        if (transform_mat) {
+            umbra_point_val32 const p = umbra_transform_perspective(transform_mat, db, x, y);
+            x = p.x;
+            y = p.y;
+        }
+        umbra_build_sdf_draw(db, dst_ptr, fmt, x, y,
+                             sdf_fn, sdf_ctx, hard_edge ? 0 : 1,
+                             shader_fn, shader_ctx,
+                             blend_fn,  blend_ctx);
+        struct umbra_flat_ir *ir = umbra_flat_ir(db);
+        umbra_builder_free(db);
+        w->draw = be->compile(be, ir);
+        umbra_flat_ir_free(ir);
+        if (!w->draw) { free(w); return NULL; }
+    }
+
+    // Bounds program (skipped for perspective: interval divide is unsound).
+    if (!transform_mat || matrix_is_affine(transform_mat)) {
+        struct umbra_builder *bb = umbra_builder();
+        umbra_ptr const cov_ptr = umbra_bind_buf(bb, &w->cov_buf);
+        umbra_interval ix, iy;
+        umbra_sdf_tile_intervals(bb, &w->grid, transform_mat, &ix, &iy);
+        umbra_build_sdf_bounds(bb, cov_ptr, ix, iy, sdf_fn, sdf_ctx);
+        struct umbra_flat_ir *ir = umbra_flat_ir(bb);
+        umbra_builder_free(bb);
+        struct umbra_backend *bounds_be = umbra_backend_jit();
+        if (!bounds_be) { bounds_be = umbra_backend_interp(); }
+        w->bounds    = bounds_be->compile(bounds_be, ir);
+        w->bounds_be = bounds_be;
+        umbra_flat_ir_free(ir);
+    }
     return w;
 }
 
@@ -489,12 +460,24 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw *w,
                           int l, int t, int r, int b, struct umbra_buf dst) {
     if (!w) { return; }
     w->draw_dst_buf = dst;
-    umbra_sdf_dispatcher_queue(w->d, l, t, r, b);
+    int const T  = QUEUE_MIN_TILE,
+              xt = (r - l + T - 1) / T,
+              yt = (b - t + T - 1) / T,
+              tiles = xt * yt;
+    if (tiles > w->cov_cap) {
+        w->cov     = realloc(w->cov, (size_t)tiles * sizeof *w->cov);
+        w->cov_cap = tiles;
+    }
+    w->cov_buf = (struct umbra_buf){.ptr = w->cov, .count = tiles, .stride = xt};
+    umbra_sdf_dispatch(w->bounds, w->draw, &w->grid, &w->cov_buf, T, l, t, r, b);
 }
 
 void umbra_sdf_draw_free(struct umbra_sdf_draw *w) {
     if (w) {
-        umbra_sdf_dispatcher_free(w->d);
+        umbra_program_free(w->draw);
+        umbra_program_free(w->bounds);
+        umbra_backend_free(w->bounds_be);
+        free(w->cov);
         free(w);
     }
 }

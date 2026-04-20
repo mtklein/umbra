@@ -141,23 +141,33 @@ struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_ma
                                          struct umbra_fmt  dst_fmt);
 
 
-// Drive a tile-culled SDF dispatch.  The dispatcher owns a caller-supplied
-// compiled draw program (built via umbra_build_sdf_draw), builds+compiles
-// its own bounds program from the same sdf (via umbra_build_sdf_bounds +
-// tile-extent intervals), and at queue() iterates tile_size x tile_size
-// tiles: bounds classifies each tile and the draw program fires on every
-// non-NONE tile.  transform_mat matches the transform the caller applied
-// in the draw IR (so bounds sees the same coordinate space); NULL or
-// affine keeps tile culling, perspective falls back to full-rect dispatch.
-// Whatever dst_buf the draw program was bound to at build time is where
-// it draws -- update that buf before each queue() as usual.
-struct umbra_sdf_dispatcher* umbra_sdf_dispatcher(
-        umbra_sdf, void *sdf_ctx,
-        struct umbra_matrix const *transform_mat,
-        struct umbra_program *draw,            // takes ownership
-        int tile_size);
-void umbra_sdf_dispatcher_queue(struct umbra_sdf_dispatcher*, int l, int t, int r, int b);
-void umbra_sdf_dispatcher_free (struct umbra_sdf_dispatcher*);
+// Dispatch grid: l/t origin and tile size shared between the bounds program
+// (bound as uniforms) and umbra_sdf_dispatch (writes before queue).
+struct umbra_sdf_grid { float base_x, base_y, tile_w, tile_h; };
+
+// Inside a bounds builder, produce (ix, iy) covering the tile at
+// (umbra_x(), umbra_y()) -- grid is bound as uniforms, optionally transformed
+// into sdf space by an affine transform_mat, ready to pass to
+// umbra_build_sdf_bounds.
+void umbra_sdf_tile_intervals(struct umbra_builder*,
+                              struct umbra_sdf_grid *grid,
+                              struct umbra_matrix const *transform_mat,
+                              umbra_interval *ix, umbra_interval *iy);
+
+// Run paired (bounds, draw) programs over the rect (l,t,r,b).  Writes
+// grid with (l, t, tile_size, tile_size), queues bounds over the xt*yt
+// tile index grid (xt = ceil((r-l)/tile_size), yt = ceil((b-t)/tile_size)),
+// then queues draw on every non-NONE tile.  If bounds is NULL (e.g. the
+// draw program uses a perspective transform we can't interval-divide),
+// skips bounds and queues draw once over the whole rect.  cov is the u16
+// output buffer bounds was built against; its .ptr must point to a uint16
+// array sized >= xt*yt; dispatch writes its .count and .stride.  All
+// pointers must outlive the call.
+void umbra_sdf_dispatch(struct umbra_program *bounds,
+                        struct umbra_program *draw,
+                        struct umbra_sdf_grid *grid,
+                        struct umbra_buf *cov,
+                        int tile_size, int l, int t, int r, int b);
 
 // TODO: remove.  Convenience wrapper around umbra_sdf_dispatcher that also
 // builds the draw program, binding a dst slot inside the wrapper so
