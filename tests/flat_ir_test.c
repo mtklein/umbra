@@ -1977,31 +1977,38 @@ TEST(test_fms) {
     test_backends_free(&B);
 }
 
-TEST(test_movi_patterns) {
+static void movi_pattern_case(int pattern) {
     struct umbra_buf slot[20] = {0};
-    int patterns[] = {
-        0x0000ff00,  0x00ff0000,        (int)0xff000000u, ~0x000000ff, ~0x0000ff00,
-        ~0x00ff0000, ~(int)0xff000000u, (int)0xfffe0000u, 0x12345678,
-    };
-    for (int pi = 0; pi < 9; pi++) {
-        struct umbra_builder *b = umbra_builder();
-        umbra_val32            x = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
-        umbra_val32            r = umbra_or_32(b, x, umbra_imm_i32(b, patterns[pi]));
-        umbra_store_32(b, umbra_bind_buf(b, &slot[1]), r);
-        struct test_backends B = make(b);
-        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-            int src[] = {0, 0, 0}, dst[3] = {0};
-            if (run(&B, bi, 3, 1, slot, 2,
-        (struct umbra_buf[]){{.ptr=src, .count=3},
-                             {.ptr=dst, .count=3}})) {
-                dst[0] == patterns[pi] here;
-                dst[1] == patterns[pi] here;
-                dst[2] == patterns[pi] here;
-            }
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32            x = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
+    umbra_val32            r = umbra_or_32(b, x, umbra_imm_i32(b, pattern));
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), r);
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int src[] = {0, 0, 0}, dst[3] = {0};
+        if (run(&B, bi, 3, 1, slot, 2,
+    (struct umbra_buf[]){{.ptr=src, .count=3},
+                         {.ptr=dst, .count=3}})) {
+            dst[0] == pattern here;
+            dst[1] == pattern here;
+            dst[2] == pattern here;
         }
-        test_backends_free(&B);
     }
+    test_backends_free(&B);
 }
+
+#define MOVI_PATTERN_CASE(SUFFIX, PAT)     \
+    TEST(test_movi_pattern_##SUFFIX) { movi_pattern_case(PAT); }
+MOVI_PATTERN_CASE(g,     0x0000ff00)
+MOVI_PATTERN_CASE(r,     0x00ff0000)
+MOVI_PATTERN_CASE(a,     (int)0xff000000u)
+MOVI_PATTERN_CASE(not_b, ~0x000000ff)
+MOVI_PATTERN_CASE(not_g, ~0x0000ff00)
+MOVI_PATTERN_CASE(not_r, ~0x00ff0000)
+MOVI_PATTERN_CASE(not_a, ~(int)0xff000000u)
+MOVI_PATTERN_CASE(hi15,  (int)0xfffe0000u)
+MOVI_PATTERN_CASE(mixed, 0x12345678)
+#undef MOVI_PATTERN_CASE
 
 TEST(test_uni_16) {
     struct umbra_buf slot[20] = {0};
