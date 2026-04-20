@@ -111,8 +111,10 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     if (n_real <= 0) { return; }
 
     int cols = 1;
-    while (cols * cols < n_real) { cols++; }
-    int const rows = (n_real + cols - 1) / cols,
+    while (cols * cols < n_real) {
+        cols++;
+    }
+    int const rows = cols,
               cw   = s->w / cols,
               ch   = s->h / rows;
     st->cols = cols;
