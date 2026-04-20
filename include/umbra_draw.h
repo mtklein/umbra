@@ -120,24 +120,6 @@ void umbra_build_sdf_bounds(struct umbra_builder*,
                             umbra_interval x, umbra_interval y,
                             umbra_sdf, void *sdf_ctx);
 
-// TODO: remove umbra_draw_builder.  A thin convenience wrapper around
-// umbra_build_draw: umbra_builder() + umbra_bind_buf(dst) + umbra_f32_from_i32
-// of umbra_x / umbra_y + optional umbra_transform_perspective +
-// umbra_build_draw -- exactly the four lines this wrapper inlines.  The
-// only remaining caller is tests/draw_test.c's draw_builder_shim, which
-// dozens of TESTs go through.  Migrate the shim and delete this
-// prototype + definition.
-//
-// Creates a fresh builder, initializes (x, y) from the dispatch, applies
-// umbra_transform_perspective through transform_mat (if non-NULL), and
-// dispatches to umbra_build_draw.
-struct umbra_builder* umbra_draw_builder(struct umbra_matrix const *transform_mat,
-                                         umbra_coverage , void *coverage_ctx,
-                                         umbra_shader   , void *shader_ctx,
-                                         umbra_blend    , void *blend_ctx,
-                                         struct umbra_buf *dst,
-                                         struct umbra_fmt  dst_fmt);
-
 // Dispatch grid: l/t origin and tile size shared between the bounds program
 // (bound as uniforms) and umbra_sdf_dispatch (writes before queue).
 struct umbra_sdf_grid { float base_x, base_y, tile_w, tile_h; };

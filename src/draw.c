@@ -156,30 +156,6 @@ void umbra_build_draw(struct umbra_builder *b,
     fmt.store(b, dst_ptr, out);
 }
 
-struct umbra_builder* umbra_draw_builder(
-    struct umbra_matrix const *transform_mat,
-    umbra_coverage  coverage_fn, void *coverage_ctx,
-    umbra_shader    shader_fn,   void *shader_ctx,
-    umbra_blend     blend_fn,    void *blend_ctx,
-    struct umbra_buf *dst_buf,
-    struct umbra_fmt  fmt)
-{
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, dst_buf);
-    umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
-                y = umbra_f32_from_i32(b, umbra_y(b));
-    if (transform_mat) {
-        umbra_point_val32 const p = umbra_transform_perspective(transform_mat, b, x, y);
-        x = p.x;
-        y = p.y;
-    }
-    umbra_build_draw(b, dst_ptr, fmt, x, y,
-                     coverage_fn, coverage_ctx,
-                     shader_fn,   shader_ctx,
-                     blend_fn,    blend_ctx);
-    return b;
-}
-
 enum {
     M_SX = (int)(__builtin_offsetof(struct umbra_matrix, sx) / 4),
     M_KX = (int)(__builtin_offsetof(struct umbra_matrix, kx) / 4),
