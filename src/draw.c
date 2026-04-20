@@ -338,11 +338,6 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *
     if (!bounds->be) { bounds->be = umbra_backend_interp(); }
     bounds->prog = bounds->be->compile(bounds->be, ir);
     umbra_flat_ir_free(ir);
-
-    if (!bounds->prog) {
-        umbra_sdf_bounds_program_free(bounds);
-        return NULL;
-    }
     return bounds;
 }
 
