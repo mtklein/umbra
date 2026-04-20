@@ -28,6 +28,83 @@ static struct umbra_builder* draw_builder_shim(
 }
 #define umbra_draw_builder draw_builder_shim
 
+enum { sdf_shim_tile = 512 };
+
+struct sdf_shim {
+    struct umbra_program *draw;
+    struct umbra_program *bounds;
+    struct umbra_backend *bounds_be;
+    struct umbra_sdf_grid grid;
+    struct umbra_buf      cov_buf;
+    struct umbra_buf      dst_slot;
+    uint16_t             *cov;
+    int                   cov_cap, :32;
+};
+
+static struct sdf_shim* sdf_shim_build(struct umbra_backend *draw_be,
+                                       umbra_sdf     sdf_fn, void *sdf_ctx,
+                                       umbra_shader  shader_fn, void *shader_ctx,
+                                       umbra_blend   blend_fn,  void *blend_ctx,
+                                       struct umbra_fmt fmt) {
+    struct sdf_shim *w = calloc(1, sizeof *w);
+
+    struct umbra_builder *db = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(db, &w->dst_slot);
+    umbra_val32 const x = umbra_f32_from_i32(db, umbra_x(db)),
+                      y = umbra_f32_from_i32(db, umbra_y(db));
+    umbra_build_sdf_draw(db, dst_ptr, fmt, x, y,
+                         sdf_fn, sdf_ctx, 0,
+                         shader_fn, shader_ctx,
+                         blend_fn,  blend_ctx);
+    struct umbra_flat_ir *dir = umbra_flat_ir(db);
+    umbra_builder_free(db);
+    w->draw = draw_be->compile(draw_be, dir);
+    umbra_flat_ir_free(dir);
+    if (!w->draw) {
+        free(w);
+        return NULL;
+    }
+
+    struct umbra_builder *bb = umbra_builder();
+    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &w->cov_buf);
+    umbra_interval ix, iy;
+    umbra_sdf_tile_intervals(bb, &w->grid, NULL, &ix, &iy);
+    umbra_build_sdf_bounds(bb, cov_ptr, ix, iy, sdf_fn, sdf_ctx);
+    struct umbra_flat_ir *bir = umbra_flat_ir(bb);
+    umbra_builder_free(bb);
+    struct umbra_backend *bounds_be = umbra_backend_jit();
+    if (!bounds_be) { bounds_be = umbra_backend_interp(); }
+    w->bounds    = bounds_be->compile(bounds_be, bir);
+    w->bounds_be = bounds_be;
+    umbra_flat_ir_free(bir);
+    return w;
+}
+
+static void sdf_shim_queue(struct sdf_shim *w,
+                           int l, int t, int r, int b, struct umbra_buf dst) {
+    w->dst_slot = dst;
+    int const T  = sdf_shim_tile,
+              xt = (r - l + T - 1) / T,
+              yt = (b - t + T - 1) / T,
+              tiles = xt * yt;
+    if (tiles > w->cov_cap) {
+        w->cov     = realloc(w->cov, (size_t)tiles * sizeof *w->cov);
+        w->cov_cap = tiles;
+    }
+    w->cov_buf = (struct umbra_buf){.ptr = w->cov, .count = tiles, .stride = xt};
+    umbra_sdf_dispatch(w->bounds, w->draw, &w->grid, &w->cov_buf, T, l, t, r, b);
+}
+
+static void sdf_shim_free(struct sdf_shim *w) {
+    if (w) {
+        umbra_program_free(w->draw);
+        umbra_program_free(w->bounds);
+        umbra_backend_free(w->bounds_be);
+        free(w->cov);
+        free(w);
+    }
+}
+
 struct draw_backends {
     struct test_backends tb;
 };
@@ -1536,15 +1613,15 @@ TEST(test_sdf_dispatch_rect) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
 
-        struct umbra_sdf_draw *qt = umbra_sdf_draw(bes[bi], NULL,            test_rect_fn, &rect,
-            1,
-            umbra_shader_color,  &color,
-            umbra_blend_srcover, NULL,
-            umbra_fmt_8888);
+        struct sdf_shim *qt = sdf_shim_build(bes[bi],
+                                             test_rect_fn,        &rect,
+                                             umbra_shader_color,  &color,
+                                             umbra_blend_srcover, NULL,
+                                             umbra_fmt_8888);
         qt != NULL here;
         uint32_t dst[8 * 4];
         __builtin_memset(dst, 0, sizeof dst);
-        umbra_sdf_draw_queue(qt, 0, 0, 8, 4, (struct umbra_buf){
+        sdf_shim_queue(qt, 0, 0, 8, 4, (struct umbra_buf){
             .ptr = dst, .count = 8 * 4, .stride = 8,
         });
         bes[bi]->flush(bes[bi]);
@@ -1562,7 +1639,7 @@ TEST(test_sdf_dispatch_rect) {
             }
         }
 
-        umbra_sdf_draw_free(qt);
+        sdf_shim_free(qt);
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -1601,11 +1678,11 @@ TEST(test_sdf_dispatch_tiling) {
     if (!be) { be = umbra_backend_interp(); }
 
     // Tiled dispatch.
-    struct umbra_sdf_draw *disp = umbra_sdf_draw(be, NULL,        test_circle_fn, &sdf,
-        1,
-        umbra_shader_color,  &color,
-        umbra_blend_srcover, NULL,
-        umbra_fmt_8888);
+    struct sdf_shim *disp = sdf_shim_build(be,
+                                           test_circle_fn,      &sdf,
+                                           umbra_shader_color,  &color,
+                                           umbra_blend_srcover, NULL,
+                                           umbra_fmt_8888);
     disp != NULL here;
 
     // Flat reference: same shader+coverage, no tiling.
@@ -1627,7 +1704,7 @@ TEST(test_sdf_dispatch_tiling) {
     uint32_t *tiled_buf = calloc(W * H, sizeof(uint32_t));
     uint32_t *flat_buf  = calloc(W * H, sizeof(uint32_t));
 
-    umbra_sdf_draw_queue(disp, 0, 0, W, H, (struct umbra_buf){
+    sdf_shim_queue(disp, 0, 0, W, H, (struct umbra_buf){
         .ptr = tiled_buf, .count = W * H, .stride = W,
     });
 
@@ -1646,7 +1723,7 @@ TEST(test_sdf_dispatch_tiling) {
     free(flat_buf);
     free(tiled_buf);
     umbra_program_free(flat);
-    umbra_sdf_draw_free(disp);
+    sdf_shim_free(disp);
     umbra_backend_free(be);
 }
 

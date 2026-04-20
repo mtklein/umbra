@@ -1,10 +1,6 @@
 #include "../include/umbra_draw.h"
-#include "assume.h"
-#include "flat_ir.h"
 
-#include <math.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 static umbra_val32 pack_unorm(struct umbra_builder *b, umbra_val32 ch, umbra_val32 scale) {
     umbra_val32 const zero = umbra_imm_f32(b, 0.0f),
@@ -368,102 +364,6 @@ void umbra_sdf_dispatch(struct umbra_program *bounds,
                 draw->queue(draw, tl, tt, tr, tb);
             }
         }
-    }
-}
-
-// TODO: query per-backend dispatch_granularity instead of this one global
-// compromise.  CPU-optimal is ~16-32, GPU-optimal is ~512-1024.
-enum { QUEUE_MIN_TILE = 512 };
-
-struct umbra_sdf_draw {
-    struct umbra_program *draw;
-    struct umbra_program *bounds;
-    struct umbra_backend *bounds_be;   // owns its own jit backend for bounds
-    struct umbra_sdf_grid grid;
-    struct umbra_buf      cov_buf;
-    struct umbra_buf      draw_dst_buf;
-    uint16_t             *cov;
-    int                   cov_cap;
-    int                   :32;
-};
-
-struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
-                                      struct umbra_matrix const *transform_mat,
-                                      umbra_sdf sdf_fn, void *sdf_ctx,
-                                      _Bool hard_edge,
-                                      umbra_shader shader_fn, void *shader_ctx,
-                                      umbra_blend blend_fn, void *blend_ctx,
-                                      struct umbra_fmt fmt) {
-    struct umbra_sdf_draw *w = calloc(1, sizeof *w);
-
-    // Draw program: caller coords -> optional transform -> sdf coverage + shader + blend.
-    {
-        struct umbra_builder *db = umbra_builder();
-        umbra_ptr const dst_ptr = umbra_bind_buf(db, &w->draw_dst_buf);
-        umbra_val32 x = umbra_f32_from_i32(db, umbra_x(db)),
-                    y = umbra_f32_from_i32(db, umbra_y(db));
-        if (transform_mat) {
-            umbra_point_val32 const p = umbra_transform_perspective(transform_mat, db, x, y);
-            x = p.x;
-            y = p.y;
-        }
-        umbra_build_sdf_draw(db, dst_ptr, fmt, x, y,
-                             sdf_fn, sdf_ctx, hard_edge ? 0 : 1,
-                             shader_fn, shader_ctx,
-                             blend_fn,  blend_ctx);
-        struct umbra_flat_ir *ir = umbra_flat_ir(db);
-        umbra_builder_free(db);
-        w->draw = be->compile(be, ir);
-        umbra_flat_ir_free(ir);
-        if (!w->draw) { free(w); return NULL; }
-    }
-
-    // Bounds program (skipped for perspective: interval divide is unsound).
-    if (!transform_mat || matrix_is_affine(transform_mat)) {
-        struct umbra_builder *bb = umbra_builder();
-        umbra_ptr const cov_ptr = umbra_bind_buf(bb, &w->cov_buf);
-        umbra_interval ix, iy;
-        umbra_sdf_tile_intervals(bb, &w->grid, transform_mat, &ix, &iy);
-        umbra_build_sdf_bounds(bb, cov_ptr, ix, iy, sdf_fn, sdf_ctx);
-        struct umbra_flat_ir *ir = umbra_flat_ir(bb);
-        umbra_builder_free(bb);
-        struct umbra_backend *bounds_be = umbra_backend_jit();
-        if (!bounds_be) { bounds_be = umbra_backend_interp(); }
-        w->bounds    = bounds_be->compile(bounds_be, ir);
-        w->bounds_be = bounds_be;
-        umbra_flat_ir_free(ir);
-    }
-    return w;
-}
-
-void umbra_sdf_draw_queue(struct umbra_sdf_draw *w,
-                          int l, int t, int r, int b, struct umbra_buf dst) {
-    if (!w) { return; }
-    w->draw_dst_buf = dst;
-    if (!w->bounds) {
-        // Perspective transform: no tile culling, dispatch full rect.
-        w->draw->queue(w->draw, l, t, r, b);
-        return;
-    }
-    int const T  = QUEUE_MIN_TILE,
-              xt = (r - l + T - 1) / T,
-              yt = (b - t + T - 1) / T,
-              tiles = xt * yt;
-    if (tiles > w->cov_cap) {
-        w->cov     = realloc(w->cov, (size_t)tiles * sizeof *w->cov);
-        w->cov_cap = tiles;
-    }
-    w->cov_buf = (struct umbra_buf){.ptr = w->cov, .count = tiles, .stride = xt};
-    umbra_sdf_dispatch(w->bounds, w->draw, &w->grid, &w->cov_buf, T, l, t, r, b);
-}
-
-void umbra_sdf_draw_free(struct umbra_sdf_draw *w) {
-    if (w) {
-        umbra_program_free(w->draw);
-        umbra_program_free(w->bounds);
-        umbra_backend_free(w->bounds_be);
-        free(w->cov);
-        free(w);
     }
 }
 

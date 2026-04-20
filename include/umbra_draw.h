@@ -148,29 +148,12 @@ void umbra_sdf_dispatch(struct umbra_program *bounds,
                         struct umbra_buf *cov,
                         int tile_size, int l, int t, int r, int b);
 
-// TODO: remove.  Convenience wrapper that builds a draw program against an
-// internal dst slot and drives it via umbra_sdf_dispatch.  Callers should
-// migrate to building the draw program themselves (via umbra_build_sdf_draw
-// on their own dst slot) and calling umbra_sdf_dispatch directly.
-struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend*,
-                                      struct umbra_matrix const *transform_mat,
-                                      umbra_sdf, void *sdf_ctx,
-                                      _Bool hard_edge,
-                                      umbra_shader, void *shader_ctx,
-                                      umbra_blend,  void *blend_ctx,
-                                      struct umbra_fmt);
-void umbra_sdf_draw_queue(struct umbra_sdf_draw*, int l, int t, int r, int b,
-                          struct umbra_buf dst);
-void umbra_sdf_draw_free(struct umbra_sdf_draw*);
-
 // Adapt an umbra_sdf as umbra_coverage.
 //
 // TRAP: evaluates the SDF per pixel with no tile culling.  That throws away
-// the whole point of SDF coverage -- umbra_sdf_draw exists specifically to
-// build a separate interval bounds program that culls empty tiles before the
-// draw program touches them.  Only used today because slides/sdf.c still
-// goes through umbra_draw_builder; both will be replaced by a build_sdf_draw
-// contract that keeps the bounds-program pair intact.
+// the whole point of SDF coverage -- callers should build a separate interval
+// bounds program and drive both through umbra_sdf_dispatch so tiles entirely
+// outside the shape are culled before the draw program touches them.
 struct umbra_coverage_from_sdf {
     umbra_sdf *sdf_fn;
     void      *sdf_ctx;

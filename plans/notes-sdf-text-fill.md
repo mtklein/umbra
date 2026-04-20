@@ -26,9 +26,9 @@ The outline → fill change is conceptually two separate pieces:
    thick stroke but is visibly wrong once we're trying to draw a fill
    whose boundary is the actual curve.
 
-Both pieces need umbra IR that works inside `sdf_text_build` (called by
-`umbra_sdf_draw` with interval x,y for the bounds scan and with exact
-x,y for the per-pixel coverage scan).
+Both pieces need umbra IR that works inside `sdf_text_build` (called
+with interval x,y for the bounds scan and with exact x,y for the
+per-pixel coverage scan).
 
 Slides in the sequence (source order in `slides/sdf.c`)
 -------------------------------------------------------
