@@ -147,13 +147,15 @@ struct text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) {
             int dy = baseline + gy;
             for (int row = 0; row < gh; row++) {
                 int py = dy + row;
-                if (py < 0 || py >= H) { continue; }
-                for (int col = 0; col < gw; col++) {
-                    int px = dx + col;
-                    if (px < 0 || px >= W) { continue; }
-                    uint8_t val = bmp[row * gw + col];
-                    uint16_t cur = tc.data[py * W + px];
-                    if (val > cur) { tc.data[py * W + px] = val; }
+                if (py >= 0 && py < H) {
+                    for (int col = 0; col < gw; col++) {
+                        int px = dx + col;
+                        if (px >= 0 && px < W) {
+                            uint8_t val = bmp[row * gw + col];
+                            uint16_t cur = tc.data[py * W + px];
+                            if (val > cur) { tc.data[py * W + px] = val; }
+                        }
+                    }
                 }
             }
             if (sdf) { stbtt_FreeSDF(bmp, NULL); }

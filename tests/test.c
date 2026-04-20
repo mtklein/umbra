@@ -17,8 +17,8 @@ void test_register(test_fn fn, char const *name) {
 
 void test_run(char const *match, int shards, int shard) {
     for (int i = 0; i < test_count; i++) {
-        if (shards > 1 && i % shards != shard) { continue; }
-        if (!match || strstr(names[i], match)) {
+        if ((shards <= 1 || i % shards == shard)
+                && (!match || strstr(names[i], match))) {
             registry[i]();
         }
     }

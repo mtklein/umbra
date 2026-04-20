@@ -31,19 +31,20 @@ _Bool jit_dump_with_labels(FILE *out, char const *obj_path,
     while (fgets(line, (int)sizeof line, p)) {
         if (!past_header) {
             if (strstr(line, "<") && strchr(line, ':')) { past_header = 1; }
-            continue;
+        } else {
+            // Expect "       <hex>: <instr>".  Skip blank lines.
+            char *end = 0;
+            long  addr = strtol(line, &end, 16);
+            if (end != line && *end == ':') {
+                while (next_label < labels && label[next_label].byte_off <= (int)addr) {
+                    fprintf(out, "# %s:\n", label[next_label].name);
+                    next_label++;
+                }
+                char *instr = end + 1;
+                while (*instr == ' ' || *instr == '\t') { instr++; }
+                fputs(instr, out);
+            }
         }
-        // Expect "       <hex>: <instr>".  Skip blank lines.
-        char *end = 0;
-        long  addr = strtol(line, &end, 16);
-        if (end == line || *end != ':') { continue; }
-        while (next_label < labels && label[next_label].byte_off <= (int)addr) {
-            fprintf(out, "# %s:\n", label[next_label].name);
-            next_label++;
-        }
-        char *instr = end + 1;
-        while (*instr == ' ' || *instr == '\t') { instr++; }
-        fputs(instr, out);
     }
     pclose(p);
     // Emit any labels that fell past the end (e.g. done_all landing at code_bytes).
