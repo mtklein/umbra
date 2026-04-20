@@ -274,12 +274,14 @@ static _Bool matrix_is_affine(struct umbra_matrix const *m) {
     return m->p0 == 0.0f && m->p1 == 0.0f && m->p2 == 1.0f;
 }
 
-// Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()).
+// Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()).  The bounds
+// struct's base_x/base_y/tile_w/tile_h live contiguously and bind as a 4-slot
+// uniform block; dispatch writes those fields each call.
 static void sdf_tile_intervals(struct umbra_builder *bb,
-                               struct umbra_sdf_grid *grid,
+                               struct umbra_sdf_bounds *bounds,
                                struct umbra_matrix const *transform_mat,
                                umbra_interval *ix, umbra_interval *iy) {
-    umbra_ptr const g = umbra_bind_uniforms(bb, grid, (int)(sizeof *grid / 4));
+    umbra_ptr const g = umbra_bind_uniforms(bb, &bounds->base_x, 4);
     umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
                       base_y = umbra_uniform_32(bb, g, 1),
                       tile_w = umbra_uniform_32(bb, g, 2),
@@ -307,7 +309,7 @@ void umbra_build_sdf_bounds(struct umbra_builder *b,
     umbra_ptr const cov = umbra_bind_buf(b, &bounds->cov_buf);
 
     umbra_interval x, y;
-    sdf_tile_intervals(b, &bounds->grid, transform, &x, &y);
+    sdf_tile_intervals(b, bounds, transform, &x, &y);
 
     // Emit the tri-state constants BEFORE calling sdf_fn so any matching
     // constants the sdf also needs (e.g. imm 0/1 as index offsets inside an
@@ -354,10 +356,10 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds *bounds,
         bounds->cov     = realloc(bounds->cov, (size_t)tiles * sizeof *bounds->cov);
         bounds->cov_cap = tiles;
     }
-    bounds->grid = (struct umbra_sdf_grid){
-        .base_x = (float)l, .base_y = (float)t,
-        .tile_w = (float)T, .tile_h = (float)T,
-    };
+    bounds->base_x = (float)l;
+    bounds->base_y = (float)t;
+    bounds->tile_w = (float)T;
+    bounds->tile_h = (float)T;
     bounds->cov_buf = (struct umbra_buf){
         .ptr = bounds->cov, .count = tiles, .stride = xt,
     };

@@ -112,17 +112,13 @@ void umbra_build_sdf_draw(struct umbra_builder*,
 // into, and our running capacity for that buffer.  Pass the bounds struct to
 // umbra_build_sdf_bounds(), compile the resulting IR, stash the program in
 // bounds.prog, then call umbra_sdf_dispatch().
-//
-// `grid` carries the per-dispatch (base, tile_w/h) uniforms the bounds program
-// reads; dispatch fills them in each call.  The layout is an ABI detail of the
-// bounds program; don't poke at the fields.
-struct umbra_sdf_grid { float base_x, base_y, tile_w, tile_h; };
 struct umbra_sdf_bounds {
     struct umbra_program *prog;
-    struct umbra_sdf_grid grid;
     struct umbra_buf      cov_buf;
     uint16_t             *cov;
     int                   cov_cap, :32;
+    float                 base_x,base_y,
+                          tile_w,tile_h;
 };
 
 // Build an SDF bounds IR that classifies each tile at (umbra_x, umbra_y) into
