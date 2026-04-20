@@ -278,14 +278,7 @@ int main(int argc, char *argv[]) {
 
     for (int si = 0; si < ns; si++) {
         struct slide *s = slide_get(si);
-        // TODO: we lost draw benchmarks here (bench shows only the compile
-        // section now). After the slide refactor only `overview` still sets
-        // .draw; leaf slides now expose .build_draw/.build_sdf_draw and are
-        // run through slide_runtime. This filter should match what demo.c's
-        // is_leaf() does: (s->build_draw || s->build_sdf_draw). Below, the
-        // slide_draw ctx already does `slide_runtime_draw` + `slide_bg_draw`,
-        // which is the right path for leaf slides.
-        if (!s->draw) { continue; }
+        if (!s->build_draw && !s->build_sdf_draw) { continue; }
         if (match && !strstr(s->title, match)) { continue; }
 
         size_t const bpp    = fmt.bpp;
