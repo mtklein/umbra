@@ -846,11 +846,8 @@ static char* build_source(IR const *orig_ir,
 
     int max_ptr = -1;
     for (int i = 0; i < ir->insts; i++) {
-        if (op_has_ptr(ir->inst[i].op)
-                && ir->inst[i].ptr.bits >= 0) {
-            if (ir->inst[i].ptr.bits > max_ptr) {
-                max_ptr = ir->inst[i].ptr.bits;
-            }
+        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits > max_ptr) {
+            max_ptr = ir->inst[i].ptr.bits;
         }
     }
     *out_max_ptr = max_ptr;

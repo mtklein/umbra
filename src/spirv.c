@@ -660,10 +660,8 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
 
     int max_ptr = -1;
     for (int i = 0; i < ir->insts; i++) {
-        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits >= 0) {
-            if (ir->inst[i].ptr.bits > max_ptr) {
-                max_ptr = ir->inst[i].ptr.bits;
-            }
+        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits > max_ptr) {
+            max_ptr = ir->inst[i].ptr.bits;
         }
     }
     result.max_ptr = max_ptr;
