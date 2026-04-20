@@ -265,7 +265,6 @@ struct slug_slide {
     struct umbra_matrix      mat; int :32;
 
     umbra_color              color;
-    struct umbra_buf         dst_buf;
 };
 
 static void slug_init(struct slide *s, int w, int h) {
@@ -295,27 +294,10 @@ static void slug_build_draw(struct slide *s, struct umbra_builder *b,
                      umbra_blend_srcover,   NULL);
 }
 
-static struct umbra_builder* slug_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct slug_slide *st = (struct slug_slide *)s;
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
-    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
-                      y = umbra_f32_from_i32(b, umbra_y(b));
-    slug_build_draw(s, b, dst_ptr, fmt, x, y);
-    return b;
-}
-
 static void slug_animate(struct slide *s, double secs) {
     struct slug_slide *st = (struct slug_slide *)s;
     slide_perspective_matrix(&st->mat, (float)secs, st->w, st->h,
                              (int)st->slug.w, (int)st->slug.h);
-}
-
-static int slug_get_builders(struct slide *s, struct umbra_fmt fmt,
-                             struct umbra_builder **out, int max) {
-    if (max < 1) { return 0; }
-    out[0] = slug_builder(s, fmt);
-    return 1;
 }
 
 static void slug_free_slide(struct slide *s) {
@@ -332,7 +314,6 @@ SLIDE(slide_slug) {
         .bg = {0.12f, 0.04f, 0.04f, 1},
         .init = slug_init,
         .free = slug_free_slide,
-        .get_builders = slug_get_builders,
         .build_draw   = slug_build_draw,
         .animate      = slug_animate,
     };

@@ -205,8 +205,6 @@ struct text_slide {
     umbra_color              color;
     struct coverage_bitmap2d bmp;
     umbra_coverage          *coverage_fn;
-
-    struct umbra_buf      dst_buf;
 };
 
 static void text_init(struct slide *s, int w, int h) {
@@ -230,23 +228,6 @@ static void text_build_draw(struct slide *s, struct umbra_builder *b,
                      umbra_blend_srcover, NULL);
 }
 
-static struct umbra_builder* text_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct text_slide *st = (struct text_slide *)s;
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
-    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
-                      y = umbra_f32_from_i32(b, umbra_y(b));
-    text_build_draw(s, b, dst_ptr, fmt, x, y);
-    return b;
-}
-
-static int text_get_builders(struct slide *s, struct umbra_fmt fmt,
-                             struct umbra_builder **out, int max) {
-    if (max < 1) { return 0; }
-    out[0] = text_builder(s, fmt);
-    return 1;
-}
-
 static void text_free(struct slide *s) { free(s); }
 
 SLIDE(slide_coverage_bitmap) {
@@ -259,7 +240,6 @@ SLIDE(slide_coverage_bitmap) {
         .bg = {0.18f, 0.1f, 0.1f, 1},
         .init = text_init,
         .free = text_free,
-        .get_builders = text_get_builders,
         .build_draw   = text_build_draw,
     };
     return &st->base;
@@ -275,7 +255,6 @@ SLIDE(slide_coverage_sdf_bitmap) {
         .bg = {0.18f, 0.1f, 0.1f, 1},
         .init = text_init,
         .free = text_free,
-        .get_builders = text_get_builders,
         .build_draw   = text_build_draw,
     };
     return &st->base;
@@ -292,8 +271,6 @@ struct persp_slide {
     umbra_color               color;
     struct coverage_bitmap2d  bmp;
     struct umbra_matrix       mat; int :32;
-
-    struct umbra_buf          dst_buf;
 };
 
 static void persp_init(struct slide *s, int w, int h) {
@@ -318,27 +295,10 @@ static void persp_build_draw(struct slide *s, struct umbra_builder *b,
                      umbra_blend_srcover, NULL);
 }
 
-static struct umbra_builder* persp_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct persp_slide *st = (struct persp_slide *)s;
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
-    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
-                      y = umbra_f32_from_i32(b, umbra_y(b));
-    persp_build_draw(s, b, dst_ptr, fmt, x, y);
-    return b;
-}
-
 static void persp_animate(struct slide *s, double secs) {
     struct persp_slide *st = (struct persp_slide *)s;
     slide_perspective_matrix(&st->mat, (float)secs, st->w, st->h,
                              st->bitmap->w, st->bitmap->h);
-}
-
-static int persp_get_builders(struct slide *s, struct umbra_fmt fmt,
-                              struct umbra_builder **out, int max) {
-    if (max < 1) { return 0; }
-    out[0] = persp_builder(s, fmt);
-    return 1;
 }
 
 static void persp_free(struct slide *s) { free(s); }
@@ -352,7 +312,6 @@ SLIDE(slide_coverage_bitmap_matrix) {
         .bg = {0.12f, 0.04f, 0.04f, 1},
         .init = persp_init,
         .free = persp_free,
-        .get_builders = persp_get_builders,
         .build_draw   = persp_build_draw,
         .animate      = persp_animate,
     };
@@ -367,7 +326,6 @@ struct cov_null_slide {
     int w, h;
 
     umbra_color           color;
-    struct umbra_buf      dst_buf;
 };
 
 static void cov_null_init(struct slide *s, int w, int h) {
@@ -386,23 +344,6 @@ static void cov_null_build_draw(struct slide *s, struct umbra_builder *b,
                      umbra_blend_srcover, NULL);
 }
 
-static struct umbra_builder* cov_null_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct cov_null_slide *st = (struct cov_null_slide *)s;
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
-    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
-                      y = umbra_f32_from_i32(b, umbra_y(b));
-    cov_null_build_draw(s, b, dst_ptr, fmt, x, y);
-    return b;
-}
-
-static int cov_null_get_builders(struct slide *s, struct umbra_fmt fmt,
-                                 struct umbra_builder **out, int max) {
-    if (max < 1) { return 0; }
-    out[0] = cov_null_builder(s, fmt);
-    return 1;
-}
-
 static void cov_null_free(struct slide *s) { free(s); }
 
 SLIDE(slide_coverage_null) {
@@ -413,7 +354,6 @@ SLIDE(slide_coverage_null) {
         .bg = {1, 1, 1, 1},
         .init = cov_null_init,
         .free = cov_null_free,
-        .get_builders = cov_null_get_builders,
         .build_draw   = cov_null_build_draw,
     };
     return &st->base;

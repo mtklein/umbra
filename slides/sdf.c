@@ -43,17 +43,14 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
 // Shared state for every SDF slide in this file.  Each slide embeds this as
 // its first field so (struct slide *) casts hit sdf_common.base and
 // (struct sdf_common *) casts work too.  Slides fill sdf_fn/sdf_ctx/color
-// in their ctor and are otherwise driven by the shared build_sdf_draw
-// and get_builders hooks below.  `rt` stays embedded because
-// sdf_common_get_builders binds its dst_buf/cov_buf/grid as stable
-// backing storage for the inspection path.
+// in their ctor; the shared build_sdf_draw hook below feeds those to
+// umbra_build_sdf_draw / umbra_build_sdf_bounds.
 struct sdf_common {
-    struct slide          base;
-    int                   w, h;
-    umbra_color           color;
-    umbra_sdf            *sdf_fn;
-    void                 *sdf_ctx;
-    struct slide_runtime  rt;
+    struct slide  base;
+    int           w, h;
+    umbra_color   color;
+    umbra_sdf    *sdf_fn;
+    void         *sdf_ctx;
 };
 
 static void sdf_common_build_draw(struct slide *s,
@@ -71,46 +68,9 @@ static void sdf_common_build_draw(struct slide *s,
     umbra_build_sdf_bounds(b_bounds, cov_ptr, ix, iy, c->sdf_fn, c->sdf_ctx);
 }
 
-static int sdf_common_get_builders(struct slide *s, struct umbra_fmt fmt,
-                                   struct umbra_builder **out, int max) {
-    if (max < 2) { return 0; }
-    struct sdf_common *c = (struct sdf_common *)s;
+static void sdf_common_free(struct slide *s) { free(s); }
 
-    struct umbra_builder *db = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(db, &c->rt.dst_buf);
-    umbra_val32 const x = umbra_f32_from_i32(db, umbra_x(db)),
-                      y = umbra_f32_from_i32(db, umbra_y(db));
-
-    struct umbra_builder *bb = umbra_builder();
-    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &c->rt.cov_buf);
-    umbra_interval ix, iy;
-    umbra_sdf_tile_intervals(bb, &c->rt.grid, NULL, &ix, &iy);
-
-    sdf_common_build_draw(s, db, dst_ptr, fmt, x, y, bb, cov_ptr, ix, iy);
-
-    out[0] = db;
-    out[1] = bb;
-    return 2;
-}
-
-// Release everything sdf_common owns, but leave the outer slide alloc alone
-// -- slides with extra state call this from their own free() and then
-// free(s).
-static void sdf_common_cleanup(struct slide *s) {
-    struct sdf_common *c = (struct sdf_common *)s;
-    slide_runtime_cleanup(&c->rt);
-}
-
-static void sdf_common_free(struct slide *s) {
-    sdf_common_cleanup(s);
-    free(s);
-}
-
-// Convenience to spread the shared slide-fn pointers across every SLIDE
-// macro below.
-#define SDF_COMMON_HOOKS                        \
-    .get_builders   = sdf_common_get_builders,  \
-    .build_sdf_draw = sdf_common_build_draw
+#define SDF_COMMON_HOOKS .build_sdf_draw = sdf_common_build_draw
 
 // CSG: union / intersection / difference of two circles.
 
@@ -682,7 +642,6 @@ static void sdf_text_init(struct slide *s, int w, int h) {
 static void sdf_text_free(struct slide *s) {
     struct sdf_text_slide *st = (struct sdf_text_slide *)s;
     slug_free(&st->slug);
-    sdf_common_cleanup(s);
     free(s);
 }
 
@@ -785,7 +744,6 @@ static void ngon_animate(struct slide *s, double secs) {
 static void ngon_free(struct slide *s) {
     struct ngon_slide *st = (struct ngon_slide *)s;
     free(st->hp_data);
-    sdf_common_cleanup(s);
     free(s);
 }
 

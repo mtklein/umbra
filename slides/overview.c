@@ -222,45 +222,6 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
     if (st->overlay_prog) { st->overlay_prog->queue(st->overlay_prog, 0, t, w, b); }
 }
 
-static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
-                                 struct umbra_builder **out, int max) {
-    struct overview_slide *st = (struct overview_slide *)s;
-    if (max < 1 || st->n_cells == 0) { return 0; }
-    // Return the first live cell's program builder(s) as a representative.
-    // SDF cells contribute two (draw + bounds); build_draw cells contribute one.
-    for (int i = 0; i < st->n_cells; i++) {
-        struct cell *c = &st->cells[i];
-        if (!c->sub || !c->rt.draw) { continue; }
-        if (c->sub->build_sdf_draw) {
-            if (max < 2) { return 0; }
-            struct umbra_builder *db = umbra_builder();
-            umbra_ptr const dst_ptr = umbra_bind_buf(db, &c->rt.dst_buf);
-            umbra_val32 x = umbra_f32_from_i32(db, umbra_x(db)),
-                        y = umbra_f32_from_i32(db, umbra_y(db));
-            umbra_point_val32 const p = umbra_transform_perspective(&c->cell_mat, db, x, y);
-            struct umbra_builder *bb = umbra_builder();
-            umbra_ptr const cov_ptr = umbra_bind_buf(bb, &c->rt.cov_buf);
-            umbra_interval ix, iy;
-            umbra_sdf_tile_intervals(bb, &c->rt.grid, &c->cell_mat, &ix, &iy);
-            c->sub->build_sdf_draw(c->sub, db, dst_ptr, fmt, p.x, p.y, bb, cov_ptr, ix, iy);
-            out[0] = db;
-            out[1] = bb;
-            return 2;
-        }
-        if (c->sub->build_draw) {
-            struct umbra_builder *b = umbra_builder();
-            umbra_ptr const dst_ptr = umbra_bind_buf(b, &c->rt.dst_buf);
-            umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
-                              y = umbra_f32_from_i32(b, umbra_y(b));
-            umbra_point_val32 const p = umbra_transform_perspective(&c->cell_mat, b, x, y);
-            c->sub->build_draw(c->sub, b, dst_ptr, fmt, p.x, p.y);
-            out[0] = b;
-            return 1;
-        }
-    }
-    return 0;
-}
-
 static void overview_free(struct slide *s) {
     struct overview_slide *st = (struct overview_slide *)s;
     umbra_program_free(st->overlay_prog);
@@ -285,7 +246,6 @@ struct slide* make_overview(void) {
         .prepare = overview_prepare,
         .draw = overview_draw,
         .free = overview_free,
-        .get_builders = overview_get_builders,
     };
     return &st->base;
 }

@@ -46,9 +46,6 @@ struct slide {
     void (*draw)   (struct slide*, double secs, int l, int t, int r, int b, void *buf);
     void (*free)   (struct slide*);
 
-    int (*get_builders)(struct slide*, struct umbra_fmt,
-                        struct umbra_builder **out, int max);
-
     // Fill builder `b` with the slide's draw IR.  Consumers compile the
     // result and dispatch it.
     //

@@ -12,8 +12,6 @@ struct blend_slide {
     umbra_color   color;
     umbra_rect    rect;
     umbra_blend   *blend_fn;
-
-    struct umbra_buf      dst_buf;
 };
 
 static void blend_init(struct slide *s, int w, int h) {
@@ -45,16 +43,6 @@ static void blend_build_draw(struct slide *s, struct umbra_builder *b,
                      st->blend_fn,        NULL);
 }
 
-static struct umbra_builder* blend_builder(struct slide *s, struct umbra_fmt fmt) {
-    struct blend_slide *st = (struct blend_slide *)s;
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, &st->dst_buf);
-    umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
-                      y = umbra_f32_from_i32(b, umbra_y(b));
-    blend_build_draw(s, b, dst_ptr, fmt, x, y);
-    return b;
-}
-
 static void blend_animate(struct slide *s, double secs) {
     struct blend_slide *st = (struct blend_slide *)s;
     double const ticks = secs * 60.0;
@@ -63,16 +51,7 @@ static void blend_animate(struct slide *s, double secs) {
     st->rect = (umbra_rect){rx, ry, rx + st->rect_w, ry + st->rect_h};
 }
 
-static int blend_get_builders(struct slide *s, struct umbra_fmt fmt,
-                              struct umbra_builder **out, int max) {
-    if (max < 1) { return 0; }
-    out[0] = blend_builder(s, fmt);
-    return 1;
-}
-
-static void blend_free(struct slide *s) {
-    free(s);
-}
+static void blend_free(struct slide *s) { free(s); }
 
 static struct slide* make_blend(char const *title, float const bg[4], float const color[4],
                                 umbra_blend blend) {
@@ -85,7 +64,6 @@ static struct slide* make_blend(char const *title, float const bg[4], float cons
         .bg = {bg[0], bg[1], bg[2], bg[3]},
         .init = blend_init,
         .free = blend_free,
-        .get_builders = blend_get_builders,
         .build_draw   = blend_build_draw,
         .animate      = blend_animate,
     };
