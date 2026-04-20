@@ -341,10 +341,6 @@ void umbra_sdf_dispatch(struct umbra_program *bounds,
                         struct umbra_sdf_grid *grid,
                         struct umbra_buf *cov,
                         int tile_size, int l, int t, int r, int b) {
-    if (!bounds) {
-        draw->queue(draw, l, t, r, b);
-        return;
-    }
     int const T  = tile_size,
               xt = (r - l + T - 1) / T,
               yt = (b - t + T - 1) / T,
@@ -460,6 +456,11 @@ void umbra_sdf_draw_queue(struct umbra_sdf_draw *w,
                           int l, int t, int r, int b, struct umbra_buf dst) {
     if (!w) { return; }
     w->draw_dst_buf = dst;
+    if (!w->bounds) {
+        // Perspective transform: no tile culling, dispatch full rect.
+        w->draw->queue(w->draw, l, t, r, b);
+        return;
+    }
     int const T  = QUEUE_MIN_TILE,
               xt = (r - l + T - 1) / T,
               yt = (b - t + T - 1) / T,

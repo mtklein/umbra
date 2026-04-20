@@ -157,12 +157,12 @@ void umbra_sdf_tile_intervals(struct umbra_builder*,
 // Run paired (bounds, draw) programs over the rect (l,t,r,b).  Writes
 // grid with (l, t, tile_size, tile_size), queues bounds over the xt*yt
 // tile index grid (xt = ceil((r-l)/tile_size), yt = ceil((b-t)/tile_size)),
-// then queues draw on every non-NONE tile.  If bounds is NULL (e.g. the
-// draw program uses a perspective transform we can't interval-divide),
-// skips bounds and queues draw once over the whole rect.  cov is the u16
-// output buffer bounds was built against; its .ptr must point to a uint16
-// array sized >= xt*yt; dispatch writes its .count and .stride.  All
-// pointers must outlive the call.
+// then queues draw on every non-NONE tile.  cov is the u16 output buffer
+// bounds was built against; its .ptr must point to a uint16 array sized
+// >= xt*yt; dispatch writes its .count and .stride.  All pointers must
+// outlive the call.  If the caller couldn't build a bounds program (e.g.
+// their draw uses a perspective transform we can't interval-divide), they
+// should skip this and just call draw->queue(draw, l, t, r, b) directly.
 void umbra_sdf_dispatch(struct umbra_program *bounds,
                         struct umbra_program *draw,
                         struct umbra_sdf_grid *grid,
