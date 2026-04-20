@@ -13,18 +13,30 @@ static uint8_t const font3x5[10][5] = {
 // declared; each transform runs as its own umbra_transform_perspective pass
 // in the IR, so matrices compose through the built-in uniforms rebind each
 // dispatch rather than through any CPU-side composition.
+//
+// SDF cells (sub->build_sdf_draw) additionally own a matching bounds program
+// and a tile cov buffer so umbra_sdf_dispatch can tile-cull each cell.
+// bounds == NULL means a non-SDF build_draw cell (or placeholder).
 struct cell {
     struct slide         *sub;          // NULL = placeholder
     struct umbra_matrix   cell_mat;   int :32;  // cell -> canvas, fixed at prepare
-    struct umbra_program *prog;
-    int                   col, row;
+    struct umbra_program *prog;         // draw, or the single build_draw program
+    struct umbra_program *bounds;       // SDF bounds program, or NULL
+    struct umbra_sdf_grid grid;
+    struct umbra_buf      cov_buf;
+    uint16_t             *cov;
+    int                   cov_cap, col, row;
+    int                   :32;
 };
+
+enum { OVERVIEW_TILE = 512 };
 
 struct overview_slide {
     struct slide base;
 
     int                   w, h;
     struct umbra_backend *be;
+    struct umbra_backend *bounds_be;    // shared JIT for every SDF cell's bounds
     struct umbra_fmt      out_fmt;
     struct umbra_buf      out_buf;
 
@@ -107,6 +119,32 @@ static struct umbra_builder* build_cell_program(struct slide *sub,
     return b;
 }
 
+// Build the per-cell SDF IR pair: draw builder + bounds builder.  cell_mat
+// is applied to the draw coords (scalar) and to the bounds intervals (via
+// umbra_sdf_tile_intervals).  cov is bound into the bounds builder against
+// the cell's own cov_buf slot so umbra_sdf_dispatch can swap sizes per frame.
+static void build_cell_sdf_programs(struct cell *c, struct umbra_buf *dst,
+                                    struct umbra_fmt fmt,
+                                    struct umbra_builder **out_draw,
+                                    struct umbra_builder **out_bounds) {
+    struct umbra_builder *db = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(db, dst);
+    umbra_val32 const x = umbra_f32_from_i32(db, umbra_x(db)),
+                      y = umbra_f32_from_i32(db, umbra_y(db));
+    umbra_point_val32 const p = umbra_transform_perspective(&c->cell_mat, db, x, y);
+
+    struct umbra_builder *bb = umbra_builder();
+    umbra_ptr const cov_ptr = umbra_bind_buf(bb, &c->cov_buf);
+    umbra_interval ix, iy;
+    umbra_sdf_tile_intervals(bb, &c->grid, &c->cell_mat, &ix, &iy);
+
+    c->sub->build_sdf_draw(c->sub, db, dst_ptr, fmt, p.x, p.y,
+                                    bb, cov_ptr, ix, iy);
+
+    *out_draw   = db;
+    *out_bounds = bb;
+}
+
 static void overview_init(struct slide *s, int w, int h) {
     struct overview_slide *st = (struct overview_slide *)s;
     st->w = w;
@@ -148,6 +186,8 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     if (st->cells) {
         for (int i = 0; i < st->n_cells; i++) {
             umbra_program_free(st->cells[i].prog);
+            umbra_program_free(st->cells[i].bounds);
+            free(st->cells[i].cov);
         }
         free(st->cells);
     }
@@ -175,30 +215,31 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         c->sub = sub;
         if (sub->prepare) { sub->prepare(sub, be, fmt); }
 
-        // TODO: SDF-based slides (all of slides/sdf.c) currently render as
-        // placeholders here because they have no build_draw hook.  Wiring one
-        // that goes through umbra_coverage_from_sdf looks right but collapses
-        // perf: per-pixel SDF evaluation with no tile culling blew past the
-        // `ninja` 30s dump timeout in one experiment and would tank demo FPS
-        // for sdf_text (~100 curves/pixel).  The standalone slides dodge this
-        // by going through umbra_sdf_draw, whose bounds program tile-culls
-        // most pixels before they reach sdf evaluation.
-        //
-        // Right fix: grow slide with a sibling build_sdf_draw hook so the
-        // overview can build a per-cell umbra_sdf_draw with cell_mat as its
-        // transform.  The cell transform is affine (scale+translate), so
-        // umbra_sdf_draw's affine-gate accepts it and keeps tile culling --
-        // see the TODO near umbra_sdf_draw in src/draw.c.  Then each cell
-        // dispatches via umbra_sdf_draw_queue in overview_draw instead of
-        // c->progs[k]->queue.
-        if (!sub->build_draw) { continue; }
+        if (sub->build_sdf_draw) {
+            if (!st->bounds_be) {
+                st->bounds_be = umbra_backend_jit();
+                if (!st->bounds_be) { st->bounds_be = umbra_backend_interp(); }
+            }
+            struct umbra_builder *db, *bb;
+            build_cell_sdf_programs(c, &st->out_buf, fmt, &db, &bb);
 
-        struct umbra_builder *b = build_cell_program(sub, &c->cell_mat,
-                                                     &st->out_buf, fmt);
-        struct umbra_flat_ir *ir = umbra_flat_ir(b);
-        umbra_builder_free(b);
-        c->prog = be->compile(be, ir);
-        umbra_flat_ir_free(ir);
+            struct umbra_flat_ir *dir = umbra_flat_ir(db);
+            umbra_builder_free(db);
+            c->prog = be->compile(be, dir);
+            umbra_flat_ir_free(dir);
+
+            struct umbra_flat_ir *bir = umbra_flat_ir(bb);
+            umbra_builder_free(bb);
+            c->bounds = st->bounds_be->compile(st->bounds_be, bir);
+            umbra_flat_ir_free(bir);
+        } else if (sub->build_draw) {
+            struct umbra_builder *b = build_cell_program(sub, &c->cell_mat,
+                                                         &st->out_buf, fmt);
+            struct umbra_flat_ir *ir = umbra_flat_ir(b);
+            umbra_builder_free(b);
+            c->prog = be->compile(be, ir);
+            umbra_flat_ir_free(ir);
+        }
     }
 
     umbra_program_free(st->overlay_prog);
@@ -254,7 +295,20 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
             // matrices as uniforms at dispatch time, so mutating them here
             // is enough; no recompile.
             if (c->sub->animate) { c->sub->animate(c->sub, secs); }
-            c->prog->queue(c->prog, xl, yt, xr, yb);
+            if (c->bounds) {
+                int const cxt = (xr - xl + OVERVIEW_TILE - 1) / OVERVIEW_TILE,
+                          cyt = (yb - yt + OVERVIEW_TILE - 1) / OVERVIEW_TILE,
+                          tiles = cxt * cyt;
+                if (tiles > c->cov_cap) {
+                    c->cov     = realloc(c->cov, (size_t)tiles * sizeof *c->cov);
+                    c->cov_cap = tiles;
+                }
+                c->cov_buf = (struct umbra_buf){.ptr = c->cov, .count = tiles, .stride = cxt};
+                umbra_sdf_dispatch(c->bounds, c->prog, &c->grid, &c->cov_buf,
+                                   OVERVIEW_TILE, xl, yt, xr, yb);
+            } else {
+                c->prog->queue(c->prog, xl, yt, xr, yb);
+            }
         }
     }
 
@@ -266,12 +320,20 @@ static int overview_get_builders(struct slide *s, struct umbra_fmt fmt,
                                  struct umbra_builder **out, int max) {
     struct overview_slide *st = (struct overview_slide *)s;
     if (max < 1 || st->n_cells == 0) { return 0; }
-    // Return the first live cell's program builder as a representative.
+    // Return the first live cell's program builder(s) as a representative.
+    // SDF cells contribute two (draw + bounds); build_draw cells contribute one.
     for (int i = 0; i < st->n_cells; i++) {
         struct cell *c = &st->cells[i];
-        if (!c->sub || !c->prog || !c->sub->build_draw) { continue; }
-        out[0] = build_cell_program(c->sub, &c->cell_mat, &st->out_buf, fmt);
-        return 1;
+        if (!c->sub || !c->prog) { continue; }
+        if (c->sub->build_sdf_draw) {
+            if (max < 2) { return 0; }
+            build_cell_sdf_programs(c, &st->out_buf, fmt, &out[0], &out[1]);
+            return 2;
+        }
+        if (c->sub->build_draw) {
+            out[0] = build_cell_program(c->sub, &c->cell_mat, &st->out_buf, fmt);
+            return 1;
+        }
     }
     return 0;
 }
@@ -283,9 +345,12 @@ static void overview_free(struct slide *s) {
     if (st->cells) {
         for (int i = 0; i < st->n_cells; i++) {
             umbra_program_free(st->cells[i].prog);
+            umbra_program_free(st->cells[i].bounds);
+            free(st->cells[i].cov);
         }
         free(st->cells);
     }
+    umbra_backend_free(st->bounds_be);
     free(st);
 }
 
