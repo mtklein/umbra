@@ -289,13 +289,21 @@ void umbra_build_sdf_bounds(struct umbra_builder *b,
                             umbra_ptr cov,
                             umbra_interval x, umbra_interval y,
                             umbra_sdf sdf_fn, void *sdf_ctx) {
+    // Emit the tri-state constants BEFORE calling sdf_fn so any matching
+    // constants the sdf also needs (e.g. imm 0/1 as index offsets inside an
+    // SDF loop) CSE onto these outer definitions.  Otherwise CSE puts the
+    // imm inside the first-use loop body, and Metal / SPIRV-Cross won't
+    // hoist scalar constants across loop scope -- later uses outside the
+    // loop reference a variable declared inside it and fail to compile.
+    umbra_val32 const zero_f    = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const none_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_NONE);
+    umbra_val32 const partial_i = umbra_imm_i32(b, UMBRA_SDF_TILE_PARTIAL);
+    umbra_val32 const full_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_FULL);
+
     umbra_interval const f = sdf_fn(sdf_ctx, b, x, y);
-    umbra_val32 const zero_f = umbra_imm_f32(b, 0.0f);
+
     umbra_val32 const partial = umbra_lt_f32(b, f.lo, zero_f),
                       full    = umbra_lt_f32(b, f.hi, zero_f);
-    umbra_val32 const none_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_NONE),
-                      partial_i = umbra_imm_i32(b, UMBRA_SDF_TILE_PARTIAL),
-                      full_i    = umbra_imm_i32(b, UMBRA_SDF_TILE_FULL);
     umbra_val32 const base = umbra_sel_32(b, partial, partial_i, none_i);
     umbra_val32 const tri  = umbra_sel_32(b, full,    full_i,    base);
     umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));

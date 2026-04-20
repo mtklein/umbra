@@ -1,0 +1,47 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _15
+{
+    uint _m0[1];
+};
+
+struct _20
+{
+    uint4 _m0[1];
+};
+
+struct _23
+{
+    uint4 _m0[1];
+};
+
+struct _27
+{
+    half _m0[1];
+};
+
+struct _32
+{
+    uint _m0[9];
+};
+
+kernel void main0(constant _32& _46 [[buffer(0)]], device _27& _43 [[buffer(1)]], constant _20& _44 [[buffer(2)]], constant _23& _45 [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    if (!(gl_GlobalInvocationID.x >= _46._m0[0u]))
+    {
+        uint _61 = _46._m0[1u] + gl_GlobalInvocationID.x;
+        uint _62 = _46._m0[2u] + gl_GlobalInvocationID.y;
+        float _85 = float(int(_61));
+        float _89 = float(int(_62));
+        float _95 = fma(as_type<float>(_44._m0[0u].w), _89 + 1.0, as_type<float>(_44._m0[0u].y)) - as_type<float>(_45._m0[0u].y);
+        float _101 = fma(as_type<float>(_44._m0[0u].z), _85 + 1.0, as_type<float>(_44._m0[0u].x)) - as_type<float>(_45._m0[0u].x);
+        float _107 = fma(as_type<float>(_44._m0[0u].z), _85, as_type<float>(_44._m0[0u].x)) - as_type<float>(_45._m0[0u].x);
+        float _114 = fma(as_type<float>(_44._m0[0u].w), _89, as_type<float>(_44._m0[0u].y)) - as_type<float>(_45._m0[0u].y);
+        _43._m0[(_62 * _46._m0[6u]) + _61] = half(float2(as_type<half2>((((((precise::sqrt(fast::max(_107 * _107, _101 * _101) + fast::max(_114 * _114, _95 * _95)) - as_type<float>(_45._m0[0u].z)) < 0.0) ? 4294967295u : 0u) != 0u) ? 2u : uint((((as_type<float>(0u) - as_type<float>(_45._m0[0u].z)) < 0.0) ? 4294967295u : 0u) != 0u)) & 65535u)).x);
+        return;
+    }
+}
+

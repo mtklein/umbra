@@ -1,0 +1,57 @@
+#include <metal_stdlib>
+using namespace metal;
+
+
+struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
+
+kernel void main0(
+    constant meta &m [[buffer(0)]],
+    device ushort * __restrict p0 [[buffer(1)]],
+    device const uint * __restrict p1 [[buffer(2)]],
+    device const uint * __restrict p2 [[buffer(3)]],
+    uint2 pos [[thread_position_in_grid]]
+) {
+    if (pos.x >= m.w) return;
+    uint x = m.x0 + pos.x;
+    uint y = m.y0 + pos.y;
+    uint v0 = 0u;
+    uint v1 = p1[0];
+    uint v2 = p1[1];
+    uint v3 = p1[2];
+    uint v4 = p1[3];
+    uint v5 = 1u;
+    uint v6 = 2u;
+    uint v7 = p2[0];
+    uint v8 = p2[1];
+    uint v9 = p2[2];
+    float v10 = as_type<float>(v0) - as_type<float>(v9);
+    uint v11 = v10 <  as_type<float>(0u) ? 0xffffffffu : 0u;
+    uint v12 = (v11 != 0u) ? v5 : v0;
+    uint v13 = m.x0 + pos.x;
+    float v14 = (float)(int)v13;
+    float v15 = v14 + as_type<float>(1065353216u);
+    uint v16 = m.y0 + pos.y;
+    float v17 = (float)(int)v16;
+    float v18 = v17 + as_type<float>(1065353216u);
+    float v19 = fma(as_type<float>(v4), v18, as_type<float>(v2));
+    float v20 = v19 - as_type<float>(v8);
+    float v21 = v20 * v20;
+    float v22 = fma(as_type<float>(v3), v15, as_type<float>(v1));
+    float v23 = v22 - as_type<float>(v7);
+    float v24 = v23 * v23;
+    float v25 = fma(as_type<float>(v3), v14, as_type<float>(v1));
+    float v26 = v25 - as_type<float>(v7);
+    float v27 = v26 * v26;
+    float v28 = max(v27, v24);
+    float v29 = fma(as_type<float>(v4), v17, as_type<float>(v2));
+    float v30 = v29 - as_type<float>(v8);
+    float v31 = v30 * v30;
+    float v32 = max(v31, v21);
+    float v33 = v28 + v32;
+    float v34 = precise::sqrt(v33);
+    float v35 = v34 - as_type<float>(v9);
+    uint v36 = v35 <  as_type<float>(0u) ? 0xffffffffu : 0u;
+    uint v37 = (v36 != 0u) ? v6 : v12;
+    uint v38 = (uint)(ushort)v37;
+    p0[y * m.stride0 + x] = (ushort)v38;
+}

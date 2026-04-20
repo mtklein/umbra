@@ -1,0 +1,68 @@
+#include <metal_stdlib>
+using namespace metal;
+
+
+struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2; };
+
+kernel void main0(
+    constant meta &m [[buffer(0)]],
+    device ushort * __restrict p0 [[buffer(1)]],
+    device const uint * __restrict p1 [[buffer(2)]],
+    device const uint * __restrict p2 [[buffer(3)]],
+    uint2 pos [[thread_position_in_grid]]
+) {
+    if (pos.x >= m.w) return;
+    uint x = m.x0 + pos.x;
+    uint y = m.y0 + pos.y;
+    uint v0 = 0u;
+    uint v1 = p1[0];
+    uint v2 = p1[1];
+    uint v3 = p1[2];
+    uint v4 = p1[3];
+    uint v5 = 1u;
+    uint v6 = 2u;
+    uint v7 = p2[0];
+    uint v8 = p2[1];
+    uint v9 = p2[2];
+    uint v10 = p2[3];
+    float v11 = as_type<float>(v0) - as_type<float>(v9);
+    float v12 = fabs(v11);
+    uint v13 = as_type<float>(v0) <  v11 ? 0xffffffffu : 0u;
+    uint v14 = m.x0 + pos.x;
+    float v15 = (float)(int)v14;
+    float v16 = v15 + as_type<float>(1065353216u);
+    uint v17 = m.y0 + pos.y;
+    float v18 = (float)(int)v17;
+    float v19 = v18 + as_type<float>(1065353216u);
+    float v20 = fma(as_type<float>(v4), v19, as_type<float>(v2));
+    float v21 = v20 - as_type<float>(v8);
+    float v22 = v21 * v21;
+    float v23 = fma(as_type<float>(v3), v16, as_type<float>(v1));
+    float v24 = v23 - as_type<float>(v7);
+    float v25 = v24 * v24;
+    float v26 = fma(as_type<float>(v3), v15, as_type<float>(v1));
+    float v27 = v26 - as_type<float>(v7);
+    float v28 = v27 * v27;
+    float v29 = max(v28, v25);
+    float v30 = fma(as_type<float>(v4), v18, as_type<float>(v2));
+    float v31 = v30 - as_type<float>(v8);
+    float v32 = v31 * v31;
+    float v33 = max(v32, v22);
+    float v34 = v29 + v33;
+    float v35 = precise::sqrt(v34);
+    float v36 = v35 - as_type<float>(v9);
+    uint v37 = v36 <  as_type<float>(0u) ? 0xffffffffu : 0u;
+    float v38 = fabs(v36);
+    float v39 = max(v12, v38);
+    float v40 = v39 - as_type<float>(v10);
+    uint v41 = v40 <  as_type<float>(0u) ? 0xffffffffu : 0u;
+    uint v42 = v13 | v37;
+    float v43 = min(v12, v38);
+    uint v44 = (v42 != 0u) ? as_type<uint>(v43) : v0;
+    float v45 = as_type<float>(v44) - as_type<float>(v10);
+    uint v46 = v45 <  as_type<float>(0u) ? 0xffffffffu : 0u;
+    uint v47 = (v46 != 0u) ? v5 : v0;
+    uint v48 = (v41 != 0u) ? v6 : v47;
+    uint v49 = (uint)(ushort)v48;
+    p0[y * m.stride0 + x] = (ushort)v49;
+}
