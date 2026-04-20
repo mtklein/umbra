@@ -195,7 +195,6 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
     return (umbra_point_val32){xp, yp};
 }
 
-
 struct coverage_from_sdf {
     umbra_sdf *sdf_fn;
     void      *sdf_ctx;

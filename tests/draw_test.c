@@ -65,7 +65,6 @@ TEST(test_solid_src) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {
             0xFFFFFFFF,
@@ -99,7 +98,6 @@ TEST(test_solid_src_n1) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0xFFFFFFFF};
         dst_slot = (struct umbra_buf){.ptr=dst, .count=1};
@@ -125,7 +123,6 @@ TEST(test_solid_src_n9) {
                      umbra_shader_color, &color,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
@@ -154,7 +151,6 @@ TEST(test_solid_src_n16) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[16];
         __builtin_memset(dst, 0, sizeof dst);
@@ -178,7 +174,6 @@ TEST(test_srcover_8888) {
                      umbra_shader_color, &color,
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
@@ -212,7 +207,6 @@ TEST(test_dstover_8888) {
                      umbra_blend_dstover, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFFFFFFFF, 0xFFFFFFFF};
         dst_slot = (struct umbra_buf){.ptr=dst, .count=2};
@@ -235,7 +229,6 @@ TEST(test_dstover_transparent) {
                      umbra_shader_color, &color,
                      umbra_blend_dstover, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0, 0};
@@ -262,7 +255,6 @@ TEST(test_multiply_8888) {
                      umbra_shader_color, &color,
                      umbra_blend_multiply, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0xFF804020, 0xFF804020};
@@ -296,7 +288,6 @@ TEST(test_solid_src_fp16) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[4 * 3];
         __builtin_memset(dst, 0, sizeof dst);
@@ -325,7 +316,6 @@ TEST(test_srcover_fp16) {
                      umbra_shader_color, &color,
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[4 * 2];
@@ -366,7 +356,6 @@ TEST(test_coverage_rect) {
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
@@ -399,7 +388,6 @@ TEST(test_coverage_rect_scalar) {
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4];
         __builtin_memset(dst, 0, sizeof dst);
@@ -429,7 +417,6 @@ TEST(test_coverage_rect_n9) {
                      umbra_shader_color, &color,
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
@@ -462,7 +449,6 @@ TEST(test_coverage_rect_offset) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4];
         __builtin_memset(dst, 0, sizeof dst);
@@ -491,7 +477,6 @@ TEST(test_coverage_rect_outside_y) {
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {
             0x12345678,
@@ -518,7 +503,6 @@ TEST(test_no_shader) {
                      NULL, NULL,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[4] = {
@@ -547,7 +531,6 @@ TEST(test_no_blend) {
                      umbra_shader_color, &color,
                      NULL, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0, 0};
@@ -593,7 +576,6 @@ TEST(test_gradient_shader) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
         dst_slot = (struct umbra_buf){.ptr=dst, .count=4};
@@ -620,7 +602,6 @@ TEST(test_multiply_half_alpha) {
                      umbra_shader_color, &color,
                      umbra_blend_multiply, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[2] = {0x80FF0000, 0x80FF0000};
@@ -654,7 +635,6 @@ TEST(test_srcover_8888_n9) {
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
         __builtin_memset(dst, 0, sizeof dst);
@@ -684,7 +664,6 @@ TEST(test_full_pipeline) {
                      umbra_shader_color, &color,
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[9];
@@ -723,7 +702,6 @@ TEST(test_solid_src_fp16_n9) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __fp16 dst[4 * 9];
         __builtin_memset(dst, 0, sizeof dst);
@@ -753,7 +731,6 @@ TEST(test_coverage_rect_white_dst) {
                      umbra_shader_color, &color,
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
-
 
     typedef struct {
         int   n;
@@ -802,7 +779,6 @@ TEST(test_coverage_bitmap) {
                      umbra_shader_color, &color,
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
@@ -862,7 +838,6 @@ TEST(test_coverage_sdf) {
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
@@ -895,7 +870,6 @@ TEST(test_coverage_bitmap_matrix) {
                      umbra_shader_color, &color,
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
@@ -966,7 +940,6 @@ TEST(test_coverage_bitmap_matrix_oob) {
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[8];
         __builtin_memset(dst, 0, sizeof dst);
@@ -997,7 +970,6 @@ TEST(test_linear_2) {
                      shader_gradient_two_stops, &state,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
@@ -1032,7 +1004,6 @@ TEST(test_radial_2) {
                      shader_gradient_two_stops, &state,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0};
@@ -1074,7 +1045,6 @@ TEST(test_linear_grad) {
                      shader_gradient_lut, &state,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
@@ -1119,7 +1089,6 @@ TEST(test_radial_grad) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0};
         dst_slot = (struct umbra_buf){.ptr=dst, .count=1};
@@ -1157,7 +1126,6 @@ TEST(test_lut_grad_last_pixel) {
                      shader_gradient_lut, &state,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
@@ -1198,7 +1166,6 @@ TEST(test_linear_grad_evenly_spaced) {
                      shader_gradient_evenly_spaced_stops, &state,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
@@ -1241,7 +1208,6 @@ TEST(test_radial_grad_evenly_spaced) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[1] = {0};
         dst_slot = (struct umbra_buf){.ptr=dst, .count=1};
@@ -1282,7 +1248,6 @@ TEST(test_gradient_lut_nonuniform) {
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
 
-
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[8] = {0};
         dst_slot = (struct umbra_buf){.ptr=dst, .count=8};
@@ -1317,7 +1282,6 @@ TEST(test_linear_stops) {
                      shader_gradient, &state,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t dst[5] = {0};
@@ -1357,7 +1321,6 @@ TEST(test_linear_stops_fp16_planar) {
                      NULL, NULL);
     struct test_backends B = make(builder);
 
-
     enum { W = 8, HP = 1 };
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint16_t dst[W * HP * 4];
@@ -1390,7 +1353,6 @@ TEST(test_supersample) {
                      umbra_shader_supersample, &ss,
                      umbra_blend_src, NULL);
     struct test_backends B = make(builder);
-
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         uint32_t  dst[4] = {0};
@@ -1644,7 +1606,6 @@ TEST(test_coverage_rect_tail_matrix) {
                          umbra_blend_srcover, NULL);
         struct test_backends B = make(builder);
 
-
         // Interp (bi=0) is always available; use it as the oracle and check
         // every other backend that compiled against its output.
         uint32_t ref[32 * 4] = {0};
@@ -1681,7 +1642,6 @@ TEST(test_coverage_rect_tail_srcover_fp16_planar) {
                      umbra_shader_color, &color,
                      umbra_blend_srcover, NULL);
     struct test_backends B = make(builder);
-
 
     enum { W = 18, H = 3 };
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
