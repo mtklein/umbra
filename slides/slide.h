@@ -97,3 +97,34 @@ void slide_perspective_matrix(struct umbra_matrix *out, float t, int sw, int sh,
 void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h);
 void slide_bg_draw   (float const bg[4], int l, int t, int r, int b, void *buf);
 void slide_bg_cleanup(void);
+
+// Compiled pipeline for one slide on one backend + format, optionally with
+// a pre-applied transform (for overview cells).  Lets drivers drive a slide
+// entirely through its build_draw / build_sdf_draw hooks -- compile once
+// and dispatch per frame -- without caring which flavor it is.
+//
+// Caller owns the struct.  Update `dst_buf` before each slide_runtime_draw
+// to point at the current frame's output; the slide's draw program was
+// bound to `&rt->dst_buf` at compile time.
+struct slide_runtime {
+    struct umbra_program *draw;
+    struct umbra_program *bounds;      // NULL for non-SDF slides
+    struct umbra_backend *bounds_be;   // owned (SDF only)
+    uint16_t             *cov;
+
+    struct umbra_fmt      fmt;
+    int                   w, h;
+    struct umbra_sdf_grid grid;
+    struct umbra_buf      dst_buf;
+    struct umbra_buf      cov_buf;
+    int                   cov_cap;
+    int                   :32;
+};
+
+void slide_runtime_compile(struct slide_runtime*, struct slide*,
+                           int w, int h,
+                           struct umbra_backend*, struct umbra_fmt,
+                           struct umbra_matrix const *pre_transform);
+void slide_runtime_draw   (struct slide_runtime*, struct slide*,
+                           double secs, int l, int t, int r, int b);
+void slide_runtime_cleanup(struct slide_runtime*);
