@@ -268,12 +268,36 @@ umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder *b,
                                        umbra_sub_f32(b, umbra_imm_f32(b, 0.0f), f)));
 }
 
+void umbra_build_sdf_draw(struct umbra_builder *b,
+                          umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
+                          umbra_val32 x, umbra_val32 y,
+                          umbra_sdf sdf_fn, void *sdf_ctx, int aa_quality,
+                          umbra_shader shader_fn, void *shader_ctx,
+                          umbra_blend  blend_fn,  void *blend_ctx) {
+    struct umbra_coverage_from_sdf cov = {
+        .sdf_fn    = sdf_fn,
+        .sdf_ctx   = sdf_ctx,
+        .hard_edge = aa_quality == 0,
+    };
+    umbra_build_draw(b, dst_ptr, dst_fmt, x, y,
+                     umbra_coverage_from_sdf, &cov,
+                     shader_fn, shader_ctx,
+                     blend_fn,  blend_ctx);
+}
+
+void umbra_build_sdf_bounds(struct umbra_builder *b,
+                            umbra_ptr lo,
+                            umbra_interval x, umbra_interval y,
+                            umbra_sdf sdf_fn, void *sdf_ctx) {
+    umbra_interval const f = sdf_fn(sdf_ctx, b, x, y);
+    umbra_store_32(b, lo, f.lo);
+}
+
 struct grid_params {
     float base_x, base_y, tile_w, tile_h;
 };
 
 struct umbra_sdf_draw {
-    struct umbra_coverage_from_sdf cov_state;
     struct umbra_program          *draw;
     struct umbra_program          *bounds;
     struct umbra_backend          *bounds_be;
@@ -312,24 +336,28 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                       umbra_blend blend_fn, void *blend_ctx,
                                       struct umbra_fmt fmt) {
     struct umbra_sdf_draw *d = calloc(1, sizeof *d);
-    d->cov_state = (struct umbra_coverage_from_sdf){
-        .sdf_fn    = sdf_fn,
-        .sdf_ctx   = sdf_ctx,
-        .hard_edge = hard_edge,
-    };
 
-    // Build the draw program (transform + shader + SDF coverage + blend).
-    struct umbra_builder *db = umbra_draw_builder(
-        transform_mat,
-        umbra_coverage_from_sdf, &d->cov_state,
-        shader_fn, shader_ctx,
-        blend_fn,  blend_ctx,
-        &d->draw_dst_buf, fmt);
-    struct umbra_flat_ir *dir = umbra_flat_ir(db);
-    umbra_builder_free(db);
-    d->draw = be->compile(be, dir);
-    umbra_flat_ir_free(dir);
-    if (!d->draw) { free(d); return NULL; }
+    // Build the draw program: dispatch coords -> optional transform -> sdf coverage + shader + blend.
+    {
+        struct umbra_builder *db = umbra_builder();
+        umbra_ptr const dst_ptr = umbra_bind_buf(db, &d->draw_dst_buf);
+        umbra_val32 x = umbra_f32_from_i32(db, umbra_x(db)),
+                    y = umbra_f32_from_i32(db, umbra_y(db));
+        if (transform_mat) {
+            umbra_point_val32 const p = umbra_transform_perspective(transform_mat, db, x, y);
+            x = p.x;
+            y = p.y;
+        }
+        umbra_build_sdf_draw(db, dst_ptr, fmt, x, y,
+                             sdf_fn, sdf_ctx, hard_edge ? 0 : 1,
+                             shader_fn, shader_ctx,
+                             blend_fn,  blend_ctx);
+        struct umbra_flat_ir *dir = umbra_flat_ir(db);
+        umbra_builder_free(db);
+        d->draw = be->compile(be, dir);
+        umbra_flat_ir_free(dir);
+        if (!d->draw) { free(d); return NULL; }
+    }
 
     // Gate the bounds program on affine-only transforms.  We don't support
     // tile-culled dispatch under perspective: the interval divide would be
@@ -361,9 +389,7 @@ struct umbra_sdf_draw* umbra_sdf_draw(struct umbra_backend *be,
                                 umbra_imm_f32(bb, 1.0f)), tile_h))};
     if (transform_mat) { transform_affine_interval(transform_mat, bb, &x, &y); }
 
-    umbra_interval const f = sdf_fn(sdf_ctx, bb, x, y);
-
-    umbra_store_32(bb, dst, f.lo);
+    umbra_build_sdf_bounds(bb, dst, x, y, sdf_fn, sdf_ctx);
 
     struct umbra_flat_ir *bir = umbra_flat_ir(bb);
     umbra_builder_free(bb);
