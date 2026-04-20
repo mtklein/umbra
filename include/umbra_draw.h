@@ -148,17 +148,3 @@ void umbra_sdf_dispatch(struct umbra_program *bounds,
                         struct umbra_buf *cov,
                         int tile_size, int l, int t, int r, int b);
 
-// Adapt an umbra_sdf as umbra_coverage.
-//
-// TRAP: evaluates the SDF per pixel with no tile culling.  That throws away
-// the whole point of SDF coverage -- callers should build a separate interval
-// bounds program and drive both through umbra_sdf_dispatch so tiles entirely
-// outside the shape are culled before the draw program touches them.
-struct umbra_coverage_from_sdf {
-    umbra_sdf *sdf_fn;
-    void      *sdf_ctx;
-    int        hard_edge, :32;
-};
-umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder*,
-                                     umbra_val32 x, umbra_val32 y);
-

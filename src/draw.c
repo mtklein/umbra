@@ -222,9 +222,15 @@ static void transform_affine_interval(struct umbra_matrix const *mat,
     *y = yp;
 }
 
-umbra_val32 umbra_coverage_from_sdf(void *ctx, struct umbra_builder *b,
+struct coverage_from_sdf {
+    umbra_sdf *sdf_fn;
+    void      *sdf_ctx;
+    int        hard_edge, :32;
+};
+
+static umbra_val32 coverage_from_sdf(void *ctx, struct umbra_builder *b,
                                      umbra_val32 x, umbra_val32 y) {
-    struct umbra_coverage_from_sdf const *self = ctx;
+    struct coverage_from_sdf const *self = ctx;
     umbra_val32 const half = umbra_imm_f32(b, 0.5f);
     umbra_val32 const xc = umbra_add_f32(b, x, half),
                       yc = umbra_add_f32(b, y, half);
@@ -246,13 +252,13 @@ void umbra_build_sdf_draw(struct umbra_builder *b,
                           umbra_sdf sdf_fn, void *sdf_ctx, int aa_quality,
                           umbra_shader shader_fn, void *shader_ctx,
                           umbra_blend  blend_fn,  void *blend_ctx) {
-    struct umbra_coverage_from_sdf cov = {
+    struct coverage_from_sdf cov = {
         .sdf_fn    = sdf_fn,
         .sdf_ctx   = sdf_ctx,
         .hard_edge = aa_quality == 0,
     };
     umbra_build_draw(b, dst_ptr, dst_fmt, x, y,
-                     umbra_coverage_from_sdf, &cov,
+                     coverage_from_sdf, &cov,
                      shader_fn, shader_ctx,
                      blend_fn,  blend_ctx);
 }

@@ -1686,16 +1686,14 @@ TEST(test_sdf_dispatch_tiling) {
     disp != NULL here;
 
     // Flat reference: same shader+coverage, no tiling.
-    struct umbra_coverage_from_sdf cov = {
-        .sdf_fn    = test_circle_fn,
-        .sdf_ctx   = &sdf,
-        .hard_edge = 1,
-    };
-    struct umbra_builder *fb = umbra_draw_builder(
-        NULL,        umbra_coverage_from_sdf, &cov,
-        umbra_shader_color,      &color,
-        umbra_blend_srcover,     NULL,
-        umbra_fmt_8888);
+    struct umbra_builder *fb = umbra_builder();
+    umbra_ptr const fdst = umbra_bind_buf(fb, &draw_dst_slot);
+    umbra_val32 const fx = umbra_f32_from_i32(fb, umbra_x(fb)),
+                      fy = umbra_f32_from_i32(fb, umbra_y(fb));
+    umbra_build_sdf_draw(fb, fdst, umbra_fmt_8888, fx, fy,
+                         test_circle_fn,      &sdf, 0,
+                         umbra_shader_color,  &color,
+                         umbra_blend_srcover, NULL);
     struct umbra_flat_ir *fir = umbra_flat_ir(fb);
     umbra_builder_free(fb);
     struct umbra_program *flat = be->compile(be, fir);
