@@ -79,15 +79,16 @@ void slide_runtime_draw (struct slide_runtime*, struct slide*,
                          double secs, int l, int t, int r, int b);
 void slide_runtime_free (struct slide_runtime*);
 
-// Builders for the slide's composable draw paths for inspection.
-// Uses `rt` as backing storage for bind sites -- rt must outlive any
-// program compiled from the returned builders' IR.  Returns:
-//   1 for build_draw slides      (out[0] = draw builder)
-//   2 for build_sdf_draw slides  (out[0] = draw builder, out[1] = bounds builder)
-//   0 for slides with neither    (custom slides like overview)
+// Builders for the slide's composable draw paths for inspection.  `rt`
+// holds the bind-site backing storage and must outlive any program
+// compiled from the returned builders.  Both fields are NULL for slides
+// with neither build_draw nor build_sdf_draw (e.g. overview); .draw is
+// set for build_draw slides and both are set for build_sdf_draw slides.
 // Caller owns the returned builders.
-// TODO: struct slide_builders { struct umbra_builder *draw, *bounds; }
-//       struct slide_builders slide_builders(...)
-int slide_builders(struct slide_runtime *rt, struct slide*,
-                   struct umbra_fmt, struct umbra_matrix const *pre,
-                   struct umbra_builder **out, int max);
+struct slide_builders {
+    struct umbra_builder *draw;
+    struct umbra_builder *bounds;
+};
+struct slide_builders slide_builders(struct slide_runtime *rt, struct slide*,
+                                     struct umbra_fmt,
+                                     struct umbra_matrix const *pre);

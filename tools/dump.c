@@ -278,10 +278,10 @@ int main(void) {
         mkdir(dir, 0755);
 
         struct slide_runtime *rt = calloc(1, sizeof *rt);
-        struct umbra_builder *builders[2] = {0};
-        int const nb = slide_builders(rt, s, umbra_fmt_fp16, NULL,
-                                      builders, count(builders));
-        for (int j = 0; j < nb; j++) {
+        struct slide_builders b = slide_builders(rt, s, umbra_fmt_fp16, NULL);
+        struct umbra_builder *builders[2] = {b.draw, b.bounds};
+        for (int j = 0; j < 2; j++) {
+            if (!builders[j]) { continue; }
             char sub[256];
             snprintf(sub, sizeof sub, "%s/%d", dir, j);
             mkdir(sub, 0755);

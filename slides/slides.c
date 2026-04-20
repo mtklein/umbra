@@ -227,18 +227,14 @@ void slide_runtime_free(struct slide_runtime *rt) {
     free(rt);
 }
 
-int slide_builders(struct slide_runtime *rt, struct slide *s,
-                   struct umbra_fmt fmt, struct umbra_matrix const *pre,
-                   struct umbra_builder **out, int max) {
+struct slide_builders slide_builders(struct slide_runtime *rt, struct slide *s,
+                                     struct umbra_fmt fmt,
+                                     struct umbra_matrix const *pre) {
+    struct slide_builders out = {0};
     if (s->build_sdf_draw) {
-        if (max < 2) { return 0; }
-        runtime_sdf_builders(s, rt, fmt, pre, &out[0], &out[1]);
-        return 2;
+        runtime_sdf_builders(s, rt, fmt, pre, &out.draw, &out.bounds);
+    } else if (s->build_draw) {
+        out.draw = runtime_draw_builder(s, &rt->dst_buf, fmt, pre);
     }
-    if (s->build_draw) {
-        if (max < 1) { return 0; }
-        out[0] = runtime_draw_builder(s, &rt->dst_buf, fmt, pre);
-        return 1;
-    }
-    return 0;
+    return out;
 }
