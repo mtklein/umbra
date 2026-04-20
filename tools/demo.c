@@ -129,7 +129,7 @@ static void rebuild_rt(struct slide *s, int fmt, int W, int H) {
     slide_rt = NULL;
     if (bes[cur_backend] && is_leaf(s)) {
         slide_rt = slide_runtime(s, W, H, bes[cur_backend], *fmt_enums[fmt], NULL);
-        slide_bg_prepare(bes[cur_backend], *fmt_enums[fmt], W, H);
+        slide_bg_prepare(bes[cur_backend], *fmt_enums[fmt]);
     }
 }
 
@@ -194,10 +194,10 @@ static void to_hdr_row(__fp16 *dst, void *src, int n) {
 }
 
 struct tile_work {
-    struct slide *s;
-    double        secs;
-    int           l, t, r, b;
-    void         *buf;
+    struct slide    *s;
+    double           secs;
+    int              l, t, r, b;
+    struct umbra_buf dst;
 };
 
 static void tile_fn(void *arg) {
@@ -205,7 +205,7 @@ static void tile_fn(void *arg) {
     if (is_leaf(tw->s)) {
         slide_runtime_draw(slide_rt, tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b);
     } else {
-        tw->s->draw(tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b, tw->buf);
+        tw->s->draw(tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b, tw->dst);
     }
 }
 
@@ -351,7 +351,7 @@ int main(void) {
             slide_rt->dst_buf = (struct umbra_buf){
                 .ptr=pixbuf, .count=W*H*planes, .stride=W,
             };
-            slide_bg_draw(s->bg, 0, 0, W, H, pixbuf);
+            slide_bg_draw(s->bg, 0, 0, W, H, slide_rt->dst_buf);
         }
 
         {
@@ -362,11 +362,14 @@ int main(void) {
             uint64_t const freq = SDL_GetPerformanceFrequency();
             double const secs = (double)(SDL_GetPerformanceCounter() - t0) / (double)freq;
 
+            struct umbra_buf const dst = {
+                .ptr=pixbuf, .count=W*H*planes, .stride=W,
+            };
             struct tile_work *work = malloc((size_t)nt * sizeof *work);
             for (int t = 0; t < nt; t++) {
                 int y0 = t * sh;
                 int y1 = y0 + sh > H ? H : y0 + sh;
-                work[t] = (struct tile_work){s, secs, 0, y0, W, y1, pixbuf};
+                work[t] = (struct tile_work){s, secs, 0, y0, W, y1, dst};
             }
             if (nt <= 1 || !xtra_progs[1]->queue_is_threadsafe) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }

@@ -25,7 +25,7 @@ struct slide_draw_ctx {
 };
 static void slide_draw(void *vctx) {
     struct slide_draw_ctx *c = vctx;
-    slide_bg_draw(c->s->bg, 0, 0, c->w, c->h, c->rt->dst_buf.ptr);
+    slide_bg_draw(c->s->bg, 0, 0, c->w, c->h, c->rt->dst_buf);
     slide_runtime_draw(c->rt, c->s, c->secs, 0, 0, c->w, c->h);
     c->secs += 1.0 / 60.0;
 }
@@ -291,7 +291,7 @@ int main(int argc, char *argv[]) {
         for (int bi = 0; bi < nb; bi++) {
             if (!(be_mask & (1 << bi)) || !bes[bi]) { continue; }
             struct slide_runtime *rt = slide_runtime(s, W, H, bes[bi], fmt, NULL);
-            slide_bg_prepare(bes[bi], fmt, W, H);
+            slide_bg_prepare(bes[bi], fmt);
             rt->dst_buf = (struct umbra_buf){.ptr=buf, .count=W*H*fmt.planes, .stride=W};
             struct slide_draw_ctx sctx = {.s=s, .rt=rt, .secs=0.0, .w=W, .h=H};
             ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,

@@ -70,19 +70,17 @@ void slides_cleanup(void) {
     count = 0;
 }
 
+// TODO: these should not be globals
 static struct umbra_flat_ir    *bg_ir;
 static struct umbra_program    *bg_prog;
 static umbra_color              bg_color;
 static struct umbra_fmt         bg_fmt;
-static int                      bg_w, bg_h;
 static struct umbra_buf         bg_dst_buf;
 
-void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h) {
-    if (bg_fmt.name != fmt.name || !bg_ir || bg_w != w || bg_h != h) {
+void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt) {
+    if (bg_fmt.name != fmt.name || !bg_ir) {
         umbra_flat_ir_free(bg_ir);
         bg_fmt = fmt;
-        bg_w   = w;
-        bg_h   = h;
         struct umbra_builder *b = umbra_builder();
         umbra_ptr const dst = umbra_bind_buf(b, &bg_dst_buf);
         umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
@@ -98,11 +96,9 @@ void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int
     bg_prog = be->compile(be, bg_ir);
 }
 
-void slide_bg_draw(umbra_color bg, int l, int t, int r, int b, void *buf) {
-    bg_color = bg;
-    bg_dst_buf = (struct umbra_buf){
-        .ptr=buf, .count=bg_w * bg_h * bg_fmt.planes, .stride=bg_w,
-    };
+void slide_bg_draw(umbra_color bg, int l, int t, int r, int b, struct umbra_buf dst) {
+    bg_color   = bg;
+    bg_dst_buf = dst;
     bg_prog->queue(bg_prog, l, t, r, b);
 }
 
@@ -110,7 +106,6 @@ void slide_bg_cleanup(void) {
     if (bg_prog) { umbra_program_free(bg_prog); bg_prog = NULL; }
     umbra_flat_ir_free(bg_ir); bg_ir = NULL;
     bg_fmt = (struct umbra_fmt){0};
-    bg_w = bg_h = 0;
 }
 
 static struct umbra_builder* runtime_draw_builder(

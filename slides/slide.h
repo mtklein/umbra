@@ -2,9 +2,6 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
-// TODO: swap .draw's `void *buf` for `struct umbra_buf dst` so the hook
-// matches the typed destination that slide_runtime already carries.
-
 struct slide {
     char const     *title;
     umbra_color     bg;
@@ -12,7 +9,7 @@ struct slide {
 
     void (*init)   (struct slide*);
     void (*prepare)(struct slide*, struct umbra_backend*, struct umbra_fmt);
-    void (*draw)   (struct slide*, double secs, int l, int t, int r, int b, void *buf);
+    void (*draw)   (struct slide*, double secs, int l, int t, int r, int b, struct umbra_buf dst);
     void (*free)   (struct slide*);
 
     void (*build_draw)(struct slide*, struct umbra_builder *b,
@@ -52,8 +49,8 @@ void          slides_cleanup     (void);
 
 void slide_perspective_matrix(struct umbra_matrix *out, float t, int sw, int sh, int bw, int bh);
 
-void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt, int w, int h);
-void slide_bg_draw   (umbra_color bg, int l, int t, int r, int b, void *buf);
+void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt);
+void slide_bg_draw   (umbra_color bg, int l, int t, int r, int b, struct umbra_buf dst);
 void slide_bg_cleanup(void);
 
 struct slide_runtime {

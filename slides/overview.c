@@ -25,8 +25,6 @@ struct cell {
 struct overview_slide {
     struct slide base;
 
-    struct umbra_backend *be;
-    struct umbra_fmt      out_fmt;
     struct umbra_buf      out_buf;
 
     struct cell          *cells;
@@ -94,10 +92,8 @@ static void compute_cell_matrix(struct umbra_matrix *out, int col, int row,
 
 static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct overview_slide *st = (struct overview_slide *)s;
-    st->be      = be;
-    st->out_fmt = fmt;
 
-    slide_bg_prepare(be, fmt, s->w, s->h);
+    slide_bg_prepare(be, fmt);
 
     if (!st->overlay) {
         st->overlay = calloc((size_t)(s->w * s->h), sizeof *st->overlay);
@@ -172,16 +168,13 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     umbra_flat_ir_free(oir);
 }
 
-static void overview_draw(struct slide *s, double secs, int l, int t, int r, int b, void *buf) {
+static void overview_draw(struct slide *s, double secs, int l, int t, int r, int b,
+                          struct umbra_buf dst) {
     struct overview_slide *st = (struct overview_slide *)s;
     (void)l; (void)r;
     int const w = s->w, h = s->h;
 
-    st->out_buf = (struct umbra_buf){
-        .ptr    = buf,
-        .count  = w * h * st->out_fmt.planes,
-        .stride = w,
-    };
+    st->out_buf = dst;
 
     umbra_color const placeholder_bg = {0.094f, 0.094f, 0.094f, 1};
 
@@ -203,7 +196,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         // need something visible.  Empty slots (idx >= n_real, c->sub NULL)
         // get a neutral dark gray.
         umbra_color const bg = c->sub ? c->sub->bg : placeholder_bg;
-        slide_bg_draw(bg, xl, yt, xr, yb, buf);
+        slide_bg_draw(bg, xl, yt, xr, yb, dst);
 
         if (c->sub && c->rt && c->rt->draw) {
             c->rt->dst_buf = st->out_buf;

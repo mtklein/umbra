@@ -230,15 +230,18 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
     struct slide_runtime *rt = NULL;
     if (leaf) {
         rt = slide_runtime(s, RW, RH, be, fmt, NULL);
-        slide_bg_prepare(be, fmt, RW, RH);
-        slide_bg_draw(s->bg, 0, 0, RW, RH, pixbuf);
+        slide_bg_prepare(be, fmt);
         rt->dst_buf = (struct umbra_buf){
             .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
         };
+        slide_bg_draw(s->bg, 0, 0, RW, RH, rt->dst_buf);
         slide_runtime_draw(rt, s, 0.0, 0, 0, RW, RH);
     } else {
         s->prepare(s, be, fmt);
-        s->draw(s, 0.0, 0, 0, RW, RH, pixbuf);
+        struct umbra_buf const dst = {
+            .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
+        };
+        s->draw(s, 0.0, 0, 0, RW, RH, dst);
     }
     be->flush(be);
     slide_runtime_free(rt);
