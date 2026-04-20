@@ -3,7 +3,7 @@
 
 enum { SWATCH_COLS = 5, SWATCH_ROWS = 2, SWATCH_N = SWATCH_COLS * SWATCH_ROWS };
 
-static umbra_color swatch_colors[SWATCH_N] = {
+static umbra_color const swatch_colors[SWATCH_N] = {
     {1.0f, 0.0f, 0.0f, 1.0f},
     {0.0f, 1.0f, 0.0f, 1.0f},
     {0.0f, 0.0f, 1.0f, 1.0f},
@@ -17,14 +17,13 @@ static umbra_color swatch_colors[SWATCH_N] = {
 };
 
 struct swatch_ctx {
-    struct umbra_buf const *colors;
-    float                   cw, ch;
+    float cw, ch;
 };
 
 static umbra_color_val32 shader_swatch(void *vctx, struct umbra_builder *b,
                                         umbra_val32 x, umbra_val32 y) {
     struct swatch_ctx const *ctx = vctx;
-    umbra_ptr const colors = umbra_bind_buf     (b, ctx->colors);
+    umbra_ptr const colors = umbra_bind_uniforms(b, swatch_colors, SWATCH_N * 4);
     umbra_ptr const u      = umbra_bind_uniforms(b, &ctx->cw, 2);
 
     umbra_val32 const cw = umbra_uniform_32(b, u, 0),
@@ -53,22 +52,15 @@ static umbra_color_val32 shader_swatch(void *vctx, struct umbra_builder *b,
 }
 
 struct swatch_slide {
-    struct slide base;
-
-    struct umbra_buf      colors_buf;
-    struct swatch_ctx     ctx;
+    struct slide      base;
+    struct swatch_ctx ctx;
 };
 
 static void swatch_init(struct slide *s) {
     struct swatch_slide *st = (struct swatch_slide *)s;
-    st->colors_buf = (struct umbra_buf){
-        .ptr   = swatch_colors,
-        .count = SWATCH_N * 4,
-    };
     st->ctx = (struct swatch_ctx){
-        .colors = &st->colors_buf,
-        .cw     = (float)(s->w / SWATCH_COLS),
-        .ch     = (float)(s->h / SWATCH_ROWS),
+        .cw = (float)(s->w / SWATCH_COLS),
+        .ch = (float)(s->h / SWATCH_ROWS),
     };
 }
 
