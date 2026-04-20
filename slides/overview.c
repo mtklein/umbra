@@ -192,19 +192,17 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         if (y1 <= t || y0 >= b) { continue; }
         int const yt = y0 > t ? y0 : t,
                   yb = y1 < b ? y1 : b;
-        int const xl = x0,
-                  xr = x1;
 
         // Paint the cell's background first -- live cells use srcover that
         // would accumulate without a fresh bg each frame; placeholders just
         // need something visible.  Empty slots (idx >= n_real, c->sub NULL)
         // get a neutral dark gray.
         umbra_color const bg = c->sub ? c->sub->bg : placeholder_bg;
-        slide_bg_draw(st->bg, bg, xl, yt, xr, yb, dst);
+        slide_bg_draw(st->bg, bg, x0, yt, x1, yb, dst);
 
         if (c->sub && c->rt && c->rt->draw) {
             c->rt->dst_buf = st->out_buf;
-            slide_runtime_draw(c->rt, c->sub, secs, xl, yt, xr, yb);
+            slide_runtime_draw(c->rt, c->sub, secs, x0, yt, x1, yb);
         }
     }
 
