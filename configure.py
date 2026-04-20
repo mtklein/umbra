@@ -33,7 +33,7 @@ CFLAGS = {
 }
 
 
-TEST_SHARDS = 3
+TEST_SHARDS = 2
 
 
 def obj(src):
