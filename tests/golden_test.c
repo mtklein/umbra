@@ -53,51 +53,53 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
     struct slide_bg      *bg[NUM_BACKENDS] = {0};
     void *pbuf[NUM_BACKENDS] = {0};
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
-        if (!bes[bi]) { continue; }
-        pbuf[bi] = calloc(1, pixbuf_sz);
+        if (bes[bi]) {
+            pbuf[bi] = calloc(1, pixbuf_sz);
 
-        rt[bi] = slide_runtime(s, W, H, bes[bi], fmt, NULL);
-        bg[bi] = slide_bg(bes[bi], fmt);
+            rt[bi] = slide_runtime(s, W, H, bes[bi], fmt, NULL);
+            bg[bi] = slide_bg(bes[bi], fmt);
 
-        rt[bi]->dst_buf = (struct umbra_buf){
-            .ptr=pbuf[bi], .count=W * H * fmt.planes, .stride=W,
-        };
-        slide_bg_draw(bg[bi], s->bg, 0, 0, W, H, rt[bi]->dst_buf);
-        slide_runtime_draw(rt[bi], s, 0, 0, 0, W, H);
+            rt[bi]->dst_buf = (struct umbra_buf){
+                .ptr=pbuf[bi], .count=W * H * fmt.planes, .stride=W,
+            };
+            slide_bg_draw(bg[bi], s->bg, 0, 0, W, H, rt[bi]->dst_buf);
+            slide_runtime_draw(rt[bi], s, 0, 0, 0, W, H);
 
-        bes[bi]->flush(bes[bi]);
+            bes[bi]->flush(bes[bi]);
+        }
     }
 
     _Bool ok = 1;
     for (int i = 0; i < NUM_BACKENDS; i++) {
-        if (!pbuf[i]) { continue; }
-        for (int j = i + 1; j < NUM_BACKENDS; j++) {
-            if (!pbuf[j]) { continue; }
-
-            int mismatches = 0;
-            int worst = 0;
-            int worst_off = -1;
-            uint8_t const *a = pbuf[i], *b = pbuf[j];
-            for (size_t k = 0; k < pixbuf_sz; k++) {
-                if (a[k] != b[k]) {
-                    mismatches++;
-                    int d = (int)a[k] - (int)b[k];
-                    if (d < 0) { d = -d; }
-                    if (d > worst) {
-                        worst = d;
-                        worst_off = (int)k;
+        if (pbuf[i]) {
+            for (int j = i + 1; j < NUM_BACKENDS; j++) {
+                if (pbuf[j]) {
+                    int mismatches = 0;
+                    int worst = 0;
+                    int worst_off = -1;
+                    uint8_t const *a = pbuf[i], *b = pbuf[j];
+                    for (size_t k = 0; k < pixbuf_sz; k++) {
+                        if (a[k] != b[k]) {
+                            mismatches++;
+                            int d = (int)a[k] - (int)b[k];
+                            if (d < 0) { d = -d; }
+                            if (d > worst) {
+                                worst = d;
+                                worst_off = (int)k;
+                            }
+                        }
+                    }
+                    if (worst > 0) {
+                        dprintf(2,
+                            "slide %d \"%s\" %s vs %s fmt=%s: "
+                            "%d/%d bytes differ, worst delta=%d at byte %d\n",
+                            slide_idx + 1, s->title,
+                            backend_name[i], backend_name[j], fmt.name,
+                            mismatches, (int)pixbuf_sz,
+                            worst, worst_off);
+                        ok = 0;
                     }
                 }
-            }
-            if (worst > 0) {
-                dprintf(2,
-                    "slide %d \"%s\" %s vs %s fmt=%s: "
-                    "%d/%d bytes differ, worst delta=%d at byte %d\n",
-                    slide_idx + 1, s->title,
-                    backend_name[i], backend_name[j], fmt.name,
-                    mismatches, (int)pixbuf_sz,
-                    worst, worst_off);
-                ok = 0;
             }
         }
     }
