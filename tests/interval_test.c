@@ -165,9 +165,11 @@ static iv eval_square(iv a) {
 }
 
 TEST(interval_square) {
-    iv_equiv(eval_square((iv){2,3}), (iv){0,9}) here;
+    iv_equiv(eval_square((iv){2,3}), (iv){4,9}) here;
     iv_equiv(eval_square((iv){-3,5}), (iv){0,25}) here;
-    iv_equiv(eval_square((iv){-5,-2}), (iv){0,25}) here;
+    iv_equiv(eval_square((iv){-5,-2}), (iv){4,25}) here;
+    iv_equiv(eval_square((iv){0,3}), (iv){0,9}) here;
+    iv_equiv(eval_square((iv){-3,0}), (iv){0,9}) here;
 }
 
 static iv eval_exact_binary(umbra_interval (*op)(struct umbra_builder*,

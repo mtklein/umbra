@@ -129,41 +129,55 @@
   v128 = sub_f32         v42 v123
   v129 = square_f32      v125
   v130 = square_f32      v126
-  v131 = max_f32         v129 v130
-  v132 = square_f32      v127
-  v133 = square_f32      v128
-  v134 = max_f32         v132 v133
-  v135 = add_f32         v131 v134
-  v136 = sqrt_f32        v135
-  v137 = load_var        var0
-  v138 = min_f32         v0 v137
-  v139 = min_f32_imm     v137 0x0
-  v140 = join            v138 v139
-      store_var       var0 v140
-  v142 = load_var        var1
-  v143 = min_f32         v136 v142
-      store_var       var1 v143
-  v145 = load_var        var2
-  v146 = add_i32         v24 v145
-  v147 = add_i32_imm     v145 0x1
-  v148 = join            v146 v147
-      store_var       var2 v148
+  v131 = lt_f32          v0 v125
+  v132 = lt_f32          v126 v0
+  v133 = lt_f32_imm      v126 0x0
+  v134 = join            v132 v133
+  v135 = or_32           v131 v134
+  v136 = min_f32         v129 v130
+  v137 = sel_32          v135 v136 v0
+  v138 = max_f32         v129 v130
+  v139 = square_f32      v127
+  v140 = square_f32      v128
+  v141 = lt_f32          v0 v127
+  v142 = lt_f32          v128 v0
+  v143 = lt_f32_imm      v128 0x0
+  v144 = join            v142 v143
+  v145 = or_32           v141 v144
+  v146 = min_f32         v139 v140
+  v147 = sel_32          v145 v146 v0
+  v148 = max_f32         v139 v140
+  v149 = add_f32         v137 v147
+  v150 = add_f32         v138 v148
+  v151 = sqrt_f32        v149
+  v152 = sqrt_f32        v150
+  v153 = load_var        var0
+  v154 = min_f32         v151 v153
+      store_var       var0 v154
+  v156 = load_var        var1
+  v157 = min_f32         v152 v156
+      store_var       var1 v157
+  v159 = load_var        var2
+  v160 = add_i32         v24 v159
+  v161 = add_i32_imm     v159 0x1
+  v162 = join            v160 v161
+      store_var       var2 v162
       loop_end
-  v151 = load_var        var0
-  v152 = load_var        var1
-  v153 = sub_f32         v151 v43
-  v154 = sub_f32_imm     v151 0x3fc00000
-  v155 = join            v153 v154
-  v156 = sub_f32         v152 v43
-  v157 = sub_f32_imm     v152 0x3fc00000
-  v158 = join            v156 v157
-  v159 = lt_f32          v155 v0
-  v160 = lt_f32_imm      v155 0x0
-  v161 = join            v159 v160
-  v162 = lt_f32          v158 v0
-  v163 = lt_f32_imm      v158 0x0
-  v164 = join            v162 v163
-  v165 = sel_32          v161 v24 v0
-  v166 = sel_32          v164 v25 v165
-  v167 = i16_from_i32    v166
-      store_16        p0 v167
+  v165 = load_var        var0
+  v166 = load_var        var1
+  v167 = sub_f32         v165 v43
+  v168 = sub_f32_imm     v165 0x3fc00000
+  v169 = join            v167 v168
+  v170 = sub_f32         v166 v43
+  v171 = sub_f32_imm     v166 0x3fc00000
+  v172 = join            v170 v171
+  v173 = lt_f32          v169 v0
+  v174 = lt_f32_imm      v169 0x0
+  v175 = join            v173 v174
+  v176 = lt_f32          v172 v0
+  v177 = lt_f32_imm      v172 0x0
+  v178 = join            v176 v177
+  v179 = sel_32          v175 v24 v0
+  v180 = sel_32          v178 v25 v179
+  v181 = i16_from_i32    v180
+      store_16        p0 v181

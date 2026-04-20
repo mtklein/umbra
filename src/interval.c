@@ -31,9 +31,14 @@ umbra_interval umbra_interval_mul_f32(struct umbra_builder *b,
         return umbra_interval_exact(umbra_mul_f32(b, a.lo, c.lo));
     }
     if (a.lo.id == c.lo.id && a.hi.id == c.hi.id) {
-        umbra_val32 const ll = umbra_mul_f32(b, a.lo, a.lo),
-                          hh = umbra_mul_f32(b, a.hi, a.hi);
-        return (umbra_interval){umbra_imm_f32(b, 0.0f),
+        umbra_val32 const zero        = umbra_imm_f32(b, 0.0f),
+                          ll          = umbra_mul_f32(b, a.lo, a.lo),
+                          hh          = umbra_mul_f32(b, a.hi, a.hi),
+                          pos         = umbra_lt_f32(b, zero, a.lo),
+                          neg         = umbra_lt_f32(b, a.hi, zero),
+                          consistent  = umbra_or_32 (b, pos, neg),
+                          tight_lo    = umbra_min_f32(b, ll, hh);
+        return (umbra_interval){umbra_sel_32(b, consistent, tight_lo, zero),
                                 umbra_max_f32(b, ll, hh)};
     }
     umbra_val32 const ll = umbra_mul_f32(b, a.lo, c.lo),
