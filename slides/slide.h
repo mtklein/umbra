@@ -71,15 +71,13 @@ struct slide_runtime {
     int                   :32;
 };
 
-// TODO: struct slide_runtime* slide_runtime(struct slide*, ...)
-//       and slide_runtime_free(struct slide_runtime*)
-void slide_runtime_compile(struct slide_runtime*, struct slide*,
-                           int w, int h,
-                           struct umbra_backend*, struct umbra_fmt,
-                           struct umbra_matrix const *pre_transform);
-void slide_runtime_draw   (struct slide_runtime*, struct slide*,
-                           double secs, int l, int t, int r, int b);
-void slide_runtime_cleanup(struct slide_runtime*);
+// Allocate and compile a slide_runtime.  Caller frees via slide_runtime_free.
+struct slide_runtime* slide_runtime(struct slide*, int w, int h,
+                                    struct umbra_backend*, struct umbra_fmt,
+                                    struct umbra_matrix const *pre_transform);
+void slide_runtime_draw (struct slide_runtime*, struct slide*,
+                         double secs, int l, int t, int r, int b);
+void slide_runtime_free (struct slide_runtime*);
 
 // Builders for the slide's composable draw paths for inspection.
 // Uses `rt` as backing storage for bind sites -- rt must outlive any

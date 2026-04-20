@@ -161,10 +161,11 @@ static void runtime_sdf_builders(
     *out_bounds = bb;
 }
 
-void slide_runtime_compile(struct slide_runtime *rt, struct slide *s,
-                           int w, int h,
-                           struct umbra_backend *be, struct umbra_fmt fmt,
-                           struct umbra_matrix const *pre) {
+struct slide_runtime* slide_runtime(struct slide *s,
+                                    int w, int h,
+                                    struct umbra_backend *be, struct umbra_fmt fmt,
+                                    struct umbra_matrix const *pre) {
+    struct slide_runtime *rt = calloc(1, sizeof *rt);
     rt->fmt = fmt;
     rt->w   = w;
     rt->h   = h;
@@ -191,6 +192,7 @@ void slide_runtime_compile(struct slide_runtime *rt, struct slide *s,
         rt->draw = be->compile(be, ir);
         umbra_flat_ir_free(ir);
     }
+    return rt;
 }
 
 void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
@@ -215,13 +217,14 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
     }
 }
 
-void slide_runtime_cleanup(struct slide_runtime *rt) {
+void slide_runtime_free(struct slide_runtime *rt) {
+    if (!rt) { return; }
     struct umbra_backend *bounds_be = rt->bounds ? rt->bounds->backend : NULL;
     umbra_program_free(rt->draw);
     umbra_program_free(rt->bounds);
     umbra_backend_free(bounds_be);
     free(rt->cov);
-    *rt = (struct slide_runtime){0};
+    free(rt);
 }
 
 int slide_builders(struct slide_runtime *rt, struct slide *s,

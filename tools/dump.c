@@ -227,22 +227,22 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
     size_t const pixbuf_sz = (size_t)RW * RH * fmt.bpp * (size_t)fmt.planes;
     void *pixbuf = calloc(1, pixbuf_sz);
 
-    struct slide_runtime rt = {0};
     _Bool const leaf = s->build_draw || s->build_sdf_draw;
+    struct slide_runtime *rt = NULL;
     if (leaf) {
-        slide_runtime_compile(&rt, s, RW, RH, be, fmt, NULL);
+        rt = slide_runtime(s, RW, RH, be, fmt, NULL);
         slide_bg_prepare(be, fmt, RW, RH);
         slide_bg_draw(s->bg, 0, 0, RW, RH, pixbuf);
-        rt.dst_buf = (struct umbra_buf){
+        rt->dst_buf = (struct umbra_buf){
             .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
         };
-        slide_runtime_draw(&rt, s, 0.0, 0, 0, RW, RH);
+        slide_runtime_draw(rt, s, 0.0, 0, 0, RW, RH);
     } else {
         s->prepare(s, be, fmt);
         s->draw(s, 0.0, 0, 0, RW, RH, pixbuf);
     }
     be->flush(be);
-    if (leaf) { slide_runtime_cleanup(&rt); }
+    slide_runtime_free(rt);
 
     float *fdata = malloc((size_t)(RW * RH) * 4 * sizeof(float));
     fp16p_to_float(fdata, pixbuf);
@@ -277,9 +277,9 @@ int main(void) {
         slugify(s->title, dir, sizeof dir);
         mkdir(dir, 0755);
 
-        struct slide_runtime rt = {0};
+        struct slide_runtime *rt = calloc(1, sizeof *rt);
         struct umbra_builder *builders[2] = {0};
-        int const nb = slide_builders(&rt, s, umbra_fmt_fp16, NULL,
+        int const nb = slide_builders(rt, s, umbra_fmt_fp16, NULL,
                                       builders, count(builders));
         for (int j = 0; j < nb; j++) {
             char sub[256];
@@ -287,7 +287,7 @@ int main(void) {
             mkdir(sub, 0755);
             dump_builder(&db, sub, builders[j]);
         }
-        slide_runtime_cleanup(&rt);
+        slide_runtime_free(rt);
 
         render_hdr(dir, i, be);
     }

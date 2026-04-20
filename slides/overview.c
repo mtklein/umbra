@@ -17,7 +17,7 @@ static uint8_t const font3x5[10][5] = {
 struct cell {
     struct slide         *sub;          // NULL = placeholder
     int                   col, row;
-    struct slide_runtime  rt;
+    struct slide_runtime *rt;
     struct umbra_matrix   cell_mat;     // cell -> canvas, fixed at prepare
     int                   :32;
 };
@@ -126,7 +126,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 
     if (st->cells) {
         for (int i = 0; i < st->n_cells; i++) {
-            slide_runtime_cleanup(&st->cells[i].rt);
+            slide_runtime_free(st->cells[i].rt);
         }
         free(st->cells);
     }
@@ -154,7 +154,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
         c->sub = sub;
         if (sub->prepare) { sub->prepare(sub, be, fmt); }
 
-        slide_runtime_compile(&c->rt, sub, s->w, s->h, be, fmt, &c->cell_mat);
+        c->rt = slide_runtime(sub, s->w, s->h, be, fmt, &c->cell_mat);
     }
 
     umbra_program_free(st->overlay_prog);
@@ -205,9 +205,9 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         umbra_color const bg = c->sub ? c->sub->bg : placeholder_bg;
         slide_bg_draw(bg, xl, yt, xr, yb, buf);
 
-        if (c->sub && c->rt.draw) {
-            c->rt.dst_buf = st->out_buf;
-            slide_runtime_draw(&c->rt, c->sub, secs, xl, yt, xr, yb);
+        if (c->sub && c->rt && c->rt->draw) {
+            c->rt->dst_buf = st->out_buf;
+            slide_runtime_draw(c->rt, c->sub, secs, xl, yt, xr, yb);
         }
     }
 
@@ -221,7 +221,7 @@ static void overview_free(struct slide *s) {
     free(st->overlay);
     if (st->cells) {
         for (int i = 0; i < st->n_cells; i++) {
-            slide_runtime_cleanup(&st->cells[i].rt);
+            slide_runtime_free(st->cells[i].rt);
         }
         free(st->cells);
     }

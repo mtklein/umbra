@@ -50,9 +50,7 @@ related assignments of the same type, with one shared type declaration:
              quux = fn(inst.w);
     float const not_int = ...;
 
-Write code that is clear without needing comments.  If you're thinking of
-adding a comment to clarify, first see if refactoring or more precise
-identifiers can make it clear.  Reserve comments only for important context
+Comments should be extremely rare.  Reserve comments only for important context
 that cannot be expressed through code.  Never use comments for organization or
 decoration.
 
