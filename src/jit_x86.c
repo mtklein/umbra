@@ -472,7 +472,7 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     void  *buf_mem;
     size_t buf_size;
-    acquire_code_buf(be, &buf_mem, &buf_size, alloc + pg);
+    jit_acquire_code_buf(be, &buf_mem, &buf_size, alloc + pg);
     __builtin_memcpy(buf_mem, c.byte, code_sz);
     mprotect((char *)buf_mem + alloc, pg, PROT_NONE);
     int const ok = mprotect(buf_mem, alloc, PROT_READ | PROT_EXEC);

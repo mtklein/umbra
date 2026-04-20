@@ -64,7 +64,7 @@ struct jit_backend {
     int                  count, cap;
 };
 
-void acquire_code_buf(struct jit_backend *be, void **mem, size_t *size, size_t min_size) {
+void jit_acquire_code_buf(struct jit_backend *be, void **mem, size_t *size, size_t min_size) {
     for (int i = be->count; i-- > 0;) {
         if (be->cache[i].size >= min_size) {
             *mem  = be->cache[i].mem;
@@ -81,7 +81,7 @@ void acquire_code_buf(struct jit_backend *be, void **mem, size_t *size, size_t m
     assume(*mem != MAP_FAILED);
 }
 
-void release_code_buf(struct jit_backend *be, void *mem, size_t size) {
+void jit_release_code_buf(struct jit_backend *be, void *mem, size_t size) {
     if (be->count == be->cap) {
         be->cap = be->cap ? 2 * be->cap : 4;
         be->cache = realloc(be->cache, (size_t)be->cap * sizeof *be->cache);
@@ -105,7 +105,7 @@ static void dump_jit(struct umbra_program const *prog, FILE *f) {
 static void free_jit(struct umbra_program *prog) {
     struct jit_program *j = (struct jit_program*)prog;
     struct jit_backend *be = (struct jit_backend*)prog->backend;
-    release_code_buf(be, j->code, j->code_size);
+    jit_release_code_buf(be, j->code, j->code_size);
     free(j->binding);
     free(j);
 }

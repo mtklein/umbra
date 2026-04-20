@@ -290,7 +290,7 @@ struct jit_program* jit_program(struct jit_backend *be,
                  est = (size_t)(ir->insts * 40 + 256);
     void  *buf_mem;
     size_t buf_size;
-    acquire_code_buf(be, &buf_mem, &buf_size, est + pg);
+    jit_acquire_code_buf(be, &buf_mem, &buf_size, est + pg);
 
     Buf c = {
         .word      = buf_mem,
