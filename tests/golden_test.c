@@ -20,15 +20,6 @@ static char const *const backend_name[NUM_BACKENDS] = {
 
 static struct umbra_backend *bes[NUM_BACKENDS];
 
-static struct umbra_fmt const *const all_fmts[] = {
-    &umbra_fmt_8888,
-    &umbra_fmt_565,
-    &umbra_fmt_1010102,
-    &umbra_fmt_fp16,
-    &umbra_fmt_fp16_planar,
-};
-enum { N_FMTS = count(all_fmts) };
-
 static void build_pipes(void) {
     bes[0] = umbra_backend_interp();
     bes[1] = umbra_backend_jit();
@@ -203,17 +194,21 @@ TEST(test_perspective_text) {
     text_cov_free(&tc);
 }
 
-TEST(test_golden_slides) {
+static void golden_slides_for_fmt(struct umbra_fmt fmt) {
     build_pipes();
     slides_init(W, H);
-    for (int fi = 0; fi < N_FMTS; fi++) {
-        for (int si = 0; si < slide_count() - 1; si++) {
-            test_slide_golden(si, *all_fmts[fi]);
-        }
+    for (int si = 0; si < slide_count() - 1; si++) {
+        test_slide_golden(si, fmt);
     }
     slides_cleanup();
     free_pipes();
 }
+
+TEST(test_golden_slides_8888)        { golden_slides_for_fmt(umbra_fmt_8888); }
+TEST(test_golden_slides_565)         { golden_slides_for_fmt(umbra_fmt_565); }
+TEST(test_golden_slides_1010102)     { golden_slides_for_fmt(umbra_fmt_1010102); }
+TEST(test_golden_slides_fp16)        { golden_slides_for_fmt(umbra_fmt_fp16); }
+TEST(test_golden_slides_fp16_planar) { golden_slides_for_fmt(umbra_fmt_fp16_planar); }
 
 static void run_long_batch_no_oom(struct umbra_backend *be) {
     if (be) {
