@@ -452,7 +452,7 @@ static void vk_program_free(struct umbra_program *p) {
 
 static struct umbra_program* vk_compile(struct umbra_backend *be,
                                          struct umbra_flat_ir const *ir) {
-    struct vk_backend *vbe = (struct vk_backend *)be;
+    struct vk_backend *v = (struct vk_backend *)be;
 
     struct spirv_result const sr =
         build_spirv(ir, SPIRV_FLOAT_CONTROLS);
@@ -467,7 +467,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
             .codeSize = (size_t)sr.spirv_words * sizeof(uint32_t),
             .pCode = sr.spirv,
         };
-        VkResult rc = vkCreateShaderModule(vbe->device, &ci, 0, &shader);
+        VkResult rc = vkCreateShaderModule(v->device, &ci, 0, &shader);
         assume(rc == VK_SUCCESS);
     }
 
@@ -491,7 +491,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
             .bindingCount = (uint32_t)descs,
             .pBindings = bindings,
         };
-        vkCreateDescriptorSetLayout(vbe->device, &ci, 0, &ds_layout);
+        vkCreateDescriptorSetLayout(v->device, &ci, 0, &ds_layout);
     }
     free(bindings);
 
@@ -510,7 +510,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
             .pushConstantRangeCount = 1,
             .pPushConstantRanges = &pcr,
         };
-        vkCreatePipelineLayout(vbe->device, &ci, 0, &pipe_layout);
+        vkCreatePipelineLayout(v->device, &ci, 0, &pipe_layout);
     }
 
     VkPipeline pipeline;
@@ -525,12 +525,12 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
             },
             .layout = pipe_layout,
         };
-        VkResult rc = vkCreateComputePipelines(vbe->device, VK_NULL_HANDLE, 1, &ci, 0, &pipeline);
+        VkResult rc = vkCreateComputePipelines(v->device, VK_NULL_HANDLE, 1, &ci, 0, &pipeline);
         assume(rc == VK_SUCCESS);
     }
 
     struct vk_program *p = calloc(1, sizeof *p);
-    p->be          = vbe;
+    p->be          = v;
     p->shader      = shader;
     p->ds_layout   = ds_layout;
     p->pipe_layout = pipe_layout;
