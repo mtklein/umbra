@@ -119,6 +119,7 @@ static void tile_factor(int n, int *cols, int *rows) {
 static int cur_backend;
 
 static struct slide_runtime *slide_rt;
+static struct slide_bg      *slide_bg_cur;
 
 static _Bool is_leaf(struct slide const *s) {
     return s->build_draw || s->build_sdf_draw;
@@ -127,9 +128,11 @@ static _Bool is_leaf(struct slide const *s) {
 static void rebuild_rt(struct slide *s, int fmt, int W, int H) {
     slide_runtime_free(slide_rt);
     slide_rt = NULL;
+    slide_bg_free(slide_bg_cur);
+    slide_bg_cur = NULL;
     if (bes[cur_backend] && is_leaf(s)) {
-        slide_rt = slide_runtime(s, W, H, bes[cur_backend], *fmt_enums[fmt], NULL);
-        slide_bg_prepare(bes[cur_backend], *fmt_enums[fmt]);
+        slide_rt     = slide_runtime(s, W, H, bes[cur_backend], *fmt_enums[fmt], NULL);
+        slide_bg_cur = slide_bg(bes[cur_backend], *fmt_enums[fmt]);
     }
 }
 
@@ -351,7 +354,7 @@ int main(void) {
             slide_rt->dst_buf = (struct umbra_buf){
                 .ptr=pixbuf, .count=W*H*planes, .stride=W,
             };
-            slide_bg_draw(s->bg, 0, 0, W, H, slide_rt->dst_buf);
+            slide_bg_draw(slide_bg_cur, s->bg, 0, 0, W, H, slide_rt->dst_buf);
         }
 
         {
@@ -458,6 +461,7 @@ int main(void) {
     free(xtra_progs);
     umbra_flat_ir_free(saved_ir);
     slide_runtime_free(slide_rt);
+    slide_bg_free(slide_bg_cur);
     free_pipes();
     slides_cleanup();
     for (int i = 0; i < NUM_BACKENDS; i++) { umbra_backend_free(bes[i]); }

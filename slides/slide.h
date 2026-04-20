@@ -49,9 +49,10 @@ void          slides_cleanup     (void);
 
 void slide_perspective_matrix(struct umbra_matrix *out, float t, int sw, int sh, int bw, int bh);
 
-void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt);
-void slide_bg_draw   (umbra_color bg, int l, int t, int r, int b, struct umbra_buf dst);
-void slide_bg_cleanup(void);
+struct slide_bg* slide_bg     (struct umbra_backend*, struct umbra_fmt);
+void             slide_bg_draw(struct slide_bg*, umbra_color,
+                               int l, int t, int r, int b, struct umbra_buf dst);
+void             slide_bg_free(struct slide_bg*);
 
 struct slide_runtime {
     struct umbra_program *draw;

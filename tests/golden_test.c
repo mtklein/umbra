@@ -50,18 +50,19 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
     size_t const pixbuf_sz = rb * H * (size_t)fmt.planes;
 
     struct slide_runtime *rt[NUM_BACKENDS] = {0};
+    struct slide_bg      *bg[NUM_BACKENDS] = {0};
     void *pbuf[NUM_BACKENDS] = {0};
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (!bes[bi]) { continue; }
         pbuf[bi] = calloc(1, pixbuf_sz);
 
         rt[bi] = slide_runtime(s, W, H, bes[bi], fmt, NULL);
-        slide_bg_prepare(bes[bi], fmt);
+        bg[bi] = slide_bg(bes[bi], fmt);
 
         rt[bi]->dst_buf = (struct umbra_buf){
             .ptr=pbuf[bi], .count=W * H * fmt.planes, .stride=W,
         };
-        slide_bg_draw(s->bg, 0, 0, W, H, rt[bi]->dst_buf);
+        slide_bg_draw(bg[bi], s->bg, 0, 0, W, H, rt[bi]->dst_buf);
         slide_runtime_draw(rt[bi], s, 0, 0, 0, W, H);
 
         bes[bi]->flush(bes[bi]);
@@ -102,6 +103,7 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
     }
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        slide_bg_free(bg[bi]);
         slide_runtime_free(rt[bi]);
         free(pbuf[bi]);
     }

@@ -228,13 +228,14 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
 
     _Bool const leaf = s->build_draw || s->build_sdf_draw;
     struct slide_runtime *rt = NULL;
+    struct slide_bg      *bg = NULL;
     if (leaf) {
         rt = slide_runtime(s, RW, RH, be, fmt, NULL);
-        slide_bg_prepare(be, fmt);
+        bg = slide_bg(be, fmt);
         rt->dst_buf = (struct umbra_buf){
             .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
         };
-        slide_bg_draw(s->bg, 0, 0, RW, RH, rt->dst_buf);
+        slide_bg_draw(bg, s->bg, 0, 0, RW, RH, rt->dst_buf);
         slide_runtime_draw(rt, s, 0.0, 0, 0, RW, RH);
     } else {
         s->prepare(s, be, fmt);
@@ -244,6 +245,7 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
         s->draw(s, 0.0, 0, 0, RW, RH, dst);
     }
     be->flush(be);
+    slide_bg_free(bg);
     slide_runtime_free(rt);
 
     float *fdata = malloc((size_t)(RW * RH) * 4 * sizeof(float));

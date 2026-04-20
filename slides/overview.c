@@ -26,6 +26,7 @@ struct overview_slide {
     struct slide base;
 
     struct umbra_buf      out_buf;
+    struct slide_bg      *bg;
 
     struct cell          *cells;
     int                   n_cells, rows, cols, cw, ch;
@@ -93,7 +94,8 @@ static void compute_cell_matrix(struct umbra_matrix *out, int col, int row,
 static void overview_prepare(struct slide *s, struct umbra_backend *be, struct umbra_fmt fmt) {
     struct overview_slide *st = (struct overview_slide *)s;
 
-    slide_bg_prepare(be, fmt);
+    slide_bg_free(st->bg);
+    st->bg = slide_bg(be, fmt);
 
     if (!st->overlay) {
         st->overlay = calloc((size_t)(s->w * s->h), sizeof *st->overlay);
@@ -198,7 +200,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
         // need something visible.  Empty slots (idx >= n_real, c->sub NULL)
         // get a neutral dark gray.
         umbra_color const bg = c->sub ? c->sub->bg : placeholder_bg;
-        slide_bg_draw(bg, xl, yt, xr, yb, dst);
+        slide_bg_draw(st->bg, bg, xl, yt, xr, yb, dst);
 
         if (c->sub && c->rt && c->rt->draw) {
             c->rt->dst_buf = st->out_buf;
@@ -213,6 +215,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
 static void overview_free(struct slide *s) {
     struct overview_slide *st = (struct overview_slide *)s;
     umbra_program_free(st->overlay_prog);
+    slide_bg_free(st->bg);
     free(st->overlay);
     if (st->cells) {
         for (int i = 0; i < st->n_cells; i++) {

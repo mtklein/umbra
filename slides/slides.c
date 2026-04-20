@@ -62,46 +62,45 @@ void slides_cleanup(void) {
     for (int i = 0; i < count; i++) {
         if (all[i]->free) { all[i]->free(all[i]); }
     }
-    slide_bg_cleanup();
     count = 0;
 }
 
-// TODO: these should not be globals
-static struct umbra_flat_ir    *bg_ir;
-static struct umbra_program    *bg_prog;
-static umbra_color              bg_color;
-static struct umbra_fmt         bg_fmt;
-static struct umbra_buf         bg_dst_buf;
+struct slide_bg {
+    struct umbra_program *prog;
+    umbra_color           color;
+    struct umbra_buf      dst_buf;
+};
 
-void slide_bg_prepare(struct umbra_backend *be, struct umbra_fmt fmt) {
-    if (bg_fmt.name != fmt.name || !bg_ir) {
-        umbra_flat_ir_free(bg_ir);
-        bg_fmt = fmt;
-        struct umbra_builder *b = umbra_builder();
-        umbra_ptr const dst = umbra_bind_buf(b, &bg_dst_buf);
-        umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
-                          y = umbra_f32_from_i32(b, umbra_y(b));
-        umbra_build_draw(b, dst, fmt, x, y,
-                         NULL,               NULL,
-                         umbra_shader_color, &bg_color,
-                         NULL,               NULL);
-        bg_ir = umbra_flat_ir(b);
-        umbra_builder_free(b);
+struct slide_bg* slide_bg(struct umbra_backend *be, struct umbra_fmt fmt) {
+    struct slide_bg *bg = calloc(1, sizeof *bg);
+
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr   const dst = umbra_bind_buf(b, &bg->dst_buf);
+    umbra_val32 const x   = umbra_f32_from_i32(b, umbra_x(b)),
+                      y   = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_build_draw(b, dst, fmt, x, y,
+                     NULL,               NULL,
+                     umbra_shader_color, &bg->color,
+                     NULL,               NULL);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    bg->prog = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
+    return bg;
+}
+
+void slide_bg_draw(struct slide_bg *bg, umbra_color color,
+                   int l, int t, int r, int b, struct umbra_buf dst) {
+    bg->color   = color;
+    bg->dst_buf = dst;
+    bg->prog->queue(bg->prog, l, t, r, b);
+}
+
+void slide_bg_free(struct slide_bg *bg) {
+    if (bg) {
+        umbra_program_free(bg->prog);
+        free(bg);
     }
-    umbra_program_free(bg_prog);
-    bg_prog = be->compile(be, bg_ir);
-}
-
-void slide_bg_draw(umbra_color bg, int l, int t, int r, int b, struct umbra_buf dst) {
-    bg_color   = bg;
-    bg_dst_buf = dst;
-    bg_prog->queue(bg_prog, l, t, r, b);
-}
-
-void slide_bg_cleanup(void) {
-    if (bg_prog) { umbra_program_free(bg_prog); bg_prog = NULL; }
-    umbra_flat_ir_free(bg_ir); bg_ir = NULL;
-    bg_fmt = (struct umbra_fmt){0};
 }
 
 static struct umbra_builder* runtime_draw_builder(
