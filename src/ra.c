@@ -139,57 +139,59 @@ void ra_assert_loop_invariant(struct ra const *ra) {
 void ra_end_loop(struct ra *ra, int *sl) {
     for (int i = 0; i < ra->preamble; i++) {
         int8_t const target = ra->loop_reg[i];
-        if (ra->slot[i].reg == target) { continue; }
-        if (target < 0) {
-            // Val i had no register at loop top (evicted during preamble,
-            // its data lives in sl[i]).  Body emit may have ra_ensure'd it
-            // back into some register; release that so next iteration's
-            // first read performs the same fill as this iteration did.
-            // No emitted instruction needed -- the data is already in sl[i].
-            int8_t const old_r = ra->slot[i].reg;
-            if (old_r >= 0 && ra->owner[(int)old_r] == i) {
-                ra->owner[(int)old_r] = -1;
-                int8_t const bit = ra->pool_inv[(int)old_r];
-                if (bit >= 0) { ra->free_set |= (uint32_t)1 << bit; }
+        if (ra->slot[i].reg != target) {
+            if (target < 0) {
+                // Val i had no register at loop top (evicted during preamble,
+                // its data lives in sl[i]).  Body emit may have ra_ensure'd it
+                // back into some register; release that so next iteration's
+                // first read performs the same fill as this iteration did.
+                // No emitted instruction needed -- the data is already in sl[i].
+                int8_t const old_r = ra->slot[i].reg;
+                if (old_r >= 0 && ra->owner[(int)old_r] == i) {
+                    ra->owner[(int)old_r] = -1;
+                    int8_t const bit = ra->pool_inv[(int)old_r];
+                    if (bit >= 0) { ra->free_set |= (uint32_t)1 << bit; }
+                }
+                ra->slot[i].reg = -1;
+            } else {
+                // Drop the owner record for val i's current register (if any)
+                // before reassigning to target.  Otherwise a later iteration
+                // that needs to restore a different val into that old register
+                // would see val i still listed as the occupant and clobber
+                // slot[i].reg back to -1.
+                int8_t const old_r = ra->slot[i].reg;
+                if (old_r >= 0 && ra->owner[(int)old_r] == i) {
+                    ra->owner[(int)old_r] = -1;
+                }
+                int const occ = ra->owner[(int)target];
+                if (occ >= 0 && occ != i) {
+                    ra->slot[occ].reg = -1;
+                    ra->owner[(int)target] = -1;
+                }
+                if (sl[i] >= 0) {
+                    ra->cfg.fill(target, sl[i], ra->cfg.ctx);
+                } else if (can_remat(ra, i)) {
+                    ra->cfg.remat(target, i, ra->cfg.ctx);
+                }
+                ra->slot[i].reg = target;
+                ra->owner[(int)target] = i;
             }
-            ra->slot[i].reg = -1;
-            continue;
         }
-        // Drop the owner record for val i's current register (if any) before
-        // reassigning to target.  Otherwise a later iteration that needs to
-        // restore a different val into that old register would see val i
-        // still listed as the occupant and clobber slot[i].reg back to -1.
-        int8_t const old_r = ra->slot[i].reg;
-        if (old_r >= 0 && ra->owner[(int)old_r] == i) {
-            ra->owner[(int)old_r] = -1;
-        }
-        int const occ = ra->owner[(int)target];
-        if (occ >= 0 && occ != i) {
-            ra->slot[occ].reg = -1;
-            ra->owner[(int)target] = -1;
-        }
-        if (sl[i] >= 0) {
-            ra->cfg.fill(target, sl[i], ra->cfg.ctx);
-        } else if (can_remat(ra, i)) {
-            ra->cfg.remat(target, i, ra->cfg.ctx);
-        }
-        ra->slot[i].reg = target;
-        ra->owner[(int)target] = i;
     }
 }
 
 void ra_evict_live_before(struct ra *ra, int *sl, int *ns, int before) {
     for (int v = 0; v < before; v++) {
         int8_t const r = ra->slot[v].reg;
-        if (r < 0) { continue; }
-        if (ra->slot[v].last_use <= before) { continue; }
-        if (!can_remat(ra, v) && sl[v] < 0) {
-            sl[v] = (*ns)++;
+        if (r >= 0 && ra->slot[v].last_use > before) {
+            if (!can_remat(ra, v) && sl[v] < 0) {
+                sl[v] = (*ns)++;
+            }
+            if (sl[v] >= 0) {
+                ra->cfg.spill(r, sl[v], ra->cfg.ctx);
+            }
+            ra_free_reg(ra, v);
         }
-        if (sl[v] >= 0) {
-            ra->cfg.spill(r, sl[v], ra->cfg.ctx);
-        }
-        ra_free_reg(ra, v);
     }
 }
 
@@ -236,11 +238,12 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
         int const bit = __builtin_ctz(cand);
         int const r   = ra->cfg.pool[bit];
         int const val = ra->owner[r];
-        if (val < 0) { continue; }
-        int const lu = ra->slot[val].last_use < 0 ? INT_MAX : ra->slot[val].last_use;
-        if (best_lu < lu) {
-            best_lu = lu;
-            best_r = r;
+        if (val >= 0) {
+            int const lu = ra->slot[val].last_use < 0 ? INT_MAX : ra->slot[val].last_use;
+            if (best_lu < lu) {
+                best_lu = lu;
+                best_r = r;
+            }
         }
     }
     int const evicted = ra->owner[best_r];
