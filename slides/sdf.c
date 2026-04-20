@@ -130,7 +130,6 @@ static void sdf_common_free(struct slide *s) {
     .get_builders   = sdf_common_get_builders,  \
     .build_sdf_draw = sdf_common_build_draw
 
-// =============================================================================
 // CSG: union / intersection / difference of two circles.
 
 struct two_circle_sdf {
@@ -226,7 +225,6 @@ SLIDE(slide_sdf_union)     { return make_csg("SDF Union",        (float[]){0.2f,
 SLIDE(slide_sdf_intersect) { return make_csg("SDF Intersection", (float[]){0.8f, 0.4f, 0.2f, 1}, CSG_INTERSECT); }
 SLIDE(slide_sdf_difference){ return make_csg("SDF Difference",   (float[]){0.4f, 0.2f, 0.8f, 1}, CSG_DIFFERENCE); }
 
-// =============================================================================
 // Circle.
 
 struct circle_sdf_ctx {
@@ -294,7 +292,6 @@ SLIDE(slide_sdf_circle) {
     return &st->common.base;
 }
 
-// =============================================================================
 // Ring.
 
 struct ring_sdf_ctx {
@@ -347,7 +344,6 @@ SLIDE(slide_sdf_ring) {
     return &st->common.base;
 }
 
-// =============================================================================
 // Rounded rect.
 
 struct rounded_rect_sdf_ctx {
@@ -419,7 +415,6 @@ SLIDE(slide_sdf_rounded_rect) {
     return &st->common.base;
 }
 
-// =============================================================================
 // Capsule.
 
 struct capsule_sdf_ctx {
@@ -501,7 +496,6 @@ SLIDE(slide_sdf_capsule) {
     return &st->common.base;
 }
 
-// =============================================================================
 // Halfplane.
 
 struct halfplane_sdf_ctx {
@@ -562,7 +556,6 @@ SLIDE(slide_sdf_halfplane) {
     return &st->common.base;
 }
 
-// =============================================================================
 // SDF Text.
 
 // TODO: use the actual quadratic Bezier distance (P0, P1, P2) instead of
@@ -726,7 +719,6 @@ SLIDE(slide_sdf_text) {
     return &st->common.base;
 }
 
-// =============================================================================
 // N-gon.
 
 #define NGON_SIDES 6
