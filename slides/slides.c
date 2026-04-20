@@ -1,4 +1,5 @@
 #include "slide.h"
+#include "../src/assume.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -34,9 +35,8 @@ static struct slide *all[MAX_SLIDES];
 static int           count;
 
 void slide_register(slide_factory_fn factory) {
-    if (registry_count < MAX_SLIDES) {
-        registry[registry_count++] = factory;
-    }
+    assume(registry_count < MAX_SLIDES);
+    registry[registry_count++] = factory;
 }
 
 int           slide_count(void) { return count; }
