@@ -349,13 +349,14 @@ struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
     struct ir_inst *out = malloc((size_t)live_count * sizeof *out);
     int j = 0;
     for (int i = 0; i < n; i++) {
-        if (!live[i]) { continue; }
-        out[j]   = inst[i];
-        out[j].x = remap_val(inst[i].x, remap);
-        out[j].y = remap_val(inst[i].y, remap);
-        out[j].z = remap_val(inst[i].z, remap);
-        out[j].w = remap_val(inst[i].w, remap);
-        j++;
+        if (live[i]) {
+            out[j]   = inst[i];
+            out[j].x = remap_val(inst[i].x, remap);
+            out[j].y = remap_val(inst[i].y, remap);
+            out[j].z = remap_val(inst[i].z, remap);
+            out[j].w = remap_val(inst[i].w, remap);
+            j++;
+        }
     }
 
     struct umbra_flat_ir *result = calloc(1, sizeof *result);

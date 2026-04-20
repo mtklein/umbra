@@ -703,17 +703,18 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
     uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
     for (int i = 0; i < ir->insts; i++) {
-        if (!op_has_ptr(ir->inst[i].op)) { continue; }
-        int p = ir->inst[i].ptr.bits;
-        buf_rw[p] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
-        if      (ir->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
-        else if (ir->inst[i].op == op_load_16x4_planar
-              || ir->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 1; buf_row_shift[p] = 1; }
-        else if (ir->inst[i].op == op_load_16x4
-              || ir->inst[i].op == op_store_16x4)        { buf_shift[p] = 3; buf_row_shift[p] = 3; }
-        else if (ir->inst[i].op == op_load_16
-              || ir->inst[i].op == op_store_16)          { buf_shift[p] = 1; buf_row_shift[p] = 1; }
-        else                                             { buf_shift[p] = 2; buf_row_shift[p] = 2; }
+        if (op_has_ptr(ir->inst[i].op)) {
+            int p = ir->inst[i].ptr.bits;
+            buf_rw[p] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+            if      (ir->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
+            else if (ir->inst[i].op == op_load_16x4_planar
+                  || ir->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 1; buf_row_shift[p] = 1; }
+            else if (ir->inst[i].op == op_load_16x4
+                  || ir->inst[i].op == op_store_16x4)        { buf_shift[p] = 3; buf_row_shift[p] = 3; }
+            else if (ir->inst[i].op == op_load_16
+                  || ir->inst[i].op == op_store_16)          { buf_shift[p] = 1; buf_row_shift[p] = 1; }
+            else                                             { buf_shift[p] = 2; buf_row_shift[p] = 2; }
+        }
     }
     uint8_t *buf_is_uniform_out = calloc((size_t)(total_bufs + 1),
                                          sizeof *buf_is_uniform_out);
