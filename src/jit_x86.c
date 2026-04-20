@@ -318,6 +318,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     mov_rr(&c, XH_X86, RCX);         // XH_X86 = b
     mov_rr(&c, XBUF, R8);            // XBUF(RDX) = buf
 
+    int const preamble_off = (int)c.size;
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
 
     ra_begin_loop(ra);
@@ -329,6 +330,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     mov_rr(&c, XI, RSI);             // XI = l
 
     int const loop_top = (int)c.size;
+    ra_assert_loop_invariant(ra);
 
     // remaining = row_end (RDI) - XI
     mov_rr(&c, R11, RDI);
@@ -348,12 +350,11 @@ struct jit_program* jit_program(struct jit_backend *be,
         ra_return_reg(ra, zr);
     }
 
-    int const loop_body_start = (int)c.size;
+    int const simd_body_off = (int)c.size;
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 0, &jc);
 
     ra_end_loop(ra, sl);
-
-    int const loop_body_end = (int)c.size;
+    ra_assert_loop_invariant(ra);
 
     add_ri(&c, XI, 8);
     {
@@ -390,6 +391,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     // row_done:
+    int const row_done = (int)c.size;
     patch_jcc(&c, br_row_done);
 
     add_ri(&c, XY, 1);
@@ -400,9 +402,11 @@ struct jit_program* jit_program(struct jit_backend *be,
     // Re-emit preamble so the next row's SIMD iter starts with uniforms in
     // the registers it expects: the tail body clobbers them, and the SIMD
     // body's end-of-loop fills are skipped when we enter the tail.
+    int const next_row_off = (int)c.size;
     ra_reset_pool(ra);
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
+    ra_assert_loop_invariant(ra);
     {
         int     const j   = jmp(&c);
         int32_t const rel = (int32_t)(loop_top - (j + 4));
@@ -410,6 +414,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     // done_all:
+    int const done_all = (int)c.size;
     patch_jcc(&c, br_done_all);
 
     {
@@ -477,8 +482,15 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     j->code = buf_mem;
     j->code_size = buf_size;
-    j->loop_start = loop_body_start;
-    j->loop_end = loop_body_end;
+    j->code_bytes = (int)code_sz;
+    j->labels = 0;
+    j->label[j->labels++] = (struct jit_label){.name = "preamble",  .byte_off = preamble_off};
+    j->label[j->labels++] = (struct jit_label){.name = "loop_top",  .byte_off = loop_top};
+    j->label[j->labels++] = (struct jit_label){.name = "simd_body", .byte_off = simd_body_off};
+    j->label[j->labels++] = (struct jit_label){.name = "tail_top",  .byte_off = tail_top};
+    j->label[j->labels++] = (struct jit_label){.name = "row_done",  .byte_off = row_done};
+    j->label[j->labels++] = (struct jit_label){.name = "next_row",  .byte_off = next_row_off};
+    j->label[j->labels++] = (struct jit_label){.name = "done_all",  .byte_off = done_all};
     {
         union {
             void *p;
@@ -1348,125 +1360,31 @@ void jit_program_run(struct jit_program *j, int l, int t, int r, int b, struct u
     j->entry(l, t, r, b, buf);
 }
 
-static _Bool x86_disasm(uint8_t const *code, size_t n, char const *spath,
-                        char const *opath, FILE *f) {
-    _Bool result = 0;
-    FILE *fp = fopen(spath, "w");
-    if (fp) {
-        for (size_t i = 0; i < n; i++) {
-            fprintf(fp, ".byte 0x%02x\n", code[i]);
-        }
-        fclose(fp);
-
-        char cmd[1024];
-        snprintf(cmd, sizeof cmd,
-                 "/opt/homebrew/opt/llvm/bin/clang"
-                 " -target x86_64-apple-macos13 -c %s -o %s 2>/dev/null &&"
-                 " /opt/homebrew/opt/llvm/bin/llvm-objdump"
-                 " -d --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
-                 spath, opath, opath);
-        FILE *p = popen(cmd, "r");
-        if (p) {
-            char  line[256];
-            _Bool ok = 0;
-            while (fgets(line, (int)sizeof line, p)) {
-                if (!ok && __builtin_strstr(line, "file format")) {
-                    ok = 1;
-                    continue;
-                }
-                if (f) {
-                    fputs(line, f);
-                }
-            }
-            result = pclose(p) == 0 && ok;
-        }
-    }
-    return result;
-}
-
 void jit_program_dump(struct jit_program const *j, FILE *f) {
     uint8_t const *code = (uint8_t const*)j->code;
-    size_t const   n    = (size_t)(j->loop_end - j->loop_start);
+    int      const n    = j->code_bytes;
 
-    char spath[]     = "/tmp/umbra_mca_XXXXXX.s";
-    char asmpath[]   = "/tmp/umbra_mca_asm_XXXXXX.s";
-    char cleanpath[] = "/tmp/umbra_mca_clean_XXXXXX.s";
+    char spath[] = "/tmp/umbra_dump_XXXXXX.s";
     char opath[sizeof spath + 2];
-    _Bool have_s = 0, have_asm = 0, have_clean = 0;
-
-    int   fd, afd, cfd;
-    FILE *afp, *cfp;
-
-    fd = mkstemps(spath, 2);
-    if (fd < 0) { goto done; }
-    have_s = 1;
-    close(fd);
+    int  fd      = mkstemps(spath, 2);
+    if (fd < 0) { return; }
+    FILE *sfp = fdopen(fd, "w");
+    if (!sfp) { close(fd); remove(spath); return; }
+    for (int i = 0; i < n; i++) {
+        fprintf(sfp, ".byte 0x%02x\n", code[i]);
+    }
+    fclose(sfp);
     snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
 
-    afd = mkstemps(asmpath, 2);
-    if (afd < 0) { goto done; }
-    have_asm = 1;
-    close(afd);
-
-    afp = fopen(asmpath, "w");
-    if (!afp)                                                    { goto done; }
-    if (!x86_disasm(code + j->loop_start, n, spath, opath, afp)) { fclose(afp); goto done; }
-    fclose(afp);
-
-    cfd = mkstemps(cleanpath, 2);
-    if (cfd < 0) { goto done; }
-    have_clean = 1;
-    cfp = fdopen(cfd, "w");
-    if (!cfp) { close(cfd); goto done; }
-
-    afp = fopen(asmpath, "r");
-    if (afp) {
-        char  line[256];
-        _Bool past_header = 0;
-        while (fgets(line, (int)sizeof line, afp)) {
-            if (past_header) {
-                if (line[0] != '\n' && line[0] != '<') {
-                    char *angle = __builtin_strchr(line, '<');
-                    if (angle) {
-                        *angle = '\n';
-                        angle[1] = '\0';
-                    }
-                    fputs(line, cfp);
-                }
-            } else if (__builtin_strstr(line, "<")) {
-                past_header = 1;
-            }
-        }
-        fclose(afp);
+    char cmd[512];
+    snprintf(cmd, sizeof cmd,
+             "/opt/homebrew/opt/llvm/bin/clang -target x86_64-apple-macos13"
+             " -c %s -o %s 2>/dev/null", spath, opath);
+    if (system(cmd) == 0) {
+        jit_dump_with_labels(f, opath, j->label, j->labels);
     }
-    fclose(cfp);
-
-    {
-        char cmd[1024];
-        snprintf(cmd, sizeof cmd,
-                 "/opt/homebrew/opt/llvm/bin/llvm-mca"
-                 " -mcpu=znver4 -iterations=100 -bottleneck-analysis"
-                 " -mtriple=x86_64 %s 2>&1",
-                 cleanpath);
-        FILE *p = popen(cmd, "r");
-        if (p) {
-            int const cplen = (int)__builtin_strlen(cleanpath);
-            char      line[256];
-            while (fgets(line, (int)sizeof line, p)) {
-                char *s = line;
-                if (__builtin_strncmp(s, cleanpath, (size_t)cplen) == 0) {
-                    s += cplen;
-                }
-                fputs(s, f);
-            }
-            pclose(p);
-        }
-    }
-
-done:
-    if (have_s)     { remove(spath); remove(opath); }
-    if (have_asm)   { remove(asmpath); }
-    if (have_clean) { remove(cleanpath); }
+    remove(spath);
+    remove(opath);
 }
 
 #endif

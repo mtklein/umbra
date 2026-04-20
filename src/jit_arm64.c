@@ -317,6 +317,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, ADD_xi(XY, 3, 0));        // XY = b (temp)
     put(&c, ADD_xi(XBUF, 4, 0));      // XBUF = buf
 
+    int const preamble_off = c.words * 4;
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0,
              &jc);
 
@@ -331,6 +332,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, STP_pre(XM, 15, 31, -2)); // push end_row
 
     int const loop_top = c.words;
+    ra_assert_loop_invariant(ra);
 
     // remaining = col_end - XCOL
     put(&c, SUB_xr(XT, 0, XCOL));
@@ -347,13 +349,12 @@ struct jit_program* jit_program(struct jit_backend *be,
         ra_return_reg(ra, zr);
     }
 
-    int const loop_body_start = c.words;
+    int const simd_body_off = c.words * 4;
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 0,
              &jc);
 
     ra_end_loop(ra, sl);
-
-    int const loop_body_end = c.words;
+    ra_assert_loop_invariant(ra);
 
     put(&c, ADD_xi(XCOL, XCOL, 8));
     put(&c, B(loop_top - c.words));
@@ -398,9 +399,11 @@ struct jit_program* jit_program(struct jit_backend *be,
     // Re-emit preamble so the next row's SIMD iter starts with uniforms in
     // the registers it expects: the tail body clobbers them, and the SIMD
     // body's end-of-loop fills are skipped when we enter the tail.
+    int const next_row_off = c.words * 4;
     ra_reset_pool(ra);
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
+    ra_assert_loop_invariant(ra);
     put(&c, B(loop_top - c.words));
 
     int const done_all = c.words;
@@ -465,8 +468,15 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     j->code = c.word;
     j->code_size = c.mmap_size;
-    j->loop_start = loop_body_start;
-    j->loop_end = loop_body_end;
+    j->code_bytes = pool_start * 4;
+    j->labels = 0;
+    j->label[j->labels++] = (struct jit_label){.name = "preamble",  .byte_off = preamble_off};
+    j->label[j->labels++] = (struct jit_label){.name = "loop_top",  .byte_off = loop_top * 4};
+    j->label[j->labels++] = (struct jit_label){.name = "simd_body", .byte_off = simd_body_off};
+    j->label[j->labels++] = (struct jit_label){.name = "tail_top",  .byte_off = tail_top * 4};
+    j->label[j->labels++] = (struct jit_label){.name = "row_done",  .byte_off = row_done * 4};
+    j->label[j->labels++] = (struct jit_label){.name = "next_row",  .byte_off = next_row_off};
+    j->label[j->labels++] = (struct jit_label){.name = "done_all",  .byte_off = done_all * 4};
     {
         union {
             void *p;
@@ -1073,80 +1083,27 @@ void jit_program_run(struct jit_program *j, int l, int t, int r, int b, struct u
 }
 void jit_program_dump(struct jit_program const *j, FILE *f) {
     uint32_t const *words = (uint32_t const*)j->code;
+    int      const  nw    = j->code_bytes / 4;
 
-    char tmp[]      = "/tmp/umbra_mca_XXXXXX.s";
-    char asm_path[] = "/tmp/umbra_mca_loop_XXXXXX.s";
-    char opath[sizeof tmp + 2];
-    _Bool have_tmp = 0, have_asm = 0;
-
-    int   fd, afd;
-    FILE *fp, *afp;
-
-    fd = mkstemps(tmp, 2);
-    if (fd < 0) { goto done; }
-    have_tmp = 1;
-    fp = fdopen(fd, "w");
-    if (!fp) { close(fd); goto done; }
-    for (int i = j->loop_start; i < j->loop_end; i++) {
-        fprintf(fp, ".inst 0x%08x\n", words[i]);
+    char spath[] = "/tmp/umbra_dump_XXXXXX.s";
+    char opath[sizeof spath + 2];
+    int  fd      = mkstemps(spath, 2);
+    if (fd < 0) { return; }
+    FILE *sfp = fdopen(fd, "w");
+    if (!sfp) { close(fd); remove(spath); return; }
+    for (int i = 0; i < nw; i++) {
+        fprintf(sfp, ".inst 0x%08x\n", words[i]);
     }
-    fclose(fp);
-    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof tmp - 3), tmp);
+    fclose(sfp);
+    snprintf(opath, sizeof opath, "%.*s.o", (int)(sizeof spath - 3), spath);
 
-    afd = mkstemps(asm_path, 2);
-    if (afd < 0) { goto done; }
-    have_asm = 1;
-
-    {
-        char cmd[1024];
-        snprintf(cmd, sizeof cmd,
-                 "as -o %s %s 2>/dev/null &&"
-                 " /opt/homebrew/opt/llvm/bin/llvm-objdump -d"
-                 " --no-show-raw-insn --no-leading-addr %s 2>/dev/null",
-                 opath, tmp, opath);
-        FILE *p = popen(cmd, "r");
-        if (!p) { close(afd); goto done; }
-        afp = fdopen(afd, "w");
-        char  line[256];
-        _Bool past_header = 0;
-        while (fgets(line, (int)sizeof line, p)) {
-            if (past_header) {
-                if (line[0] != '\n' && line[0] != '<') {
-                    char *angle = __builtin_strchr(line, '<');
-                    if (angle) {
-                        *angle = '\n';
-                        angle[1] = '\0';
-                    }
-                    fputs(line, afp);
-                }
-            } else if (__builtin_strstr(line, "<")) {
-                past_header = 1;
-            }
-        }
-        pclose(p);
-        fclose(afp);
+    char cmd[512];
+    snprintf(cmd, sizeof cmd, "as -o %s %s 2>/dev/null", opath, spath);
+    if (system(cmd) == 0) {
+        jit_dump_with_labels(f, opath, j->label, j->labels);
     }
-
-    {
-        char cmd[1024];
-        snprintf(cmd, sizeof cmd,
-                 "/opt/homebrew/opt/llvm/bin/llvm-mca"
-                 " -mcpu=apple-m4 -iterations=100 -bottleneck-analysis"
-                 " %s 2>&1",
-                 asm_path);
-        FILE *p = popen(cmd, "r");
-        if (p) {
-            char line[256];
-            while (fgets(line, (int)sizeof line, p)) {
-                fputs(line, f);
-            }
-            pclose(p);
-        }
-    }
-
-done:
-    if (have_tmp) { remove(tmp); remove(opath); }
-    if (have_asm) { remove(asm_path); }
+    remove(spath);
+    remove(opath);
 }
 
 #endif

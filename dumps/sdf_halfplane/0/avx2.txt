@@ -1,368 +1,349 @@
-Iterations:        100
-Instructions:      9600
-Total Cycles:      3033
-Total uOps:        10400
-
-Dispatch Width:    6
-uOps Per Cycle:    3.43
-IPC:               3.17
-Block RThroughput: 17.3
-
-
-Cycles with backend pressure increase [ 95.38% ]
-Throughput Bottlenecks: 
-  Resource Pressure       [ 78.64% ]
-  - Zn4FP0  [ 23.11% ]
-  - Zn4FP1  [ 48.80% ]
-  - Zn4FP2  [ 42.57% ]
-  - Zn4FP3  [ 6.73% ]
-  - Zn4FP45  [ 29.54% ]
-  - Zn4FPSt  [ 3.30% ]
-  Data Dependencies:      [ 88.82% ]
-  - Register Dependencies [ 88.82% ]
-  - Memory Dependencies   [ 0.00% ]
-
-Critical sequence based on the simulation:
-
-              Instruction                                 Dependency Information
- +----< 94.   vmovdqu	(%rsp), %ymm1
- |
- |    < loop carried > 
- |
- +----> 0.    vmovd	%r10d, %xmm9                      ## RESOURCE interference:  Zn4FP45 [ probability: 98% ]
- +----> 1.    vbroadcastss	%xmm9, %ymm9              ## REGISTER dependency:  %xmm9
- |      2.    vpaddd	1061(%rip), %ymm9, %ymm9
- |      3.    vcvtdq2ps	%ymm9, %ymm9
- |      4.    vaddps	1079(%rip), %ymm9, %ymm9
- |      5.    vmovd	%r14d, %xmm10
- +----> 6.    vbroadcastss	%xmm10, %ymm10            ## RESOURCE interference:  Zn4FP1 [ probability: 97% ]
- +----> 7.    vcvtdq2ps	%ymm10, %ymm10                    ## REGISTER dependency:  %ymm10
- +----> 8.    vaddps	1087(%rip), %ymm10, %ymm10        ## RESOURCE interference:  Zn4FP2 [ probability: 96% ]
- |      9.    vmulps	%ymm2, %ymm10, %ymm10
- |      10.   vfmadd231ps	%ymm1, %ymm9, %ymm10
- |      11.   vsubps	%ymm3, %ymm10, %ymm10
- |      12.   vsubps	%ymm10, %ymm0, %ymm10
- |      13.   vmaxps	1092(%rip), %ymm10, %ymm10
- |      14.   vminps	1115(%rip), %ymm10, %ymm10
- |      15.   movq	(%rdx), %r11
- |      16.   movl	12(%rdx), %eax
- |      17.   shlq	$3, %rax
- |      18.   imulq	%r14, %rax
- |      19.   addq	%rax, %r11
- |      20.   vmovdqu	(%r11,%r10,8), %ymm15
- |      21.   vmovdqu	32(%r11,%r10,8), %ymm0
- +----> 22.   vmovdqu	(%r11,%r10,8), %ymm15             ## RESOURCE interference:  Zn4FP45 [ probability: 97% ]
- +----> 23.   vpshufb	1102(%rip), %ymm15, %ymm9         ## REGISTER dependency:  %ymm15
- |      24.   vextracti128	$1, %ymm9, %xmm14
- |      25.   vpunpckldq	%xmm14, %xmm9, %xmm9
- +----> 26.   vpshufb	1082(%rip), %ymm0, %ymm14         ## RESOURCE interference:  Zn4FP45 [ probability: 98% ]
- |      27.   vextracti128	$1, %ymm14, %xmm15
- |      28.   vpunpckldq	%xmm15, %xmm14, %xmm14
- |      29.   vpunpcklqdq	%xmm14, %xmm9, %xmm9
- +----> 30.   vmovdqu	(%r11,%r10,8), %ymm15             ## RESOURCE interference:  Zn4FP45 [ probability: 98% ]
- |      31.   vpshufb	1083(%rip), %ymm15, %ymm11
- |      32.   vextracti128	$1, %ymm11, %xmm14
- |      33.   vpunpckldq	%xmm14, %xmm11, %xmm11
- +----> 34.   vpshufb	1063(%rip), %ymm0, %ymm14         ## RESOURCE interference:  Zn4FP45 [ probability: 98% ]
- |      35.   vextracti128	$1, %ymm14, %xmm15
- |      36.   vpunpckldq	%xmm15, %xmm14, %xmm14
- |      37.   vpunpcklqdq	%xmm14, %xmm11, %xmm11
- +----> 38.   vmovdqu	(%r11,%r10,8), %ymm15             ## RESOURCE interference:  Zn4FP45 [ probability: 99% ]
- +----> 39.   vpshufb	1064(%rip), %ymm15, %ymm12        ## REGISTER dependency:  %ymm15
- |      40.   vextracti128	$1, %ymm12, %xmm14
- |      41.   vpunpckldq	%xmm14, %xmm12, %xmm12
- +----> 42.   vpshufb	1044(%rip), %ymm0, %ymm14         ## RESOURCE interference:  Zn4FP1 [ probability: 98% ]
- |      43.   vextracti128	$1, %ymm14, %xmm15
- |      44.   vpunpckldq	%xmm15, %xmm14, %xmm14
- |      45.   vpunpcklqdq	%xmm14, %xmm12, %xmm12
- |      46.   vmovdqu	(%r11,%r10,8), %ymm15
- +----> 47.   vpshufb	1045(%rip), %ymm15, %ymm13        ## RESOURCE interference:  Zn4FP45 [ probability: 97% ]
- |      48.   vextracti128	$1, %ymm13, %xmm14
- |      49.   vpunpckldq	%xmm14, %xmm13, %xmm13
- +----> 50.   vpshufb	1025(%rip), %ymm0, %ymm14         ## RESOURCE interference:  Zn4FP45 [ probability: 99% ]
- +----> 51.   vextracti128	$1, %ymm14, %xmm15        ## REGISTER dependency:  %ymm14
- +----> 52.   vpunpckldq	%xmm15, %xmm14, %xmm14            ## REGISTER dependency:  %xmm15
- +----> 53.   vpunpcklqdq	%xmm14, %xmm13, %xmm13    ## REGISTER dependency:  %xmm14
- |      54.   vcvtph2ps	%xmm9, %ymm0
- |      55.   vmovaps	%ymm5, %ymm14
- |      56.   vfmadd231ps	%ymm4, %ymm0, %ymm14
- |      57.   vpxor	%ymm15, %ymm15, %ymm15
- |      58.   vsubps	%ymm0, %ymm14, %ymm14
- |      59.   vfmadd231ps	%ymm14, %ymm10, %ymm0
- |      60.   vcvtph2ps	%xmm11, %ymm14
- |      61.   vmovaps	%ymm6, %ymm11
- |      62.   vfmadd231ps	%ymm4, %ymm14, %ymm11
- |      63.   vsubps	%ymm14, %ymm11, %ymm11
- |      64.   vfmadd231ps	%ymm11, %ymm10, %ymm14
- |      65.   vcvtph2ps	%xmm12, %ymm11
- |      66.   vmovaps	%ymm7, %ymm12
- |      67.   vfmadd231ps	%ymm4, %ymm11, %ymm12
- |      68.   vsubps	%ymm11, %ymm12, %ymm12
- |      69.   vfmadd231ps	%ymm12, %ymm10, %ymm11
- +----> 70.   vcvtph2ps	%xmm13, %ymm12                    ## REGISTER dependency:  %xmm13
- |      71.   vmovaps	%ymm8, %ymm13
- |      72.   vfmadd231ps	%ymm4, %ymm12, %ymm13
- +----> 73.   vsubps	%ymm12, %ymm13, %ymm13            ## REGISTER dependency:  %ymm12
- +----> 74.   vfmadd231ps	%ymm13, %ymm10, %ymm12    ## REGISTER dependency:  %ymm13
- +----> 75.   vcvtps2ph	$4, %ymm12, %xmm12                ## REGISTER dependency:  %ymm12
- |      76.   vcvtps2ph	$4, %ymm11, %xmm11
- |      77.   vcvtps2ph	$4, %ymm14, %xmm14
- |      78.   vcvtps2ph	$4, %ymm0, %xmm0
- |      79.   vmovdqu	%ymm1, (%rsp)
- |      80.   vmovdqu	%ymm2, 32(%rsp)
- |      81.   vpunpcklwd	%xmm14, %xmm0, %xmm10
- |      82.   vpunpcklwd	%xmm12, %xmm11, %xmm13
- |      83.   vpunpckldq	%xmm13, %xmm10, %xmm1
- |      84.   vpunpckhdq	%xmm13, %xmm10, %xmm2
- |      85.   vinserti128	$1, %xmm2, %ymm1, %ymm1
- |      86.   vmovdqu	%ymm1, (%r11,%r10,8)
- |      87.   vpunpckhwd	%xmm14, %xmm0, %xmm10
- +----> 88.   vpunpckhwd	%xmm12, %xmm11, %xmm13            ## REGISTER dependency:  %xmm12
- |      89.   vpunpckldq	%xmm13, %xmm10, %xmm1
- +----> 90.   vpunpckhdq	%xmm13, %xmm10, %xmm2             ## REGISTER dependency:  %xmm13
- +----> 91.   vinserti128	$1, %xmm2, %ymm1, %ymm1   ## REGISTER dependency:  %xmm2
- |      92.   vmovdqu	%ymm1, 32(%r11,%r10,8)
- |      93.   vpxor	%ymm0, %ymm0, %ymm0
- |      94.   vmovdqu	(%rsp), %ymm1
- |      95.   vmovdqu	32(%rsp), %ymm2
- |
- |    < loop carried > 
- |
- +----> 41.   vpunpckldq	%xmm14, %xmm12, %xmm12            ## RESOURCE interference:  Zn4FP1 [ probability: 98% ]
-
-
-Instruction Info:
-[1]: #uOps
-[2]: Latency
-[3]: RThroughput
-[4]: MayLoad
-[5]: MayStore
-[6]: HasSideEffects (U)
-
-[1]    [2]    [3]    [4]    [5]    [6]    Instructions:
- 1      1     1.00                        vmovd	%r10d, %xmm9
- 1      2     1.00                        vbroadcastss	%xmm9, %ymm9
- 1      8     0.50    *                   vpaddd	1061(%rip), %ymm9, %ymm9
- 1      3     0.50                        vcvtdq2ps	%ymm9, %ymm9
- 1      10    0.50    *                   vaddps	1079(%rip), %ymm9, %ymm9
- 1      1     1.00                        vmovd	%r14d, %xmm10
- 1      2     1.00                        vbroadcastss	%xmm10, %ymm10
- 1      3     0.50                        vcvtdq2ps	%ymm10, %ymm10
- 1      10    0.50    *                   vaddps	1087(%rip), %ymm10, %ymm10
- 1      3     0.50                        vmulps	%ymm2, %ymm10, %ymm10
- 1      4     0.50                        vfmadd231ps	%ymm1, %ymm9, %ymm10
- 1      3     0.50                        vsubps	%ymm3, %ymm10, %ymm10
- 1      3     0.50                        vsubps	%ymm10, %ymm0, %ymm10
- 1      9     0.50    *                   vmaxps	1092(%rip), %ymm10, %ymm10
- 1      9     0.50    *                   vminps	1115(%rip), %ymm10, %ymm10
- 1      5     0.33    *                   movq	(%rdx), %r11
- 1      5     0.33    *                   movl	12(%rdx), %eax
- 1      1     0.50                        shlq	$3, %rax
- 1      3     1.00                        imulq	%r14, %rax
- 1      1     0.25                        addq	%rax, %r11
- 1      8     0.50    *                   vmovdqu	(%r11,%r10,8), %ymm15
- 1      8     0.50    *                   vmovdqu	32(%r11,%r10,8), %ymm0
- 1      8     0.50    *                   vmovdqu	(%r11,%r10,8), %ymm15
- 1      8     0.50    *                   vpshufb	1102(%rip), %ymm15, %ymm9
- 1      4     1.00                        vextracti128	$1, %ymm9, %xmm14
- 1      1     0.50                        vpunpckldq	%xmm14, %xmm9, %xmm9
- 1      8     0.50    *                   vpshufb	1082(%rip), %ymm0, %ymm14
- 1      4     1.00                        vextracti128	$1, %ymm14, %xmm15
- 1      1     0.50                        vpunpckldq	%xmm15, %xmm14, %xmm14
- 1      1     0.50                        vpunpcklqdq	%xmm14, %xmm9, %xmm9
- 1      8     0.50    *                   vmovdqu	(%r11,%r10,8), %ymm15
- 1      8     0.50    *                   vpshufb	1083(%rip), %ymm15, %ymm11
- 1      4     1.00                        vextracti128	$1, %ymm11, %xmm14
- 1      1     0.50                        vpunpckldq	%xmm14, %xmm11, %xmm11
- 1      8     0.50    *                   vpshufb	1063(%rip), %ymm0, %ymm14
- 1      4     1.00                        vextracti128	$1, %ymm14, %xmm15
- 1      1     0.50                        vpunpckldq	%xmm15, %xmm14, %xmm14
- 1      1     0.50                        vpunpcklqdq	%xmm14, %xmm11, %xmm11
- 1      8     0.50    *                   vmovdqu	(%r11,%r10,8), %ymm15
- 1      8     0.50    *                   vpshufb	1064(%rip), %ymm15, %ymm12
- 1      4     1.00                        vextracti128	$1, %ymm12, %xmm14
- 1      1     0.50                        vpunpckldq	%xmm14, %xmm12, %xmm12
- 1      8     0.50    *                   vpshufb	1044(%rip), %ymm0, %ymm14
- 1      4     1.00                        vextracti128	$1, %ymm14, %xmm15
- 1      1     0.50                        vpunpckldq	%xmm15, %xmm14, %xmm14
- 1      1     0.50                        vpunpcklqdq	%xmm14, %xmm12, %xmm12
- 1      8     0.50    *                   vmovdqu	(%r11,%r10,8), %ymm15
- 1      8     0.50    *                   vpshufb	1045(%rip), %ymm15, %ymm13
- 1      4     1.00                        vextracti128	$1, %ymm13, %xmm14
- 1      1     0.50                        vpunpckldq	%xmm14, %xmm13, %xmm13
- 1      8     0.50    *                   vpshufb	1025(%rip), %ymm0, %ymm14
- 1      4     1.00                        vextracti128	$1, %ymm14, %xmm15
- 1      1     0.50                        vpunpckldq	%xmm15, %xmm14, %xmm14
- 1      1     0.50                        vpunpcklqdq	%xmm14, %xmm13, %xmm13
- 2      4     1.00                        vcvtph2ps	%xmm9, %ymm0
- 1      0     0.17                        vmovaps	%ymm5, %ymm14
- 1      4     0.50                        vfmadd231ps	%ymm4, %ymm0, %ymm14
- 1      0     0.17                        vpxor	%ymm15, %ymm15, %ymm15
- 1      3     0.50                        vsubps	%ymm0, %ymm14, %ymm14
- 1      4     0.50                        vfmadd231ps	%ymm14, %ymm10, %ymm0
- 2      4     1.00                        vcvtph2ps	%xmm11, %ymm14
- 1      0     0.17                        vmovaps	%ymm6, %ymm11
- 1      4     0.50                        vfmadd231ps	%ymm4, %ymm14, %ymm11
- 1      3     0.50                        vsubps	%ymm14, %ymm11, %ymm11
- 1      4     0.50                        vfmadd231ps	%ymm11, %ymm10, %ymm14
- 2      4     1.00                        vcvtph2ps	%xmm12, %ymm11
- 1      0     0.17                        vmovaps	%ymm7, %ymm12
- 1      4     0.50                        vfmadd231ps	%ymm4, %ymm11, %ymm12
- 1      3     0.50                        vsubps	%ymm11, %ymm12, %ymm12
- 1      4     0.50                        vfmadd231ps	%ymm12, %ymm10, %ymm11
- 2      4     1.00                        vcvtph2ps	%xmm13, %ymm12
- 1      0     0.17                        vmovaps	%ymm8, %ymm13
- 1      4     0.50                        vfmadd231ps	%ymm4, %ymm12, %ymm13
- 1      3     0.50                        vsubps	%ymm12, %ymm13, %ymm13
- 1      4     0.50                        vfmadd231ps	%ymm13, %ymm10, %ymm12
- 2      6     1.00                        vcvtps2ph	$4, %ymm12, %xmm12
- 2      6     1.00                        vcvtps2ph	$4, %ymm11, %xmm11
- 2      6     1.00                        vcvtps2ph	$4, %ymm14, %xmm14
- 2      6     1.00                        vcvtps2ph	$4, %ymm0, %xmm0
- 1      1     1.00           *            vmovdqu	%ymm1, (%rsp)
- 1      1     1.00           *            vmovdqu	%ymm2, 32(%rsp)
- 1      1     0.50                        vpunpcklwd	%xmm14, %xmm0, %xmm10
- 1      1     0.50                        vpunpcklwd	%xmm12, %xmm11, %xmm13
- 1      1     0.50                        vpunpckldq	%xmm13, %xmm10, %xmm1
- 1      1     0.50                        vpunpckhdq	%xmm13, %xmm10, %xmm2
- 1      1     1.00                        vinserti128	$1, %xmm2, %ymm1, %ymm1
- 1      1     1.00           *            vmovdqu	%ymm1, (%r11,%r10,8)
- 1      1     0.50                        vpunpckhwd	%xmm14, %xmm0, %xmm10
- 1      1     0.50                        vpunpckhwd	%xmm12, %xmm11, %xmm13
- 1      1     0.50                        vpunpckldq	%xmm13, %xmm10, %xmm1
- 1      1     0.50                        vpunpckhdq	%xmm13, %xmm10, %xmm2
- 1      1     1.00                        vinserti128	$1, %xmm2, %ymm1, %ymm1
- 1      1     1.00           *            vmovdqu	%ymm1, 32(%r11,%r10,8)
- 1      0     0.17                        vpxor	%ymm0, %ymm0, %ymm0
- 1      8     0.50    *                   vmovdqu	(%rsp), %ymm1
- 1      8     0.50    *                   vmovdqu	32(%rsp), %ymm2
-
-
-Resources:
-[0]   - Zn4AGU0
-[1]   - Zn4AGU1
-[2]   - Zn4AGU2
-[3]   - Zn4ALU0
-[4]   - Zn4ALU1
-[5]   - Zn4ALU2
-[6]   - Zn4ALU3
-[7]   - Zn4BRU1
-[8]   - Zn4FP0
-[9]   - Zn4FP1
-[10]  - Zn4FP2
-[11]  - Zn4FP3
-[12.0] - Zn4FP45
-[12.1] - Zn4FP45
-[13]  - Zn4FPSt
-[14.0] - Zn4LSU
-[14.1] - Zn4LSU
-[14.2] - Zn4LSU
-[15.0] - Zn4Load
-[15.1] - Zn4Load
-[15.2] - Zn4Load
-[16.0] - Zn4Store
-[16.1] - Zn4Store
-
-
-Resource pressure per iteration:
-[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] 
-0.66   0.67   0.67   0.50   1.00   1.00   0.50    -     17.00  21.01  23.99  17.00  14.50  14.50  4.00   9.00   9.00   9.00   7.66   7.67   7.67   2.00   2.00   
-
-Resource pressure by instruction:
-[0]    [1]    [2]    [3]    [4]    [5]    [6]    [7]    [8]    [9]    [10]   [11]   [12.0] [12.1] [13]   [14.0] [14.1] [14.2] [15.0] [15.1] [15.2] [16.0] [16.1] Instructions:
- -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00    -      -      -      -      -      -      -      -      -     vmovd	%r10d, %xmm9
- -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vbroadcastss	%xmm9, %ymm9
- -      -      -      -      -      -      -      -     0.01   0.02   0.95   0.02   0.49   0.51    -      -      -     1.00   0.33   0.32   0.35    -      -     vpaddd	1061(%rip), %ymm9, %ymm9
- -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm9, %ymm9
- -      -      -      -      -      -      -      -      -      -     0.02   0.98   0.51   0.49    -     0.01   0.97   0.02   0.33   0.33   0.34    -      -     vaddps	1079(%rip), %ymm9, %ymm9
- -      -      -      -      -      -      -      -      -      -      -      -     1.00   1.00    -      -      -      -      -      -      -      -      -     vmovd	%r14d, %xmm10
- -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vbroadcastss	%xmm10, %ymm10
- -      -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -     vcvtdq2ps	%ymm10, %ymm10
- -      -      -      -      -      -      -      -      -      -     0.01   0.99   0.50   0.50    -      -     0.01   0.99   0.32   0.32   0.36    -      -     vaddps	1087(%rip), %ymm10, %ymm10
- -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -      -     vmulps	%ymm2, %ymm10, %ymm10
- -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm1, %ymm9, %ymm10
- -      -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm3, %ymm10, %ymm10
- -      -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm10, %ymm0, %ymm10
- -      -      -      -      -      -      -      -     0.98   0.02    -      -     0.51   0.49    -     0.97   0.02   0.01   0.33   0.33   0.34    -      -     vmaxps	1092(%rip), %ymm10, %ymm10
- -      -      -      -      -      -      -      -     0.99   0.01    -      -     0.50   0.50    -     0.02   0.01   0.97   0.33   0.34   0.33    -      -     vminps	1115(%rip), %ymm10, %ymm10
-0.33   0.33   0.34    -      -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01   0.32   0.36   0.32    -      -     movq	(%rdx), %r11
-0.33   0.34   0.33    -      -      -      -      -      -      -      -      -      -      -      -     0.99   0.01    -     0.36   0.32   0.32    -      -     movl	12(%rdx), %eax
- -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     shlq	$3, %rax
- -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     imulq	%r14, %rax
- -      -      -     0.50    -      -     0.50    -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     addq	%rax, %r11
- -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -     0.97   0.01   0.02   0.35   0.32   0.33    -      -     vmovdqu	(%r11,%r10,8), %ymm15
- -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49    -     0.02   0.97   0.01   0.33   0.35   0.32    -      -     vmovdqu	32(%r11,%r10,8), %ymm0
- -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.01   0.99    -     0.32   0.34   0.34    -      -     vmovdqu	(%r11,%r10,8), %ymm15
- -      -      -      -      -      -      -      -      -     0.01   0.99    -     0.52   0.48    -     0.96   0.01   0.03   0.33   0.34   0.33    -      -     vpshufb	1102(%rip), %ymm15, %ymm9
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm9, %xmm14
- -      -      -      -      -      -      -      -      -     0.97   0.03    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm14, %xmm9, %xmm9
- -      -      -      -      -      -      -      -      -     1.00    -      -     0.49   0.51    -     0.04    -     0.96   0.34   0.33   0.33    -      -     vpshufb	1082(%rip), %ymm0, %ymm14
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm14, %xmm15
- -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm15, %xmm14, %xmm14
- -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklqdq	%xmm14, %xmm9, %xmm9
- -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -     0.01   0.99    -     0.34   0.33   0.33    -      -     vmovdqu	(%r11,%r10,8), %ymm15
- -      -      -      -      -      -      -      -      -     0.02   0.98    -     0.51   0.49    -     0.02    -     0.98   0.33   0.34   0.33    -      -     vpshufb	1083(%rip), %ymm15, %ymm11
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm11, %xmm14
- -      -      -      -      -      -      -      -      -     0.97   0.03    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm14, %xmm11, %xmm11
- -      -      -      -      -      -      -      -      -     0.02   0.98    -     0.49   0.51    -     0.96   0.02   0.02   0.34   0.33   0.33    -      -     vpshufb	1063(%rip), %ymm0, %ymm14
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm14, %xmm15
- -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm15, %xmm14, %xmm14
- -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklqdq	%xmm14, %xmm11, %xmm11
- -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.01   0.98   0.01   0.32   0.33   0.35    -      -     vmovdqu	(%r11,%r10,8), %ymm15
- -      -      -      -      -      -      -      -      -     0.98   0.02    -     0.51   0.49    -     0.97   0.01   0.02   0.33   0.33   0.34    -      -     vpshufb	1064(%rip), %ymm15, %ymm12
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm12, %xmm14
- -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm14, %xmm12, %xmm12
- -      -      -      -      -      -      -      -      -     0.99   0.01    -     0.50   0.50    -     0.98   0.02    -     0.34   0.34   0.32    -      -     vpshufb	1044(%rip), %ymm0, %ymm14
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm14, %xmm15
- -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm15, %xmm14, %xmm14
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklqdq	%xmm14, %xmm12, %xmm12
- -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51    -     0.02   0.01   0.97   0.32   0.34   0.34    -      -     vmovdqu	(%r11,%r10,8), %ymm15
- -      -      -      -      -      -      -      -      -     0.03   0.97    -     0.50   0.50    -     0.02   0.01   0.97   0.36   0.32   0.32    -      -     vpshufb	1045(%rip), %ymm15, %ymm13
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm13, %xmm14
- -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm14, %xmm13, %xmm13
- -      -      -      -      -      -      -      -      -     0.98   0.02    -     0.49   0.51    -      -     0.98   0.02   0.32   0.34   0.34    -      -     vpshufb	1025(%rip), %ymm0, %ymm14
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vextracti128	$1, %ymm14, %xmm15
- -      -      -      -      -      -      -      -      -     0.97   0.03    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm15, %xmm14, %xmm14
- -      -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklqdq	%xmm14, %xmm13, %xmm13
- -      -      -      -      -      -      -      -      -      -      -     2.00    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm9, %ymm0
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm5, %ymm14
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm4, %ymm0, %ymm14
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm15, %ymm15, %ymm15
- -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm0, %ymm14, %ymm14
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm14, %ymm10, %ymm0
- -      -      -      -      -      -      -      -      -      -      -     2.00    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm11, %ymm14
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm6, %ymm11
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm4, %ymm14, %ymm11
- -      -      -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm14, %ymm11, %ymm11
- -      -      -      -      -      -      -      -     0.02   0.98    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm11, %ymm10, %ymm14
- -      -      -      -      -      -      -      -      -      -     1.94   0.06    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm12, %ymm11
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm7, %ymm12
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm4, %ymm11, %ymm12
- -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm11, %ymm12, %ymm12
- -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm12, %ymm10, %ymm11
- -      -      -      -      -      -      -      -      -      -     0.06   1.94    -      -      -      -      -      -      -      -      -      -      -     vcvtph2ps	%xmm13, %ymm12
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vmovaps	%ymm8, %ymm13
- -      -      -      -      -      -      -      -     0.98   0.02    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm4, %ymm12, %ymm13
- -      -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -     vsubps	%ymm12, %ymm13, %ymm13
- -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -      -     vfmadd231ps	%ymm13, %ymm10, %ymm12
- -      -      -      -      -      -      -      -      -      -     1.98   0.02    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm12, %xmm12
- -      -      -      -      -      -      -      -      -      -     0.02   1.98    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm11, %xmm11
- -      -      -      -      -      -      -      -      -      -     0.02   1.98    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm14, %xmm14
- -      -      -      -      -      -      -      -      -      -     1.96   0.04    -      -      -      -      -      -      -      -      -      -      -     vcvtps2ph	$4, %ymm0, %xmm0
- -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.01   0.98   0.01    -      -      -      -     1.00   vmovdqu	%ymm1, (%rsp)
- -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50   1.00   0.98   0.01   0.01    -      -      -     1.00    -     vmovdqu	%ymm2, 32(%rsp)
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklwd	%xmm14, %xmm0, %xmm10
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpunpcklwd	%xmm12, %xmm11, %xmm13
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm13, %xmm10, %xmm1
- -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckhdq	%xmm13, %xmm10, %xmm2
- -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vinserti128	$1, %xmm2, %ymm1, %ymm1
- -      -      -      -      -      -      -      -      -      -      -      -     0.49   0.51   1.00   0.01   0.02   0.97    -      -      -      -     1.00   vmovdqu	%ymm1, (%r11,%r10,8)
- -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckhwd	%xmm14, %xmm0, %xmm10
- -      -      -      -      -      -      -      -      -     0.01   0.99    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckhwd	%xmm12, %xmm11, %xmm13
- -      -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckldq	%xmm13, %xmm10, %xmm1
- -      -      -      -      -      -      -      -      -     0.99   0.01    -      -      -      -      -      -      -      -      -      -      -      -     vpunpckhdq	%xmm13, %xmm10, %xmm2
- -      -      -      -      -      -      -      -      -     1.00    -      -      -      -      -      -      -      -      -      -      -      -      -     vinserti128	$1, %xmm2, %ymm1, %ymm1
- -      -      -      -      -      -      -      -      -      -      -      -     0.51   0.49   1.00   0.02   0.97   0.01    -      -      -     1.00    -     vmovdqu	%ymm1, 32(%r11,%r10,8)
- -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -      -     vpxor	%ymm0, %ymm0, %ymm0
- -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.99   0.01    -     0.33   0.34   0.33    -      -     vmovdqu	(%rsp), %ymm1
- -      -      -      -      -      -      -      -      -      -      -      -     0.50   0.50    -     0.01    -     0.99   0.34   0.33   0.33    -      -     vmovdqu	32(%rsp), %ymm2
+pushq	%r13
+pushq	%r14
+pushq	%r12
+pushq	%r15
+pushq	%rbx
+subq	$0x80, %rsp
+movq	%rdx, %r10
+movq	%rcx, %r12
+movq	%r8, %rdx
+# preamble:
+vpxor	%ymm0, %ymm0, %ymm0
+movq	0x10(%rdx), %r11
+movl	0x1c(%rdx), %eax
+shlq	$0x2, %rax
+imulq	%r14, %rax
+addq	%rax, %r11
+vbroadcastss	(%r11), %ymm1
+vbroadcastss	0x4(%r11), %ymm2
+vbroadcastss	0x8(%r11), %ymm3
+vbroadcastss	0x47e(%rip), %ymm4 ## 0x4c7 <__text+0x4c7>
+movq	0x20(%rdx), %r11
+movl	0x2c(%rdx), %eax
+shlq	$0x2, %rax
+imulq	%r14, %rax
+addq	%rax, %r11
+vbroadcastss	(%r11), %ymm5
+vbroadcastss	0x4(%r11), %ymm6
+vbroadcastss	0x8(%r11), %ymm7
+vbroadcastss	0xc(%r11), %ymm8
+vsubps	%ymm8, %ymm4, %ymm4
+movq	%rsi, %r14
+movq	%rdi, %rsi
+movq	%r10, %rdi
+movq	%rsi, %r10
+# loop_top:
+movq	%rdi, %r11
+subq	%r10, %r11
+cmpq	$0x8, %r11
+jl	0x2bb <__text+0x2bb>
+# simd_body:
+vmovd	%r10d, %xmm9
+vbroadcastss	%xmm9, %ymm9
+vpaddd	0x425(%rip), %ymm9, %ymm9 ## 0x4cb <__text+0x4cb>
+vcvtdq2ps	%ymm9, %ymm9
+vaddps	0x437(%rip), %ymm9, %ymm9 ## 0x4eb <__text+0x4eb>
+vmovd	%r14d, %xmm10
+vbroadcastss	%xmm10, %ymm10
+vcvtdq2ps	%ymm10, %ymm10
+vaddps	0x43f(%rip), %ymm10, %ymm10 ## 0x50b <__text+0x50b>
+vmulps	%ymm2, %ymm10, %ymm10
+vfmadd231ps	%ymm1, %ymm9, %ymm10 ## ymm10 = (ymm9 * ymm1) + ymm10
+vsubps	%ymm3, %ymm10, %ymm10
+vsubps	%ymm10, %ymm0, %ymm10
+vmaxps	0x444(%rip), %ymm10, %ymm10 ## 0x52b <__text+0x52b>
+vminps	0x45b(%rip), %ymm10, %ymm10 ## 0x54b <__text+0x54b>
+movq	(%rdx), %r11
+movl	0xc(%rdx), %eax
+shlq	$0x3, %rax
+imulq	%r14, %rax
+addq	%rax, %r11
+vmovdqu	(%r11,%r10,8), %ymm15
+vmovdqu	0x20(%r11,%r10,8), %ymm0
+vmovdqu	(%r11,%r10,8), %ymm15
+vpshufb	0x44e(%rip), %ymm15, %ymm9 ## 0x56b <__text+0x56b>
+vextracti128	$0x1, %ymm9, %xmm14
+vpunpckldq	%xmm14, %xmm9, %xmm9 ## xmm9 = xmm9[0],xmm14[0],xmm9[1],xmm14[1]
+vpshufb	0x43a(%rip), %ymm0, %ymm14 ## 0x56b <__text+0x56b>
+vextracti128	$0x1, %ymm14, %xmm15
+vpunpckldq	%xmm15, %xmm14, %xmm14 ## xmm14 = xmm14[0],xmm15[0],xmm14[1],xmm15[1]
+vpunpcklqdq	%xmm14, %xmm9, %xmm9 ## xmm9 = xmm9[0],xmm14[0]
+vmovdqu	(%r11,%r10,8), %ymm15
+vpshufb	0x43b(%rip), %ymm15, %ymm11 ## 0x58b <__text+0x58b>
+vextracti128	$0x1, %ymm11, %xmm14
+vpunpckldq	%xmm14, %xmm11, %xmm11 ## xmm11 = xmm11[0],xmm14[0],xmm11[1],xmm14[1]
+vpshufb	0x427(%rip), %ymm0, %ymm14 ## 0x58b <__text+0x58b>
+vextracti128	$0x1, %ymm14, %xmm15
+vpunpckldq	%xmm15, %xmm14, %xmm14 ## xmm14 = xmm14[0],xmm15[0],xmm14[1],xmm15[1]
+vpunpcklqdq	%xmm14, %xmm11, %xmm11 ## xmm11 = xmm11[0],xmm14[0]
+vmovdqu	(%r11,%r10,8), %ymm15
+vpshufb	0x428(%rip), %ymm15, %ymm12 ## 0x5ab <__text+0x5ab>
+vextracti128	$0x1, %ymm12, %xmm14
+vpunpckldq	%xmm14, %xmm12, %xmm12 ## xmm12 = xmm12[0],xmm14[0],xmm12[1],xmm14[1]
+vpshufb	0x414(%rip), %ymm0, %ymm14 ## 0x5ab <__text+0x5ab>
+vextracti128	$0x1, %ymm14, %xmm15
+vpunpckldq	%xmm15, %xmm14, %xmm14 ## xmm14 = xmm14[0],xmm15[0],xmm14[1],xmm15[1]
+vpunpcklqdq	%xmm14, %xmm12, %xmm12 ## xmm12 = xmm12[0],xmm14[0]
+vmovdqu	(%r11,%r10,8), %ymm15
+vpshufb	0x415(%rip), %ymm15, %ymm13 ## 0x5cb <__text+0x5cb>
+vextracti128	$0x1, %ymm13, %xmm14
+vpunpckldq	%xmm14, %xmm13, %xmm13 ## xmm13 = xmm13[0],xmm14[0],xmm13[1],xmm14[1]
+vpshufb	0x401(%rip), %ymm0, %ymm14 ## 0x5cb <__text+0x5cb>
+vextracti128	$0x1, %ymm14, %xmm15
+vpunpckldq	%xmm15, %xmm14, %xmm14 ## xmm14 = xmm14[0],xmm15[0],xmm14[1],xmm15[1]
+vpunpcklqdq	%xmm14, %xmm13, %xmm13 ## xmm13 = xmm13[0],xmm14[0]
+vcvtph2ps	%xmm9, %ymm0
+vmovaps	%ymm5, %ymm14
+vfmadd231ps	%ymm4, %ymm0, %ymm14 ## ymm14 = (ymm0 * ymm4) + ymm14
+vpxor	%ymm15, %ymm15, %ymm15
+vsubps	%ymm0, %ymm14, %ymm14
+vfmadd231ps	%ymm14, %ymm10, %ymm0 ## ymm0 = (ymm10 * ymm14) + ymm0
+vcvtph2ps	%xmm11, %ymm14
+vmovaps	%ymm6, %ymm11
+vfmadd231ps	%ymm4, %ymm14, %ymm11 ## ymm11 = (ymm14 * ymm4) + ymm11
+vsubps	%ymm14, %ymm11, %ymm11
+vfmadd231ps	%ymm11, %ymm10, %ymm14 ## ymm14 = (ymm10 * ymm11) + ymm14
+vcvtph2ps	%xmm12, %ymm11
+vmovaps	%ymm7, %ymm12
+vfmadd231ps	%ymm4, %ymm11, %ymm12 ## ymm12 = (ymm11 * ymm4) + ymm12
+vsubps	%ymm11, %ymm12, %ymm12
+vfmadd231ps	%ymm12, %ymm10, %ymm11 ## ymm11 = (ymm10 * ymm12) + ymm11
+vcvtph2ps	%xmm13, %ymm12
+vmovaps	%ymm8, %ymm13
+vfmadd231ps	%ymm4, %ymm12, %ymm13 ## ymm13 = (ymm12 * ymm4) + ymm13
+vsubps	%ymm12, %ymm13, %ymm13
+vfmadd231ps	%ymm13, %ymm10, %ymm12 ## ymm12 = (ymm10 * ymm13) + ymm12
+vcvtps2ph	$0x4, %ymm12, %xmm12
+vcvtps2ph	$0x4, %ymm11, %xmm11
+vcvtps2ph	$0x4, %ymm14, %xmm14
+vcvtps2ph	$0x4, %ymm0, %xmm0
+vmovdqu	%ymm1, (%rsp)
+vmovdqu	%ymm2, 0x20(%rsp)
+vpunpcklwd	%xmm14, %xmm0, %xmm10 ## xmm10 = xmm0[0],xmm14[0],xmm0[1],xmm14[1],xmm0[2],xmm14[2],xmm0[3],xmm14[3]
+vpunpcklwd	%xmm12, %xmm11, %xmm13 ## xmm13 = xmm11[0],xmm12[0],xmm11[1],xmm12[1],xmm11[2],xmm12[2],xmm11[3],xmm12[3]
+vpunpckldq	%xmm13, %xmm10, %xmm1 ## xmm1 = xmm10[0],xmm13[0],xmm10[1],xmm13[1]
+vpunpckhdq	%xmm13, %xmm10, %xmm2 ## xmm2 = xmm10[2],xmm13[2],xmm10[3],xmm13[3]
+vinserti128	$0x1, %xmm2, %ymm1, %ymm1
+vmovdqu	%ymm1, (%r11,%r10,8)
+vpunpckhwd	%xmm14, %xmm0, %xmm10 ## xmm10 = xmm0[4],xmm14[4],xmm0[5],xmm14[5],xmm0[6],xmm14[6],xmm0[7],xmm14[7]
+vpunpckhwd	%xmm12, %xmm11, %xmm13 ## xmm13 = xmm11[4],xmm12[4],xmm11[5],xmm12[5],xmm11[6],xmm12[6],xmm11[7],xmm12[7]
+vpunpckldq	%xmm13, %xmm10, %xmm1 ## xmm1 = xmm10[0],xmm13[0],xmm10[1],xmm13[1]
+vpunpckhdq	%xmm13, %xmm10, %xmm2 ## xmm2 = xmm10[2],xmm13[2],xmm10[3],xmm13[3]
+vinserti128	$0x1, %xmm2, %ymm1, %ymm1
+vmovdqu	%ymm1, 0x20(%r11,%r10,8)
+vpxor	%ymm0, %ymm0, %ymm0
+vmovdqu	(%rsp), %ymm1
+vmovdqu	0x20(%rsp), %ymm2
+addq	$0x8, %r10
+jmp	0x83 <__text+0x83>
+# tail_top:
+cmpq	%rdi, %r10
+jge	0x440 <__text+0x440>
+vpxor	%ymm0, %ymm0, %ymm0
+movq	0x10(%rdx), %r11
+movl	0x1c(%rdx), %eax
+shlq	$0x2, %rax
+imulq	%r14, %rax
+addq	%rax, %r11
+vbroadcastss	(%r11), %ymm1
+vbroadcastss	0x4(%r11), %ymm2
+vbroadcastss	0x8(%r11), %ymm3
+vbroadcastss	0x1d3(%rip), %ymm4 ## 0x4c7 <__text+0x4c7>
+movq	0x20(%rdx), %r11
+movl	0x2c(%rdx), %eax
+shlq	$0x2, %rax
+imulq	%r14, %rax
+addq	%rax, %r11
+vbroadcastss	(%r11), %ymm5
+vbroadcastss	0x4(%r11), %ymm6
+vbroadcastss	0x8(%r11), %ymm7
+vbroadcastss	0xc(%r11), %ymm8
+vsubps	%ymm8, %ymm4, %ymm4
+vmovd	%r10d, %xmm9
+vcvtdq2ps	%ymm9, %ymm9
+vaddps	0x1d2(%rip), %ymm9, %ymm9 ## 0x507 <__text+0x507>
+vmovd	%r14d, %xmm10
+vcvtdq2ps	%ymm10, %ymm10
+vaddps	0x1bf(%rip), %ymm10, %ymm10 ## 0x507 <__text+0x507>
+vmulps	%ymm2, %ymm10, %ymm10
+vfmadd231ps	%ymm1, %ymm9, %ymm10 ## ymm10 = (ymm9 * ymm1) + ymm10
+vsubps	%ymm3, %ymm10, %ymm10
+vsubps	%ymm10, %ymm0, %ymm10
+vmaxps	0x288(%rip), %ymm10, %ymm10 ## 0x5eb <__text+0x5eb>
+vminps	0x29f(%rip), %ymm10, %ymm10 ## 0x60b <__text+0x60b>
+movq	(%rdx), %r11
+movl	0xc(%rdx), %eax
+shlq	$0x3, %rax
+imulq	%r14, %rax
+addq	%rax, %r11
+vmovq	(%r11,%r10,8), %xmm14
+vmovaps	%ymm14, %ymm9
+vpsrldq	$0x2, %xmm14, %xmm11    ## xmm11 = xmm14[2,3,4,5,6,7,8,9,10,11,12,13,14,15],zero,zero
+vpsrldq	$0x4, %xmm14, %xmm12    ## xmm12 = xmm14[4,5,6,7,8,9,10,11,12,13,14,15],zero,zero,zero,zero
+vpsrldq	$0x6, %xmm14, %xmm13    ## xmm13 = xmm14[6,7,8,9,10,11,12,13,14,15],zero,zero,zero,zero,zero,zero
+vcvtph2ps	%xmm9, %ymm0
+vmovaps	%ymm5, %ymm14
+vfmadd231ps	%ymm4, %ymm0, %ymm14 ## ymm14 = (ymm0 * ymm4) + ymm14
+vpxor	%ymm15, %ymm15, %ymm15
+vsubps	%ymm0, %ymm14, %ymm14
+vfmadd231ps	%ymm14, %ymm10, %ymm0 ## ymm0 = (ymm10 * ymm14) + ymm0
+vcvtph2ps	%xmm11, %ymm14
+vmovaps	%ymm6, %ymm11
+vfmadd231ps	%ymm4, %ymm14, %ymm11 ## ymm11 = (ymm14 * ymm4) + ymm11
+vsubps	%ymm14, %ymm11, %ymm11
+vfmadd231ps	%ymm11, %ymm10, %ymm14 ## ymm14 = (ymm10 * ymm11) + ymm14
+vcvtph2ps	%xmm12, %ymm11
+vmovaps	%ymm7, %ymm12
+vfmadd231ps	%ymm4, %ymm11, %ymm12 ## ymm12 = (ymm11 * ymm4) + ymm12
+vsubps	%ymm11, %ymm12, %ymm12
+vfmadd231ps	%ymm12, %ymm10, %ymm11 ## ymm11 = (ymm10 * ymm12) + ymm11
+vcvtph2ps	%xmm13, %ymm12
+vmovaps	%ymm8, %ymm13
+vfmadd231ps	%ymm4, %ymm12, %ymm13 ## ymm13 = (ymm12 * ymm4) + ymm13
+vsubps	%ymm12, %ymm13, %ymm13
+vfmadd231ps	%ymm13, %ymm10, %ymm12 ## ymm12 = (ymm10 * ymm13) + ymm12
+vcvtps2ph	$0x4, %ymm12, %xmm12
+vcvtps2ph	$0x4, %ymm11, %xmm11
+vcvtps2ph	$0x4, %ymm14, %xmm14
+vcvtps2ph	$0x4, %ymm0, %xmm0
+vmovdqu	%ymm1, 0x40(%rsp)
+vmovdqu	%ymm2, 0x60(%rsp)
+vpunpcklwd	%xmm14, %xmm0, %xmm13 ## xmm13 = xmm0[0],xmm14[0],xmm0[1],xmm14[1],xmm0[2],xmm14[2],xmm0[3],xmm14[3]
+vpunpcklwd	%xmm12, %xmm11, %xmm1 ## xmm1 = xmm11[0],xmm12[0],xmm11[1],xmm12[1],xmm11[2],xmm12[2],xmm11[3],xmm12[3]
+vpunpckldq	%xmm1, %xmm13, %xmm2 ## xmm2 = xmm13[0],xmm1[0],xmm13[1],xmm1[1]
+vmovq	%xmm2, (%r11,%r10,8)
+addq	$0x1, %r10
+jmp	0x2bb <__text+0x2bb>
+# row_done:
+addq	$0x1, %r14
+movq	%rsi, %r10
+cmpq	%r12, %r14
+jge	0x4b3 <__text+0x4b3>
+# next_row:
+vpxor	%ymm0, %ymm0, %ymm0
+movq	0x10(%rdx), %r11
+movl	0x1c(%rdx), %eax
+shlq	$0x2, %rax
+imulq	%r14, %rax
+addq	%rax, %r11
+vbroadcastss	(%r11), %ymm1
+vbroadcastss	0x4(%r11), %ymm2
+vbroadcastss	0x8(%r11), %ymm3
+vbroadcastss	0x47(%rip), %ymm4 ## 0x4c7 <__text+0x4c7>
+movq	0x20(%rdx), %r11
+movl	0x2c(%rdx), %eax
+shlq	$0x2, %rax
+imulq	%r14, %rax
+addq	%rax, %r11
+vbroadcastss	(%r11), %ymm5
+vbroadcastss	0x4(%r11), %ymm6
+vbroadcastss	0x8(%r11), %ymm7
+vbroadcastss	0xc(%r11), %ymm8
+vsubps	%ymm8, %ymm4, %ymm4
+jmp	0x83 <__text+0x83>
+# done_all:
+addq	$0x80, %rsp
+popq	%rbx
+popq	%r15
+popq	%r12
+popq	%r14
+popq	%r13
+vzeroupper
+retq
+addb	%al, (%rax)
+cmpb	$0x0, (%rdi)
+addb	%al, (%rax)
+addb	%al, (%rcx)
+addb	%al, (%rax)
+addb	%al, (%rdx)
+addb	%al, (%rax)
+addb	%al, (%rbx)
+addb	%al, (%rax)
+addb	%al, (%rax,%rax)
+addb	%al, (%rax)
+addl	$0x6000000, %eax        ## imm = 0x6000000
+addb	%al, (%rax)
+addb	%al, (%rdi)
+addb	%al, (%rax)
+addb	%al, (%rax)
+addb	%al, (%rax)
+<unknown>
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+addb	%bh, (%rdi)
+addb	%al, (%rax)
+cmpb	$0x0, (%rdi)
+addb	%al, -0x7fffffc1(%rax)
+<unknown>
+addb	%al, (%rax)
+cmpb	$0x0, (%rdi)
+addb	%al, -0x7fffffc1(%rax)
+<unknown>
+addb	%al, (%rax)
+cmpb	$0x0, (%rdi)
+addb	%al, 0x801003f(%rax)
+orl	%eax, -0x7f7f7f80(%rax)
+addb	$-0x80, -0x7f7f7f80(%rax)
+addb	%al, (%rcx)
+orb	%cl, (%rcx)
+addb	$-0x80, -0x7f7f7f80(%rax)
+addb	$0x3, 0x2808080(%rax)
+orb	(%rbx), %cl
+addb	$-0x80, -0x7f7f7f80(%rax)
+addb	$0x3, 0x2808080(%rax)
+orb	(%rbx), %cl
+addb	$-0x80, -0x7f7f7f80(%rax)
+addb	$0x5, 0x4808080(%rax)
+orb	$0xd, %al
+addb	$-0x80, -0x7f7f7f80(%rax)
+addb	$0x5, 0x4808080(%rax)
+orb	$0xd, %al
+addb	$-0x80, -0x7f7f7f80(%rax)
+addb	$0x7, 0x6808080(%rax)
+<unknown>
+jo	0xffffffff80808654 <__text+0xffffffff80808654>
+addb	$-0x80, -0x7f7f7f80(%rax)
+<unknown>
+<unknown>
+<unknown>
+jo	0xffffffff80808664 <__text+0xffffffff80808664>
+addb	$-0x80, -0x7f7f7f80(%rax)
+addb	%al, (%rax)
+cmpb	$0x0, (%rdi)
+addb	%al, -0x7fffffc1(%rax)
+<unknown>
+addb	%al, (%rax)
+cmpb	$0x0, (%rdi)
+addb	%al, -0x7fffffc1(%rax)
+<unknown>
+addb	%al, (%rax)
+cmpb	$0x0, (%rdi)
+<unknown>
+<unknown>

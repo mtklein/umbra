@@ -130,11 +130,25 @@ static _Bool can_remat(struct ra const *ra, int val) {
     return ra->cfg.remat && ra->inst[val].op == op_imm_32;
 }
 
+void ra_assert_loop_invariant(struct ra const *ra) {
+    for (int i = 0; i < ra->preamble; i++) {
+        assume(ra->slot[i].reg == ra->loop_reg[i]);
+    }
+}
+
 void ra_end_loop(struct ra *ra, int *sl) {
     for (int i = 0; i < ra->preamble; i++) {
         int8_t const target = ra->loop_reg[i];
         if (target < 0) { continue; }
         if (ra->slot[i].reg == target) { continue; }
+        // Drop the owner record for val i's current register (if any) before
+        // reassigning to target.  Otherwise a later iteration that needs to
+        // restore a different val into that old register would see val i
+        // still listed as the occupant and clobber slot[i].reg back to -1.
+        int8_t const old_r = ra->slot[i].reg;
+        if (old_r >= 0 && ra->owner[(int)old_r] == i) {
+            ra->owner[(int)old_r] = -1;
+        }
         int const occ = ra->owner[(int)target];
         if (occ >= 0 && occ != i) {
             ra->slot[occ].reg = -1;

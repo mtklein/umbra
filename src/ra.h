@@ -30,6 +30,12 @@ void   ra_begin_loop(struct ra *ra);
 void   ra_end_loop(struct ra *ra, int *sl);
 void   ra_evict_live_before(struct ra *ra, int *sl, int *ns, int before);
 
+// Assert that every preamble value is back in the register that ra_begin_loop
+// captured for it.  Call at compile-time on each edge that branches to the
+// start of the SIMD body -- if it ever fires, the emitted code will compare
+// x against whatever garbage the previous edge left in that register.
+void   ra_assert_loop_invariant(struct ra const *ra);
+
 int8_t ra_reg(struct ra const *ra, int val);
 int8_t ra_chan_reg(struct ra const *ra, int val, int chan);
 int    ra_last_use(struct ra const *ra, int val);
