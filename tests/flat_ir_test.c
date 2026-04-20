@@ -3673,19 +3673,21 @@ TEST(test_strided_2d_dispatch) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(buf, 0xff, sizeof buf);
-        if (!B.p[bi]) { continue; }
-        slot[0] = (struct umbra_buf){.ptr=buf, .count=count(buf), .stride=S};
-        B.p[bi]->queue(B.p[bi], L, T, R, BT);
-        B.be[bi]->flush(B.be[bi]);
-        for (int row = T; row < BT; row++) {
-            for (int col = L; col < R; col++) {
-                buf[row * S + col] == col + row * 1000 here;
+        if (B.p[bi]) {
+            slot[0] = (struct umbra_buf){.ptr=buf, .count=count(buf), .stride=S};
+            B.p[bi]->queue(B.p[bi], L, T, R, BT);
+            B.be[bi]->flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    buf[row * S + col] == col + row * 1000 here;
+                }
             }
-        }
-        for (int row = 0; row < TH; row++) {
-            for (int col = 0; col < S; col++) {
-                if (row >= T && row < BT && col >= L && col < R) { continue; }
-                buf[row * S + col] == (int32_t)0xffffffff here;
+            for (int row = 0; row < TH; row++) {
+                for (int col = 0; col < S; col++) {
+                    if (row < T || row >= BT || col < L || col >= R) {
+                        buf[row * S + col] == (int32_t)0xffffffff here;
+                    }
+                }
             }
         }
     }
@@ -3706,21 +3708,23 @@ TEST(test_strided_load_arbitrary_tile) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!B.p[bi]) { continue; }
-        slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=S};
-        slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=S};
-        B.p[bi]->queue(B.p[bi], L, T, R, BT);
-        B.be[bi]->flush(B.be[bi]);
-        for (int row = T; row < BT; row++) {
-            for (int col = L; col < R; col++) {
-                int idx = row * S + col;
-                dst[idx] == src[idx] + 1 here;
+        if (B.p[bi]) {
+            slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=S};
+            slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=S};
+            B.p[bi]->queue(B.p[bi], L, T, R, BT);
+            B.be[bi]->flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int idx = row * S + col;
+                    dst[idx] == src[idx] + 1 here;
+                }
             }
-        }
-        for (int row = 0; row < TH; row++) {
-            for (int col = 0; col < S; col++) {
-                if (row >= T && row < BT && col >= L && col < R) { continue; }
-                dst[row * S + col] == 0 here;
+            for (int row = 0; row < TH; row++) {
+                for (int col = 0; col < S; col++) {
+                    if (row < T || row >= BT || col < L || col >= R) {
+                        dst[row * S + col] == 0 here;
+                    }
+                }
             }
         }
     }
@@ -3741,16 +3745,17 @@ TEST(test_two_buffers_different_row_bytes) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!B.p[bi]) { continue; }
-        slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=SW};
-        slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=DW};
-        B.p[bi]->queue(B.p[bi], L, T, R, BT);
-        B.be[bi]->flush(B.be[bi]);
-        for (int row = T; row < BT; row++) {
-            for (int col = L; col < R; col++) {
-                int si = row * SW + col;
-                int di = row * DW + col;
-                dst[di] == src[si] + 1 here;
+        if (B.p[bi]) {
+            slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=SW};
+            slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=DW};
+            B.p[bi]->queue(B.p[bi], L, T, R, BT);
+            B.be[bi]->flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int si = row * SW + col;
+                    int di = row * DW + col;
+                    dst[di] == src[si] + 1 here;
+                }
             }
         }
     }
@@ -3774,20 +3779,22 @@ TEST(test_deref_row_bytes_l_gt_0) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst_px, 0, sizeof dst_px);
-        if (!B.p[bi]) { continue; }
-        slot[0] = (struct umbra_buf){.ptr=dst_px, .count=count(dst_px), .stride=S};
-        B.p[bi]->queue(B.p[bi], L, T, R, BT);
-        B.be[bi]->flush(B.be[bi]);
-        for (int row = T; row < BT; row++) {
-            for (int col = L; col < R; col++) {
-                int idx = row * S + col;
-                dst_px[idx] == src_px[idx] + 1 here;
+        if (B.p[bi]) {
+            slot[0] = (struct umbra_buf){.ptr=dst_px, .count=count(dst_px), .stride=S};
+            B.p[bi]->queue(B.p[bi], L, T, R, BT);
+            B.be[bi]->flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int idx = row * S + col;
+                    dst_px[idx] == src_px[idx] + 1 here;
+                }
             }
-        }
-        for (int row = 0; row < TH; row++) {
-            for (int col = 0; col < S; col++) {
-                if (row >= T && row < BT && col >= L && col < R) { continue; }
-                dst_px[row * S + col] == 0 here;
+            for (int row = 0; row < TH; row++) {
+                for (int col = 0; col < S; col++) {
+                    if (row < T || row >= BT || col < L || col >= R) {
+                        dst_px[row * S + col] == 0 here;
+                    }
+                }
             }
         }
     }
@@ -3815,14 +3822,15 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst_px, 0, sizeof dst_px);
-        if (!B.p[bi]) { continue; }
-        slot[0] = (struct umbra_buf){.ptr=dst_px, .count=count(dst_px), .stride=S};
-        B.p[bi]->queue(B.p[bi], L, T, R, BT);
-        B.be[bi]->flush(B.be[bi]);
-        for (int row = T; row < BT; row++) {
-            for (int col = L; col < R; col++) {
-                int idx = row * S + col;
-                equiv(dst_px[idx], (float)(row * S + col) + 1.0f) here;
+        if (B.p[bi]) {
+            slot[0] = (struct umbra_buf){.ptr=dst_px, .count=count(dst_px), .stride=S};
+            B.p[bi]->queue(B.p[bi], L, T, R, BT);
+            B.be[bi]->flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int idx = row * S + col;
+                    equiv(dst_px[idx], (float)(row * S + col) + 1.0f) here;
+                }
             }
         }
     }
@@ -3909,15 +3917,16 @@ TEST(test_tail_to_vector_row_transition) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0, sizeof dst);
-        if (!B.p[bi]) { continue; }
-        slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=S};
-        slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=S};
-        B.p[bi]->queue(B.p[bi], L, T, R, BT);
-        B.be[bi]->flush(B.be[bi]);
-        for (int row = T; row < BT; row++) {
-            for (int col = L; col < R; col++) {
-                int idx = row * S + col;
-                dst[idx] == src[idx] + 1 here;
+        if (B.p[bi]) {
+            slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=S};
+            slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=S};
+            B.p[bi]->queue(B.p[bi], L, T, R, BT);
+            B.be[bi]->flush(B.be[bi]);
+            for (int row = T; row < BT; row++) {
+                for (int col = L; col < R; col++) {
+                    int idx = row * S + col;
+                    dst[idx] == src[idx] + 1 here;
+                }
             }
         }
     }
@@ -3937,13 +3946,14 @@ TEST(test_gather_partial_oob) {
 
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         __builtin_memset(dst, 0xff, sizeof dst);
-        if (!B.p[bi]) { continue; }
-        slot[0] = (struct umbra_buf){.ptr=src, .count=count(src)};
-        slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst)};
-        B.p[bi]->queue(B.p[bi], 0, 0, 16, 1);
-        B.be[bi]->flush(B.be[bi]);
-        for (int col = 0; col < 6; col++) { dst[col] == src[col] here; }
-        for (int col = 6; col < 16; col++) { dst[col] == 0 here; }
+        if (B.p[bi]) {
+            slot[0] = (struct umbra_buf){.ptr=src, .count=count(src)};
+            slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst)};
+            B.p[bi]->queue(B.p[bi], 0, 0, 16, 1);
+            B.be[bi]->flush(B.be[bi]);
+            for (int col = 0; col < 6; col++) { dst[col] == src[col] here; }
+            for (int col = 6; col < 16; col++) { dst[col] == 0 here; }
+        }
     }
     test_backends_free(&B);
 }
