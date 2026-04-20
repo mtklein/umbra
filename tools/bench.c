@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
     int const H = 480;
     slides_init(W, H);
 
-    int ns = slide_count() - 1;
+    int const ns = slide_count() - 1;
 
     struct umbra_backend *bes[] = {
         umbra_backend_interp(), umbra_backend_jit(),
