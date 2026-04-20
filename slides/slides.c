@@ -106,7 +106,7 @@ void slide_bg_free(struct slide_bg *bg) {
 struct umbra_builder* slide_draw_builder(struct slide *s,
                                          struct umbra_buf *dst,
                                          struct umbra_fmt fmt,
-                                         struct umbra_matrix const *pre) {
+                                         union transform const *pre) {
     if (!s->build_draw && !s->build_sdf_draw) { return NULL; }
 
     struct umbra_builder *b = umbra_builder();
@@ -114,7 +114,7 @@ struct umbra_builder* slide_draw_builder(struct slide *s,
     umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
                 y = umbra_f32_from_i32(b, umbra_y(b));
     if (pre) {
-        umbra_point_val32 const p = umbra_transform_perspective(pre, b, x, y);
+        umbra_point_val32 const p = umbra_transform_perspective(&pre->persp, b, x, y);
         x = p.x;
         y = p.y;
     }
@@ -126,7 +126,7 @@ struct umbra_builder* slide_draw_builder(struct slide *s,
 struct slide_runtime* slide_runtime(struct slide *s,
                                     int w, int h,
                                     struct umbra_backend *be, struct umbra_fmt fmt,
-                                    struct umbra_matrix const *pre) {
+                                    union transform const *pre) {
     struct slide_runtime *rt = calloc(1, sizeof *rt);
     rt->fmt = fmt;
     rt->w   = w;
@@ -141,15 +141,8 @@ struct slide_runtime* slide_runtime(struct slide *s,
     }
 
     if (s->build_sdf_draw) {
-        struct umbra_affine aff;
-        if (pre) {
-            aff = (struct umbra_affine){
-                pre->sx, pre->kx, pre->tx,
-                pre->ky, pre->sy, pre->ty,
-            };
-        }
         struct umbra_builder *bb = umbra_builder();
-        rt->bounds = umbra_sdf_bounds_program(bb, pre ? &aff : NULL,
+        rt->bounds = umbra_sdf_bounds_program(bb, pre ? &pre->affine : NULL,
                                               s->sdf_fn, s->sdf_ctx);
         umbra_builder_free(bb);
     }

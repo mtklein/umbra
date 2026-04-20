@@ -2,6 +2,16 @@
 #include "../include/umbra_draw.h"
 #include <stdint.h>
 
+// A point transform viewed either as its full 3x3 perspective form (for the
+// draw-side umbra_transform_perspective call) or as its affine prefix (for the
+// bounds-side umbra_sdf_bounds_program call).  Per C11 6.5.2.3 common-initial-
+// sequence, writing through one member lets readers access the shared prefix
+// through the other wherever this declaration is visible.
+union transform {
+    struct umbra_matrix persp;
+    struct umbra_affine affine;
+};
+
 struct slide {
     char const     *title;
     umbra_color     bg;
@@ -64,7 +74,7 @@ struct slide_runtime {
 
 struct slide_runtime* slide_runtime(struct slide*, int w, int h,
                                     struct umbra_backend*, struct umbra_fmt,
-                                    struct umbra_matrix const *pre_transform);
+                                    union transform const *pre_transform);
 void   slide_runtime_draw(struct slide_runtime*, struct slide*,
                           double secs, int l, int t, int r, int b);
 void   slide_runtime_free(struct slide_runtime*);
@@ -77,4 +87,4 @@ void   slide_runtime_free(struct slide_runtime*);
 struct umbra_builder* slide_draw_builder(struct slide*,
                                           struct umbra_buf *dst,
                                           struct umbra_fmt,
-                                          struct umbra_matrix const *pre);
+                                          union transform const *pre);

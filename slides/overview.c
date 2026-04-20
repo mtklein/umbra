@@ -18,7 +18,7 @@ struct cell {
     struct slide         *sub;          // NULL = placeholder
     int                   col, row;
     struct slide_runtime *rt;
-    struct umbra_matrix   cell_mat;     // cell -> canvas, fixed at prepare
+    union transform       cell_mat;     // cell -> canvas, fixed at prepare
     int                   :32;
 };
 
@@ -80,11 +80,11 @@ static void draw_xbox(uint16_t *mask, int stride, int x0, int y0, int cw, int ch
 // of the overview framebuffer to the sub-slide's full-canvas coordinates.
 //   cell_x in [col*cw, col*cw + cw]  ->  canvas_x in [0, w]
 //   cell_y in [row*ch, row*ch + ch]  ->  canvas_y in [0, h]
-static void compute_cell_matrix(struct umbra_matrix *out, int col, int row,
+static void compute_cell_matrix(union transform *out, int col, int row,
                                  int cw, int ch, int w, int h) {
     float const sx = (float)w / (float)cw,
                 sy = (float)h / (float)ch;
-    *out = (struct umbra_matrix){
+    out->persp = (struct umbra_matrix){
         .sx = sx, .kx = 0, .tx = -(float)col * (float)w,
         .ky = 0,  .sy = sy, .ty = -(float)row * (float)h,
         .p0 = 0,  .p1 = 0,  .p2 = 1,
