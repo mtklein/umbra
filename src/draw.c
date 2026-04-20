@@ -475,58 +475,58 @@ umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
     return umbra_sel_32(b, inside, one_f, zero_f);
 }
 
-umbra_color_val32 umbra_blend_src(void *ctx, struct umbra_builder *builder,
+umbra_color_val32 umbra_blend_src(void *ctx, struct umbra_builder *b,
                                   umbra_color_val32 src, umbra_color_val32 dst) {
     (void)ctx;
-    (void)builder;
+    (void)b;
     (void)dst;
     return src;
 }
 
-umbra_color_val32 umbra_blend_srcover(void *ctx, struct umbra_builder *builder,
+umbra_color_val32 umbra_blend_srcover(void *ctx, struct umbra_builder *b,
                                       umbra_color_val32 src, umbra_color_val32 dst) {
     (void)ctx;
-    umbra_val32 const one = umbra_imm_f32(builder, 1.0f);
-    umbra_val32 const inv_a = umbra_sub_f32(builder, one, src.a);
+    umbra_val32 const one   = umbra_imm_f32(b, 1.0f),
+                      inv_a = umbra_sub_f32(b, one, src.a);
     return (umbra_color_val32){
-        umbra_add_f32(builder, src.r, umbra_mul_f32(builder, dst.r, inv_a)),
-        umbra_add_f32(builder, src.g, umbra_mul_f32(builder, dst.g, inv_a)),
-        umbra_add_f32(builder, src.b, umbra_mul_f32(builder, dst.b, inv_a)),
-        umbra_add_f32(builder, src.a, umbra_mul_f32(builder, dst.a, inv_a)),
+        umbra_add_f32(b, src.r, umbra_mul_f32(b, dst.r, inv_a)),
+        umbra_add_f32(b, src.g, umbra_mul_f32(b, dst.g, inv_a)),
+        umbra_add_f32(b, src.b, umbra_mul_f32(b, dst.b, inv_a)),
+        umbra_add_f32(b, src.a, umbra_mul_f32(b, dst.a, inv_a)),
     };
 }
 
-umbra_color_val32 umbra_blend_dstover(void *ctx, struct umbra_builder *builder,
+umbra_color_val32 umbra_blend_dstover(void *ctx, struct umbra_builder *b,
                                       umbra_color_val32 src, umbra_color_val32 dst) {
     (void)ctx;
-    umbra_val32 const one = umbra_imm_f32(builder, 1.0f);
-    umbra_val32 const inv_a = umbra_sub_f32(builder, one, dst.a);
+    umbra_val32 const one   = umbra_imm_f32(b, 1.0f),
+                      inv_a = umbra_sub_f32(b, one, dst.a);
     return (umbra_color_val32){
-        umbra_add_f32(builder, dst.r, umbra_mul_f32(builder, src.r, inv_a)),
-        umbra_add_f32(builder, dst.g, umbra_mul_f32(builder, src.g, inv_a)),
-        umbra_add_f32(builder, dst.b, umbra_mul_f32(builder, src.b, inv_a)),
-        umbra_add_f32(builder, dst.a, umbra_mul_f32(builder, src.a, inv_a)),
+        umbra_add_f32(b, dst.r, umbra_mul_f32(b, src.r, inv_a)),
+        umbra_add_f32(b, dst.g, umbra_mul_f32(b, src.g, inv_a)),
+        umbra_add_f32(b, dst.b, umbra_mul_f32(b, src.b, inv_a)),
+        umbra_add_f32(b, dst.a, umbra_mul_f32(b, src.a, inv_a)),
     };
 }
 
-umbra_color_val32 umbra_blend_multiply(void *ctx, struct umbra_builder *builder,
+umbra_color_val32 umbra_blend_multiply(void *ctx, struct umbra_builder *b,
                                        umbra_color_val32 src, umbra_color_val32 dst) {
     (void)ctx;
-    umbra_val32 const one = umbra_imm_f32(builder, 1.0f);
-    umbra_val32 const inv_sa = umbra_sub_f32(builder, one, src.a);
-    umbra_val32 const inv_da = umbra_sub_f32(builder, one, dst.a);
-    umbra_val32 const r = umbra_add_f32(builder, umbra_mul_f32(builder, src.r, dst.r),
-                                      umbra_add_f32(builder, umbra_mul_f32(builder, src.r, inv_da),
-                                                    umbra_mul_f32(builder, dst.r, inv_sa)));
-    umbra_val32 const g = umbra_add_f32(builder, umbra_mul_f32(builder, src.g, dst.g),
-                                      umbra_add_f32(builder, umbra_mul_f32(builder, src.g, inv_da),
-                                                    umbra_mul_f32(builder, dst.g, inv_sa)));
-    umbra_val32 const b = umbra_add_f32(builder, umbra_mul_f32(builder, src.b, dst.b),
-                                      umbra_add_f32(builder, umbra_mul_f32(builder, src.b, inv_da),
-                                                    umbra_mul_f32(builder, dst.b, inv_sa)));
-    umbra_val32 const a = umbra_add_f32(builder, umbra_mul_f32(builder, src.a, dst.a),
-                                      umbra_add_f32(builder, umbra_mul_f32(builder, src.a, inv_da),
-                                                    umbra_mul_f32(builder, dst.a, inv_sa)));
-    return (umbra_color_val32){r, g, b, a};
+    umbra_val32 const one    = umbra_imm_f32(b, 1.0f),
+                      inv_sa = umbra_sub_f32(b, one, src.a),
+                      inv_da = umbra_sub_f32(b, one, dst.a);
+    umbra_val32 const r = umbra_add_f32(b, umbra_mul_f32(b, src.r, dst.r),
+                              umbra_add_f32(b, umbra_mul_f32(b, src.r, inv_da),
+                                               umbra_mul_f32(b, dst.r, inv_sa))),
+                      g = umbra_add_f32(b, umbra_mul_f32(b, src.g, dst.g),
+                              umbra_add_f32(b, umbra_mul_f32(b, src.g, inv_da),
+                                               umbra_mul_f32(b, dst.g, inv_sa))),
+                      bl = umbra_add_f32(b, umbra_mul_f32(b, src.b, dst.b),
+                              umbra_add_f32(b, umbra_mul_f32(b, src.b, inv_da),
+                                               umbra_mul_f32(b, dst.b, inv_sa))),
+                      a = umbra_add_f32(b, umbra_mul_f32(b, src.a, dst.a),
+                              umbra_add_f32(b, umbra_mul_f32(b, src.a, inv_da),
+                                               umbra_mul_f32(b, dst.a, inv_sa)));
+    return (umbra_color_val32){r, g, bl, a};
 }
 
