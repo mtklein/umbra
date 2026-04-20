@@ -122,12 +122,13 @@ static void compile_all_builders(struct slide_runtime *rt, struct slide *s,
                                  struct umbra_fmt fmt,
                                  struct umbra_backend *be) {
     struct umbra_builder *b = slide_draw_builder(s, &rt->dst_buf, fmt, NULL);
-    if (!b) { return; }
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
-    struct umbra_program *p = be->compile(be, ir);
-    umbra_program_free(p);
-    umbra_flat_ir_free(ir);
+    if (b) {
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        umbra_builder_free(b);
+        struct umbra_program *p = be->compile(be, ir);
+        umbra_program_free(p);
+        umbra_flat_ir_free(ir);
+    }
 }
 
 static _Bool streq(char const *a, char const *b) { return strcmp(a, b) == 0; }

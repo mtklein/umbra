@@ -101,9 +101,10 @@ static void free_xtra(void) {
 
 static void rebuild_xtra(int backend) {
     free_xtra();
-    if (!saved_ir || n_threads <= 1 || !bes[backend]) { return; }
-    for (int t = 1; t < n_threads; t++) {
-        xtra_progs[t] = bes[backend]->compile(bes[backend], saved_ir);
+    if (saved_ir && n_threads > 1 && bes[backend]) {
+        for (int t = 1; t < n_threads; t++) {
+            xtra_progs[t] = bes[backend]->compile(bes[backend], saved_ir);
+        }
     }
 }
 

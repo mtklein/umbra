@@ -107,20 +107,21 @@ struct umbra_builder* slide_draw_builder(struct slide *s,
                                          struct umbra_buf *dst,
                                          struct umbra_fmt fmt,
                                          union transform const *pre) {
-    if (!s->build_draw && !s->build_sdf_draw) { return NULL; }
-
-    struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
-    umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
-                y = umbra_f32_from_i32(b, umbra_y(b));
-    if (pre) {
-        umbra_point_val32 const p = umbra_transform_perspective(&pre->persp, b, x, y);
-        x = p.x;
-        y = p.y;
+    if (s->build_draw || s->build_sdf_draw) {
+        struct umbra_builder *b = umbra_builder();
+        umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
+        umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
+                    y = umbra_f32_from_i32(b, umbra_y(b));
+        if (pre) {
+            umbra_point_val32 const p = umbra_transform_perspective(&pre->persp, b, x, y);
+            x = p.x;
+            y = p.y;
+        }
+        if (s->build_sdf_draw) { s->build_sdf_draw(s, b, dst_ptr, fmt, x, y); }
+        else                   { s->build_draw    (s, b, dst_ptr, fmt, x, y); }
+        return b;
     }
-    if (s->build_sdf_draw) { s->build_sdf_draw(s, b, dst_ptr, fmt, x, y); }
-    else                   { s->build_draw    (s, b, dst_ptr, fmt, x, y); }
-    return b;
+    return NULL;
 }
 
 struct slide_runtime* slide_runtime(struct slide *s,

@@ -23,36 +23,37 @@ _Bool jit_dump_with_labels(FILE *out, char const *obj_path,
              " %s 2>/dev/null",
              obj_path);
     FILE *p = popen(cmd, "r");
-    if (!p) { return 0; }
-
-    char  line[256];
-    _Bool past_header = 0;
-    int   next_label = 0;
-    while (fgets(line, (int)sizeof line, p)) {
-        if (!past_header) {
-            if (strstr(line, "<") && strchr(line, ':')) { past_header = 1; }
-        } else {
-            // Expect "       <hex>: <instr>".  Skip blank lines.
-            char *end = 0;
-            long  addr = strtol(line, &end, 16);
-            if (end != line && *end == ':') {
-                while (next_label < labels && label[next_label].byte_off <= (int)addr) {
-                    fprintf(out, "# %s:\n", label[next_label].name);
-                    next_label++;
+    if (p) {
+        char  line[256];
+        _Bool past_header = 0;
+        int   next_label = 0;
+        while (fgets(line, (int)sizeof line, p)) {
+            if (!past_header) {
+                if (strstr(line, "<") && strchr(line, ':')) { past_header = 1; }
+            } else {
+                // Expect "       <hex>: <instr>".  Skip blank lines.
+                char *end = 0;
+                long  addr = strtol(line, &end, 16);
+                if (end != line && *end == ':') {
+                    while (next_label < labels && label[next_label].byte_off <= (int)addr) {
+                        fprintf(out, "# %s:\n", label[next_label].name);
+                        next_label++;
+                    }
+                    char *instr = end + 1;
+                    while (*instr == ' ' || *instr == '\t') { instr++; }
+                    fputs(instr, out);
                 }
-                char *instr = end + 1;
-                while (*instr == ' ' || *instr == '\t') { instr++; }
-                fputs(instr, out);
             }
         }
+        pclose(p);
+        // Emit any labels that fell past the end (e.g. done_all landing at code_bytes).
+        while (next_label < labels) {
+            fprintf(out, "# %s:\n", label[next_label].name);
+            next_label++;
+        }
+        return 1;
     }
-    pclose(p);
-    // Emit any labels that fell past the end (e.g. done_all landing at code_bytes).
-    while (next_label < labels) {
-        fprintf(out, "# %s:\n", label[next_label].name);
-        next_label++;
-    }
-    return 1;
+    return 0;
 }
 
 struct cache_entry { void *mem; size_t size; };
