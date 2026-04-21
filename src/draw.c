@@ -351,13 +351,29 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
                         int l, int t, int r, int b) {
-    // TODO: continue to refine tiling based on properties of backend
-    _Bool const backend_is_cpu = draw_partial->queue_is_threadsafe;
-    int const TW = backend_is_cpu ? 8 : 512,
-              TH = backend_is_cpu ? 8 : 512,
-              xt = (r - l + TW - 1) / TW,
-              yt = (b - t + TH - 1) / TH,
-              tiles = xt * yt;
+    // Pick a square tile big enough that per-tile overhead (bounds eval +
+    // one draw queue() dispatch) is <=5% of per-tile draw savings, assuming
+    // a 50% cull fraction.  Power-of-two sweep from 1 to 512.  No hard
+    // dispatch_K floor: for heavy shaders, smaller tiles can win even with
+    // partially-filled SIMD lanes, because culling savings outrun the waste.
+    //
+    // TODO: bootstrap gpu_dispatch_cost; refine via backend->stats() over
+    // time (encode_sec + submit_sec divided by dispatches, converted to
+    // op-equivalent units using a measured seconds-per-op from gpu_sec).
+    _Bool const backend_is_cpu      = draw_partial->queue_is_threadsafe;
+    int   const gpu_dispatch_cost   = 1000000;
+    int   const dispatch_cost       = backend_is_cpu ? 0 : gpu_dispatch_cost;
+    int   const draw_ops            = draw_partial->min_queue_ops > 0
+                                    ? draw_partial->min_queue_ops : 1;
+    int   const tile_sq_min         = (bounds->prog->min_queue_ops + dispatch_cost)
+                                    * 40 / draw_ops;
+    int         tile                = 1;
+    while (tile * tile < tile_sq_min && tile < 512) { tile *= 2; }
+    int   const TW = tile,
+                TH = tile,
+                xt = (r - l + TW - 1) / TW,
+                yt = (b - t + TH - 1) / TH,
+                tiles = xt * yt;
 
     if (tiles > bounds->cov_cap) {
         bounds->cov     = realloc(bounds->cov, (size_t)tiles * sizeof *bounds->cov);
