@@ -31,8 +31,9 @@ int op_values(enum op op) {
 
 // log2 of the byte width of a single buffer element accessed by a ptr-bearing
 // op.  Used to size GPU buffer allocations (bytes = count << shift) and to
-// pick shader-side pointer element types.  Assumes op_has_ptr(op).
+// pick shader-side pointer element types.
 int op_elem_shift(enum op op) {
+    assume(op_flags[op] & OP_PTR);
     switch ((int)op) {
     case op_load_16x4:
     case op_store_16x4:        return 3;   // half4 = 8 bytes
