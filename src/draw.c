@@ -373,8 +373,6 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     bounds->prog->queue(bounds->prog, 0, 0, xt, yt);
     uint16_t const *c = bounds->cov;
 
-    // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
-
     // TODO: use a draw that skips per-pixel SDF eval when TILE_FULL.
 
     // TODO: once we have a better handle on the ideal tile shapes (tile_size
@@ -393,14 +391,25 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     // vehicle here: one source shader with bounds as function constants,
     // specialized per-tile at pipeline creation.  Vulkan/SPIR-V has
     // analogous specialization constants.
+
+    // Coalesce horizontally adjacent covered tiles in each row into a single
+    // draw->queue() so each backend amortizes per-dispatch overhead across
+    // the whole run of tiles.
     for (int ty = 0; ty < yt; ty++) {
-        for (int tx = 0; tx < xt; tx++) {
+        int const tt = t + ty * T,
+                  tb = tt + T < b ? tt + T : b;
+        int tx = 0;
+        while (tx < xt) {
             if (c[ty * xt + tx] != UMBRA_SDF_TILE_NONE) {
-                int const tl = l + tx * T,
-                          tt = t + ty * T,
-                          tr = tl + T < r ? tl + T : r,
-                          tb = tt + T < b ? tt + T : b;
+                int const run_start = tx;
+                while (tx < xt && c[ty * xt + tx] != UMBRA_SDF_TILE_NONE) {
+                    tx++;
+                }
+                int const tl = l + run_start * T,
+                          tr = l + tx * T < r ? l + tx * T : r;
                 draw->queue(draw, tl, tt, tr, tb);
+            } else {
+                tx++;
             }
         }
     }
