@@ -555,6 +555,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->base.dump    = vk_program_dump;
     p->base.free    = vk_program_free;
     p->base.backend = be;
+    p->base.min_ops = sr.min_ops;
     return &p->base;
 }
 

@@ -20,6 +20,7 @@ struct spirv_result {
     int               max_ptr;
     int               total_bufs;
     int               push_words;
+    int               min_ops, pad;
 };
 
 struct spirv_result build_spirv(struct umbra_flat_ir const *ir, int flags);

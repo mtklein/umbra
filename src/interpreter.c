@@ -174,7 +174,7 @@ struct interp_program {
     struct sw_inst *inst;
     ival           *v;
     ival           *var;
-    int             preamble, ptrs, bindings, vars;
+    int             preamble, ptrs, bindings, vars, min_ops, pad;
     struct buffer_binding *binding;
 };
 
@@ -214,6 +214,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 #if !__has_feature(address_sanitizer)
     ir = resolved = flat_ir_resolve(ir, JOIN_KEEP_X);
 #endif
+    p->min_ops = ir->insts;
 
     int n = 0;
     int loop_begin_sw_n = -1;
@@ -1307,6 +1308,7 @@ static struct umbra_program* compile_interp(struct umbra_backend           *be,
         .dump       = 0,
         .free       = free_interp,
         .backend    = be,
+        .min_ops    = p->min_ops,
         .queue_is_threadsafe = 1,
     };
     return &p->base;

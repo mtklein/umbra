@@ -39,7 +39,11 @@ struct umbra_program {
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
-    _Bool                 queue_is_threadsafe, pad[7];
+    // Lower bound on the IR ops one queue() call executes per K-step:
+    // preamble + body, with loops counted as a single pass.  Useful to
+    // reason about tile-size tradeoffs in dispatchers.
+    int                   min_ops;
+    _Bool                 queue_is_threadsafe, pad[3];
 };
 void umbra_program_free(struct umbra_program*);
 

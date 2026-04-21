@@ -118,6 +118,7 @@ static struct umbra_program* compile_jit(struct umbra_backend           *be,
         .dump       = dump_jit,
         .free       = free_jit,
         .backend    = be,
+        .min_ops    = j->min_ops,
         .queue_is_threadsafe = 1,
     };
     return &j->base;

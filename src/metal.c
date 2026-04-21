@@ -97,7 +97,7 @@ struct metal_program {
     uint8_t  *buf_shift;
     int    max_ptr;
     int    total_bufs;
-    int    bindings, pad;
+    int    bindings, min_ops;
     struct buffer_binding *binding;
 };
 
@@ -1109,6 +1109,7 @@ static struct metal_program* metal_program(
             p->buf_rw        = buf_rw;
             p->buf_shift     = buf_shift;
             p->bindings      = ir->bindings;
+            p->min_ops       = ir->insts;
             if (p->bindings) {
                 size_t const sz = (size_t)p->bindings * sizeof *p->binding;
                 p->binding = malloc(sz);
@@ -1342,6 +1343,7 @@ static struct umbra_program* compile_metal(struct umbra_backend           *be,
             .dump    = dump_metal,
             .free    = free_metal,
             .backend = be,
+            .min_ops = p->min_ops,
         };
         return &p->base;
     }

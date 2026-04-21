@@ -680,6 +680,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
 
     struct umbra_flat_ir *resolved = flat_ir_resolve(ir, JOIN_PREFER_IMM);
     ir = resolved;
+    result.min_ops = ir->insts;
 
     SpvBuilder B;
     memset(&B, 0, sizeof B);

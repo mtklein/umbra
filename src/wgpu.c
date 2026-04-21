@@ -438,6 +438,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->bg_layout   = bg_layout;
     p->pipe_layout = pipe_layout;
     p->pipeline    = pipeline;
+    p->base.min_ops = sr.min_ops;
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
     p->push_words  = sr.push_words;
