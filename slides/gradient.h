@@ -44,17 +44,6 @@ umbra_color_val32 shader_gradient_two_stops(void *shader_gradient_two_stops,
                                             struct umbra_builder*,
                                             umbra_val32 x, umbra_val32 y);
 
-struct shader_gradient_lut {
-    gradient_coords *coords_fn;
-    void            *coords_ctx;
-    float            N;
-    int              :32;
-    struct umbra_buf lut;
-};
-umbra_color_val32 shader_gradient_lut(void *shader_gradient_lut,
-                                      struct umbra_builder*,
-                                      umbra_val32 x, umbra_val32 y);
-
 struct shader_gradient_evenly_spaced_stops {
     gradient_coords *coords_fn;
     void            *coords_ctx;
@@ -75,6 +64,3 @@ struct shader_gradient {
 };
 umbra_color_val32 shader_gradient(void *shader_gradient, struct umbra_builder*,
                                   umbra_val32 x, umbra_val32 y);
-
-void gradient_lut(float *out, int lut_n, int n_stops, float const positions[],
-                  umbra_color const *colors);

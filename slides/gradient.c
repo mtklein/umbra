@@ -62,38 +62,6 @@ struct gradient_radial gradient_radial_from(umbra_point center, float radius) {
     };
 }
 
-static umbra_color_val32 sample_lut(struct umbra_builder *b, umbra_val32 t,
-                                    umbra_ptr uniforms, int N_slot, umbra_ptr lut) {
-    umbra_val32 const N_f     = umbra_uniform_32(b, uniforms, N_slot);
-    umbra_val32 const N_m1    = umbra_sub_f32(b, N_f, umbra_imm_f32(b, 1.0f));
-    umbra_val32 const N_m2    = umbra_sub_f32(b, N_f, umbra_imm_f32(b, 2.0f));
-    umbra_val32 const seg     = umbra_mul_f32(b, t, N_m1);
-    umbra_val32 const clamped = umbra_min_f32(b, seg, N_m2);
-    umbra_val32 const idx     = umbra_floor_i32(b, clamped);
-    umbra_val32 const idx1    = umbra_add_i32(b, idx, umbra_imm_i32(b, 1));
-    umbra_val32 const frac    = umbra_sub_f32(b, seg, umbra_floor_f32(b, clamped));
-
-    umbra_val32 const N_i = umbra_i32_from_f32(b, N_f);
-    umbra_val32 const n2  = umbra_add_i32(b, N_i, N_i);
-    umbra_val32 const n3  = umbra_add_i32(b, n2,  N_i);
-
-    umbra_val32 const r0 = umbra_gather_32(b, lut, idx),
-                      r1 = umbra_gather_32(b, lut, idx1),
-                      g0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  N_i)),
-                      g1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, N_i)),
-                      b0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  n2)),
-                      b1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, n2)),
-                      a0 = umbra_gather_32(b, lut, umbra_add_i32(b, idx,  n3)),
-                      a1 = umbra_gather_32(b, lut, umbra_add_i32(b, idx1, n3));
-
-    return (umbra_color_val32){
-        lerp_f(b, r0, r1, frac),
-        lerp_f(b, g0, g1, frac),
-        lerp_f(b, b0, b1, frac),
-        lerp_f(b, a0, a1, frac),
-    };
-}
-
 static umbra_color_val32 walk_stops(struct umbra_builder *b, umbra_val32 t,
                                     umbra_ptr uniforms, int N_slot,
                                     umbra_ptr colors, umbra_ptr pos) {
@@ -166,16 +134,6 @@ umbra_color_val32 shader_gradient_two_stops(void *ctx, struct umbra_builder *b,
     };
 }
 
-umbra_color_val32 shader_gradient_lut(void *ctx, struct umbra_builder *b,
-                                       umbra_val32 x, umbra_val32 y) {
-    struct shader_gradient_lut const *self = ctx;
-    umbra_val32 const t = self->coords_fn(self->coords_ctx, b,
-                                          (umbra_point_val32){x, y});
-    umbra_ptr const u   = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const lut = umbra_bind_buf(b, &self->lut);
-    return sample_lut(b, t, u, SLOT(N), lut);
-}
-
 static umbra_color_val32 gather_even_stops(struct umbra_builder *b, umbra_val32 t,
                                            umbra_ptr uniforms, int N_slot,
                                            umbra_ptr colors) {
@@ -230,37 +188,10 @@ umbra_color_val32 shader_gradient(void *ctx, struct umbra_builder *b,
     return walk_stops(b, t, u, SLOT(N), colors, pos);
 }
 
-void gradient_lut(float *out, int lut_n, int n_stops, float const positions[],
-                  umbra_color const *colors) {
-    for (int i = 0; i < lut_n; i++) {
-        float const t = (float)i / (float)(lut_n - 1);
-        int   seg = 0;
-        for (int j = 1; j < n_stops; j++) {
-            if (t >= positions[j]) {
-                seg = j;
-            }
-        }
-        if (seg >= n_stops - 1) {
-            seg = n_stops - 2;
-        }
-        float const span = positions[seg + 1] - positions[seg];
-        float f = 0;
-        if (span > 0) {
-            f = (t - positions[seg]) / span;
-            if (f < 0) { f = 0; }
-            if (f > 1) { f = 1; }
-        }
-        out[0 * lut_n + i] = colors[seg].r * (1 - f) + colors[seg + 1].r * f;
-        out[1 * lut_n + i] = colors[seg].g * (1 - f) + colors[seg + 1].g * f;
-        out[2 * lut_n + i] = colors[seg].b * (1 - f) + colors[seg + 1].b * f;
-        out[3 * lut_n + i] = colors[seg].a * (1 - f) + colors[seg + 1].a * f;
-    }
-}
-
 struct grad_slide {
     struct slide base;
 
-    float *colors_data, *pos_data, *lut_data;
+    float *colors_data, *pos_data;
 
     union {
         struct gradient_linear linear;
@@ -268,7 +199,6 @@ struct grad_slide {
     } coords;
     union {
         struct shader_gradient_two_stops           two_stops;
-        struct shader_gradient_lut                 lut;
         struct shader_gradient_evenly_spaced_stops even;
         struct shader_gradient                     full;
     } colorizer;
@@ -290,7 +220,6 @@ static void grad_free(struct slide *s) {
     struct grad_slide *st = (struct grad_slide *)s;
     free(st->colors_data);
     free(st->pos_data);
-    free(st->lut_data);
     free(st);
 }
 
@@ -342,30 +271,6 @@ SLIDE(slide_gradient_linear_evenly_spaced) {
     };
     st->shader_fn  = shader_gradient_evenly_spaced_stops;
     st->shader_ctx = &st->colorizer.even;
-    return &st->base;
-}
-
-SLIDE(slide_gradient_linear_lut) {
-    static umbra_color const colors[] = {
-        {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
-        {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
-    };
-    enum { N_STOPS = 6, LUT_N = 64 };
-    float pos[N_STOPS];
-    for (int i = 0; i < N_STOPS; i++) { pos[i] = (float)i / (float)(N_STOPS - 1); }
-    float *lut = malloc(LUT_N * 4 * sizeof(float));
-    gradient_lut(lut, LUT_N, N_STOPS, pos, colors);
-    struct grad_slide *st = make_grad("Gradient Linear LUT");
-    st->lut_data = lut;
-    st->coords.linear = gradient_linear_from((umbra_point){0, 0}, (umbra_point){640, 0});
-    st->colorizer.lut = (struct shader_gradient_lut){
-        .coords_fn  = gradient_linear,
-        .coords_ctx = &st->coords.linear,
-        .N          = (float)LUT_N,
-        .lut        = {.ptr=lut, .count=LUT_N * 4},
-    };
-    st->shader_fn  = shader_gradient_lut;
-    st->shader_ctx = &st->colorizer.lut;
     return &st->base;
 }
 
@@ -439,30 +344,6 @@ SLIDE(slide_gradient_radial_evenly_spaced) {
     };
     st->shader_fn  = shader_gradient_evenly_spaced_stops;
     st->shader_ctx = &st->colorizer.even;
-    return &st->base;
-}
-
-SLIDE(slide_gradient_radial_lut) {
-    static umbra_color const colors[] = {
-        {1.5f, 1.5f, 1.2f, 1.0f}, {1.2f, 0.8f, 0.0f, 1.0f},
-        {0.8f, 0.0f, 0.2f, 1.0f}, {0.05f, 0.0f, 0.15f, 1.0f},
-    };
-    enum { N_STOPS = 4, LUT_N = 64 };
-    float pos[N_STOPS];
-    for (int i = 0; i < N_STOPS; i++) { pos[i] = (float)i / (float)(N_STOPS - 1); }
-    float *lut = malloc(LUT_N * 4 * sizeof(float));
-    gradient_lut(lut, LUT_N, N_STOPS, pos, colors);
-    struct grad_slide *st = make_grad("Gradient Radial LUT");
-    st->lut_data = lut;
-    st->coords.radial = gradient_radial_from((umbra_point){320, 240}, 280.0f);
-    st->colorizer.lut = (struct shader_gradient_lut){
-        .coords_fn  = gradient_radial,
-        .coords_ctx = &st->coords.radial,
-        .N          = (float)LUT_N,
-        .lut        = {.ptr=lut, .count=LUT_N * 4},
-    };
-    st->shader_fn  = shader_gradient_lut;
-    st->shader_ctx = &st->colorizer.lut;
     return &st->base;
 }
 
