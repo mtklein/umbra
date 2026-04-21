@@ -1722,7 +1722,9 @@ static umbra_interval test_rect_fn(void *ctx, struct umbra_builder *b,
 TEST(test_sdf_dispatch_rect) {
     enum { W = 8, H = 8 };
     umbra_color color = {1, 0, 0, 1};
-    umbra_rect  rect  = {2.0f, 2.0f, 6.0f, 6.0f};
+    // Rect edges sit at pixel centers (x.5), so pixel boxes at x in {2,5} or
+    // y in {2,5} straddle a rect edge and have coverage == 0.5.
+    umbra_rect  rect  = {2.5f, 2.5f, 5.5f, 5.5f};
 
     struct umbra_backend *bes[NUM_BACKENDS] = {
         umbra_backend_interp(), umbra_backend_jit(),
@@ -1763,11 +1765,18 @@ TEST(test_sdf_dispatch_rect) {
             for (int y = 0; y < H; y++) {
                 for (int x = 0; x < W; x++) {
                     uint32_t const px = dst[y * W + x];
-                    if (x >= 3 && x <= 4 && y >= 3 && y <= 4) {
+                    _Bool const inner = x >= 3 && x <= 4 && y >= 3 && y <= 4,
+                                band  = x >= 2 && x <= 5 && y >= 2 && y <= 5,
+                                edge  = band && !inner;
+                    if (inner) {
                         (px & 0xFF)         == 0xFF here;
                         ((px >> 24) & 0xFF) == 0xFF here;
                     }
-                    if (x == 0 || x == 7 || y == 0 || y == 7) {
+                    if (edge) {
+                        (px & 0xFF)         == 0x80 here;
+                        ((px >> 24) & 0xFF) == 0x80 here;
+                    }
+                    if (!band) {
                         px == 0 here;
                     }
                 }
