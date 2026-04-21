@@ -428,6 +428,33 @@ static uint32_t spv_glsl_3(SpvBuilder *b, uint32_t type, uint32_t ext_op,
     return id;
 }
 
+// FP add/sub/mul that refuse to let the backend compiler contract them
+// into an fma.  When `flags & SPIRV_NO_CONTRACT` we lower each op to an
+// explicit GLSLstd450 Fma with a trivial factor, matching SPIRV-Cross's
+// spvFAdd/spvFMul helpers -- needed for backends (notably naga) that
+// don't honor ContractionOff.
+static uint32_t spv_fadd(SpvBuilder *b, int flags, uint32_t xf, uint32_t yf) {
+    if (flags & SPIRV_NO_CONTRACT) {
+        return spv_glsl_3(b, b->t_f32, GLSLstd450Fma,
+                          spv_const_f32(b, 1.0f), xf, yf);
+    }
+    return spv_binop(b, SpvOpFAdd, b->t_f32, xf, yf);
+}
+static uint32_t spv_fsub(SpvBuilder *b, int flags, uint32_t xf, uint32_t yf) {
+    if (flags & SPIRV_NO_CONTRACT) {
+        return spv_glsl_3(b, b->t_f32, GLSLstd450Fma,
+                          spv_const_f32(b, -1.0f), yf, xf);
+    }
+    return spv_binop(b, SpvOpFSub, b->t_f32, xf, yf);
+}
+static uint32_t spv_fmul(SpvBuilder *b, int flags, uint32_t xf, uint32_t yf) {
+    if (flags & SPIRV_NO_CONTRACT) {
+        return spv_glsl_3(b, b->t_f32, GLSLstd450Fma,
+                          xf, yf, spv_const_f32(b, 0.0f));
+    }
+    return spv_binop(b, SpvOpFMul, b->t_f32, xf, yf);
+}
+
 // OpSelect: result = cond ? a : b
 static uint32_t spv_select(SpvBuilder *b, uint32_t type,
                             uint32_t cond, uint32_t a, uint32_t val_b) {
@@ -1533,19 +1560,19 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                 } break;
 
                 case op_add_f32:
-                    B.val[i] = spv_binop(&B, SpvOpFAdd, B.t_f32,
-                                          as_f32(&B, get_val(&B, inst->x), xid),
-                                          as_f32(&B, get_val(&B, inst->y), yid));
+                    B.val[i] = spv_fadd(&B, flags,
+                                        as_f32(&B, get_val(&B, inst->x), xid),
+                                        as_f32(&B, get_val(&B, inst->y), yid));
                     break;
                 case op_sub_f32:
-                    B.val[i] = spv_binop(&B, SpvOpFSub, B.t_f32,
-                                          as_f32(&B, get_val(&B, inst->x), xid),
-                                          as_f32(&B, get_val(&B, inst->y), yid));
+                    B.val[i] = spv_fsub(&B, flags,
+                                        as_f32(&B, get_val(&B, inst->x), xid),
+                                        as_f32(&B, get_val(&B, inst->y), yid));
                     break;
                 case op_mul_f32:
-                    B.val[i] = spv_binop(&B, SpvOpFMul, B.t_f32,
-                                          as_f32(&B, get_val(&B, inst->x), xid),
-                                          as_f32(&B, get_val(&B, inst->y), yid));
+                    B.val[i] = spv_fmul(&B, flags,
+                                        as_f32(&B, get_val(&B, inst->x), xid),
+                                        as_f32(&B, get_val(&B, inst->y), yid));
                     break;
                 case op_div_f32:
                     B.val[i] = spv_binop(&B, SpvOpFDiv, B.t_f32,
@@ -1625,7 +1652,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     break;
                 case op_square_f32: {
                     uint32_t xf = as_f32(&B, get_val(&B, inst->x), xid);
-                    B.val[i] = spv_binop(&B, SpvOpFMul, B.t_f32, xf, xf);
+                    B.val[i] = spv_fmul(&B, flags, xf, xf);
                 } break;
                 case op_round_f32:
                     B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450RoundEven,
@@ -1834,29 +1861,25 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     break;
 
                 case op_add_f32_imm: {
-                    uint32_t imm_f = spv_const_f32(&B, 0);
-                    // Overwrite the constant bits directly.
-                    // Actually, inst->imm holds the float bits as int.
-                    // We need to create a float constant from those bits.
                     float fval;
                     memcpy(&fval, &inst->imm, sizeof fval);
-                    imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_binop(&B, SpvOpFAdd, B.t_f32,
-                                          as_f32(&B, get_val(&B, inst->x), xid), imm_f);
+                    uint32_t imm_f = spv_const_f32(&B, fval);
+                    B.val[i] = spv_fadd(&B, flags,
+                                        as_f32(&B, get_val(&B, inst->x), xid), imm_f);
                 } break;
                 case op_sub_f32_imm: {
                     float fval;
                     memcpy(&fval, &inst->imm, sizeof fval);
                     uint32_t imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_binop(&B, SpvOpFSub, B.t_f32,
-                                          as_f32(&B, get_val(&B, inst->x), xid), imm_f);
+                    B.val[i] = spv_fsub(&B, flags,
+                                        as_f32(&B, get_val(&B, inst->x), xid), imm_f);
                 } break;
                 case op_mul_f32_imm: {
                     float fval;
                     memcpy(&fval, &inst->imm, sizeof fval);
                     uint32_t imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_binop(&B, SpvOpFMul, B.t_f32,
-                                          as_f32(&B, get_val(&B, inst->x), xid), imm_f);
+                    B.val[i] = spv_fmul(&B, flags,
+                                        as_f32(&B, get_val(&B, inst->x), xid), imm_f);
                 } break;
                 case op_div_f32_imm: {
                     float fval;

@@ -8,6 +8,7 @@ enum { SPIRV_WG_SIZE = 64 };
 enum {
     SPIRV_FLOAT_CONTROLS = 1,
     SPIRV_PUSH_VIA_SSBO  = 4,
+    SPIRV_NO_CONTRACT    = 8,  // lower add/sub/mul/square to Fma wrappers
 };
 
 struct spirv_result {

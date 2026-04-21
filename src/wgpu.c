@@ -342,7 +342,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
 
     be->had_error = 0;
     struct spirv_result const sr =
-        build_spirv(ir, SPIRV_PUSH_VIA_SSBO);
+        build_spirv(ir, SPIRV_PUSH_VIA_SSBO | SPIRV_NO_CONTRACT);
 
     WGPUShaderSourceSPIRV spirv_src = {
         .chain    = {.sType = WGPUSType_ShaderSourceSPIRV},
