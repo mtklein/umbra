@@ -126,8 +126,7 @@ void umbra_build_draw(struct umbra_builder *b,
                       umbra_val32 x, umbra_val32 y,
                       umbra_coverage coverage_fn, void *coverage_ctx,
                       umbra_shader   shader_fn,   void *shader_ctx,
-                      umbra_blend    blend_fn,    void *blend_ctx)
-{
+                      umbra_blend    blend_fn,    void *blend_ctx) {
     umbra_val32 coverage = {0};
     if (coverage_fn) { coverage = coverage_fn(coverage_ctx, b, x, y); }
 
