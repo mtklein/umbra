@@ -1326,7 +1326,7 @@ struct umbra_backend* umbra_backend_interp(void) {
         .flush   = flush_be_noop,
         .free    = free_be_interp,
         .stats   = stats_zero,
-        .simd_K  = K,
+        .dispatch_K  = K,
     };
     return be;
 }

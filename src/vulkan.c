@@ -842,7 +842,7 @@ struct umbra_backend* umbra_backend_vulkan(void) {
     v->base.flush          = vk_flush;
     v->base.free           = vk_free;
     v->base.stats          = vk_stats;
-    v->base.simd_K         = SPIRV_WG_SIZE;
+    v->base.dispatch_K         = SPIRV_WG_SIZE;
     return &v->base;
 }
 

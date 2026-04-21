@@ -146,7 +146,7 @@ struct umbra_backend* umbra_backend_jit(void) {
         .flush   = flush_be_noop,
         .free    = free_be_jit,
         .stats   = stats_zero,
-        .simd_K  = 8,
+        .dispatch_K  = 8,
     };
     return &be->base;
 }

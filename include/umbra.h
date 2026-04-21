@@ -26,9 +26,12 @@ struct umbra_backend {
     void                       (*flush  )(struct umbra_backend*);
     void                       (*free   )(struct umbra_backend*);
     struct umbra_backend_stats (*stats  )(struct umbra_backend const*);
-    // Lanes processed in parallel per queue() K-step.  A hard SIMD floor:
-    // dispatching a rect narrower than simd_K wastes lanes.
-    int                        simd_K, pad;
+    // Effective unit of dispatch per queue() K-step.  A multiple of the
+    // backend's hardware SIMD width (e.g., interp K=16 on 4-wide NEON,
+    // jit K=8 on 4-wide NEON double-pumped or native 8-wide AVX2, GPU
+    // K=64 threadgroup on 32-wide Apple SIMDs).  Dispatching a rect
+    // narrower than dispatch_K leaves lanes idle.
+    int                        dispatch_K, pad;
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);

@@ -1375,7 +1375,7 @@ struct umbra_backend* umbra_backend_metal(void) {
             .flush          = flush_be_metal,
             .free           = free_be_metal,
             .stats          = stats_metal,
-            .simd_K         = 64,
+            .dispatch_K         = 64,
         };
         mbe->cache = (struct gpu_buf_cache){
             .ops = {metal_cache_alloc, metal_cache_upload, metal_cache_download,
