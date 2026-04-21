@@ -731,6 +731,15 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         if (op_has_ptr(ir->inst[i].op)) {
             int p = ir->inst[i].ptr.bits;
             buf_rw[p] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
+            // TODO: gather_16 sets buf_shift but leaves buf_row_shift = 0,
+            // while metal.c's equivalent table lumps gather_16 with load_16/
+            // store_16 and sets row_shift = 1.  Probably a bug on one side or
+            // the other -- if a buffer is reachable through both a gather_16
+            // and a load_16/store_16 the two backends will disagree on the
+            // buffer's 2D stride accounting.  Reconcile by picking one
+            // behavior (likely row_shift = 1 for gather_16 too, matching
+            // metal.c) and ideally factor this table into a shared helper
+            // near op.h so it can't drift again.
             if      (ir->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
             else if (ir->inst[i].op == op_load_16x4_planar
                   || ir->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 1; buf_row_shift[p] = 1; }
