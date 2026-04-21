@@ -621,36 +621,55 @@ SLIDE(slide_sdf_text) {
 
 // SDF Polyline Text.
 //
-// Text rendered as a SIGNED distance field against a pre-flattened polyline:
-// each Bezier curve from stbtt is chopped into N chord segments at build time
-// (see slug_polyline_extract), then the shader just loops over line segments.
+// Text rendered as a SIGNED distance field.  The curve buffer holds quadratic
+// Beziers in (P0, P1, P2) form -- the same data slug.c emits -- and the
+// shader flattens each curve into N=8 chord segments on the fly.  A single
+// uniform-count loop of curves*N iterations handles this: index j splits as
+// curve_id = j >> 3 and seg_id = j & 7, so each iteration pulls the current
+// curve and evaluates B(t) at t = seg_id/8 and t = (seg_id+1)/8 to get a
+// chord.  Requires N to be a power of two so the shift/mask is cheap.
+//
 // Interior/exterior sign comes from a horizontal-ray winding-parity test at
 // the tile / pixel center.  The returned SDF interval is a Lipschitz-1
 // conservative ball around the center's signed distance, so it's valid for
-// both the 512-px tile bounds pass and the per-pixel draw pass without a
-// separate code path.
+// both the 512-px tile bounds pass and the per-pixel draw pass.
+
+enum { SDF_POLYLINE_SAMPLES = 8 };
 
 struct sdf_polyline_text_sdf {
     float            scale_x, scale_y, off_x, off_y;
-    int              n_segs, :32;
-    struct umbra_buf segs;
+    int              n_curves;
+    int              lg_n;    // log2(samples_per_curve); mask_n and rcp_n derive from this
+    struct umbra_buf curves;
 };
 
 static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b,
                                                umbra_interval x, umbra_interval y) {
     struct sdf_polyline_text_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_bind_buf(b, &self->segs);
-    umbra_val32 const n  = umbra_uniform_32(b, u, SLOT(n_segs));
+    umbra_ptr const data = umbra_bind_buf(b, &self->curves);
+
+    umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves)),
+                      lgN  = umbra_uniform_32(b, u, SLOT(lg_n));
 
     umbra_val32 const sx = umbra_uniform_32(b, u, SLOT(scale_x)),
                       sy = umbra_uniform_32(b, u, SLOT(scale_y)),
                       ox = umbra_uniform_32(b, u, SLOT(off_x)),
                       oy = umbra_uniform_32(b, u, SLOT(off_y));
 
-    umbra_val32 const z    = umbra_imm_f32(b, 0.0f),
-                      o    = umbra_imm_f32(b, 1.0f),
-                      half = umbra_imm_f32(b, 0.5f);
+    umbra_val32 const z     = umbra_imm_f32(b, 0.0f),
+                      o     = umbra_imm_f32(b, 1.0f),
+                      tw    = umbra_imm_f32(b, 2.0f),
+                      half  = umbra_imm_f32(b, 0.5f),
+                      one_i = umbra_imm_i32(b, 1);
+
+    // samples_n = 1 << lg_n; mask_n = samples_n - 1; rcp_n = 1 / samples_n.
+    // All uniforms, so these compile to a single pre-dispatch scalar block.
+    umbra_val32 const samplesN = umbra_shl_i32(b, one_i, lgN),
+                      mskN     = umbra_sub_i32(b, samplesN, one_i),
+                      rcpN     = umbra_div_f32(b, o, umbra_f32_from_i32(b, samplesN));
+
+    umbra_val32 const six  = umbra_imm_i32(b, 6);
 
     umbra_val32 const bcx = umbra_mul_f32(b, umbra_add_f32(b, x.lo, x.hi), half),
                       bcy = umbra_mul_f32(b, umbra_add_f32(b, y.lo, y.hi), half);
@@ -663,25 +682,57 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
     umbra_val32 const gx = umbra_add_f32(b, umbra_mul_f32(b, bcx, sx), ox),
                       gy = umbra_add_f32(b, umbra_mul_f32(b, bcy, sy), oy);
 
+    umbra_val32 const n_iter = umbra_shl_i32(b, n, lgN);
+
     umbra_var32 const dist = umbra_declare_var32(b),
                       par  = umbra_declare_var32(b);
     umbra_store_var32(b, dist, umbra_imm_f32(b, 1e9f));
     umbra_store_var32(b, par,  umbra_imm_i32(b, 0));
 
-    umbra_val32 const j = umbra_loop(b, n); {
-        umbra_val32 const k = umbra_mul_i32(b, j, umbra_imm_i32(b, 4));
-        umbra_val32 const p0x = umbra_gather_32(b, data, k),
+    umbra_val32 const j = umbra_loop(b, n_iter); {
+        umbra_val32 const curve_id = umbra_shr_u32(b, j, lgN),
+                          seg_id   = umbra_and_32(b, j, mskN);
+        umbra_val32 const base = umbra_mul_i32(b, curve_id, six);
+        umbra_val32 const p0x = umbra_gather_32(b, data, base),
                           p0y = umbra_gather_32(b, data,
-                                    umbra_add_i32(b, k, umbra_imm_i32(b, 1))),
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 1))),
                           p1x = umbra_gather_32(b, data,
-                                    umbra_add_i32(b, k, umbra_imm_i32(b, 2))),
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 2))),
                           p1y = umbra_gather_32(b, data,
-                                    umbra_add_i32(b, k, umbra_imm_i32(b, 3)));
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 3))),
+                          p2x = umbra_gather_32(b, data,
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 4))),
+                          p2y = umbra_gather_32(b, data,
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 5)));
 
-        umbra_val32 const dx = umbra_sub_f32(b, p1x, p0x),
-                          dy = umbra_sub_f32(b, p1y, p0y),
-                          ex = umbra_sub_f32(b, gx, p0x),
-                          ey = umbra_sub_f32(b, gy, p0y);
+        umbra_val32 const ts   = umbra_mul_f32(b, umbra_f32_from_i32(b, seg_id), rcpN),
+                          te   = umbra_add_f32(b, ts, rcpN),
+                          mts  = umbra_sub_f32(b, o, ts),
+                          mte  = umbra_sub_f32(b, o, te);
+        umbra_val32 const w0s  = umbra_mul_f32(b, mts, mts),
+                          w1s  = umbra_mul_f32(b, tw,  umbra_mul_f32(b, mts, ts)),
+                          w2s  = umbra_mul_f32(b, ts,  ts),
+                          w0e  = umbra_mul_f32(b, mte, mte),
+                          w1e  = umbra_mul_f32(b, tw,  umbra_mul_f32(b, mte, te)),
+                          w2e  = umbra_mul_f32(b, te,  te);
+
+        umbra_val32 const ax = umbra_add_f32(b, umbra_mul_f32(b, w0s, p0x),
+                                 umbra_add_f32(b, umbra_mul_f32(b, w1s, p1x),
+                                                  umbra_mul_f32(b, w2s, p2x))),
+                          ay = umbra_add_f32(b, umbra_mul_f32(b, w0s, p0y),
+                                 umbra_add_f32(b, umbra_mul_f32(b, w1s, p1y),
+                                                  umbra_mul_f32(b, w2s, p2y))),
+                          cx = umbra_add_f32(b, umbra_mul_f32(b, w0e, p0x),
+                                 umbra_add_f32(b, umbra_mul_f32(b, w1e, p1x),
+                                                  umbra_mul_f32(b, w2e, p2x))),
+                          cy = umbra_add_f32(b, umbra_mul_f32(b, w0e, p0y),
+                                 umbra_add_f32(b, umbra_mul_f32(b, w1e, p1y),
+                                                  umbra_mul_f32(b, w2e, p2y)));
+
+        umbra_val32 const dx = umbra_sub_f32(b, cx, ax),
+                          dy = umbra_sub_f32(b, cy, ay),
+                          ex = umbra_sub_f32(b, gx, ax),
+                          ey = umbra_sub_f32(b, gy, ay);
         umbra_val32 const dd = umbra_add_f32(b, umbra_mul_f32(b, dx, dx),
                                                 umbra_mul_f32(b, dy, dy));
         umbra_val32 const ed = umbra_add_f32(b, umbra_mul_f32(b, ex, dx),
@@ -690,19 +741,19 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
                                   umbra_max_f32(b, z,
                                       umbra_div_f32(b, ed, dd)));
         umbra_val32 const qx = umbra_sub_f32(b, gx,
-                                  umbra_add_f32(b, p0x, umbra_mul_f32(b, t, dx))),
+                                  umbra_add_f32(b, ax, umbra_mul_f32(b, t, dx))),
                           qy = umbra_sub_f32(b, gy,
-                                  umbra_add_f32(b, p0y, umbra_mul_f32(b, t, dy)));
+                                  umbra_add_f32(b, ay, umbra_mul_f32(b, t, dy)));
         umbra_val32 const seg_d = umbra_sqrt_f32(b,
                                       umbra_add_f32(b, umbra_mul_f32(b, qx, qx),
                                                        umbra_mul_f32(b, qy, qy)));
         umbra_store_var32(b, dist, umbra_min_f32(b, umbra_load_var32(b, dist), seg_d));
 
-        umbra_val32 const below0 = umbra_lt_f32(b, p0y, gy),
-                          below1 = umbra_lt_f32(b, p1y, gy),
+        umbra_val32 const below0 = umbra_lt_f32(b, ay, gy),
+                          below1 = umbra_lt_f32(b, cy, gy),
                           strad  = umbra_xor_32(b, below0, below1);
-        umbra_val32 const ty   = umbra_div_f32(b, umbra_sub_f32(b, gy, p0y), dy),
-                          xat  = umbra_add_f32(b, p0x, umbra_mul_f32(b, ty, dx)),
+        umbra_val32 const ty   = umbra_div_f32(b, umbra_sub_f32(b, gy, ay), dy),
+                          xat  = umbra_add_f32(b, ax, umbra_mul_f32(b, ty, dx)),
                           right = umbra_lt_f32(b, gx, xat);
         umbra_val32 const cross = umbra_and_32(b, strad, right);
         umbra_store_var32(b, par, umbra_xor_32(b, umbra_load_var32(b, par), cross));
@@ -721,33 +772,34 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
 
 struct sdf_polyline_text_slide {
     struct sdf_common            common;
-    struct slug_polyline         poly;
+    struct slug_curves           slug;
     struct sdf_polyline_text_sdf sdf;
 };
 
 static void sdf_polyline_text_init(struct slide *s) {
     struct sdf_polyline_text_slide *st = (struct sdf_polyline_text_slide *)s;
-    st->poly = slug_polyline_extract("Hamburgefons", (float)s->h * 0.4f, 8);
+    st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
 
-    float const gw = st->poly.w,
-                gh = st->poly.h;
+    float const gw = st->slug.w,
+                gh = st->slug.h;
     float const sx = gw / (float)s->w,
                 sy = gh / (float)s->h;
     float const scale = sx > sy ? sx : sy;
     float const pad_x = ((float)s->w * scale - gw) * 0.5f,
                 pad_y = ((float)s->h * scale - gh) * 0.5f;
-    st->sdf.scale_x = scale;
-    st->sdf.scale_y = scale;
-    st->sdf.off_x   = -pad_x;
-    st->sdf.off_y   = -pad_y;
-    st->sdf.n_segs  = st->poly.count;
-    st->sdf.segs    = (struct umbra_buf){.ptr = st->poly.data,
-                                          .count = st->poly.count * 4};
+    st->sdf.scale_x  = scale;
+    st->sdf.scale_y  = scale;
+    st->sdf.off_x    = -pad_x;
+    st->sdf.off_y    = -pad_y;
+    st->sdf.n_curves = st->slug.count;
+    st->sdf.lg_n     = __builtin_ctz(SDF_POLYLINE_SAMPLES);
+    st->sdf.curves   = (struct umbra_buf){.ptr = st->slug.data,
+                                           .count = st->slug.count * 6};
 }
 
 static void sdf_polyline_text_free(struct slide *s) {
     struct sdf_polyline_text_slide *st = (struct sdf_polyline_text_slide *)s;
-    slug_polyline_free(&st->poly);
+    slug_free(&st->slug);
     free(s);
 }
 
