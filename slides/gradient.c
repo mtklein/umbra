@@ -372,7 +372,7 @@ SLIDE(slide_gradient_linear_lut) {
 // Fixed: was ~131 µs Metal vs ~102 µs Vulkan.  Now ~62 and ~66 respectively,
 // thanks to umbra_if() wrapping the gathers+lerps so GPU backends can branch-skip
 // them when the pixel isn't in the current gradient segment.
-SLIDE(slide_gradient_linear) {
+SLIDE(slide_gradient_linear_general) {
     static umbra_color const colors[] = {
         {1.2f, 0.0f, 0.0f, 1.0f}, {1.0f, 0.8f, 0.0f, 1.0f}, {0.0f, 1.2f, 0.0f, 1.0f},
         {0.0f, 0.8f, 1.2f, 1.0f}, {0.0f, 0.0f, 1.2f, 1.0f}, {0.8f, 0.0f, 1.0f, 1.0f},
@@ -386,7 +386,7 @@ SLIDE(slide_gradient_linear) {
         }
         pos[i] = (float)i / (float)(N - 1);
     }
-    struct grad_slide *st = make_grad("Gradient Linear");
+    struct grad_slide *st = make_grad("Gradient Linear General");
     st->colors_data = planar;
     st->pos_data    = pos;
     st->coords.linear = gradient_linear_from((umbra_point){0, 0}, (umbra_point){640, 0});
@@ -466,7 +466,7 @@ SLIDE(slide_gradient_radial_lut) {
     return &st->base;
 }
 
-SLIDE(slide_gradient_radial) {
+SLIDE(slide_gradient_radial_general) {
     static umbra_color const colors[] = {
         {1.5f, 1.5f, 1.2f, 1.0f}, {1.2f, 0.8f, 0.0f, 1.0f},
         {0.8f, 0.0f, 0.2f, 1.0f}, {0.05f, 0.0f, 0.15f, 1.0f},
@@ -480,7 +480,7 @@ SLIDE(slide_gradient_radial) {
         }
         pos[i] = (float)i / (float)(N - 1);
     }
-    struct grad_slide *st = make_grad("Gradient Radial");
+    struct grad_slide *st = make_grad("Gradient Radial General");
     st->colors_data = planar;
     st->pos_data    = pos;
     st->coords.radial = gradient_radial_from((umbra_point){320, 240}, 280.0f);
