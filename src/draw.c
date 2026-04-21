@@ -461,9 +461,9 @@ umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
                                                    umbra_lt_f32(b, x, r)),
                                    umbra_and_32(b, umbra_le_f32(b, t, y),
                                                    umbra_lt_f32(b, y, bot)));
-    umbra_val32 const one_f  = umbra_imm_f32(b, 1.0f),
-                      zero_f = umbra_imm_f32(b, 0.0f);
-    return umbra_sel_32(b, inside, one_f, zero_f);
+    umbra_val32 const one  = umbra_imm_f32(b, 1.0f),
+                      zero = umbra_imm_f32(b, 0.0f);
+    return umbra_sel_32(b, inside, one, zero);
 }
 
 umbra_color_val32 umbra_blend_src(void *ctx, struct umbra_builder *b,
