@@ -464,7 +464,8 @@ struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const
     pin_val(ra, i);
 
     _Bool const fma_scratch = fma && s.rd != s.rz && (s.rd == s.rx || s.rd == s.ry);
-    if (nscratch >= 1 || fma_scratch) { s.scratch = ra_alloc(ra, sl, ns); }
+    _Bool const sqa_scratch = sqa && s.rd != s.ry &&  s.rd == s.rx;
+    if (nscratch >= 1 || fma_scratch || sqa_scratch) { s.scratch = ra_alloc(ra, sl, ns); }
     if (nscratch >= 2) { s.scratch2 = ra_alloc(ra, sl, ns); }
 
     ra->pinned_set = 0;

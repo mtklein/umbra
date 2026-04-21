@@ -631,6 +631,70 @@ TEST(test_fma_f32_single_rounding) {
     test_backends_free(&B);
 }
 
+// Two fmas share an accumulator w.  In the first fma, multiplicands a and b
+// die but w lives into the second fma, so ra_step_alu claims x's register
+// for the destination (z_dead ? z : x_dead ? x : ...).  The arm64 JIT then
+// hits its d == x case, which needs a scratch register to stage the
+// accumulator before FMLA — ra.c's fma_scratch heuristic must allocate one.
+TEST(test_fma_f32_d_equals_x) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const a = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      b = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
+                      c = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
+                      d = umbra_load_32(builder, umbra_bind_buf(builder, &slot[3])),
+                      w = umbra_load_32(builder, umbra_bind_buf(builder, &slot[4])),
+                      r0 = umbra_add_f32(builder, umbra_mul_f32(builder, a, b), w),
+                      r1 = umbra_add_f32(builder, umbra_mul_f32(builder, c, d), w);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[5]), r0);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[6]), r1);
+    struct test_backends B = make(builder);
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float av[] = {2}, bv[] = {3}, cv[] = {5}, dv[] = {7}, wv[] = {1};
+        float z0[1] = {0}, z1[1] = {0};
+        if (run(&B, bi, 1, 1, slot, 7,
+        (struct umbra_buf[]){{.ptr=av, .count=1}, {.ptr=bv, .count=1},
+                             {.ptr=cv, .count=1}, {.ptr=dv, .count=1},
+                             {.ptr=wv, .count=1},
+                             {.ptr=z0, .count=1}, {.ptr=z1, .count=1}})) {
+            equiv(z0[0],  7.0f) here;
+            equiv(z1[0], 36.0f) here;
+        }
+    }
+    test_backends_free(&B);
+}
+
+// Same shape as test_fma_f32_d_equals_x but for square_add_f32: two
+// square_adds sharing their y (accumulator) operand, with each x operand
+// dying at its op.  ra_step_alu's sqa_scratch heuristic must allocate
+// scratch here for the d == x arm64 JIT path.
+TEST(test_square_add_f32_d_equals_x) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const a = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      c = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
+                      w = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
+                      r0 = umbra_add_f32(builder, umbra_mul_f32(builder, a, a), w),
+                      r1 = umbra_add_f32(builder, umbra_mul_f32(builder, c, c), w);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[3]), r0);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[4]), r1);
+    struct test_backends B = make(builder);
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float av[] = {3}, cv[] = {5}, wv[] = {1};
+        float z0[1] = {0}, z1[1] = {0};
+        if (run(&B, bi, 1, 1, slot, 5,
+        (struct umbra_buf[]){{.ptr=av, .count=1}, {.ptr=cv, .count=1},
+                             {.ptr=wv, .count=1},
+                             {.ptr=z0, .count=1}, {.ptr=z1, .count=1}})) {
+            equiv(z0[0], 10.0f) here;
+            equiv(z1[0], 26.0f) here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_min_max_sqrt_f32) {
     struct umbra_buf slot[20] = {0};
     {
