@@ -26,12 +26,6 @@ struct umbra_backend {
     void                       (*flush  )(struct umbra_backend*);
     void                       (*free   )(struct umbra_backend*);
     struct umbra_backend_stats (*stats  )(struct umbra_backend const*);
-    // Effective unit of dispatch per queue() K-step.  A multiple of the
-    // backend's hardware SIMD width (e.g., interp K=16 on 4-wide NEON,
-    // jit K=8 on 4-wide NEON double-pumped or native 8-wide AVX2, GPU
-    // K=64 threadgroup on 32-wide Apple SIMDs).  Dispatching a rect
-    // narrower than dispatch_K leaves lanes idle.
-    int                        dispatch_K, pad;
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
@@ -45,11 +39,7 @@ struct umbra_program {
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
-    // Lower bound on the IR ops one queue() call executes per K-step:
-    // preamble + body, with loops counted as a single pass.  Useful to
-    // reason about tile-size tradeoffs in dispatchers.
-    int                   min_queue_ops;
-    _Bool                 queue_is_threadsafe, pad[3];
+    _Bool                 queue_is_threadsafe; int :24,:32;
 };
 void umbra_program_free(struct umbra_program*);
 

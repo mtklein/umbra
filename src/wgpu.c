@@ -438,7 +438,6 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->bg_layout   = bg_layout;
     p->pipe_layout = pipe_layout;
     p->pipeline    = pipeline;
-    p->base.min_queue_ops = sr.min_queue_ops;
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
     p->push_words  = sr.push_words;
@@ -784,7 +783,6 @@ struct umbra_backend* umbra_backend_wgpu(void) {
         .flush          = wgpu_flush,
         .free           = (void (*)(struct umbra_backend *))wgpu_free,
         .stats          = wgpu_stats,
-        .dispatch_K         = SPIRV_WG_SIZE,
     };
 
     be->uni_pool = (struct uniform_ring_pool){

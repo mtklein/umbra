@@ -455,7 +455,6 @@ struct jit_program* jit_program(struct jit_backend *be,
     pool_free(&jc.pool);
 
     struct jit_program *j = calloc(1, sizeof *j);
-    j->min_queue_ops = ir->insts;
     if (ir->bindings) {
         j->bindings = ir->bindings;
         size_t const sz = (size_t)j->bindings * sizeof *j->binding;

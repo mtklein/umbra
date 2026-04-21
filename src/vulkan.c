@@ -555,7 +555,6 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->base.dump    = vk_program_dump;
     p->base.free    = vk_program_free;
     p->base.backend = be;
-    p->base.min_queue_ops = sr.min_queue_ops;
     return &p->base;
 }
 
@@ -842,7 +841,6 @@ struct umbra_backend* umbra_backend_vulkan(void) {
     v->base.flush          = vk_flush;
     v->base.free           = vk_free;
     v->base.stats          = vk_stats;
-    v->base.dispatch_K         = SPIRV_WG_SIZE;
     return &v->base;
 }
 

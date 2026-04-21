@@ -351,27 +351,15 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
                         int l, int t, int r, int b) {
-    // Pick a square tile big enough that per-tile overhead (bounds eval +
-    // one draw queue() dispatch) is <=5% of per-tile draw savings, assuming
-    // a 50% cull fraction.  Power-of-two sweep from 1 to 512.  No hard
-    // dispatch_K floor: for heavy shaders, smaller tiles can win even with
-    // partially-filled SIMD lanes, because culling savings outrun the waste.
-    //
-    // TODO: bootstrap gpu_dispatch_cost; refine via backend->stats() over
-    // time (encode_sec + submit_sec divided by dispatches, converted to
-    // op-equivalent units using a measured seconds-per-op from gpu_sec).
-    _Bool const backend_is_cpu      = draw_partial->queue_is_threadsafe;
-    int   const gpu_dispatch_cost   = 1000000;
-    int   const dispatch_cost       = backend_is_cpu ? 0 : gpu_dispatch_cost;
-    int   const tile_sq_min         = (bounds->prog->min_queue_ops + dispatch_cost)
-                                    * 40 / draw_partial->min_queue_ops;
-    int         tile                = 1;
-    while (tile * tile < tile_sq_min && tile < 512) { tile *= 2; }
-    int   const TW = tile,
-                TH = tile,
-                xt = (r - l + TW - 1) / TW,
-                yt = (b - t + TH - 1) / TH,
-                tiles = xt * yt;
+    _Bool const backend_is_cpu = draw_partial->queue_is_threadsafe;
+    if (!backend_is_cpu) {
+        draw_full = draw_partial;  // Program switching is expensive on GPU.
+    }
+
+    int const T = backend_is_cpu ? 8 : 64,
+              xt = (r - l + T - 1) / T,
+              yt = (b - t + T - 1) / T,
+              tiles = xt * yt;
 
     if (tiles > bounds->cov_cap) {
         bounds->cov     = realloc(bounds->cov, (size_t)tiles * sizeof *bounds->cov);
@@ -379,8 +367,8 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     }
     bounds->base_x = (float)l;
     bounds->base_y = (float)t;
-    bounds->tile_w = (float)TW;
-    bounds->tile_h = (float)TH;
+    bounds->tile_w = (float)T;
+    bounds->tile_h = (float)T;
     bounds->cov_buf = (struct umbra_buf){
         .ptr = bounds->cov, .count = tiles, .stride = xt,
     };
@@ -388,42 +376,25 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     bounds->prog->queue(bounds->prog, 0, 0, xt, yt);
     uint16_t const *c = bounds->cov;
 
-    // TODO: once we have a better handle on the ideal tile shapes (tile_size
-    // is still a global compromise), try compiling per-tile SDF draw programs
-    // so the IR can fold in l/t/r/b as constants rather than reading them as
-    // uniforms each dispatch.  Per-tile specialization would let e.g. axis-
-    // aligned SDFs fold their half-plane clips away entirely, and generally
-    // shrink the per-pixel work near tile edges.
-    //
-    // Cost: build-and-cache N (or N*M) variants of the draw program instead
-    // of one.  Worth it if tile count is small and per-pixel savings are
-    // large.  Existing builder dedup/CSE handles most of the redundancy
-    // across variants; the compile path is the dominating unknown.
-    //
-    // Metal function constants (MTLFunctionConstantValues) are a plausible
-    // vehicle here: one source shader with bounds as function constants,
-    // specialized per-tile at pipeline creation.  Vulkan/SPIR-V has
-    // analogous specialization constants.
-
-    // Coalesce horizontally adjacent tiles into runs, breaking when the
+    // We coalesce horizontally adjacent tiles into runs, breaking when the
     // draw program changes (partial vs full vs NONE).  Each run becomes one
     // draw->queue() call so per-dispatch overhead is amortized across tiles.
     for (int ty = 0; ty < yt; ty++) {
-        int const tt = t + ty * TH,
-                  tb = tt + TH < b ? tt + TH : b;
+        int const tt = t + ty * T,
+                  tb = tt + T < b ? tt + T : b;
         struct umbra_program *run_prog = NULL;
         int                   run_start = 0;
         for (int tx = 0; tx <= xt; tx++) {
             struct umbra_program *prog = NULL;
             if (tx < xt) {
                 int const cell = c[ty * xt + tx];
-                if (                  cell != UMBRA_SDF_TILE_NONE) { prog = draw_partial; }
-                if (backend_is_cpu && cell == UMBRA_SDF_TILE_FULL) { prog = draw_full; }
+                if (cell != UMBRA_SDF_TILE_NONE) { prog = draw_partial; }
+                if (cell == UMBRA_SDF_TILE_FULL) { prog = draw_full; }
             }
             if (prog != run_prog) {
                 if (run_prog) {
-                    int const tl = l + run_start * TW,
-                              tr = l + tx * TW < r ? l + tx * TW : r;
+                    int const tl = l + run_start * T,
+                              tr = l + tx * T < r ? l + tx * T : r;
                     run_prog->queue(run_prog, tl, tt, tr, tb);
                 }
                 run_start = tx;

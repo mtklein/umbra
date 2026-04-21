@@ -97,7 +97,7 @@ struct metal_program {
     uint8_t  *buf_shift;
     int    max_ptr;
     int    total_bufs;
-    int    bindings, min_queue_ops;
+    int    bindings, :32;
     struct buffer_binding *binding;
 };
 
@@ -1109,7 +1109,6 @@ static struct metal_program* metal_program(
             p->buf_rw        = buf_rw;
             p->buf_shift     = buf_shift;
             p->bindings      = ir->bindings;
-            p->min_queue_ops       = ir->insts;
             if (p->bindings) {
                 size_t const sz = (size_t)p->bindings * sizeof *p->binding;
                 p->binding = malloc(sz);
@@ -1343,7 +1342,6 @@ static struct umbra_program* compile_metal(struct umbra_backend           *be,
             .dump    = dump_metal,
             .free    = free_metal,
             .backend = be,
-            .min_queue_ops = p->min_queue_ops,
         };
         return &p->base;
     }
@@ -1375,7 +1373,6 @@ struct umbra_backend* umbra_backend_metal(void) {
             .flush          = flush_be_metal,
             .free           = free_be_metal,
             .stats          = stats_metal,
-            .dispatch_K         = 64,
         };
         mbe->cache = (struct gpu_buf_cache){
             .ops = {metal_cache_alloc, metal_cache_upload, metal_cache_download,
