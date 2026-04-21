@@ -347,16 +347,17 @@ void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
     }
 }
 
-// TODO: query per-backend dispatch_granularity instead of a global compromise.
-enum { UMBRA_SDF_TILE = 512 };
-
 void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
                         int l, int t, int r, int b) {
-    int const T  = UMBRA_SDF_TILE,
-              xt = (r - l + T - 1) / T,
-              yt = (b - t + T - 1) / T,
+    // TODO: continue to refine tiling based on properties of backend
+    // TODO: changing TW/TH on CPU backends draws wrong
+    _Bool const backend_is_cpu = draw_partial->queue_is_threadsafe;
+    int const TW = backend_is_cpu ? 512 : 512,
+              TH = backend_is_cpu ? 512 : 512,
+              xt = (r - l + TW - 1) / TW,
+              yt = (b - t + TH - 1) / TH,
               tiles = xt * yt;
 
     if (tiles > bounds->cov_cap) {
@@ -365,8 +366,8 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     }
     bounds->base_x = (float)l;
     bounds->base_y = (float)t;
-    bounds->tile_w = (float)T;
-    bounds->tile_h = (float)T;
+    bounds->tile_w = (float)TW;
+    bounds->tile_h = (float)TH;
     bounds->cov_buf = (struct umbra_buf){
         .ptr = bounds->cov, .count = tiles, .stride = xt,
     };
@@ -395,8 +396,8 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     // draw program changes (partial vs full vs NONE).  Each run becomes one
     // draw->queue() call so per-dispatch overhead is amortized across tiles.
     for (int ty = 0; ty < yt; ty++) {
-        int const tt = t + ty * T,
-                  tb = tt + T < b ? tt + T : b;
+        int const tt = t + ty * TH,
+                  tb = tt + TH < b ? tt + TH : b;
         struct umbra_program *run_prog = NULL;
         int                   run_start = 0;
         for (int tx = 0; tx <= xt; tx++) {
@@ -408,8 +409,8 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
             }
             if (prog != run_prog) {
                 if (run_prog) {
-                    int const tl = l + run_start * T,
-                              tr = l + tx * T < r ? l + tx * T : r;
+                    int const tl = l + run_start * TW,
+                              tr = l + tx * TW < r ? l + tx * TW : r;
                     run_prog->queue(run_prog, tl, tt, tr, tb);
                 }
                 run_start = tx;
