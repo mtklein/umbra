@@ -67,6 +67,12 @@ static struct slide* make_blend(char const *title, umbra_color bg, umbra_color c
     return &st->base;
 }
 
+SLIDE(slide_blend_null) {
+    return make_blend("Blend NULL", (umbra_color){0, 0, 0, 1},
+                      (umbra_color){0.9f, 0.4f, 0.1f, 1.0f},
+                      NULL);
+}
+
 SLIDE(slide_blend_src) {
     return make_blend("Blend Src", (umbra_color){0.125f, 0.125f, 0.125f, 1},
                       (umbra_color){0.0f, 0.6f, 1.0f, 1.0f},
@@ -89,10 +95,4 @@ SLIDE(slide_blend_multiply) {
     return make_blend("Blend Multiply", (umbra_color){0.125f, 0.25f, 0.5f, 1},
                       (umbra_color){1.0f, 0.5f, 0.0f, 1.0f},
                       umbra_blend_multiply);
-}
-
-SLIDE(slide_blend_null) {
-    return make_blend("Blend NULL", (umbra_color){0, 0, 0, 1},
-                      (umbra_color){0.9f, 0.4f, 0.1f, 1.0f},
-                      NULL);
 }

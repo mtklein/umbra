@@ -223,6 +223,37 @@ static void text_free(struct slide *s) {
     free(s);
 }
 
+// Coverage NULL: draw_builder with coverage=NULL, testing the no-coverage
+// fast path.
+struct cov_null_slide {
+    struct slide base;
+    umbra_color  color;
+};
+
+static void cov_null_build_draw(struct slide *s, struct umbra_builder *b,
+                                umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                                umbra_val32 x, umbra_val32 y) {
+    struct cov_null_slide *st = (struct cov_null_slide *)s;
+    umbra_build_draw(b, dst_ptr, fmt, x, y,
+                     NULL,                NULL,
+                     umbra_shader_color,  &st->color,
+                     umbra_blend_srcover, NULL);
+}
+
+static void cov_null_free(struct slide *s) { free(s); }
+
+SLIDE(slide_coverage_null) {
+    struct cov_null_slide *st = calloc(1, sizeof *st);
+    st->color = (umbra_color){0.15f, 0.0f, 0.3f, 0.3f};
+    st->base = (struct slide){
+        .title = "Coverage NULL",
+        .bg = {1, 1, 1, 1},
+        .free = cov_null_free,
+        .build_draw   = cov_null_build_draw,
+    };
+    return &st->base;
+}
+
 SLIDE(slide_coverage_bitmap) {
     struct text_slide *st = calloc(1, sizeof *st);
     st->sdf         = 0;
@@ -308,37 +339,6 @@ SLIDE(slide_coverage_bitmap_matrix) {
         .free = persp_free,
         .build_draw   = persp_build_draw,
         .animate      = persp_animate,
-    };
-    return &st->base;
-}
-
-// Coverage NULL: draw_builder with coverage=NULL, testing the no-coverage
-// fast path.
-struct cov_null_slide {
-    struct slide base;
-    umbra_color  color;
-};
-
-static void cov_null_build_draw(struct slide *s, struct umbra_builder *b,
-                                umbra_ptr dst_ptr, struct umbra_fmt fmt,
-                                umbra_val32 x, umbra_val32 y) {
-    struct cov_null_slide *st = (struct cov_null_slide *)s;
-    umbra_build_draw(b, dst_ptr, fmt, x, y,
-                     NULL,                NULL,
-                     umbra_shader_color,  &st->color,
-                     umbra_blend_srcover, NULL);
-}
-
-static void cov_null_free(struct slide *s) { free(s); }
-
-SLIDE(slide_coverage_null) {
-    struct cov_null_slide *st = calloc(1, sizeof *st);
-    st->color = (umbra_color){0.15f, 0.0f, 0.3f, 0.3f};
-    st->base = (struct slide){
-        .title = "Coverage NULL",
-        .bg = {1, 1, 1, 1},
-        .free = cov_null_free,
-        .build_draw   = cov_null_build_draw,
     };
     return &st->base;
 }
