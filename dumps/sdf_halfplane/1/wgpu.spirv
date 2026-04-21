@@ -1,7 +1,7 @@
 ; SPIR-V
 ; Version: 1.0
 ; Generator: Khronos; 0
-; Bound: 136
+; Bound: 135
 ; Schema: 0
                OpCapability Shader
                OpCapability Float16
@@ -77,7 +77,6 @@
     %float_0 = OpConstant %float 0
 %uint_4294967295 = OpConstant %uint 4294967295
     %float_1 = OpConstant %float 1
-   %float_n1 = OpConstant %float -1
  %uint_65535 = OpConstant %uint 65535
      %uint_6 = OpConstant %uint 6
 %gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
@@ -118,15 +117,15 @@
          %76 = OpLoad %uint %75
          %77 = OpBitcast %int %61
          %78 = OpConvertSToF %float %77
-         %80 = OpExtInst %float %1 Fma %float_1 %78 %float_1
+         %80 = OpFAdd %float %78 %float_1
          %81 = OpBitcast %int %62
          %82 = OpConvertSToF %float %81
-         %83 = OpExtInst %float %1 Fma %float_1 %82 %float_1
+         %83 = OpFAdd %float %82 %float_1
          %84 = OpBitcast %float %70
          %85 = OpBitcast %float %66
          %86 = OpExtInst %float %1 Fma %84 %83 %85
          %87 = OpBitcast %float %74
-         %88 = OpExtInst %float %1 Fma %86 %87 %float_0
+         %88 = OpFMul %float %86 %87
          %89 = OpBitcast %float %68
          %90 = OpBitcast %float %64
          %91 = OpExtInst %float %1 Fma %89 %80 %90
@@ -134,7 +133,7 @@
          %93 = OpBitcast %float %66
          %94 = OpExtInst %float %1 Fma %92 %82 %93
          %95 = OpBitcast %float %74
-         %96 = OpExtInst %float %1 Fma %94 %95 %float_0
+         %96 = OpFMul %float %94 %95
          %97 = OpExtInst %float %1 FMax %96 %88
          %98 = OpBitcast %float %72
          %99 = OpExtInst %float %1 Fma %91 %98 %97
@@ -148,30 +147,30 @@
         %107 = OpExtInst %float %1 Fma %105 %106 %97
         %108 = OpExtInst %float %1 FMax %107 %99
         %109 = OpBitcast %float %76
-        %111 = OpExtInst %float %1 Fma %float_n1 %109 %108
-        %112 = OpFOrdLessThan %bool %111 %float_0
-        %113 = OpSelect %uint %112 %uint_4294967295 %uint_0
-        %114 = OpBitcast %float %72
-        %115 = OpExtInst %float %1 Fma %105 %114 %100
-        %116 = OpExtInst %float %1 FMin %115 %102
-        %117 = OpBitcast %float %76
-        %118 = OpExtInst %float %1 Fma %float_n1 %117 %116
-        %119 = OpFOrdLessThan %bool %118 %float_0
-        %120 = OpSelect %uint %119 %uint_4294967295 %uint_0
-        %121 = OpINotEqual %bool %120 %uint_0
-        %122 = OpSelect %uint %121 %uint_1 %uint_0
-        %123 = OpINotEqual %bool %113 %uint_0
-        %124 = OpSelect %uint %123 %uint_2 %122
-        %126 = OpBitwiseAnd %uint %124 %uint_65535
-        %128 = OpAccessChain %_ptr_StorageBuffer_uint_0 %46 %uint_0 %uint_6
-        %129 = OpLoad %uint %128
-        %130 = OpIMul %uint %62 %129
-        %131 = OpIAdd %uint %130 %61
-        %132 = OpAccessChain %_ptr_StorageBuffer_half %43 %uint_0 %131
-        %133 = OpExtInst %v2float %1 UnpackHalf2x16 %126
-        %134 = OpCompositeExtract %float %133 0
-        %135 = OpFConvert %half %134
-               OpStore %132 %135
+        %110 = OpFSub %float %108 %109
+        %111 = OpFOrdLessThan %bool %110 %float_0
+        %112 = OpSelect %uint %111 %uint_4294967295 %uint_0
+        %113 = OpBitcast %float %72
+        %114 = OpExtInst %float %1 Fma %105 %113 %100
+        %115 = OpExtInst %float %1 FMin %114 %102
+        %116 = OpBitcast %float %76
+        %117 = OpFSub %float %115 %116
+        %118 = OpFOrdLessThan %bool %117 %float_0
+        %119 = OpSelect %uint %118 %uint_4294967295 %uint_0
+        %120 = OpINotEqual %bool %119 %uint_0
+        %121 = OpSelect %uint %120 %uint_1 %uint_0
+        %122 = OpINotEqual %bool %112 %uint_0
+        %123 = OpSelect %uint %122 %uint_2 %121
+        %125 = OpBitwiseAnd %uint %123 %uint_65535
+        %127 = OpAccessChain %_ptr_StorageBuffer_uint_0 %46 %uint_0 %uint_6
+        %128 = OpLoad %uint %127
+        %129 = OpIMul %uint %62 %128
+        %130 = OpIAdd %uint %129 %61
+        %131 = OpAccessChain %_ptr_StorageBuffer_half %43 %uint_0 %130
+        %132 = OpExtInst %v2float %1 UnpackHalf2x16 %125
+        %133 = OpCompositeExtract %float %132 0
+        %134 = OpFConvert %half %133
+               OpStore %131 %134
                OpReturn
          %56 = OpLabel
                OpReturn

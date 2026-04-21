@@ -877,7 +877,15 @@ static char* build_source(IR const *orig_ir,
     SrcBuf b = {0};
 
     emit(&b,
+#if defined(UMBRA_NO_BACKEND_FP_CONTRACT)
+         // Diagnostic knob: forbid Apple's Metal compiler from contracting
+         // a*b+c into fma(a,b,c).  The builder's add/fma peepholes keep
+         // {interp, jit, vulkan, metal} bit-exact without this, so we
+         // only define UMBRA_NO_BACKEND_FP_CONTRACT to re-enable it
+         // during investigations like the one that uncovered the N-Gon
+         // halfplane divergence.  Pairs with SPIRV_NO_CONTRACT on wgpu.
          "#pragma METAL fp contract(off)\n"
+#endif
          "#include <metal_stdlib>\n"
          "using namespace metal;\n\n");
 
