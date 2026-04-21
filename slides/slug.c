@@ -46,9 +46,7 @@ static umbra_val32 coverage_slug_winding(void *vctx, struct umbra_builder *b,
                       o    = umbra_imm_f32(b, 1.0f),
                       tw   = umbra_imm_f32(b, 2.0f),
                       half = umbra_imm_f32(b, 0.5f),
-                      ep   = umbra_imm_f32(b, 1.0f/65536.0f),
-                      po   = umbra_imm_f32(b, 1.0f),
-                      no   = umbra_imm_f32(b, -1.0f);
+                      ep   = umbra_imm_f32(b, 1.0f/65536.0f);
 
     umbra_val32 const sb31  = umbra_imm_i32(b, 31),
                       i_one = umbra_imm_i32(b, 1),
@@ -118,8 +116,15 @@ static umbra_val32 coverage_slug_winding(void *vctx, struct umbra_builder *b,
                              umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ax, t2), bx), t2),
                              q0x);
 
-        umbra_val32 w1 = umbra_sel_32(b, umbra_and_32(b, t1ok, umbra_lt_f32(b, z, x1)), po, z);
-        umbra_val32 w2 = umbra_sel_32(b, umbra_and_32(b, t2ok, umbra_lt_f32(b, z, x2)), no, z);
+        // Antialiased contribution: saturate(x + 0.5) in em-space units.
+        // TODO: scale by pixels-per-em once we have derivatives (or a uniform),
+        // to get correct AA under non-identity transforms.
+        umbra_val32 sx1 = umbra_min_f32(b, umbra_max_f32(b,
+                             umbra_add_f32(b, x1, half), z), o);
+        umbra_val32 sx2 = umbra_min_f32(b, umbra_max_f32(b,
+                             umbra_add_f32(b, x2, half), z), o);
+        umbra_val32 w1  = umbra_sel_32(b, t1ok, sx1, z);
+        umbra_val32 w2  = umbra_sel_32(b, t2ok, umbra_sub_f32(b, z, sx2), z);
 
         umbra_val32 dw = umbra_add_f32(b, w1, w2);
 
