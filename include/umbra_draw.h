@@ -100,9 +100,10 @@ void umbra_build_draw(struct umbra_builder*,
 typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
                                  umbra_interval x, umbra_interval y);
 
-// Like umbra_build_draw() but using an SDF for coverage.
-// TODO: switch AA from cov = clamp(-f, 0, 1) at pixel center to
-// cov ≈ -lo / (hi - lo) over the pixel box.
+// Like umbra_build_draw() but using an SDF for coverage.  Coverage is the
+// fraction of the pixel-box interval [x,x+1]x[y,y+1] that the SDF reports
+// as inside: cov = -lo / (hi - lo), with the fully-inside (hi <= 0) and
+// fully-outside (lo >= 0) cases routed around the division.
 void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                           umbra_val32 x, umbra_val32 y,

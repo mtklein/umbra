@@ -204,15 +204,18 @@ struct coverage_from_sdf {
 static umbra_val32 coverage_from_sdf(void *ctx, struct umbra_builder *b,
                                      umbra_val32 x, umbra_val32 y) {
     struct coverage_from_sdf const *self = ctx;
-    umbra_val32 const half = umbra_imm_f32(b, 0.5f);
-    umbra_val32 const xc = umbra_add_f32(b, x, half),
-                      yc = umbra_add_f32(b, y, half);
-    umbra_val32 const f = self->sdf_fn(self->sdf_ctx, b,
-                                       (umbra_interval){xc, xc},
-                                       (umbra_interval){yc, yc}).lo;
-    return umbra_min_f32(b, umbra_imm_f32(b, 1.0f),
-                         umbra_max_f32(b, umbra_imm_f32(b, 0.0f),
-                                       umbra_sub_f32(b, umbra_imm_f32(b, 0.0f), f)));
+    umbra_val32 const zero = umbra_imm_f32(b, 0.0f),
+                      one  = umbra_imm_f32(b, 1.0f);
+    umbra_interval const f = self->sdf_fn(self->sdf_ctx, b,
+                                          (umbra_interval){x, umbra_add_f32(b, x, one)},
+                                          (umbra_interval){y, umbra_add_f32(b, y, one)});
+    umbra_val32 const width   = umbra_sub_f32(b, f.hi, f.lo),
+                      neg_lo  = umbra_sub_f32(b, zero, f.lo),
+                      edge    = umbra_div_f32(b, neg_lo, width),
+                      inside  = umbra_le_f32 (b, f.hi, zero),
+                      outside = umbra_le_f32 (b, zero, f.lo);
+    return umbra_sel_32(b, inside,  one,
+           umbra_sel_32(b, outside, zero, edge));
 }
 
 void umbra_build_sdf_draw(struct umbra_builder *b,
