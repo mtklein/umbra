@@ -118,7 +118,7 @@ static struct umbra_program* compile_jit(struct umbra_backend           *be,
         .dump       = dump_jit,
         .free       = free_jit,
         .backend    = be,
-        .min_ops    = j->min_ops,
+        .min_queue_ops    = j->min_queue_ops,
         .queue_is_threadsafe = 1,
     };
     return &j->base;
@@ -146,6 +146,7 @@ struct umbra_backend* umbra_backend_jit(void) {
         .flush   = flush_be_noop,
         .free    = free_be_jit,
         .stats   = stats_zero,
+        .simd_K  = 8,
     };
     return &be->base;
 }

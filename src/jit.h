@@ -20,7 +20,7 @@ struct jit_program {
     int code_bytes;   // bytes of code before the constant pool
     int bindings;
     struct buffer_binding *binding;
-    int labels, min_ops;
+    int labels, min_queue_ops;
     struct jit_label label[16];
 };
 struct jit_program* jit_program(struct jit_backend*, struct umbra_flat_ir const*);
