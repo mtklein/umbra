@@ -352,10 +352,9 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_full,
                         int l, int t, int r, int b) {
     // TODO: continue to refine tiling based on properties of backend
-    // TODO: changing TW/TH on CPU backends draws wrong
     _Bool const backend_is_cpu = draw_partial->queue_is_threadsafe;
-    int const TW = backend_is_cpu ? 512 : 512,
-              TH = backend_is_cpu ? 512 : 512,
+    int const TW = backend_is_cpu ? 8 : 512,
+              TH = backend_is_cpu ? 8 : 512,
               xt = (r - l + TW - 1) / TW,
               yt = (b - t + TH - 1) / TH,
               tiles = xt * yt;
