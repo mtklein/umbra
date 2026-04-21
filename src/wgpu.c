@@ -445,7 +445,6 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->buf_shift      = sr.buf_shift;
     p->buf_is_uniform = sr.buf_is_uniform;
     p->dynamic_offset_bindings = dynamic_offset_bindings;
-    free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 

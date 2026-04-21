@@ -855,22 +855,21 @@ static char* build_source(IR const *orig_ir,
     int total_bufs = max_ptr + 1;
     *out_total_bufs = total_bufs;
 
-    uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
-    uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
-    _Bool   *buf_written   = calloc((size_t)(total_bufs + 1), sizeof *buf_written);
+    uint8_t *buf_shift   = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
+    _Bool   *buf_written = calloc((size_t)(total_bufs + 1), sizeof *buf_written);
     *out_buf_shift = buf_shift;
     for (int i = 0; i < ir->insts; i++) {
         if (op_has_ptr(ir->inst[i].op)) {
             int bi = ir->inst[i].ptr.bits;
             if (op_is_store(ir->inst[i].op)) { buf_written[bi] = 1; }
             if (ir->inst[i].op == op_load_16x4_planar
-             || ir->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
+             || ir->inst[i].op == op_store_16x4_planar) { buf_shift[bi] = 1; }
             else if (ir->inst[i].op == op_load_16x4
-                  || ir->inst[i].op == op_store_16x4) { buf_shift[bi] = 3; buf_row_shift[bi] = 3; }
+                  || ir->inst[i].op == op_store_16x4)   { buf_shift[bi] = 3; }
             else if (ir->inst[i].op == op_gather_16
                   || ir->inst[i].op == op_load_16
-                  || ir->inst[i].op == op_store_16) { buf_shift[bi] = 1; buf_row_shift[bi] = 1; }
-            else                                    { buf_shift[bi] = 2; buf_row_shift[bi] = 2; }
+                  || ir->inst[i].op == op_store_16)     { buf_shift[bi] = 1; }
+            else                                        { buf_shift[bi] = 2; }
         }
     }
 
@@ -904,8 +903,8 @@ static char* build_source(IR const *orig_ir,
     emit(&b,
          "    constant meta &m [[buffer(0)]]");
     for (int p = 0; p <= max_ptr; p++) {
-        char const *type = buf_row_shift[p] == 3 ? "half4"
-                         : buf_shift[p]     == 2 ? "uint" : "ushort";
+        char const *type = buf_shift[p] == 3 ? "half4"
+                         : buf_shift[p] == 2 ? "uint" : "ushort";
         char const *qual = buf_written[p] ? "device" : "device const";
         emit(&b,
              ",\n    %s %s * __restrict p%d"
@@ -929,7 +928,6 @@ static char* build_source(IR const *orig_ir,
     emit(&b, "}\n");
 
     free(is_f);
-    free(buf_row_shift);
     free(buf_written);
 
     char *src = malloc(b.size + 1);

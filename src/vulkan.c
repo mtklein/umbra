@@ -541,7 +541,6 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->buf_rw         = sr.buf_rw;
     p->buf_shift      = sr.buf_shift;
     p->buf_is_uniform = sr.buf_is_uniform;
-    free(sr.buf_row_shift);
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 

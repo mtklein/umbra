@@ -724,30 +724,20 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         }
     }
 
-    uint8_t *buf_rw        = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
-    uint8_t *buf_shift     = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
-    uint8_t *buf_row_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_row_shift);
+    uint8_t *buf_rw    = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
+    uint8_t *buf_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
     for (int i = 0; i < ir->insts; i++) {
         if (op_has_ptr(ir->inst[i].op)) {
             int p = ir->inst[i].ptr.bits;
             buf_rw[p] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
-            // TODO: gather_16 sets buf_shift but leaves buf_row_shift = 0,
-            // while metal.c's equivalent table lumps gather_16 with load_16/
-            // store_16 and sets row_shift = 1.  Probably a bug on one side or
-            // the other -- if a buffer is reachable through both a gather_16
-            // and a load_16/store_16 the two backends will disagree on the
-            // buffer's 2D stride accounting.  Reconcile by picking one
-            // behavior (likely row_shift = 1 for gather_16 too, matching
-            // metal.c) and ideally factor this table into a shared helper
-            // near op.h so it can't drift again.
-            if      (ir->inst[i].op == op_gather_16)        { buf_shift[p] = 1; }
-            else if (ir->inst[i].op == op_load_16x4_planar
-                  || ir->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 1; buf_row_shift[p] = 1; }
+            if      (ir->inst[i].op == op_load_16x4_planar
+                  || ir->inst[i].op == op_store_16x4_planar) { buf_shift[p] = 1; }
             else if (ir->inst[i].op == op_load_16x4
-                  || ir->inst[i].op == op_store_16x4)        { buf_shift[p] = 3; buf_row_shift[p] = 3; }
-            else if (ir->inst[i].op == op_load_16
-                  || ir->inst[i].op == op_store_16)          { buf_shift[p] = 1; buf_row_shift[p] = 1; }
-            else                                             { buf_shift[p] = 2; buf_row_shift[p] = 2; }
+                  || ir->inst[i].op == op_store_16x4)        { buf_shift[p] = 3; }
+            else if (ir->inst[i].op == op_gather_16
+                  || ir->inst[i].op == op_load_16
+                  || ir->inst[i].op == op_store_16)          { buf_shift[p] = 1; }
+            else                                             { buf_shift[p] = 2; }
         }
     }
     uint8_t *buf_is_uniform_out = calloc((size_t)(total_bufs + 1),
@@ -757,7 +747,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     }
     result.buf_rw         = buf_rw;
     result.buf_shift      = buf_shift;
-    result.buf_row_shift  = buf_row_shift;
     result.buf_is_uniform = buf_is_uniform_out;
 
     // Push constant layout: w, x0, y0, buf_count[total_bufs], buf_stride[total_bufs].
