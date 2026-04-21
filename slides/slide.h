@@ -26,6 +26,13 @@ struct slide {
     void (*build_sdf_draw)(struct slide*, struct umbra_builder *b,
                            umbra_ptr dst_ptr, struct umbra_fmt fmt,
                            umbra_val32 x, umbra_val32 y);
+    // Optional.  When set, compiled as the draw used for TILE_FULL tiles --
+    // same shader/blend as build_sdf_draw but with coverage=1 hardcoded, so
+    // the per-pixel SDF eval is skipped for pixels we already know are
+    // entirely inside the shape.
+    void (*build_draw_full)(struct slide*, struct umbra_builder *b,
+                            umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                            umbra_val32 x, umbra_val32 y);
 
     void  (*animate)(struct slide*, double secs);
 };
@@ -57,7 +64,8 @@ void             slide_bg_free(struct slide_bg*);
 
 struct slide_runtime {
     struct umbra_program            *draw;
-    struct umbra_sdf_bounds_program *bounds;   // NULL for non-SDF
+    struct umbra_program            *draw_full; // NULL unless slide set build_draw_full
+    struct umbra_sdf_bounds_program *bounds;    // NULL for non-SDF
 
     struct umbra_fmt                 fmt;
     int                              w, h;

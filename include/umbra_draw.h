@@ -118,6 +118,12 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder*,
                                                           struct umbra_affine const *transform,
                                                           umbra_sdf, void *sdf_ctx);
 void   umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program*);
+// `draw_partial` is used for tiles where the bounds classifier says the
+// shape edge lies within the tile (per-pixel SDF eval required).
+// `draw_full` is optional: when non-NULL, used for tiles entirely inside
+// the shape, where coverage=1 is known and the SDF eval can be skipped.
+// Pass draw_full=NULL to route both tile kinds to draw_partial.
 void   umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
-                          struct umbra_program            *draw,
+                          struct umbra_program            *draw_partial,
+                          struct umbra_program            *draw_full,
                           int l, int t, int r, int b);

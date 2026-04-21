@@ -51,9 +51,22 @@ static void sdf_common_build_draw(struct slide *s,
                          umbra_blend_srcover, NULL);
 }
 
+static void sdf_common_build_draw_full(struct slide *s,
+                                       struct umbra_builder *b,
+                                       umbra_ptr dst_ptr, struct umbra_fmt fmt,
+                                       umbra_val32 x, umbra_val32 y) {
+    struct sdf_common *c = (struct sdf_common *)s;
+    umbra_build_draw(b, dst_ptr, fmt, x, y,
+                     NULL,                NULL,
+                     umbra_shader_color,  &c->color,
+                     umbra_blend_srcover, NULL);
+}
+
 static void sdf_common_free(struct slide *s) { free(s); }
 
-#define SDF_COMMON_HOOKS .build_sdf_draw = sdf_common_build_draw
+#define SDF_COMMON_HOOKS                                     \
+    .build_sdf_draw  = sdf_common_build_draw,                \
+    .build_draw_full = sdf_common_build_draw_full
 
 // CSG: union / intersection / difference of two circles.
 

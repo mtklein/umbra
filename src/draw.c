@@ -351,7 +351,8 @@ void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
 enum { UMBRA_SDF_TILE = 512 };
 
 void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
-                        struct umbra_program            *draw,
+                        struct umbra_program            *draw_partial,
+                        struct umbra_program            *draw_full,
                         int l, int t, int r, int b) {
     int const T  = UMBRA_SDF_TILE,
               xt = (r - l + T - 1) / T,
@@ -373,7 +374,9 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     bounds->prog->queue(bounds->prog, 0, 0, xt, yt);
     uint16_t const *c = bounds->cov;
 
-    // TODO: use a draw that skips per-pixel SDF eval when TILE_FULL.
+    // When draw_full is NULL both FULL and PARTIAL tiles fall back to the
+    // partial draw, so runs don't break between them.
+    struct umbra_program *const prog_full = draw_full ? draw_full : draw_partial;
 
     // TODO: once we have a better handle on the ideal tile shapes (tile_size
     // is still a global compromise), try compiling per-tile SDF draw programs
@@ -392,24 +395,29 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     // specialized per-tile at pipeline creation.  Vulkan/SPIR-V has
     // analogous specialization constants.
 
-    // Coalesce horizontally adjacent covered tiles in each row into a single
-    // draw->queue() so each backend amortizes per-dispatch overhead across
-    // the whole run of tiles.
+    // Coalesce horizontally adjacent tiles into runs, breaking when the
+    // draw program changes (partial vs full vs NONE).  Each run becomes one
+    // draw->queue() call so per-dispatch overhead is amortized across tiles.
     for (int ty = 0; ty < yt; ty++) {
         int const tt = t + ty * T,
                   tb = tt + T < b ? tt + T : b;
-        int tx = 0;
-        while (tx < xt) {
-            if (c[ty * xt + tx] != UMBRA_SDF_TILE_NONE) {
-                int const run_start = tx;
-                while (tx < xt && c[ty * xt + tx] != UMBRA_SDF_TILE_NONE) {
-                    tx++;
+        struct umbra_program *run_prog = NULL;
+        int                   run_start = 0;
+        for (int tx = 0; tx <= xt; tx++) {
+            struct umbra_program *prog = NULL;
+            if (tx < xt) {
+                int const cell = c[ty * xt + tx];
+                if (cell == UMBRA_SDF_TILE_PARTIAL) { prog = draw_partial; }
+                if (cell == UMBRA_SDF_TILE_FULL)    { prog = prog_full; }
+            }
+            if (prog != run_prog) {
+                if (run_prog) {
+                    int const tl = l + run_start * T,
+                              tr = l + tx * T < r ? l + tx * T : r;
+                    run_prog->queue(run_prog, tl, tt, tr, tb);
                 }
-                int const tl = l + run_start * T,
-                          tr = l + tx * T < r ? l + tx * T : r;
-                draw->queue(draw, tl, tt, tr, tb);
-            } else {
-                tx++;
+                run_start = tx;
+                run_prog  = prog;
             }
         }
     }

@@ -124,6 +124,26 @@ struct umbra_builder* slide_draw_builder(struct slide *s,
     return NULL;
 }
 
+static struct umbra_builder* slide_draw_full_builder(struct slide *s,
+                                                     struct umbra_buf *dst,
+                                                     struct umbra_fmt fmt,
+                                                     union transform const *pre) {
+    if (s->build_draw_full) {
+        struct umbra_builder *b = umbra_builder();
+        umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
+        umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
+                    y = umbra_f32_from_i32(b, umbra_y(b));
+        if (pre) {
+            umbra_point_val32 const p = umbra_transform_perspective(&pre->persp, b, x, y);
+            x = p.x;
+            y = p.y;
+        }
+        s->build_draw_full(s, b, dst_ptr, fmt, x, y);
+        return b;
+    }
+    return NULL;
+}
+
 struct slide_runtime* slide_runtime(struct slide *s,
                                     int w, int h,
                                     struct umbra_backend *be, struct umbra_fmt fmt,
@@ -141,6 +161,14 @@ struct slide_runtime* slide_runtime(struct slide *s,
         umbra_flat_ir_free(ir);
     }
 
+    struct umbra_builder *bf = slide_draw_full_builder(s, &rt->dst_buf, fmt, pre);
+    if (bf) {
+        struct umbra_flat_ir *irf = umbra_flat_ir(bf);
+        umbra_builder_free(bf);
+        rt->draw_full = be->compile(be, irf);
+        umbra_flat_ir_free(irf);
+    }
+
     if (s->build_sdf_draw) {
         struct umbra_builder *bb = umbra_builder();
         rt->bounds = umbra_sdf_bounds_program(bb, pre ? &pre->affine : NULL,
@@ -155,7 +183,7 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
     if (s->animate) { s->animate(s, secs); }
 
     if (rt->bounds) {
-        umbra_sdf_dispatch(rt->bounds, rt->draw, l, t, r, b);
+        umbra_sdf_dispatch(rt->bounds, rt->draw, rt->draw_full, l, t, r, b);
     } else {
         rt->draw->queue(rt->draw, l, t, r, b);
     }
@@ -164,6 +192,7 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
 void slide_runtime_free(struct slide_runtime *rt) {
     if (rt) {
         umbra_program_free(rt->draw);
+        umbra_program_free(rt->draw_full);
         umbra_sdf_bounds_program_free(rt->bounds);
         free(rt);
     }
