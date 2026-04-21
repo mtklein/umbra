@@ -374,10 +374,6 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     bounds->prog->queue(bounds->prog, 0, 0, xt, yt);
     uint16_t const *c = bounds->cov;
 
-    // When draw_full is NULL both FULL and PARTIAL tiles fall back to the
-    // partial draw, so runs don't break between them.
-    struct umbra_program *const prog_full = draw_full ? draw_full : draw_partial;
-
     // TODO: once we have a better handle on the ideal tile shapes (tile_size
     // is still a global compromise), try compiling per-tile SDF draw programs
     // so the IR can fold in l/t/r/b as constants rather than reading them as
@@ -408,7 +404,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
             if (tx < xt) {
                 int const cell = c[ty * xt + tx];
                 if (cell == UMBRA_SDF_TILE_PARTIAL) { prog = draw_partial; }
-                if (cell == UMBRA_SDF_TILE_FULL)    { prog = prog_full; }
+                if (cell == UMBRA_SDF_TILE_FULL)    { prog = draw_full; }
             }
             if (prog != run_prog) {
                 if (run_prog) {

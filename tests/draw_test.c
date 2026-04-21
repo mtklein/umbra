@@ -1595,7 +1595,7 @@ TEST(test_sdf_dispatch_rect) {
             uint32_t dst[W * H];
             __builtin_memset(dst, 0, sizeof dst);
             dst_slot = (struct umbra_buf){.ptr = dst, .count = W * H, .stride = W};
-            umbra_sdf_dispatch(bounds, draw, NULL, 0, 0, W, H);
+            umbra_sdf_dispatch(bounds, draw, draw, 0, 0, W, H);
             bes[bi]->flush(bes[bi]);
 
             for (int y = 0; y < H; y++) {
@@ -1697,7 +1697,7 @@ TEST(test_sdf_dispatch_tiling) {
     uint32_t *flat_buf  = calloc(W * H, sizeof *flat_buf);
 
     tiled_dst_slot = (struct umbra_buf){.ptr = tiled_buf, .count = W * H, .stride = W};
-    umbra_sdf_dispatch(bounds, tiled, NULL, 0, 0, W, H);
+    umbra_sdf_dispatch(bounds, tiled, tiled, 0, 0, W, H);
 
     flat_dst_slot = (struct umbra_buf){.ptr = flat_buf, .count = W * H, .stride = W};
     flat->queue(flat, 0, 0, W, H);

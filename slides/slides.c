@@ -128,20 +128,17 @@ static struct umbra_builder* slide_draw_full_builder(struct slide *s,
                                                      struct umbra_buf *dst,
                                                      struct umbra_fmt fmt,
                                                      union transform const *pre) {
-    if (s->build_draw_full) {
-        struct umbra_builder *b = umbra_builder();
-        umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
-        umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
-                    y = umbra_f32_from_i32(b, umbra_y(b));
-        if (pre) {
-            umbra_point_val32 const p = umbra_transform_perspective(&pre->persp, b, x, y);
-            x = p.x;
-            y = p.y;
-        }
-        s->build_draw_full(s, b, dst_ptr, fmt, x, y);
-        return b;
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
+    umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
+                y = umbra_f32_from_i32(b, umbra_y(b));
+    if (pre) {
+        umbra_point_val32 const p = umbra_transform_perspective(&pre->persp, b, x, y);
+        x = p.x;
+        y = p.y;
     }
-    return NULL;
+    s->build_draw_full(s, b, dst_ptr, fmt, x, y);
+    return b;
 }
 
 struct slide_runtime* slide_runtime(struct slide *s,
@@ -161,15 +158,13 @@ struct slide_runtime* slide_runtime(struct slide *s,
         umbra_flat_ir_free(ir);
     }
 
-    struct umbra_builder *bf = slide_draw_full_builder(s, &rt->dst_buf, fmt, pre);
-    if (bf) {
+    if (s->build_sdf_draw) {
+        struct umbra_builder *bf = slide_draw_full_builder(s, &rt->dst_buf, fmt, pre);
         struct umbra_flat_ir *irf = umbra_flat_ir(bf);
         umbra_builder_free(bf);
         rt->draw_full = be->compile(be, irf);
         umbra_flat_ir_free(irf);
-    }
 
-    if (s->build_sdf_draw) {
         struct umbra_builder *bb = umbra_builder();
         rt->bounds = umbra_sdf_bounds_program(bb, pre ? &pre->affine : NULL,
                                               s->sdf_fn, s->sdf_ctx);
