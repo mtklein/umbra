@@ -375,6 +375,8 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
 
     // TODO: coalesce horizontally adjacent covered tiles into one draw->queue() call.
 
+    // TODO: use a draw that skips per-pixel SDF eval when TILE_FULL.
+
     // TODO: once we have a better handle on the ideal tile shapes (tile_size
     // is still a global compromise), try compiling per-tile SDF draw programs
     // so the IR can fold in l/t/r/b as constants rather than reading them as

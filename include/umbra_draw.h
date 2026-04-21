@@ -114,7 +114,6 @@ void umbra_build_sdf_draw(struct umbra_builder*,
 // Use an SDF bounds program to intelligently dispatch draw->queue() calls for a
 // draw program built by umbra_build_sdf_draw() from the same SDF, skipping
 // uncovered rectangles.  Optional affine coordinate transform.
-// TODO: use a draw that skips per-pixel SDF eval when TILE_FULL.
 struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder*,
                                                           struct umbra_affine const *transform,
                                                           umbra_sdf, void *sdf_ctx);
