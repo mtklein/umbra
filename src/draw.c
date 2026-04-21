@@ -363,10 +363,8 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
     _Bool const backend_is_cpu      = draw_partial->queue_is_threadsafe;
     int   const gpu_dispatch_cost   = 1000000;
     int   const dispatch_cost       = backend_is_cpu ? 0 : gpu_dispatch_cost;
-    int   const draw_ops            = draw_partial->min_queue_ops > 0
-                                    ? draw_partial->min_queue_ops : 1;
     int   const tile_sq_min         = (bounds->prog->min_queue_ops + dispatch_cost)
-                                    * 40 / draw_ops;
+                                    * 40 / draw_partial->min_queue_ops;
     int         tile                = 1;
     while (tile * tile < tile_sq_min && tile < 512) { tile *= 2; }
     int   const TW = tile,
