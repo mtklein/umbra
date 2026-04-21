@@ -800,6 +800,50 @@ TEST(test_add_through_min_of_muls_single_rounding) {
     test_backends_free(&B);
 }
 
+// add(sel(cond, mul(a,b), f), c) distributes into
+// sel(cond, fma(a,b,c), f+c), single-rounding the selected arm.
+// Run the cond both all-ones and all-zeros to exercise both branches.
+TEST(test_add_through_sel_of_muls_single_rounding) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const mask = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      a = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
+                      bl = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
+                      f = umbra_load_32(builder, umbra_bind_buf(builder, &slot[3])),
+                      c = umbra_load_32(builder, umbra_bind_buf(builder, &slot[4])),
+                      s = umbra_sel_32(builder, mask, umbra_mul_f32(builder, a, bl), f),
+                      r = umbra_add_f32(builder, s, c);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[5]), r);
+    struct test_backends B = make(builder);
+
+    float const av = 1.0f + ldexpf(1.0f, -22);
+    float const aa_round = av * av;
+    float const expected = fmaf(av, av, -aa_round);
+    !equiv(expected, 0.0f) here;
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        int   mx[] = {-1};
+        float ax[] = {av}, bx[] = {av}, fx[] = {0.0f}, cx[] = {-aa_round};
+        float z[1] = {0};
+        if (run(&B, bi, 1, 1, slot, 6,
+        (struct umbra_buf[]){{.ptr=mx, .count=1}, {.ptr=ax, .count=1},
+                             {.ptr=bx, .count=1}, {.ptr=fx, .count=1},
+                             {.ptr=cx, .count=1}, {.ptr=z,  .count=1}})) {
+            equiv(z[0], expected) here;
+        }
+        int   mx0[] = {0};
+        float fx2[] = {3.0f}, cx2[] = {4.0f};
+        float z2[1] = {0};
+        if (run(&B, bi, 1, 1, slot, 6,
+        (struct umbra_buf[]){{.ptr=mx0, .count=1}, {.ptr=ax,   .count=1},
+                             {.ptr=bx,  .count=1}, {.ptr=fx2,  .count=1},
+                             {.ptr=cx2, .count=1}, {.ptr=z2,   .count=1}})) {
+            equiv(z2[0], 7.0f) here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_min_max_sqrt_f32) {
     struct umbra_buf slot[20] = {0};
     {

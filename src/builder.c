@@ -287,15 +287,17 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (b->inst[y.id].op == op_square_f32) {
         return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
     }
-    // Distribute through min/max when an arm is a mul or square, so the
-    // recursive add above collapses that arm into fma / square_add.
+    // Distribute through min / max / sel when an arm is a mul or square,
+    // so the recursive add above collapses that arm into fma / square_add.
     // max(a,b)+c == max(a+c, b+c) exactly in IEEE-754 (adding the same c
-    // preserves ordering), and likewise for min.
+    // preserves ordering), and likewise for min and for each branch of
+    // a mask-select (sel_32 dispatches per lane, so adding c inside each
+    // branch preserves the selection).
     for (int swap = 0; swap < 2; swap++) {
         umbra_val32 const X = swap ? y : x,
                           Y = swap ? x : y;
-        enum op const minmax = b->inst[X.id].op;
-        if (minmax == op_max_f32 || minmax == op_min_f32) {
+        enum op const op = b->inst[X.id].op;
+        if (op == op_max_f32 || op == op_min_f32) {
             umbra_val32 const lhs = b->inst[X.id].x.v32,
                               rhs = b->inst[X.id].y.v32;
             enum op const lhs_op = b->inst[lhs.id].op,
@@ -304,7 +306,23 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
              || rhs_op == op_mul_f32 || rhs_op == op_square_f32) {
                 umbra_val32 const la = umbra_add_f32(b, lhs, Y),
                                   lb = umbra_add_f32(b, rhs, Y);
-                return math(b, minmax, .x = (val){.v32 = la}, .y = (val){.v32 = lb}).v32;
+                return math(b, op, .x = (val){.v32 = la}, .y = (val){.v32 = lb}).v32;
+            }
+        }
+        if (op == op_sel_32) {
+            val         const cond = b->inst[X.id].x;
+            umbra_val32 const t = b->inst[X.id].y.v32,
+                              f = b->inst[X.id].z.v32;
+            enum op const t_op = b->inst[t.id].op,
+                          f_op = b->inst[f.id].op;
+            if (t_op == op_mul_f32 || t_op == op_square_f32
+             || f_op == op_mul_f32 || f_op == op_square_f32) {
+                umbra_val32 const lt = umbra_add_f32(b, t, Y),
+                                  lf = umbra_add_f32(b, f, Y);
+                return math(b, op_sel_32,
+                            .x = cond,
+                            .y = (val){.v32 = lt},
+                            .z = (val){.v32 = lf}).v32;
             }
         }
     }
