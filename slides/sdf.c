@@ -1,12 +1,3 @@
-// TODO: add a "butt" slide recreating the smiling anthropomorphic butt from
-// https://mtklein.github.io/butts/.  The original is an SVG with a bean-shaped
-// body (single cubic path), stick-figure arms and legs (polylines), a curved
-// smile (quadratic path), and two teardrop eyes.  A good SDF approximation:
-// body as union of two offset circles (like the CSG union slide), arms/legs as
-// capsule SDFs, mouth as an arc or thin capsule, eyes as small ellipses.
-// Animate with orbit_update or a gentle breathing scale, and slowly cycle the
-// fill color over time (the original randomizes on click).
-
 #include "slide.h"
 #include "slug.h"
 #include "../include/umbra_interval.h"
