@@ -677,8 +677,10 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
 
     umbra_val32 const bcx = umbra_mul_f32(b, umbra_add_f32(b, x.lo, x.hi), half),
                       bcy = umbra_mul_f32(b, umbra_add_f32(b, y.lo, y.hi), half);
-    umbra_val32 const hw  = umbra_mul_f32(b, umbra_sub_f32(b, x.hi, x.lo), half),
-                      hh  = umbra_mul_f32(b, umbra_sub_f32(b, y.hi, y.lo), half);
+    umbra_val32 const hw  = umbra_mul_f32(b, umbra_mul_f32(b, umbra_sub_f32(b, x.hi, x.lo),
+                                                              half), sx),
+                      hh  = umbra_mul_f32(b, umbra_mul_f32(b, umbra_sub_f32(b, y.hi, y.lo),
+                                                              half), sy);
     umbra_val32 const r   = umbra_sqrt_f32(b,
                                 umbra_add_f32(b, umbra_mul_f32(b, hw, hw),
                                                  umbra_mul_f32(b, hh, hh)));
