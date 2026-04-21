@@ -79,13 +79,18 @@ warn    = -Weverything $
           -Wno-switch-default $
           -Wno-unsafe-buffer-usage
 
+# -fdebug-info-for-profiling: clang-only, emits richer DWARF line info so
+# sample-based profilers (Instruments) can attribute at -O1.  Overridden
+# to empty in the GCC config, which doesn't understand the flag.
+profinfo = -fdebug-info-for-profiling
+
 rule compile
-    command = $cc -g -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
+    command = $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
     depfile = $out.d
     deps    = gcc
 
 rule link
-    command = $cc $in $ldflags -o $out && codesign -s - -f --entitlements build/entitlements.plist $out 2>/dev/null
+    command = $cc $in $ldflags -o $out && codesign -s - -f --entitlements build/entitlements.plist $out 2>/dev/null && (dsymutil $out 2>/dev/null || true)
 
 
 rule run
@@ -265,10 +270,11 @@ include build/project.ninja
 """
 
 
-GCC_NINJA = r"""out     = $builddir/gcc
-cc      = /opt/homebrew/bin/gcc-15
-warn    = -Wall -Wextra -Wpedantic -Wno-unknown-pragmas
-ldflags = -lm -lobjc -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK -lwgpu_native
+GCC_NINJA = r"""out      = $builddir/gcc
+cc       = /opt/homebrew/bin/gcc-15
+warn     = -Wall -Wextra -Wpedantic -Wno-unknown-pragmas
+profinfo =
+ldflags  = -lm -lobjc -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK -lwgpu_native
 include build/project.ninja
 """
 
