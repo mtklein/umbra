@@ -403,8 +403,8 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
             struct umbra_program *prog = NULL;
             if (tx < xt) {
                 int const cell = c[ty * xt + tx];
-                if (cell == UMBRA_SDF_TILE_PARTIAL) { prog = draw_partial; }
-                if (cell == UMBRA_SDF_TILE_FULL)    { prog = draw_full; }
+                if (       cell != UMBRA_SDF_TILE_NONE) { prog = draw_partial; }
+                if ((0) && cell == UMBRA_SDF_TILE_FULL) { prog = draw_full; }
             }
             if (prog != run_prog) {
                 if (run_prog) {
