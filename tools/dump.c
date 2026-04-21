@@ -232,33 +232,26 @@ static void fp16p_to_float(float *out, void const *pixbuf) {
     }
 }
 
-static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be) {
-    struct slide *s = slide_get(slide_idx);
+static void render_hdr_at(struct slide *s, struct slide_runtime *rt,
+                          struct slide_bg *bg, struct umbra_backend *be,
+                          double secs, char const *dir, char const *suffix) {
     struct umbra_fmt const fmt = umbra_fmt_fp16_planar;
     size_t const pixbuf_sz = (size_t)RW * RH * fmt.bpp * (size_t)fmt.planes;
     void *pixbuf = calloc(1, pixbuf_sz);
 
-    _Bool const leaf = s->build_draw || s->build_sdf_draw;
-    struct slide_runtime *rt = NULL;
-    struct slide_bg      *bg = NULL;
-    if (leaf) {
-        rt = slide_runtime(s, RW, RH, be, fmt, NULL);
-        bg = slide_bg(be, fmt);
+    if (rt) {
         rt->dst_buf = (struct umbra_buf){
             .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
         };
         slide_bg_draw(bg, s->bg, 0, 0, RW, RH, rt->dst_buf);
-        slide_runtime_draw(rt, s, 0.0, 0, 0, RW, RH);
+        slide_runtime_draw(rt, s, secs, 0, 0, RW, RH);
     } else {
-        s->prepare(s, be, fmt);
         struct umbra_buf const dst = {
             .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
         };
-        s->draw(s, 0.0, 0, 0, RW, RH, dst);
+        s->draw(s, secs, 0, 0, RW, RH, dst);
     }
     be->flush(be);
-    slide_bg_free(bg);
-    slide_runtime_free(rt);
 
     float *fdata = malloc((size_t)(RW * RH) * 4 * sizeof(float));
     fp16p_to_float(fdata, pixbuf);
@@ -267,9 +260,32 @@ static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be)
     char const *base = strrchr(dir, '/');
     base = base ? base + 1 : dir;
     char p[512];
-    snprintf(p, sizeof p, "%s/%s.hdr", dir, base);
+    snprintf(p, sizeof p, "%s/%s%s.hdr", dir, base, suffix);
     atomic_write_hdr(p, RW, RH, 4, fdata);
     free(fdata);
+}
+
+static void render_hdr(char const *dir, int slide_idx, struct umbra_backend *be) {
+    struct slide *s = slide_get(slide_idx);
+    struct umbra_fmt const fmt = umbra_fmt_fp16_planar;
+
+    _Bool const leaf = s->build_draw || s->build_sdf_draw;
+    struct slide_runtime *rt = NULL;
+    struct slide_bg      *bg = NULL;
+    if (leaf) {
+        rt = slide_runtime(s, RW, RH, be, fmt, NULL);
+        bg = slide_bg(be, fmt);
+    } else {
+        s->prepare(s, be, fmt);
+    }
+
+    render_hdr_at(s, rt, bg, be, 0.0, dir, "");
+    if (s->animate) {
+        render_hdr_at(s, rt, bg, be, 1.0, dir, "_1sec");
+    }
+
+    slide_bg_free(bg);
+    slide_runtime_free(rt);
 }
 
 int main(int argc, char *argv[]) {
