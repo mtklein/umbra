@@ -695,6 +695,111 @@ TEST(test_square_add_f32_d_equals_x) {
     test_backends_free(&B);
 }
 
+// add(max(mul(a,b), mul(c,d)), e) distributes through max into
+// max(fma(a,b,e), fma(c,d,e)) so each arm is single-rounded.
+// a = b = 1 + 2^-22 and c = d = 0 give m1 = round(a*a), m2 = 0.
+// With e = -round(a*a): unfused path rounds twice and yields 0 on the
+// winning arm; fused path evaluates fma(a, a, -round(a*a)) ≈ 2^-44.
+TEST(test_add_through_max_of_muls_single_rounding) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const a = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      bl = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
+                      c = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
+                      d = umbra_load_32(builder, umbra_bind_buf(builder, &slot[3])),
+                      e = umbra_load_32(builder, umbra_bind_buf(builder, &slot[4])),
+                      m = umbra_max_f32(builder, umbra_mul_f32(builder, a, bl),
+                                                 umbra_mul_f32(builder, c, d)),
+                      r = umbra_add_f32(builder, m, e);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[5]), r);
+    struct test_backends B = make(builder);
+
+    float const av = 1.0f + ldexpf(1.0f, -22);
+    float const aa_round = av * av;
+    float const expected = fmaf(av, av, -aa_round);
+    !equiv(expected, 0.0f) here;
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float ax[] = {av}, bx[] = {av}, cx[] = {0}, dx[] = {0}, ex[] = {-aa_round};
+        float z[1] = {0};
+        if (run(&B, bi, 1, 1, slot, 6,
+        (struct umbra_buf[]){{.ptr=ax, .count=1}, {.ptr=bx, .count=1},
+                             {.ptr=cx, .count=1}, {.ptr=dx, .count=1},
+                             {.ptr=ex, .count=1}, {.ptr=z,  .count=1}})) {
+            equiv(z[0], expected) here;
+        }
+    }
+    test_backends_free(&B);
+}
+
+// As above but mul(X, X) auto-rewrites to op_square_f32, so the peephole
+// gate also covers the square arm.  add(max(square(a), square(b)), e)
+// rewrites to max(square_add(a, e), square_add(b, e)).
+TEST(test_add_through_max_of_squares_single_rounding) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const a = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      bl = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
+                      e = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
+                      m = umbra_max_f32(builder, umbra_mul_f32(builder, a,  a),
+                                                 umbra_mul_f32(builder, bl, bl)),
+                      r = umbra_add_f32(builder, m, e);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[3]), r);
+    struct test_backends B = make(builder);
+
+    float const av = 1.0f + ldexpf(1.0f, -22);
+    float const aa_round = av * av;
+    float const expected = fmaf(av, av, -aa_round);
+    !equiv(expected, 0.0f) here;
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float ax[] = {av}, bx[] = {0}, ex[] = {-aa_round};
+        float z[1] = {0};
+        if (run(&B, bi, 1, 1, slot, 4,
+        (struct umbra_buf[]){{.ptr=ax, .count=1}, {.ptr=bx, .count=1},
+                             {.ptr=ex, .count=1}, {.ptr=z,  .count=1}})) {
+            equiv(z[0], expected) here;
+        }
+    }
+    test_backends_free(&B);
+}
+
+// Symmetric min variant: add(min(mul(x,y), mul(z,w)), c) distributes to
+// min(fma, fma).  Pick inputs so the min picks the fused arm.
+TEST(test_add_through_min_of_muls_single_rounding) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const a = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      bl = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
+                      c = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
+                      d = umbra_load_32(builder, umbra_bind_buf(builder, &slot[3])),
+                      e = umbra_load_32(builder, umbra_bind_buf(builder, &slot[4])),
+                      m = umbra_min_f32(builder, umbra_mul_f32(builder, a, bl),
+                                                 umbra_mul_f32(builder, c, d)),
+                      r = umbra_add_f32(builder, m, e);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[5]), r);
+    struct test_backends B = make(builder);
+
+    float const av = 1.0f + ldexpf(1.0f, -22);
+    float const aa_round = av * av;
+    float const expected = fmaf(av, av, -aa_round);
+    !equiv(expected, 0.0f) here;
+
+    // a*b = round(a*a); c*d = 2*round(a*a) via c=2, d=round(a*a).  min picks
+    // a*b; add -round(a*a); fused arm ≈ 2^-44, unfused yields 0.
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float ax[] = {av}, bx[] = {av}, cx[] = {2.0f}, dx[] = {aa_round}, ex[] = {-aa_round};
+        float z[1] = {0};
+        if (run(&B, bi, 1, 1, slot, 6,
+        (struct umbra_buf[]){{.ptr=ax, .count=1}, {.ptr=bx, .count=1},
+                             {.ptr=cx, .count=1}, {.ptr=dx, .count=1},
+                             {.ptr=ex, .count=1}, {.ptr=z,  .count=1}})) {
+            equiv(z[0], expected) here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_min_max_sqrt_f32) {
     struct umbra_buf slot[20] = {0};
     {

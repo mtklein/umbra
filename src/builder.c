@@ -287,6 +287,27 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (b->inst[y.id].op == op_square_f32) {
         return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
     }
+    // Distribute through min/max when an arm is a mul or square, so the
+    // recursive add above collapses that arm into fma / square_add.
+    // max(a,b)+c == max(a+c, b+c) exactly in IEEE-754 (adding the same c
+    // preserves ordering), and likewise for min.
+    for (int swap = 0; swap < 2; swap++) {
+        umbra_val32 const X = swap ? y : x,
+                          Y = swap ? x : y;
+        enum op const minmax = b->inst[X.id].op;
+        if (minmax == op_max_f32 || minmax == op_min_f32) {
+            umbra_val32 const lhs = b->inst[X.id].x.v32,
+                              rhs = b->inst[X.id].y.v32;
+            enum op const lhs_op = b->inst[lhs.id].op,
+                          rhs_op = b->inst[rhs.id].op;
+            if (lhs_op == op_mul_f32 || lhs_op == op_square_f32
+             || rhs_op == op_mul_f32 || rhs_op == op_square_f32) {
+                umbra_val32 const la = umbra_add_f32(b, lhs, Y),
+                                  lb = umbra_add_f32(b, rhs, Y);
+                return math(b, minmax, .x = (val){.v32 = la}, .y = (val){.v32 = lb}).v32;
+            }
+        }
+    }
     return try_join_imm(b, math(b, op_add_f32, VX(x), VY(y)), op_add_f32_imm, (val){.v32 = x},
                         (val){.v32 = y}).v32;
 }
