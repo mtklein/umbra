@@ -149,6 +149,15 @@ uint32_t LDRH_wi(int d, int n, int imm) {
 uint32_t LDRH_wr(int d, int n, int m) {
     return 0x78607800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }
+uint32_t LDRB_wi(int d, int n, int imm) {
+    return 0x39400000u | ((uint32_t)imm << 10) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t LDRB_wr(int d, int n, int m) {
+    return 0x38607800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
+uint32_t STR_bx(int d, int n, int m) {
+    return 0x3c207800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
+}
 uint32_t LDR_wr(int d, int n, int m) {
     return 0xb8607800u | ((uint32_t)m << 16) | ((uint32_t)n << 5) | (uint32_t)d;
 }

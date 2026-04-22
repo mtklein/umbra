@@ -528,6 +528,23 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             }
         } break;
 
+        case op_load_8: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            ptr            p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, 0);
+            if (scalar) {
+                put(c, LDRB_wr(XT, XP, XCOL));
+                put(c, DUP_4s_w(lo(s.rd), XT));
+            } else {
+                // Load 8 bytes into V0.8b, widen u8 -> u16 -> u32.
+                put(c, ADD_xr(XT, XP, XCOL));
+                put(c, LDR_di(0, XT, 0));
+                put(c, UXTL_8h(0, 0));
+                put(c, UXTL_4s(lo(s.rd), 0));
+                put(c, W(UXTL_4s(hi(s.rd), 0)));
+            }
+        } break;
+
         case op_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
@@ -629,6 +646,43 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                     put(c, INS_s(hi(s.rd), k, XT));
                 }
                 put(c, XTN_4h(hi(s.rd), hi(s.rd)));
+            }
+        } break;
+
+        case op_gather_8: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
+            ra_free_chan(ra, inst->x, i);
+            ptr p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, 0);
+            load_count(c, p);
+            if (scalar) {
+                put(c, MOVI_4s(lo(s.rd), 0, 0));
+                put(c, UMOV_ws(XT, lo(rx)));
+                put(c, CMP_wr(XT, XM));
+                put(c, Bcond(0x2, 4));
+                put(c, ADD_xr(XT, XP, XT));
+                put(c, LDRB_wi(XT, XT, 0));
+                put(c, DUP_4s_w(lo(s.rd), XT));
+            } else {
+                put(c, MOVI_4s(lo(s.rd), 0, 0));
+                for (int k = 0; k < 4; k++) {
+                    put(c, UMOV_ws_lane(XT, lo(rx), k));
+                    put(c, CMP_wr(XT, XM));
+                    put(c, Bcond(0x2, 4));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LDRB_wi(XT, XT, 0));
+                    put(c, INS_s(lo(s.rd), k, XT));
+                }
+                put(c, MOVI_4s(hi(s.rd), 0, 0));
+                for (int k = 0; k < 4; k++) {
+                    put(c, UMOV_ws_lane(XT, hi(rx), k));
+                    put(c, CMP_wr(XT, XM));
+                    put(c, Bcond(0x2, 4));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LDRB_wi(XT, XT, 0));
+                    put(c, INS_s(hi(s.rd), k, XT));
+                }
             }
         } break;
 
@@ -895,6 +949,23 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, ADD_xr(XT, XP, XT));
                 put(c, STR_di(lo(ry), XT, 0));
                 put(c, STR_di(hi(ry), XT, 1));
+            }
+            ra_free_chan(ra, inst->y, i);
+        } break;
+
+        case op_store_8: {
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
+            ptr    p = inst->ptr;
+            resolve_ptr(c, p, &last_ptr, 0);
+            if (scalar) {
+                put(c, STR_bx(lo(ry), XP, XCOL));
+            } else {
+                // Narrow u32 -> u16 into V0, then u16 -> u8 into V0.8b, then store 8 bytes.
+                put(c, XTN_4h(0, lo(ry)));
+                put(c, W(XTN_4h(0, hi(ry))));
+                put(c, XTN_8b(0, 0));
+                put(c, ADD_xr(XT, XP, XCOL));
+                put(c, STR_di(0, XT, 0));
             }
             ra_free_chan(ra, inst->y, i);
         } break;

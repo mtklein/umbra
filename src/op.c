@@ -42,6 +42,9 @@ int op_elem_shift(enum op op) {
     case op_gather_16:
     case op_load_16:
     case op_store_16:          return 1;   // half / u16 = 2 bytes
+    case op_gather_8:
+    case op_load_8:
+    case op_store_8:           return 0;   // u8 = 1 byte
     default:                   return 2;   // u32 = 4 bytes
     }
 }

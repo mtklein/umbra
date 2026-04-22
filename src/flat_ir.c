@@ -474,12 +474,14 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
             break;
         case op_gather_uniform_32:
         case op_gather_32:
-        case op_gather_16: fprintf(f, " p%d v%d", ip->ptr.bits, ip->x.id); break;
+        case op_gather_16:
+        case op_gather_8:  fprintf(f, " p%d v%d", ip->ptr.bits, ip->x.id); break;
         case op_load_16:
         case op_load_32:
         case op_load_16x4:
         case op_load_16x4_planar:
-        case op_load_8x4: fprintf(f, " p%d", ip->ptr.bits); break;
+        case op_load_8x4:
+        case op_load_8:    fprintf(f, " p%d", ip->ptr.bits); break;
         case op_loop_begin: fprintf(f, " v%d", ip->x.id); break;
         case op_if_begin: fprintf(f, " v%d", ip->x.id); break;
         case op_load_var: fprintf(f, " var%d", ip->imm); break;
@@ -492,7 +494,8 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
         case op_store_var:
         case op_store_16x4:
         case op_store_16x4_planar:
-        case op_store_8x4: break;
+        case op_store_8x4:
+        case op_store_8:   break;
 
         case op_sqrt_f32:
         case op_abs_f32:

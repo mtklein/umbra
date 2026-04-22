@@ -622,6 +622,41 @@ static void store_ssbo_u16(SpvBuilder *b, int buf_idx, uint32_t elem_idx, uint32
     spv_store(b, ptr, h);
 }
 
+// Load u8 from SSBO[buf_idx] at byte_idx, zero-extended to u32.  Buffer is
+// a RuntimeArray<u32>; we unpack the target byte via shift and mask.
+static uint32_t load_ssbo_u8(SpvBuilder *b, int buf_idx, uint32_t byte_idx) {
+    uint32_t const c_2   = spv_const_u32(b, 2);
+    uint32_t const c_3   = spv_const_u32(b, 3);
+    uint32_t const c_0xFF = spv_const_u32(b, 0xFFu);
+    uint32_t const word  = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, byte_idx, c_2);
+    uint32_t const bmod  = spv_binop(b, SpvOpBitwiseAnd,         b->t_u32, byte_idx, c_3);
+    uint32_t const sh    = spv_binop(b, SpvOpShiftLeftLogical,   b->t_u32, bmod, c_3);
+    uint32_t const raw   = load_ssbo_u32(b, buf_idx, word);
+    uint32_t const shifted = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, raw, sh);
+    return spv_binop(b, SpvOpBitwiseAnd, b->t_u32, shifted, c_0xFF);
+}
+
+// Store u8 to SSBO[buf_idx] at byte_idx via read-modify-write of the
+// containing u32.  Not safe against concurrent writes to the same u32 word
+// (four adjacent bytes share one word); only use when a single thread writes
+// each byte, or when races on neighboring bytes are tolerated.
+static void store_ssbo_u8(SpvBuilder *b, int buf_idx, uint32_t byte_idx, uint32_t value) {
+    uint32_t const c_2    = spv_const_u32(b, 2);
+    uint32_t const c_3    = spv_const_u32(b, 3);
+    uint32_t const c_0xFF = spv_const_u32(b, 0xFFu);
+    uint32_t const word   = spv_binop(b, SpvOpShiftRightLogical, b->t_u32, byte_idx, c_2);
+    uint32_t const bmod   = spv_binop(b, SpvOpBitwiseAnd,         b->t_u32, byte_idx, c_3);
+    uint32_t const sh     = spv_binop(b, SpvOpShiftLeftLogical,   b->t_u32, bmod, c_3);
+    uint32_t const vmask  = spv_binop(b, SpvOpBitwiseAnd,         b->t_u32, value, c_0xFF);
+    uint32_t const vshift = spv_binop(b, SpvOpShiftLeftLogical,   b->t_u32, vmask, sh);
+    uint32_t const bmask  = spv_binop(b, SpvOpShiftLeftLogical,   b->t_u32, c_0xFF, sh);
+    uint32_t const bmaski = spv_unop (b, SpvOpNot,                b->t_u32, bmask);
+    uint32_t const old    = load_ssbo_u32(b, buf_idx, word);
+    uint32_t const clr    = spv_binop(b, SpvOpBitwiseAnd, b->t_u32, old, bmaski);
+    uint32_t const nw     = spv_binop(b, SpvOpBitwiseOr,  b->t_u32, clr, vshift);
+    store_ssbo_u32(b, buf_idx, word, nw);
+}
+
 // Compute linear address for row-structured buffer:
 //   addr = y * buf_stride[buf_idx] + x
 static uint32_t compute_addr(SpvBuilder *b, uint32_t x, uint32_t y, int buf_idx) {
@@ -1348,6 +1383,19 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     store_ssbo_u16(&B, p, addr16, v);
                 } break;
 
+                case op_load_8: {
+                    int p = resolve_ptr(&B, inst);
+                    uint32_t addr8 = compute_addr(&B, x_coord, y_coord, p);
+                    B.val[i] = load_ssbo_u8(&B, p, addr8);
+                } break;
+
+                case op_store_8: {
+                    int p = resolve_ptr(&B, inst);
+                    uint32_t addr8 = compute_addr(&B, x_coord, y_coord, p);
+                    uint32_t v = as_u32(&B, get_val(&B, inst->y), yid);
+                    store_ssbo_u8(&B, p, addr8, v);
+                } break;
+
                 case op_gather_uniform_32:
                 case op_gather_32: {
                     int p = resolve_ptr(&B, inst);
@@ -1364,6 +1412,15 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     uint32_t safe_idx, mask;
                     gather_safe(&B, ix_val, p, &safe_idx, &mask);
                     uint32_t raw = load_ssbo_u16(&B, p, safe_idx);
+                    B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
+                } break;
+
+                case op_gather_8: {
+                    int p = resolve_ptr(&B, inst);
+                    uint32_t ix_val = as_u32(&B, get_val(&B, inst->x), xid);
+                    uint32_t safe_idx, mask;
+                    gather_safe(&B, ix_val, p, &safe_idx, &mask);
+                    uint32_t raw = load_ssbo_u8(&B, p, safe_idx);
                     B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32, raw, mask);
                 } break;
 

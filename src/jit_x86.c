@@ -546,6 +546,32 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             }
         } break;
 
+        case op_load_8: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            ptr            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, 0);
+            if (scalar) {
+                // MOVZX eax, byte [base + R10]
+                {
+                    uint8_t rex = 0x40;
+                    if (XCOL_X86 >= 8) { rex |= 0x02; }
+                    if (base >= 8) { rex |= 0x01; }
+                    if (rex != 0x40) { emit1(c, rex); }
+                    emit1(c, 0x0f);
+                    emit1(c, 0xb6);
+                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                    emit1(c, (uint8_t)((0 << 6) | ((XCOL_X86 & 7) << 3) | (base & 7)));
+                }
+                vmovd_from_gpr(c, s.rd, RAX);
+            } else {
+                // Load 8 bytes into low 64 of tmp XMM, then zero-extend 8 u8 -> 8 u32 (YMM).
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                vmovq_load(c, tmp, base, XCOL_X86, 1, 0);
+                vpmovzxbd(c, s.rd, tmp);
+                ra_return_reg(ra, tmp);
+            }
+        } break;
+
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
@@ -955,6 +981,36 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ra_free_chan(ra, inst->y, i);
         } break;
 
+        case op_store_8: {
+            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
+            ptr    p = inst->ptr;
+            int    base = resolve_ptr_x86(c, p, &last_ptr, 0);
+            if (scalar) {
+                // VMOVD eax, xmm; MOV byte [base + R10], al
+                vmovd_to_gpr(c, RAX, ry);
+                uint8_t rex = 0x40;
+                if (XCOL_X86 >= 8) { rex |= 0x02; }
+                if (base >= 8) { rex |= 0x01; }
+                if (rex != 0x40) { emit1(c, rex); }
+                emit1(c, 0x88);
+                emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                emit1(c, (uint8_t)((0 << 6) | ((XCOL_X86 & 7) << 3) | (base & 7)));
+            } else {
+                // Narrow 8 x u32 -> 8 x u8 (across both 128-bit halves).
+                // Assumes each u32 lane already fits in a byte (callers produce 0..255).
+                int8_t t   = ra_alloc(ra, sl, ns);
+                int8_t thi = ra_alloc(ra, sl, ns);
+                vpackusdw(c, t, ry, ry);        // each 128 lane: [a,b,c,d,a,b,c,d] as 8 u16
+                vextracti128(c, thi, t, 1);     // thi lo 64 = e,f,g,h (as u16)
+                vpunpcklqdq(c, t, t, thi);      // t.xmm = [a,b,c,d,e,f,g,h] as 8 u16
+                vpackuswb(c, t, t, t);          // t.xmm low 64 = 8 u8
+                vmovq_store(c, t, base, XCOL_X86, 1, 0);
+                ra_return_reg(ra, thi);
+                ra_return_reg(ra, t);
+            }
+            ra_free_chan(ra, inst->y, i);
+        } break;
+
         case op_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
@@ -1080,6 +1136,61 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                         emit1(c, 0xb7);
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
+                    }
+                    vex(c, 1, 1, 0, 0, s.rd, s.rd, RAX, 0xC4);
+                    emit1(c, (uint8_t)k);
+                    patch_jcc(c, skip);
+                }
+                ra_return_reg(ra, hi_idx);
+                ra_free_chan(ra, inst->x, i);
+            }
+        } break;
+
+        case op_gather_8: {
+            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
+            int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
+            ptr            p = inst->ptr;
+            int            base = resolve_ptr_x86(c, p, &last_ptr, 0);
+            load_count_x86(c, p);
+            if (scalar) {
+                vmovd_to_gpr(c, RAX, rx);
+                ra_free_chan(ra, inst->x, i);
+                vpxor(c, 0, s.rd, s.rd, s.rd);
+                cmp_rr(c, RAX, XM);
+                int skip = jcc(c, 0x03);
+                {
+                    uint8_t rex = 0x40;
+                    if (base >= 8) { rex |= 0x01; }
+                    if (rex != 0x40) { emit1(c, rex); }
+                    emit1(c, 0x0f);
+                    emit1(c, 0xb6);
+                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                    emit1(c, (uint8_t)((0 << 6) | ((RAX & 7) << 3) | (base & 7)));
+                }
+                vmovd_from_gpr(c, s.rd, RAX);
+                patch_jcc(c, skip);
+            } else {
+                int8_t hi_idx = ra_alloc(ra, sl, ns);
+                vextracti128(c, hi_idx, rx, 1);
+                vpxor(c, 0, s.rd, s.rd, s.rd);
+                for (int k = 0; k < 8; k++) {
+                    int src = (k < 4) ? rx : hi_idx;
+                    int lane = k & 3;
+                    if (lane == 0) {
+                        vmovd_to_gpr(c, RAX, src);
+                    } else {
+                        vpextrd(c, RAX, src, (uint8_t)lane);
+                    }
+                    cmp_rr(c, RAX, XM);
+                    int skip = jcc(c, 0x03);
+                    {
+                        uint8_t rex2 = 0x40;
+                        if (base >= 8) { rex2 |= 0x01; }
+                        if (rex2 != 0x40) { emit1(c, rex2); }
+                        emit1(c, 0x0f);
+                        emit1(c, 0xb6);
+                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
+                        emit1(c, (uint8_t)((0 << 6) | ((RAX & 7) << 3) | (base & 7)));
                     }
                     vex(c, 1, 1, 0, 0, s.rd, s.rd, RAX, 0xC4);
                     emit1(c, (uint8_t)k);
