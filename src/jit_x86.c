@@ -528,20 +528,9 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, 1);
             if (scalar) {
-                // MOVZX eax, word [base + R10*2]
-                {
-                    uint8_t rex = 0x40;
-                    if (XCOL_X86 >= 8) { rex |= 0x02; }
-                    if (base >= 8) { rex |= 0x01; }
-                    if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x0f);
-                    emit1(c, 0xb7);
-                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                    emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (base & 7)));
-                }
+                movzx_word_load(c, RAX, base, XCOL_X86, 2, 0);
                 vmovd_from_gpr(c, s.rd, RAX);
             } else {
-                // Load 128-bit (8 x u16)
                 vmov_load(c, 0, s.rd, base, XCOL_X86, 2, 0);
             }
         } break;
@@ -551,20 +540,9 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, 0);
             if (scalar) {
-                // MOVZX eax, byte [base + R10]
-                {
-                    uint8_t rex = 0x40;
-                    if (XCOL_X86 >= 8) { rex |= 0x02; }
-                    if (base >= 8) { rex |= 0x01; }
-                    if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x0f);
-                    emit1(c, 0xb6);
-                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                    emit1(c, (uint8_t)((0 << 6) | ((XCOL_X86 & 7) << 3) | (base & 7)));
-                }
+                movzx_byte_load(c, RAX, base, XCOL_X86, 1, 0);
                 vmovd_from_gpr(c, s.rd, RAX);
             } else {
-                // Load 8 bytes into low 64 of tmp XMM, then zero-extend 8 u8 -> 8 u32 (YMM).
                 int8_t tmp = ra_alloc(ra, sl, ns);
                 vmovq_load(c, tmp, base, XCOL_X86, 1, 0);
                 vpmovzxbd(c, s.rd, tmp);
@@ -986,15 +964,8 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, 0);
             if (scalar) {
-                // VMOVD eax, xmm; MOV byte [base + R10], al
                 vmovd_to_gpr(c, RAX, ry);
-                uint8_t rex = 0x40;
-                if (XCOL_X86 >= 8) { rex |= 0x02; }
-                if (base >= 8) { rex |= 0x01; }
-                if (rex != 0x40) { emit1(c, rex); }
-                emit1(c, 0x88);
-                emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                emit1(c, (uint8_t)((0 << 6) | ((XCOL_X86 & 7) << 3) | (base & 7)));
+                mov_byte_store(c, RAX, base, XCOL_X86, 1, 0);
             } else {
                 int8_t t   = ra_alloc(ra, sl, ns);
                 int8_t thi = ra_alloc(ra, sl, ns);
@@ -1100,15 +1071,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
                 int skip = jcc(c, 0x03);
-                {
-                    uint8_t rex = 0x40;
-                    if (base >= 8) { rex |= 0x01; }
-                    if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x0f);
-                    emit1(c, 0xb7u);
-                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                    emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
-                }
+                movzx_word_load(c, RAX, base, RAX, 2, 0);
                 vmovd_from_gpr(c, s.rd, RAX);
                 patch_jcc(c, skip);
             } else {
@@ -1125,17 +1088,8 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                     }
                     cmp_rr(c, RAX, XM);
                     int skip = jcc(c, 0x03);
-                    {
-                        uint8_t rex2 = 0x40;
-                        if (base >= 8) { rex2 |= 0x01; }
-                        if (rex2 != 0x40) { emit1(c, rex2); }
-                        emit1(c, 0x0f);
-                        emit1(c, 0xb7);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((RAX & 7) << 3) | (base & 7)));
-                    }
-                    vex(c, 1, 1, 0, 0, s.rd, s.rd, RAX, 0xC4);
-                    emit1(c, (uint8_t)k);
+                    movzx_word_load(c, RAX, base, RAX, 2, 0);
+                    vpinsrw(c, s.rd, s.rd, RAX, (uint8_t)k);
                     patch_jcc(c, skip);
                 }
                 ra_return_reg(ra, hi_idx);
@@ -1155,15 +1109,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 vpxor(c, 0, s.rd, s.rd, s.rd);
                 cmp_rr(c, RAX, XM);
                 int skip = jcc(c, 0x03);
-                {
-                    uint8_t rex = 0x40;
-                    if (base >= 8) { rex |= 0x01; }
-                    if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x0f);
-                    emit1(c, 0xb6);
-                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                    emit1(c, (uint8_t)((0 << 6) | ((RAX & 7) << 3) | (base & 7)));
-                }
+                movzx_byte_load(c, RAX, base, RAX, 1, 0);
                 vmovd_from_gpr(c, s.rd, RAX);
                 patch_jcc(c, skip);
             } else {
@@ -1181,17 +1127,8 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                     }
                     cmp_rr(c, RAX, XM);
                     int skip = jcc(c, 0x03);
-                    {
-                        uint8_t rex2 = 0x40;
-                        if (base >= 8) { rex2 |= 0x01; }
-                        if (rex2 != 0x40) { emit1(c, rex2); }
-                        emit1(c, 0x0f);
-                        emit1(c, 0xb6);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((0 << 6) | ((RAX & 7) << 3) | (base & 7)));
-                    }
-                    vex(c, 1, 1, 0, 0, tmp, tmp, RAX, 0xC4);
-                    emit1(c, (uint8_t)k);
+                    movzx_byte_load(c, RAX, base, RAX, 1, 0);
+                    vpinsrw(c, tmp, tmp, RAX, (uint8_t)k);
                     patch_jcc(c, skip);
                 }
                 vpmovzxwd(c, s.rd, tmp);

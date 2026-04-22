@@ -383,3 +383,43 @@ void vpsrldq(Buf *b, int d, int s, uint8_t imm) {
     vex(b, 1, 1, 0, 0, 3, d, s, 0x73);
     emit1(b, imm);
 }
+
+void vpinsrw(Buf *b, int d, int v, int gpr, uint8_t imm) {
+    vex(b, 1, 1, 0, 0, d, v, gpr, 0xc4);
+    emit1(b, imm);
+}
+
+static void legacy_rm_sib(Buf *b, _Bool esc_0f, uint8_t op, int r,
+                          int base, int index, int scale, int disp,
+                          _Bool byte_reg) {
+    uint8_t rex = 0x40;
+    if (r     >= 8) { rex |= 0x04; }
+    if (index >= 8) { rex |= 0x02; }
+    if (base  >= 8) { rex |= 0x01; }
+    if (rex != 0x40 || (byte_reg && r >= 4)) { emit1(b, rex); }
+    if (esc_0f) { emit1(b, 0x0f); }
+    emit1(b, op);
+
+    int const mod = (disp == 0 && (base & 7) != RBP) ? 0
+                  : (disp >= -128 && disp <= 127)    ? 1
+                                                     : 2;
+    emit1(b, (uint8_t)((mod << 6) | ((r & 7) << 3) | 4));
+    int const ss = (scale == 1) ? 0 : (scale == 2) ? 1 : (scale == 4) ? 2 : 3;
+    emit1(b, (uint8_t)((ss << 6) | ((index & 7) << 3) | (base & 7)));
+
+    if (mod == 1) {
+        emit1(b, (uint8_t)(int8_t)disp);
+    } else if (mod == 2) {
+        emit4(b, (uint32_t)disp);
+    }
+}
+
+void movzx_byte_load(Buf *b, int r, int base, int index, int scale, int disp) {
+    legacy_rm_sib(b, 1, 0xb6, r, base, index, scale, disp, 0);
+}
+void movzx_word_load(Buf *b, int r, int base, int index, int scale, int disp) {
+    legacy_rm_sib(b, 1, 0xb7, r, base, index, scale, disp, 0);
+}
+void mov_byte_store(Buf *b, int r, int base, int index, int scale, int disp) {
+    legacy_rm_sib(b, 0, 0x88, r, base, index, scale, disp, 1);
+}

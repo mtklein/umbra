@@ -638,3 +638,71 @@ TEST(test_vmovd_vmovq_vpsrldq) {
     free(b.byte);
 }
 
+TEST(test_vpinsrw) {
+    struct asm_x86 b = {0};
+
+    // vpinsrw $3, %eax, %xmm0, %xmm0  =>  C5 F9 C4 C0 03
+    vpinsrw(&b, 0, 0, RAX, 3);
+    bytes_eq(&b, 5, (uint8_t[]){0xC5, 0xF9, 0xC4, 0xC0, 0x03}) here;
+    reset(&b);
+
+    // vpinsrw $7, %r10d, %xmm5, %xmm5  =>  C4 C1 51 C4 EA 07
+    vpinsrw(&b, 5, 5, R10, 7);
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xC1, 0x51, 0xC4, 0xEA, 0x07}) here;
+    reset(&b);
+
+    free(b.byte);
+}
+
+TEST(test_legacy_sib_mem) {
+    struct asm_x86 b = {0};
+
+    // movzbl (%rdi,%rsi), %eax        =>  0F B6 04 37
+    movzx_byte_load(&b, RAX, RDI, RSI, 1, 0);
+    bytes_eq(&b, 4, (uint8_t[]){0x0F, 0xB6, 0x04, 0x37}) here;
+    reset(&b);
+
+    // movzbl (%r11,%r10), %eax        =>  43 0F B6 04 13
+    movzx_byte_load(&b, RAX, R11, R10, 1, 0);
+    bytes_eq(&b, 5, (uint8_t[]){0x43, 0x0F, 0xB6, 0x04, 0x13}) here;
+    reset(&b);
+
+    // movzbl 4(%rdi,%rsi), %eax       =>  0F B6 44 37 04
+    movzx_byte_load(&b, RAX, RDI, RSI, 1, 4);
+    bytes_eq(&b, 5, (uint8_t[]){0x0F, 0xB6, 0x44, 0x37, 0x04}) here;
+    reset(&b);
+
+    // movzbl 0x1000(%r11,%r10), %r9d  =>  47 0F B6 8C 13 00 10 00 00
+    movzx_byte_load(&b, R9, R11, R10, 1, 0x1000);
+    bytes_eq(&b, 9, (uint8_t[]){0x47, 0x0F, 0xB6, 0x8C, 0x13,
+                                0x00, 0x10, 0x00, 0x00}) here;
+    reset(&b);
+
+    // movzwl (%r11,%r10,2), %eax      =>  43 0F B7 04 53
+    movzx_word_load(&b, RAX, R11, R10, 2, 0);
+    bytes_eq(&b, 5, (uint8_t[]){0x43, 0x0F, 0xB7, 0x04, 0x53}) here;
+    reset(&b);
+
+    // movzwl (%rdi,%rsi,2), %eax      =>  0F B7 04 77
+    movzx_word_load(&b, RAX, RDI, RSI, 2, 0);
+    bytes_eq(&b, 4, (uint8_t[]){0x0F, 0xB7, 0x04, 0x77}) here;
+    reset(&b);
+
+    // movb %al, (%r11,%r10)           =>  43 88 04 13
+    mov_byte_store(&b, RAX, R11, R10, 1, 0);
+    bytes_eq(&b, 4, (uint8_t[]){0x43, 0x88, 0x04, 0x13}) here;
+    reset(&b);
+
+    // movb %al, (%rdi,%rsi)           =>  88 04 37
+    mov_byte_store(&b, RAX, RDI, RSI, 1, 0);
+    bytes_eq(&b, 3, (uint8_t[]){0x88, 0x04, 0x37}) here;
+    reset(&b);
+
+    // movb %sil, (%rdi,%rdx)          =>  40 88 34 17
+    mov_byte_store(&b, RSI, RDI, RDX, 1, 0);
+    bytes_eq(&b, 4, (uint8_t[]){0x40, 0x88, 0x34, 0x17}) here;
+    reset(&b);
+
+    free(b.byte);
+}
+

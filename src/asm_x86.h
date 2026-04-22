@@ -136,3 +136,9 @@ void vmovd_store(struct asm_x86 *b, int reg, int base, int index, int scale, int
 void vmovq_load (struct asm_x86 *b, int reg, int base, int index, int scale, int disp);
 void vmovq_store(struct asm_x86 *b, int reg, int base, int index, int scale, int disp);
 void vpsrldq(struct asm_x86 *b, int d, int s, uint8_t imm);
+
+void vpinsrw(struct asm_x86 *b, int d, int v, int gpr, uint8_t imm);
+
+void movzx_byte_load(struct asm_x86 *b, int r, int base, int index, int scale, int disp);
+void movzx_word_load(struct asm_x86 *b, int r, int base, int index, int scale, int disp);
+void mov_byte_store (struct asm_x86 *b, int r, int base, int index, int scale, int disp);
