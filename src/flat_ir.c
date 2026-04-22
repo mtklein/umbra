@@ -1,5 +1,6 @@
 #include "../include/umbra.h"
 #include "assume.h"
+#include "count.h"
 #include "flat_ir.h"
 #include <stdint.h>
 #include <stdio.h>
@@ -7,6 +8,26 @@
 
 _Bool binding_is_uniform(enum binding_kind k) {
     return k == BIND_EARLY_UNIFORMS || k == BIND_LATE_UNIFORMS;
+}
+
+_Bool flat_ir_has_early_writes(struct umbra_flat_ir const *ir) {
+    _Bool is_early_buf[32] = {0};
+    for (int k = 0; k < ir->bindings; k++) {
+        if (ir->binding[k].kind == BIND_EARLY_BUF) {
+            int const ix = ir->binding[k].ix;
+            assume(0 <= ix && ix < (int)count(is_early_buf));
+            is_early_buf[ix] = 1;
+        }
+    }
+    for (int i = 0; i < ir->insts; i++) {
+        if (op_is_store(ir->inst[i].op)) {
+            int const ix = ir->inst[i].ptr.bits;
+            if (0 <= ix && ix < (int)count(is_early_buf) && is_early_buf[ix]) {
+                return 1;
+            }
+        }
+    }
+    return 0;
 }
 
 void resolve_bindings(struct umbra_buf *out,

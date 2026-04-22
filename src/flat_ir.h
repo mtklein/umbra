@@ -53,6 +53,10 @@ void resolve_bindings(struct umbra_buf *out,
                       struct buffer_binding const *binding, int bindings,
                       int lates, struct umbra_late_binding const *late);
 
+// True iff the IR stores to any early-bound buffer.  Used to tag compiled
+// programs as thread-safe (along with the backend's own threadsafe bit).
+_Bool flat_ir_has_early_writes(struct umbra_flat_ir const*);
+
 struct umbra_builder {
     struct ir_inst           *inst;
     _Bool                    *var_uniform;

@@ -1341,6 +1341,7 @@ static struct umbra_program* compile_metal(struct umbra_backend *be, IR const *i
             .dump    = dump_metal,
             .free    = free_metal,
             .backend = be,
+            .queue_is_threadsafe = be->queue_is_threadsafe && !flat_ir_has_early_writes(ir),
         };
         return &p->base;
     }

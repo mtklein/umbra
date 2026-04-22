@@ -2531,35 +2531,50 @@ TEST(test_jit_xs_init) {
 }
 
 TEST(test_program_threadsafe) {
-    struct umbra_buf slot[20] = {0};
-    struct umbra_builder *b = umbra_builder();
-    umbra_store_32(b, umbra_early_bind_buf(b, &slot[0]), umbra_x(b));
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    umbra_builder_free(b);
+    // Early-bound store: two threads calling queue() share the bound buf, so
+    // queue_is_threadsafe must be false on every backend regardless of whether
+    // the backend itself is threadsafe.
+    struct umbra_buf slot = {0};
+    struct umbra_builder *eb = umbra_builder();
+    umbra_store_32(eb, umbra_early_bind_buf(eb, &slot), umbra_x(eb));
+    struct umbra_flat_ir *early_ir = umbra_flat_ir(eb);
+    umbra_builder_free(eb);
 
-    struct umbra_backend *interp = umbra_backend_interp();
-    { struct umbra_program *p = interp->compile(interp, ir);
-      p->queue_is_threadsafe == 1 here;
-      umbra_program_free(p); }
-    umbra_backend_free(interp);
+    // Late-bound store: dst is supplied per queue() call, so two threads can
+    // each pass their own buf.  Threadsafe iff the backend is.
+    struct umbra_builder *lb = umbra_builder();
+    umbra_store_32(lb, umbra_late_bind_buf(lb), umbra_x(lb));
+    struct umbra_flat_ir *late_ir = umbra_flat_ir(lb);
+    umbra_builder_free(lb);
 
-    struct umbra_backend *jit = umbra_backend_jit();
-    if (jit) {
-        struct umbra_program *p = jit->compile(jit, ir);
-        p->queue_is_threadsafe == 1 here;
-        umbra_program_free(p);
-        umbra_backend_free(jit);
+    struct {
+        struct umbra_backend *be;
+        _Bool                 backend_threadsafe; int :24, :32;
+    } cases[] = {
+        {umbra_backend_interp(), 1},
+        {umbra_backend_jit(),    1},
+        {umbra_backend_metal(),  0},
+        {umbra_backend_vulkan(), 0},
+        {umbra_backend_wgpu(),   0},
+    };
+    for (int i = 0; i < count(cases); i++) {
+        struct umbra_backend *be = cases[i].be;
+        if (!be) { continue; }
+        _Bool const want_tsafe = cases[i].backend_threadsafe;
+
+        struct umbra_program *p_early = be->compile(be, early_ir);
+        p_early->queue_is_threadsafe == 0 here;
+        umbra_program_free(p_early);
+
+        struct umbra_program *p_late  = be->compile(be, late_ir);
+        p_late->queue_is_threadsafe == want_tsafe here;
+        umbra_program_free(p_late);
+
+        umbra_backend_free(be);
     }
 
-    struct umbra_backend *metal = umbra_backend_metal();
-    if (metal) {
-        struct umbra_program *p = metal->compile(metal, ir);
-        p->queue_is_threadsafe == 0 here;
-        umbra_program_free(p);
-        umbra_backend_free(metal);
-    }
-
-    umbra_flat_ir_free(ir);
+    umbra_flat_ir_free(early_ir);
+    umbra_flat_ir_free(late_ir);
 }
 
 static void run_umbra_uniforms_test(struct umbra_backend *be) {
