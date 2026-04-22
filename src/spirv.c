@@ -250,12 +250,11 @@ typedef struct {
     _Bool *buf_is_16x4;
     int    has_16, has_16x4;
 
-    // Per-buffer flag: true if the buffer is a umbra_{early,late}_bind_uniforms
-    // binding (fixed slot count known at IR build time).  Such bindings are
-    // emitted as Uniform-storage blocks with vec4<u32>-packed arrays
-    // (std140-compatible) instead of StorageBuffer + RuntimeArray.
-    _Bool    *buf_is_uniform;
-    int      *buf_uniform_slots;        // u32 slot count per uniform binding
+    // Per-buffer metadata borrowed from the IR.  Uniform-kind bindings
+    // (buf[p].is_uniform) are emitted as Uniform-storage blocks with
+    // vec4<u32>-packed arrays (std140-compatible) instead of StorageBuffer
+    // + RuntimeArray, with `uniform_slots` u32 slots.
+    struct buffer_metadata const *buf;
     uint32_t *t_ptr_uniform_struct;     // per-binding pointer-to-struct type ID
 
     // Constant deduplication cache.
@@ -532,7 +531,7 @@ static uint32_t spv_access_chain_3(SpvBuilder *b, uint32_t ptr_type,
 // For SSBO bindings the access is direct; for Uniform bindings the slot
 // is split into (slot/4, slot%4) and indexed through the vec4<u32> array.
 static uint32_t load_buf_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
-    if (b->buf_is_uniform[buf_idx]) {
+    if (b->buf[buf_idx].is_uniform) {
         uint32_t const vec_ix = spv_binop(b, SpvOpShiftRightLogical, b->t_u32,
                                           elem_idx, b->c_2);
         uint32_t const lane   = spv_binop(b, SpvOpBitwiseAnd, b->t_u32,
@@ -552,7 +551,7 @@ static uint32_t load_buf_u32(SpvBuilder *b, int buf_idx, uint32_t elem_idx) {
 // block we split (slot/4, slot%4) into constants here so the access chain
 // stays fully constant-indexed.
 static uint32_t load_buf_u32_const_slot(SpvBuilder *b, int buf_idx, int slot) {
-    if (b->buf_is_uniform[buf_idx]) {
+    if (b->buf[buf_idx].is_uniform) {
         uint32_t const vec_ix = spv_const_u32(b, (uint32_t)(slot >> 2));
         uint32_t const lane   = spv_const_u32(b, (uint32_t)(slot & 3));
         uint32_t const ptr    = spv_access_chain_3(b, b->t_ptr_uniform_u32,
@@ -742,25 +741,12 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         }
     }
 
-    // Local int-sized copies for the emitter's internal use; kept separate from
-    // ir->buf_is_uniform (which is uint8_t) so we can pass them by pointer.
-    B.buf_is_uniform    = calloc((size_t)total_bufs, sizeof *B.buf_is_uniform);
-    B.buf_uniform_slots = calloc((size_t)total_bufs, sizeof *B.buf_uniform_slots);
-    for (int p = 0; p < total_bufs; p++) {
-        B.buf_is_uniform   [p] = ir->buf_is_uniform[p];
-        B.buf_uniform_slots[p] = ir->buf_uniform_slots[p];
-    }
+    B.buf = ir->buf;
 
-    size_t const meta_bytes = (size_t)total_bufs;
-    uint8_t *buf_rw         = malloc(meta_bytes);
-    uint8_t *buf_shift      = malloc(meta_bytes);
-    uint8_t *buf_is_uniform = malloc(meta_bytes);
-    __builtin_memcpy(buf_rw,         ir->buf_rw,         meta_bytes);
-    __builtin_memcpy(buf_shift,      ir->buf_shift,      meta_bytes);
-    __builtin_memcpy(buf_is_uniform, ir->buf_is_uniform, meta_bytes);
-    result.buf_rw         = buf_rw;
-    result.buf_shift      = buf_shift;
-    result.buf_is_uniform = buf_is_uniform;
+    size_t const meta_bytes = (size_t)total_bufs * sizeof *ir->buf;
+    struct buffer_metadata *buf = malloc(meta_bytes);
+    __builtin_memcpy(buf, ir->buf, meta_bytes);
+    result.buf = buf;
 
     // Push constant layout: w, x0, y0, buf_count[total_bufs], buf_stride[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a
@@ -1008,9 +994,9 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     B.t_ptr_uniform_struct = calloc((size_t)total_bufs, sizeof *B.t_ptr_uniform_struct);
     _Bool any_uniform = 0;
     for (int p = 0; p < total_bufs; p++) {
-        if (B.buf_is_uniform[p]) {
+        if (B.buf[p].is_uniform) {
             any_uniform = 1;
-            int      const slots     = B.buf_uniform_slots[p];
+            int      const slots     = B.buf[p].uniform_slots;
             int      const vec_count = (slots + 3) / 4;
             uint32_t const c_count   = spv_const_u32(&B, (uint32_t)vec_count);
 
@@ -1172,9 +1158,9 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     B.v_ssbo = calloc((size_t)total_bufs, sizeof *B.v_ssbo);
     for (int i = 0; i < total_bufs; i++) {
         B.v_ssbo[i] = spv_id(&B);
-        uint32_t const sc = B.buf_is_uniform[i] ? (uint32_t)SpvStorageClassUniform
+        uint32_t const sc = B.buf[i].is_uniform ? (uint32_t)SpvStorageClassUniform
                                                 : (uint32_t)SpvStorageClassStorageBuffer;
-        uint32_t const ptr_type = B.buf_is_uniform[i] ? B.t_ptr_uniform_struct[i]
+        uint32_t const ptr_type = B.buf[i].is_uniform ? B.t_ptr_uniform_struct[i]
                                 : B.buf_is_16     [i] ? B.t_ptr_ssbo_struct_f16
                                 : B.buf_is_16x4   [i] ? B.t_ptr_ssbo_struct_uvec2
                                 :                       B.t_ptr_ssbo_struct;
@@ -2148,8 +2134,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     free(B.is_f);
     free(B.buf_is_16);
     free(B.buf_is_16x4);
-    free(B.buf_is_uniform);
-    free(B.buf_uniform_slots);
     free(B.t_ptr_uniform_struct);
     free(B.const_cache);
     free(v_vars);

@@ -91,9 +91,7 @@ struct wgpu_program {
     int push_words, bindings;
     struct buffer_binding *binding;
 
-    uint8_t          *buf_rw;
-    uint8_t          *buf_shift;
-    uint8_t          *buf_is_uniform;
+    struct buffer_metadata *buf;
 
     // When true, every read-only binding uses a dynamic offset so the
     // bind group survives across dispatches whose offsets differ.  When
@@ -373,8 +371,8 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     // limits.
     int n_ro_storage = 0, n_ro_uniform = 0;
     for (int i = 0; i < descs - 1; i++) {
-        if (!(sr.buf_rw[i] & BUF_WRITTEN)) {
-            if (sr.buf_is_uniform[i]) { n_ro_uniform++; }
+        if (!(sr.buf[i].rw & BUF_WRITTEN)) {
+            if (sr.buf[i].is_uniform) { n_ro_uniform++; }
             else                      { n_ro_storage++; }
         }
     }
@@ -383,12 +381,12 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
      && (uint32_t) n_ro_uniform      <= be->max_dyn_uniform;
 
     for (int i = 0; i < descs - 1; i++) {
-        _Bool const is_ring = dynamic_offset_bindings && !(sr.buf_rw[i] & BUF_WRITTEN);
+        _Bool const is_ring = dynamic_offset_bindings && !(sr.buf[i].rw & BUF_WRITTEN);
         entries[i] = (WGPUBindGroupLayoutEntry){
             .binding    = (uint32_t)i,
             .visibility = WGPUShaderStage_Compute,
             .buffer = {
-                .type             = sr.buf_is_uniform[i] ? WGPUBufferBindingType_Uniform
+                .type             = sr.buf[i].is_uniform ? WGPUBufferBindingType_Uniform
                                                          : WGPUBufferBindingType_Storage,
                 .hasDynamicOffset = is_ring,
             },
@@ -441,9 +439,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
     p->push_words  = sr.push_words;
-    p->buf_rw         = sr.buf_rw;
-    p->buf_shift      = sr.buf_shift;
-    p->buf_is_uniform = sr.buf_is_uniform;
+    p->buf            = sr.buf;
     p->dynamic_offset_bindings = dynamic_offset_bindings;
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
@@ -491,19 +487,19 @@ static void wgpu_program_queue(struct umbra_program *prog,
 
     for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].count) {
-            size_t const bytes = (size_t)buf[i].count << p->buf_shift[i];
-            uint8_t const rw = p->buf_rw[i];
+            size_t const bytes = (size_t)buf[i].count << p->buf[i].shift;
+            uint8_t const rw = p->buf[i].rw;
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 // Ring alloc copies data into chunk buffer; bulk-uploaded at submit.
                 // Uniform-class bindings come from a dedicated pool whose chunks
                 // carry only the Uniform usage; mixing usage classes within a
                 // single dispatch on the same WGPU buffer is a validation error.
-                struct uniform_ring_pool *pool = p->buf_is_uniform[i] ? &be->uni_pool_uniform
+                struct uniform_ring_pool *pool = p->buf[i].is_uniform ? &be->uni_pool_uniform
                                                                       : &be->uni_pool;
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(pool, buf[i].ptr, bytes);
                 struct wgpu_ring_chunk *chunk = loc.handle;
-                size_t const align = p->buf_is_uniform[i] ? (size_t)16 : (size_t)4;
+                size_t const align = p->buf[i].is_uniform ? (size_t)16 : (size_t)4;
                 bind_buf   [i] = chunk->buf;
                 bind_offset[i] = loc.offset;
                 bind_size  [i] = (bytes + align - 1) & ~(align - 1);
@@ -561,7 +557,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
         int n_bg = n + 1;
         WGPUBindGroupEntry bg_entries[33];
         for (int i = 0; i < n; i++) {
-            _Bool const is_ring = p->dynamic_offset_bindings && !(p->buf_rw[i] & BUF_WRITTEN);
+            _Bool const is_ring = p->dynamic_offset_bindings && !(p->buf[i].rw & BUF_WRITTEN);
             bg_entries[i] = (WGPUBindGroupEntry){
                 .binding = (uint32_t)i,
                 .buffer  = bind_buf[i],
@@ -598,7 +594,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
     int n_dyn = 0;
     if (p->dynamic_offset_bindings) {
         for (int i = 0; i < n; i++) {
-            if (!(p->buf_rw[i] & BUF_WRITTEN)) {
+            if (!(p->buf[i].rw & BUF_WRITTEN)) {
                 dyn_offsets[n_dyn++] = (uint32_t)bind_offset[i];
             }
         }
@@ -651,9 +647,7 @@ static void wgpu_program_free(struct umbra_program *prog) {
     wgpuBindGroupLayoutRelease(p->bg_layout);
     wgpuShaderModuleRelease(p->shader);
     free(p->spirv);
-    free(p->buf_rw);
-    free(p->buf_shift);
-    free(p->buf_is_uniform);
+    free(p->buf);
     free(p->binding);
     free(p);
 }

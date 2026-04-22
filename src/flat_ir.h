@@ -56,6 +56,15 @@ struct buffer_binding {
     };
 };
 
+// Per-ptr metadata gathered by a single IR walk; indexed by ptr.bits.
+struct buffer_metadata {
+    uint8_t shift;        // op_elem_shift of any op on this ptr
+    uint8_t rw;           // BUF_READ | BUF_WRITTEN flags
+    uint8_t is_uniform;   // 1 if the binding's kind is a uniform kind
+    int    :8;
+    int     uniform_slots; // u32 slot count for uniform bindings, else 0
+};
+
 _Bool binding_is_uniform(enum binding_kind);
 
 void resolve_bindings(struct umbra_buf *out,
@@ -84,13 +93,10 @@ struct umbra_flat_ir {
     struct ir_inst           *inst;
     struct buffer_binding    *binding;
 
-    // Per-ptr buffer metadata, computed at IR construction.  Arrays are
-    // sized [total_bufs].  total_bufs == max(ptr.bits) + 1, or 0 if no
+    // Per-ptr buffer metadata, computed at IR construction.  Sized
+    // [total_bufs].  total_bufs == max(ptr.bits) + 1, or 0 if no
     // ptr-bearing op is live.
-    uint8_t                  *buf_shift;         // op_elem_shift of any op on this ptr
-    uint8_t                  *buf_rw;             // BUF_READ | BUF_WRITTEN flags
-    uint8_t                  *buf_is_uniform;     // 1 if binding kind is a uniform kind
-    int                      *buf_uniform_slots;  // count of u32 slots for uniform bindings
+    struct buffer_metadata   *buf;
 
     int insts,      // Total instruction count.
         preamble;   // inst[0..preamble) are uniform, [preamble..) varying.

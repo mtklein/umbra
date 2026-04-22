@@ -97,9 +97,7 @@ struct vk_program {
     int push_words, bindings;
     struct buffer_binding *binding;
 
-    uint8_t          *buf_rw;
-    uint8_t          *buf_shift;
-    uint8_t          *buf_is_uniform;
+    struct buffer_metadata *buf;
 
     uint32_t *spirv;
     int       spirv_words, :32;
@@ -298,13 +296,13 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (buf[i].ptr && buf[i].count) {
-            size_t const bytes = (size_t)buf[i].count << vp->buf_shift[i];
-            uint8_t const rw = vp->buf_rw[i];
+            size_t const bytes = (size_t)buf[i].count << vp->buf[i].shift;
+            uint8_t const rw = vp->buf[i].rw;
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
                 struct vk_ring_chunk *chunk = loc.handle;
-                size_t const range = vp->buf_is_uniform[i] ? ((bytes + 15) & ~(size_t)15)
+                size_t const range = vp->buf[i].is_uniform ? ((bytes + 15) & ~(size_t)15)
                                                            : bytes;
                 bind_buffer[i] = chunk->buf;
                 bind_offset[i] = (VkDeviceSize)loc.offset;
@@ -351,7 +349,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstBinding=(uint32_t)i,
             .descriptorCount=1,
-            .descriptorType=vp->buf_is_uniform[i] ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+            .descriptorType=vp->buf[i].is_uniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
                                                   : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .pBufferInfo=&buf_infos[i],
         };
@@ -369,7 +367,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     _Bool needs_barrier = 0;
     if (be->batch_has_dispatch) {
         for (int i = 0; i < n && !needs_barrier; i++) {
-            if (vp->buf_rw[i]) {
+            if (vp->buf[i].rw) {
                 needs_barrier = dispatch_overlap_check(&be->overlap, bind_buffer[i],
                                                        l, t, r, b);
             }
@@ -394,7 +392,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     be->total_dispatches++;
 
     for (int i = 0; i < n; i++) {
-        if (vp->buf_rw[i] & BUF_WRITTEN) {
+        if (vp->buf[i].rw & BUF_WRITTEN) {
             dispatch_overlap_record(&be->overlap, bind_buffer[i], l, t, r, b);
         }
     }
@@ -440,9 +438,7 @@ static void vk_program_free(struct umbra_program *p) {
     vkDestroyPipelineLayout(be->device, vp->pipe_layout, 0);
     vkDestroyDescriptorSetLayout(be->device, vp->ds_layout, 0);
     vkDestroyShaderModule(be->device, vp->shader, 0);
-    free(vp->buf_rw);
-    free(vp->buf_shift);
-    free(vp->buf_is_uniform);
+    free(vp->buf);
     free(vp->binding);
     free(vp->spirv);
     free(vp);
@@ -475,7 +471,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     for (int i = 0; i < descs; i++) {
         bindings[i] = (VkDescriptorSetLayoutBinding){
             .binding = (uint32_t)i,
-            .descriptorType = sr.buf_is_uniform[i] ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+            .descriptorType = sr.buf[i].is_uniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
                                                    : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
@@ -536,9 +532,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->max_ptr     = sr.max_ptr;
     p->total_bufs  = sr.total_bufs;
     p->push_words  = sr.push_words;
-    p->buf_rw         = sr.buf_rw;
-    p->buf_shift      = sr.buf_shift;
-    p->buf_is_uniform = sr.buf_is_uniform;
+    p->buf            = sr.buf;
     p->spirv       = sr.spirv;
     p->spirv_words = sr.spirv_words;
 

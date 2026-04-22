@@ -92,9 +92,8 @@ struct metal_backend {
 struct metal_program {
     struct umbra_program base;
     void *pipeline;
-    char     *src;
-    uint8_t  *buf_rw;
-    uint8_t  *buf_shift;
+    char *src;
+    struct buffer_metadata *buf;
     int    max_ptr;
     int    total_bufs;
     int    bindings, :32;
@@ -866,10 +865,9 @@ static char* build_source(IR const *orig_ir, struct umbra_flat_ir **out_resolved
     IR const *ir = resolved;
     *out_resolved = resolved;
 
-    int     const  total_bufs = ir->total_bufs;
-    int     const  max_ptr    = total_bufs - 1;
-    uint8_t const *buf_shift  = ir->buf_shift;
-    uint8_t const *buf_rw     = ir->buf_rw;
+    int const total_bufs = ir->total_bufs;
+    int const max_ptr    = total_bufs - 1;
+    struct buffer_metadata const *buf = ir->buf;
 
     SrcBuf b = {0};
 
@@ -901,11 +899,11 @@ static char* build_source(IR const *orig_ir, struct umbra_flat_ir **out_resolved
     emit(&b,
          "    constant meta &m [[buffer(0)]]");
     for (int p = 0; p <= max_ptr; p++) {
-        char const *type = buf_shift[p] == 3 ? "half4"
-                         : buf_shift[p] == 2 ? "uint"
-                         : buf_shift[p] == 1 ? "ushort"
+        char const *type = buf[p].shift == 3 ? "half4"
+                         : buf[p].shift == 2 ? "uint"
+                         : buf[p].shift == 1 ? "ushort"
                                              : "uchar";
-        char const *qual = (buf_rw[p] & BUF_WRITTEN) ? "device" : "device const";
+        char const *qual = (buf[p].rw & BUF_WRITTEN) ? "device" : "device const";
         emit(&b,
              ",\n    %s %s * __restrict p%d"
              " [[buffer(%d)]]",
@@ -1025,13 +1023,11 @@ static struct metal_program* metal_program(
         char *src = build_source(ir, &resolved);
         ir = resolved;
 
-        int     const total_bufs = ir->total_bufs;
-        int     const max_ptr    = total_bufs - 1;
-        size_t  const meta_bytes = (size_t)total_bufs;
-        uint8_t *buf_shift = malloc(meta_bytes);
-        uint8_t *buf_rw    = malloc(meta_bytes);
-        __builtin_memcpy(buf_shift, ir->buf_shift, meta_bytes);
-        __builtin_memcpy(buf_rw,    ir->buf_rw,    meta_bytes);
+        int    const total_bufs = ir->total_bufs;
+        int    const max_ptr    = total_bufs - 1;
+        size_t const meta_bytes = (size_t)total_bufs * sizeof *ir->buf;
+        struct buffer_metadata *buf = malloc(meta_bytes);
+        __builtin_memcpy(buf, ir->buf, meta_bytes);
 
         char const *override = getenv("UMBRA_METAL_OVERRIDE");
         if (override) {
@@ -1108,8 +1104,7 @@ static struct metal_program* metal_program(
             p->src           = src;
             p->max_ptr       = max_ptr;
             p->total_bufs    = total_bufs;
-            p->buf_rw        = buf_rw;
-            p->buf_shift     = buf_shift;
+            p->buf           = buf;
             p->bindings      = ir->bindings;
             if (p->bindings) {
                 size_t const sz = (size_t)p->bindings * sizeof *p->binding;
@@ -1124,8 +1119,7 @@ static struct metal_program* metal_program(
 
     fail:
         umbra_flat_ir_free(resolved);
-        free(buf_rw);
-        free(buf_shift);
+        free(buf);
         free(src);
     out:;
     }
@@ -1204,8 +1198,8 @@ static void encode_dispatch(
 
     for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].count) {
-            size_t const bytes = (size_t)buf[i].count << p->buf_shift[i];
-            uint8_t const rw = p->buf_rw[i];
+            size_t const bytes = (size_t)buf[i].count << p->buf[i].shift;
+            uint8_t const rw = p->buf[i].rw;
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
@@ -1310,8 +1304,7 @@ static void metal_program_free(struct metal_program *p) {
     if (p->pipeline) {
         release(p->pipeline);
     }
-    free(p->buf_rw);
-    free(p->buf_shift);
+    free(p->buf);
     free(p->binding);
     free(p->src);
     free(p);
