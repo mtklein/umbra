@@ -536,7 +536,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, LDRB_wr(XT, XP, XCOL));
                 put(c, DUP_4s_w(lo(s.rd), XT));
             } else {
-                // Load 8 bytes into V0.8b, widen u8 -> u16 -> u32.
                 put(c, ADD_xr(XT, XP, XCOL));
                 put(c, LDR_di(0, XT, 0));
                 put(c, UXTL_8h(0, 0));
@@ -919,7 +918,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 ra_return_reg(ra, t);
                 ra_return_reg(ra, px);
             } else {
-                // Narrow u32->u16->u8 per channel into V0-V3, then ST4.8B.
                 put(c, XTN_4h(0, lo(rr)));   put(c, W(XTN_4h(0, hi(rr))));
                 put(c, XTN_8b(0, 0));
                 put(c, XTN_4h(1, lo(rg)));   put(c, W(XTN_4h(1, hi(rg))));
@@ -960,7 +958,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             if (scalar) {
                 put(c, STR_bx(lo(ry), XP, XCOL));
             } else {
-                // Narrow u32 -> u16 into V0, then u16 -> u8 into V0.8b, then store 8 bytes.
                 put(c, XTN_4h(0, lo(ry)));
                 put(c, W(XTN_4h(0, hi(ry))));
                 put(c, XTN_8b(0, 0));
