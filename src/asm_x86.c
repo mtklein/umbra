@@ -389,6 +389,69 @@ void vpinsrw(Buf *b, int d, int v, int gpr, uint8_t imm) {
     emit1(b, imm);
 }
 
+void vinserti128(Buf *b, int d, int v, int s, uint8_t imm) {
+    vex_rrr(b, 1, 3, 1, 0x38, d, v, s);
+    emit1(b, imm);
+}
+
+// VBROADCASTSS ymm, m32 using the compact ModRM form (no SIB byte unless
+// base lands on RSP/R12).  Saves a byte vs vex_mem's always-SIB encoding.
+int vbroadcastss_mem(Buf *b, int d, int base, int disp) {
+    uint8_t const R = (uint8_t)(~d    >> 3) & 1;
+    uint8_t const B = (uint8_t)(~base >> 3) & 1;
+    emit1(b, 0xc4);
+    emit1(b, (uint8_t)((R << 7) | (1 << 6) | (B << 5) | 0x02));
+    emit1(b, 0x7d);
+    emit1(b, 0x18);
+    int const mod = (disp == 0 && (base & 7) != RBP) ? 0
+                  : (disp >= -128 && disp <= 127)    ? 1
+                                                     : 2;
+    emit1(b, (uint8_t)((mod << 6) | ((d & 7) << 3) | (base & 7)));
+    if ((base & 7) == RSP) { emit1(b, 0x24); }
+    int const pos = (int)b->size;
+    if      (mod == 1) { emit1(b, (uint8_t)(int8_t)disp); }
+    else if (mod == 2) { emit4(b, (uint32_t)disp); }
+    return pos;
+}
+
+int vcmpps_rip(Buf *b, int d, int v, uint8_t pred) {
+    int const pos = vex_rip(b, 0, 1, 0, 1, d, v, 0xc2);
+    emit1(b, pred);
+    return pos;
+}
+
+static void legacy_rm_sib(Buf *b, _Bool esc_0f, uint8_t op, int r,
+                          int base, int index, int scale, int disp,
+                          _Bool byte_reg);
+
+void mov_word_store(Buf *b, int r, int base, int index, int scale, int disp) {
+    emit1(b, 0x66);
+    legacy_rm_sib(b, 0, 0x89, r, base, index, scale, disp, 0);
+}
+
+static void legacy_rr(Buf *b, _Bool esc_0f, uint8_t op, int reg, int rm) {
+    uint8_t rex = 0x48;
+    if (reg >= 8) { rex |= 0x04; }
+    if (rm  >= 8) { rex |= 0x01; }
+    emit1(b, rex);
+    if (esc_0f) { emit1(b, 0x0f); }
+    emit1(b, op);
+    emit1(b, (uint8_t)(0xc0 | ((reg & 7) << 3) | (rm & 7)));
+}
+
+// d += s : ADD r/m64, r64   (ModRM.reg = s, ModRM.rm = d)
+void add_rr (Buf *b, int d, int s) { legacy_rr(b, 0, 0x01, s, d); }
+// d -= s : SUB r/m64, r64   (ModRM.reg = s, ModRM.rm = d)
+void sub_rr (Buf *b, int d, int s) { legacy_rr(b, 0, 0x29, s, d); }
+// d = d * s : IMUL r64, r/m64  (ModRM.reg = d, ModRM.rm = s)
+void imul_rr(Buf *b, int d, int s) { legacy_rr(b, 1, 0xaf, d, s); }
+
+void emit_bytes(Buf *b, void const *src, size_t bytes) {
+    for (size_t i = 0; i < bytes; i++) {
+        emit1(b, ((uint8_t const*)src)[i]);
+    }
+}
+
 static void legacy_rm_sib(Buf *b, _Bool esc_0f, uint8_t op, int r,
                           int base, int index, int scale, int disp,
                           _Bool byte_reg) {

@@ -137,8 +137,19 @@ void vmovq_load (struct asm_x86 *b, int reg, int base, int index, int scale, int
 void vmovq_store(struct asm_x86 *b, int reg, int base, int index, int scale, int disp);
 void vpsrldq(struct asm_x86 *b, int d, int s, uint8_t imm);
 
-void vpinsrw(struct asm_x86 *b, int d, int v, int gpr, uint8_t imm);
+void vpinsrw   (struct asm_x86 *b, int d, int v, int gpr, uint8_t imm);
+void vinserti128(struct asm_x86 *b, int d, int v, int s, uint8_t imm);
+int  vbroadcastss_mem(struct asm_x86 *b, int d, int base, int disp);
+int  vcmpps_rip(struct asm_x86 *b, int d, int v, uint8_t pred);
 
 void movzx_byte_load(struct asm_x86 *b, int r, int base, int index, int scale, int disp);
 void movzx_word_load(struct asm_x86 *b, int r, int base, int index, int scale, int disp);
 void mov_byte_store (struct asm_x86 *b, int r, int base, int index, int scale, int disp);
+void mov_word_store (struct asm_x86 *b, int r, int base, int index, int scale, int disp);
+
+void add_rr (struct asm_x86 *b, int d, int s);
+void sub_rr (struct asm_x86 *b, int d, int s);
+void imul_rr(struct asm_x86 *b, int d, int s);
+
+// Append raw bytes (non-instruction data, e.g. a constant pool blob).
+void emit_bytes(struct asm_x86 *b, void const *src, size_t bytes);

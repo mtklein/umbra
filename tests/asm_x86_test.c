@@ -654,6 +654,69 @@ TEST(test_vpinsrw) {
     free(b.byte);
 }
 
+TEST(test_vinserti128_vbroadcastss_mem_vcmpps_rip) {
+    struct asm_x86 b = {0};
+
+    // vinserti128 $1, %xmm3, %ymm2, %ymm1   =>  C4 E3 6D 38 CB 01
+    vinserti128(&b, 1, 2, 3, 1);
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE3, 0x6D, 0x38, 0xCB, 0x01}) here;
+    reset(&b);
+
+    // vbroadcastss (%rdi), %ymm3   =>  C4 E2 7D 18 1F
+    vbroadcastss_mem(&b, 3, RDI, 0);
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x18, 0x1F}) here;
+    reset(&b);
+
+    // vbroadcastss 256(%r12), %ymm3   =>  C4 C2 7D 18 9C 24 00 01 00 00
+    vbroadcastss_mem(&b, 3, R12, 256);
+    bytes_eq(&b, 10, (uint8_t[]){0xC4, 0xC2, 0x7D, 0x18, 0x9C, 0x24,
+                                 0x00, 0x01, 0x00, 0x00}) here;
+    reset(&b);
+
+    // vcmpltps (%rip), %ymm1, %ymm2 : vex_rip always uses the 3-byte VEX form
+    // so we emit C4 E1 74 C2 15 <rip32> 01, one byte longer than llvm-mc's
+    // 2-byte-VEX picking.  Same instruction; vex_rip returns the offset of the
+    // rip-relative disp32 so the caller can patch it.
+    int pos = vcmpps_rip(&b, 2, 1, /*pred=*/1);
+    pos == 5 here;
+    bytes_eq(&b, 10, (uint8_t[]){0xC4, 0xE1, 0x74, 0xC2, 0x15,
+                                 0x00, 0x00, 0x00, 0x00, 0x01}) here;
+    reset(&b);
+
+    free(b.byte);
+}
+
+TEST(test_legacy_reg_reg) {
+    struct asm_x86 b = {0};
+
+    // addq %rcx, %rdx        =>  48 01 CA
+    add_rr(&b, RDX, RCX);
+    bytes_eq(&b, 3, (uint8_t[]){0x48, 0x01, 0xCA}) here;
+    reset(&b);
+
+    // addq %r10, %r11        =>  4D 01 D3
+    add_rr(&b, R11, R10);
+    bytes_eq(&b, 3, (uint8_t[]){0x4D, 0x01, 0xD3}) here;
+    reset(&b);
+
+    // imulq %r14, %rax       =>  49 0F AF C6
+    imul_rr(&b, RAX, R14);
+    bytes_eq(&b, 4, (uint8_t[]){0x49, 0x0F, 0xAF, 0xC6}) here;
+    reset(&b);
+
+    // imulq %rbx, %r9        =>  4C 0F AF CB
+    imul_rr(&b, R9, RBX);
+    bytes_eq(&b, 4, (uint8_t[]){0x4C, 0x0F, 0xAF, 0xCB}) here;
+    reset(&b);
+
+    // subq %r10, %r11        =>  4D 29 D3
+    sub_rr(&b, R11, R10);
+    bytes_eq(&b, 3, (uint8_t[]){0x4D, 0x29, 0xD3}) here;
+    reset(&b);
+
+    free(b.byte);
+}
+
 TEST(test_legacy_sib_mem) {
     struct asm_x86 b = {0};
 
@@ -701,6 +764,16 @@ TEST(test_legacy_sib_mem) {
     // movb %sil, (%rdi,%rdx)          =>  40 88 34 17
     mov_byte_store(&b, RSI, RDI, RDX, 1, 0);
     bytes_eq(&b, 4, (uint8_t[]){0x40, 0x88, 0x34, 0x17}) here;
+    reset(&b);
+
+    // movw %ax, (%r11,%r10,2)         =>  66 43 89 04 53
+    mov_word_store(&b, RAX, R11, R10, 2, 0);
+    bytes_eq(&b, 5, (uint8_t[]){0x66, 0x43, 0x89, 0x04, 0x53}) here;
+    reset(&b);
+
+    // movw %ax, (%rdi,%rsi,2)         =>  66 89 04 77
+    mov_word_store(&b, RAX, RDI, RSI, 2, 0);
+    bytes_eq(&b, 4, (uint8_t[]){0x66, 0x89, 0x04, 0x77}) here;
     reset(&b);
 
     free(b.byte);

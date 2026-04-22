@@ -78,12 +78,8 @@ static int load_ptr_x86(Buf *c, ptr p, int *last_ptr, int elem_shift) {
         if (elem_shift) {
             shl_ri(c, RAX, (uint8_t)elem_shift);
         }
-        rex_w(c, RAX, XY);
-        emit1(c, 0x0f); emit1(c, 0xaf);
-        emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (XY & 7)));
-        rex_w(c, RAX, R11);
-        emit1(c, 0x01);
-        emit1(c, (uint8_t)(0xc0 | ((RAX & 7) << 3) | (R11 & 7)));
+        imul_rr(c, RAX, XY);
+        add_rr (c, R11, RAX);
     }
     return R11;
 }
@@ -333,9 +329,7 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     // remaining = row_end (RDI) - XCOL_X86
     mov_rr(&c, R11, RDI);
-    rex_w(&c, XCOL_X86, R11);
-    emit1(&c, 0x29);
-    emit1(&c, (uint8_t)(0xc0 | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
+    sub_rr(&c, R11, XCOL_X86);
 
     cmp_ri(&c, R11, 8);
     int const br_tail = jcc(&c, 0x0c);
@@ -426,9 +420,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     int const pool_start = (int)c.size;
-    for (int i = 0; i < jc.pool.bytes; i++) {
-        emit1(&c, jc.pool.data[i]);
-    }
+    emit_bytes(&c, jc.pool.data, (size_t)jc.pool.bytes);
     for (int i = 0; i < jc.pool.refs; i++) {
         struct pool_ref *r = &jc.pool.ref[i];
         int     const entry_off = pool_start + r->data_off;
@@ -645,84 +637,18 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 mov_rr(c, R11, base);
                 mov_load32(c, stride, XBUF, count_off);
                 shr_ri(c, stride, 1);
+                int8_t const plane[4] = {s0.rd, r1, r2, r3};
                 if (scalar) {
-                    // Plane 0 (R): MOVZX eax, word [R11 + XCOL_X86*2]; VMOVD xmm, eax
-                    {
-                        uint8_t rex = 0x40;
-                        if (XCOL_X86 >= 8)   { rex |= 0x02; }
-                        if (R11 >= 8)  { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x0f); emit1(c, 0xb7);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
+                    for (int k = 0; k < 4; k++) {
+                        if (k > 0) { add_rr(c, R11, stride); }
+                        movzx_word_load(c, RAX, R11, XCOL_X86, 2, 0);
+                        vmovd_from_gpr(c, plane[k], RAX);
                     }
-                    vmovd_from_gpr(c, s0.rd, RAX);
-
-                    // Plane 1 (G): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    {
-                        uint8_t rex = 0x40;
-                        if (XCOL_X86 >= 8)   { rex |= 0x02; }
-                        if (R11 >= 8)  { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x0f); emit1(c, 0xb7);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
-                    }
-                    vmovd_from_gpr(c, r1, RAX);
-
-                    // Plane 2 (B): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    {
-                        uint8_t rex = 0x40;
-                        if (XCOL_X86 >= 8)   { rex |= 0x02; }
-                        if (R11 >= 8)  { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x0f); emit1(c, 0xb7);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
-                    }
-                    vmovd_from_gpr(c, r2, RAX);
-
-                    // Plane 3 (A): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    {
-                        uint8_t rex = 0x40;
-                        if (XCOL_X86 >= 8)   { rex |= 0x02; }
-                        if (R11 >= 8)  { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x0f); emit1(c, 0xb7);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
-                    }
-                    vmovd_from_gpr(c, r3, RAX);
                 } else {
-                    // Plane 0 (R): load 8 x u16 (16 bytes)
-                    vmov_load(c, 0, s0.rd, R11, XCOL_X86, 2, 0);
-
-                    // Plane 1 (G): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmov_load(c, 0, r1, R11, XCOL_X86, 2, 0);
-
-                    // Plane 2 (B): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmov_load(c, 0, r2, R11, XCOL_X86, 2, 0);
-
-                    // Plane 3 (A): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmov_load(c, 0, r3, R11, XCOL_X86, 2, 0);
+                    for (int k = 0; k < 4; k++) {
+                        if (k > 0) { add_rr(c, R11, stride); }
+                        vmov_load(c, 0, plane[k], R11, XCOL_X86, 2, 0);
+                    }
                 }
                 last_ptr = -1;
             }
@@ -759,14 +685,14 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 vpunpcklwd(c, px, rb_, ra_v);
                 vpunpckldq(c, t, scale, px);
                 vpunpckhdq(c, z, scale, px);
-                vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
+                vinserti128(c, t, t, z, 1);
                 vmov_store(c, 1, t, base, XCOL_X86, 8, 0);
                 // High 4:
                 vpunpckhwd(c, scale, rr, rg);
                 vpunpckhwd(c, px, rb_, ra_v);
                 vpunpckldq(c, t, scale, px);
                 vpunpckhdq(c, z, scale, px);
-                vex(c, 1, 3, 0, 1, t, t, z, 0x38); emit1(c, 1);
+                vinserti128(c, t, t, z, 1);
                 vmov_store(c, 1, t, base, XCOL_X86, 8, 32);
             }
             ra_return_reg(ra, z);
@@ -792,88 +718,18 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 mov_rr(c, R11, base);
                 mov_load32(c, stride, XBUF, count_off);
                 shr_ri(c, stride, 1);
+                int8_t const plane[4] = {rr, rg, rb_, ra_v};
                 if (scalar) {
-                    // Plane 0 (R): VMOVD eax, rr; MOV word [R11+XCOL_X86*2], ax
-                    vmovd_to_gpr(c, RAX, rr);
-                    {
-                        emit1(c, 0x66);
-                        uint8_t rex = 0x40;
-                        if (XCOL_X86 >= 8)   { rex |= 0x02; }
-                        if (R11 >= 8)  { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x89);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
-                    }
-
-                    // Plane 1 (G): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmovd_to_gpr(c, RAX, rg);
-                    {
-                        emit1(c, 0x66);
-                        uint8_t rex = 0x40;
-                        if (XCOL_X86 >= 8)   { rex |= 0x02; }
-                        if (R11 >= 8)  { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x89);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
-                    }
-
-                    // Plane 2 (B): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmovd_to_gpr(c, RAX, rb_);
-                    {
-                        emit1(c, 0x66);
-                        uint8_t rex = 0x40;
-                        if (XCOL_X86 >= 8)   { rex |= 0x02; }
-                        if (R11 >= 8)  { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x89);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
-                    }
-
-                    // Plane 3 (A): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmovd_to_gpr(c, RAX, ra_v);
-                    {
-                        emit1(c, 0x66);
-                        uint8_t rex = 0x40;
-                        if (XCOL_X86 >= 8)   { rex |= 0x02; }
-                        if (R11 >= 8)  { rex |= 0x01; }
-                        if (rex != 0x40) { emit1(c, rex); }
-                        emit1(c, 0x89);
-                        emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                        emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (R11 & 7)));
+                    for (int k = 0; k < 4; k++) {
+                        if (k > 0) { add_rr(c, R11, stride); }
+                        vmovd_to_gpr(c, RAX, plane[k]);
+                        mov_word_store(c, RAX, R11, XCOL_X86, 2, 0);
                     }
                 } else {
-                    // Plane 0 (R): store 8 x u16 (16 bytes)
-                    vmov_store(c, 0, rr, R11, XCOL_X86, 2, 0);
-
-                    // Plane 1 (G): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmov_store(c, 0, rg, R11, XCOL_X86, 2, 0);
-
-                    // Plane 2 (B): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmov_store(c, 0, rb_, R11, XCOL_X86, 2, 0);
-
-                    // Plane 3 (A): advance R11 by plane_stride
-                    rex_w(c, stride, R11);
-                    emit1(c, 0x01);
-                    emit1(c, (uint8_t)(0xc0 | ((stride & 7) << 3) | (R11 & 7)));
-                    vmov_store(c, 0, ra_v, R11, XCOL_X86, 2, 0);
+                    for (int k = 0; k < 4; k++) {
+                        if (k > 0) { add_rr(c, R11, stride); }
+                        vmov_store(c, 0, plane[k], R11, XCOL_X86, 2, 0);
+                    }
                 }
                 last_ptr = -1;
             }
@@ -940,19 +796,8 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, 1);
             if (scalar) {
-                // VMOVD eax, xmm
                 vmovd_to_gpr(c, RAX, ry);
-                // MOV word [base + R10*2], ax
-                {
-                    emit1(c, 0x66);
-                    uint8_t rex = 0x40;
-                    if (XCOL_X86 >= 8) { rex |= 0x02; }
-                    if (base >= 8) { rex |= 0x01; }
-                    if (rex != 0x40) { emit1(c, rex); }
-                    emit1(c, 0x89);
-                    emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
-                    emit1(c, (uint8_t)((1 << 6) | ((XCOL_X86 & 7) << 3) | (base & 7)));
-                }
+                mov_word_store(c, RAX, base, XCOL_X86, 2, 0);
             } else {
                 vmov_store(c, 0, ry, base, XCOL_X86, 2, 0);
             }
@@ -983,27 +828,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
             int            base = resolve_ptr_x86(c, p, &last_ptr, 2);
-            {
-                int     disp = inst->imm * 4;
-                uint8_t R = (uint8_t)(~s.rd >> 3) & 1;
-                uint8_t B = (uint8_t)(~base >> 3) & 1;
-                emit1(c, 0xc4);
-                emit1(c, (uint8_t)((R << 7) | (1 << 6) | (B << 5) | 0x02));
-                emit1(c, 0x7d);
-                emit1(c, 0x18);
-                if (disp == 0 && (base & 7) != RBP) {
-                    emit1(c, (uint8_t)(((s.rd & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                } else if (disp >= -128 && disp <= 127) {
-                    emit1(c, (uint8_t)(0x40 | ((s.rd & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                    emit1(c, (uint8_t)disp);
-                } else {
-                    emit1(c, (uint8_t)(0x80 | ((s.rd & 7) << 3) | (base & 7)));
-                    if ((base & 7) == RSP) { emit1(c, 0x24); }
-                    emit4(c, (uint32_t)disp);
-                }
-            }
+            vbroadcastss_mem(c, s.rd, base, inst->imm * 4);
         } break;
 
         case op_gather_uniform_32: {
@@ -1253,8 +1078,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             }
             if (o == op_eq_f32_imm || o == op_lt_f32_imm || o == op_le_f32_imm) {
                 uint8_t pred = o == op_eq_f32_imm ? 0 : o == op_lt_f32_imm ? 1 : 2;
-                int     pos = vex_rip(c, pp, mm, 0, 1, s.rd, s.rx, vop);
-                emit1(c, pred);
+                int     pos = vcmpps_rip(c, s.rd, s.rx, pred);
                 pool_ref_at(&jc->pool, off, pos, 1);
             } else {
                 int pos = vex_rip(c, pp, mm, 0, 1, s.rd, s.rx, vop);
