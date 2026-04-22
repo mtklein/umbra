@@ -157,7 +157,9 @@ static struct umbra_fmt parse_fmt(char const *s) {
 }
 
 // Display order: M(metal), V(vulkan), W(wgpu), J(jit), I(interp).
-// Expected ranking: fastest to slowest, left to right.
+// Expectations: metal is the fastest GPU backend, jit is the fastest CPU
+// backend, and every GPU backend beats every CPU backend.  Vulkan vs wgpu
+// ordering is not constrained.
 enum { ND = 5, TITLE_W = 36, VAL_W = 7, CPU_W = 5, GAP = 2 };
 static int const disp_idx[ND] = {2, 3, 4, 1, 0};
 static char const *const disp_name[ND] = {"metal", "vulkan", "wgpu", "jit", "interp"};
@@ -224,9 +226,21 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
         }
     }
 
+    enum { IDX_INTERP = 0, IDX_JIT = 1, IDX_METAL = 2, IDX_VULKAN = 3, IDX_WGPU = 4 };
+    int const pairs[][2] = {
+        {IDX_METAL,  IDX_VULKAN},
+        {IDX_METAL,  IDX_WGPU  },
+        {IDX_JIT,    IDX_INTERP},
+        {IDX_METAL,  IDX_JIT   },
+        {IDX_VULKAN, IDX_JIT   },
+        {IDX_WGPU,   IDX_JIT   },
+        {IDX_METAL,  IDX_INTERP},
+        {IDX_VULKAN, IDX_INTERP},
+        {IDX_WGPU,   IDX_INTERP},
+    };
     _Bool anomaly = 0;
-    for (int d = 0; d + 1 < ND; d++) {
-        int a = disp_idx[d], b = disp_idx[d + 1];
+    for (int p = 0; p < count(pairs); p++) {
+        int a = pairs[p][0], b = pairs[p][1];
         if ((be_mask & (1 << a)) && (be_mask & (1 << b))
                 && ns_px[a] >= 0 && ns_px[b] >= 0) {
             int ra = (int)(ns_px[a] * 100 + 0.5);
