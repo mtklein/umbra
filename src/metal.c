@@ -1333,8 +1333,7 @@ static void dump_metal(struct umbra_program const *prog, FILE *f) {
 static void free_metal(struct umbra_program *prog) {
     metal_program_free((struct metal_program*)prog);
 }
-static struct umbra_program* compile_metal(struct umbra_backend           *be,
-                                           IR const *ir) {
+static struct umbra_program* compile_metal(struct umbra_backend *be, IR const *ir) {
     struct metal_program *p = metal_program((struct metal_backend*)be, ir);
     if (p) {
         p->base = (struct umbra_program){

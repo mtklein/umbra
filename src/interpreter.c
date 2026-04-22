@@ -1295,8 +1295,8 @@ static void run_interp(struct umbra_program *prog, int l, int t, int r, int b) {
 static void free_interp(struct umbra_program *prog) {
     interp_program_free((struct interp_program*)prog);
 }
-static struct umbra_program* compile_interp(struct umbra_backend           *be,
-                                            struct umbra_flat_ir const *ir) {
+static struct umbra_program* compile_interp(struct umbra_backend *be,
+                                             struct umbra_flat_ir const *ir) {
     struct interp_program *p = interp_program(ir);
     p->base = (struct umbra_program){
         .queue      = run_interp,
