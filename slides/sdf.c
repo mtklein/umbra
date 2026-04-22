@@ -442,9 +442,9 @@ static void halfplane_animate(struct slide *s, double secs) {
     orbit_compute(&cx, &cy, &ox, &oy, &r_center, &r_orbit,
                    (float)secs, s->w, s->h);
     float const dx = ox - cx, dy = oy - cy;
-    float const len = sqrtf(dx * dx + dy * dy);
-    st->sdf.nx = len > 0 ?  dy / len : 0;
-    st->sdf.ny = len > 0 ? -dx / len : 1;
+    float const mag = sqrtf(dx * dx + dy * dy);
+    st->sdf.nx = mag > 0 ?  dy / mag : 0;
+    st->sdf.ny = mag > 0 ? -dx / mag : 1;
     st->sdf.d  = st->sdf.nx * cx + st->sdf.ny * cy;
 }
 
@@ -882,9 +882,9 @@ static void ngon_animate(struct slide *s, double secs) {
                     wy = st->cy + st->r * sinf(a2);
         float const ex = wx - vx,
                     ey = wy - vy;
-        float const len = sqrtf(ex * ex + ey * ey);
-        float const nx = len > 0 ?  ey / len : 0,
-                    ny = len > 0 ? -ex / len : 1;
+        float const mag = sqrtf(ex * ex + ey * ey);
+        float const nx = mag > 0 ?  ey / mag : 0,
+                    ny = mag > 0 ? -ex / mag : 1;
         st->hp_data[i * 3]     = nx;
         st->hp_data[i * 3 + 1] = ny;
         st->hp_data[i * 3 + 2] = nx * vx + ny * vy;
