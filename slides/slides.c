@@ -76,7 +76,7 @@ struct slide_bg* slide_bg(struct umbra_backend *be, struct umbra_fmt fmt) {
     struct slide_bg *bg = calloc(1, sizeof *bg);
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr   const dst = umbra_bind_buf(b, &bg->dst_buf);
+    umbra_ptr   const dst = umbra_early_bind_buf(b, &bg->dst_buf);
     umbra_val32 const x   = umbra_f32_from_i32(b, umbra_x(b)),
                       y   = umbra_f32_from_i32(b, umbra_y(b));
     umbra_build_draw(b, dst, fmt, x, y,
@@ -110,7 +110,7 @@ struct umbra_builder* slide_draw_builder(struct slide *s,
                                          union transform const *pre) {
     if (s->build_draw || s->build_sdf_draw) {
         struct umbra_builder *b = umbra_builder();
-        umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
+        umbra_ptr const dst_ptr = umbra_early_bind_buf(b, dst);
         umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
                     y = umbra_f32_from_i32(b, umbra_y(b));
         if (pre) {
@@ -130,7 +130,7 @@ static struct umbra_builder* slide_draw_full_builder(struct slide *s,
                                                      struct umbra_fmt fmt,
                                                      union transform const *pre) {
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, dst);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(b, dst);
     umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
                 y = umbra_f32_from_i32(b, umbra_y(b));
     if (pre) {

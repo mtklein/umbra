@@ -70,8 +70,8 @@ static void finish_pipe(struct pipe *p, struct umbra_builder *builder) {
 static void build_fmt_to_fp16(struct pipe *p, int fmt) {
     free_pipe(p);
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const src_ptr = umbra_bind_buf(builder, &p->src_buf),
-                    dst_ptr = umbra_bind_buf(builder, &p->dst_buf);
+    umbra_ptr const src_ptr = umbra_early_bind_buf(builder, &p->src_buf),
+                    dst_ptr = umbra_early_bind_buf(builder, &p->dst_buf);
     umbra_color_val32 c = fmt_enums[fmt]->load(builder, src_ptr);
     umbra_fmt_fp16.store(builder, dst_ptr, c);
     finish_pipe(p, builder);

@@ -31,7 +31,7 @@ struct ir_inst {
 // Programs auto-populate buf[.ix] at dispatch time so callers don't thread
 // these through queue() args.  If buf != NULL, the dispatch reads the current
 // contents of *buf (fully mutable between dispatches).  Otherwise the binding
-// was registered by umbra_bind_uniforms and `uniforms` carries the fixed
+// was registered by umbra_early_bind_uniforms and `uniforms` carries the fixed
 // (slot, slots) snapshot captured at that time.
 struct buffer_binding {
     struct umbra_buf const *buf;

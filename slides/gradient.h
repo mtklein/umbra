@@ -34,7 +34,7 @@ umbra_val32 gradient_radial(void *gradient_radial, struct umbra_builder*,
 // to convert t to a color.  Callers own the state; pass &state as shader_ctx.
 // coords_fn / coords_ctx are baked at IR-emit time -- mutating them after
 // has no effect on a compiled program.  The colors/lut/pos *bytes* still
-// mutate freely via umbra_bind_uniforms.
+// mutate freely via umbra_early_bind_uniforms.
 struct shader_gradient_two_stops {
     gradient_coords *coords_fn;
     void            *coords_ctx;

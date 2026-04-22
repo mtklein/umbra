@@ -20,9 +20,9 @@ static iv eval_binary(umbra_interval (*op)(struct umbra_builder*,
                      hi_buf = {.ptr = &hi_out, .count = 1};
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr const u    = umbra_bind_uniforms(bld, uniforms, 4);
-    umbra_ptr const lop  = umbra_bind_buf(bld, &lo_buf);
-    umbra_ptr const hip  = umbra_bind_buf(bld, &hi_buf);
+    umbra_ptr const u    = umbra_early_bind_uniforms(bld, uniforms, 4);
+    umbra_ptr const lop  = umbra_early_bind_buf(bld, &lo_buf);
+    umbra_ptr const hip  = umbra_early_bind_buf(bld, &hi_buf);
     umbra_interval const ia = {umbra_uniform_32(bld, u, 0),
                                umbra_uniform_32(bld, u, 1)};
     umbra_interval const ib = {umbra_uniform_32(bld, u, 2),
@@ -52,9 +52,9 @@ static iv eval_unary(umbra_interval (*op)(struct umbra_builder*, umbra_interval)
                      hi_buf = {.ptr = &hi_out, .count = 1};
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr const u    = umbra_bind_uniforms(bld, uniforms, 2);
-    umbra_ptr const lop  = umbra_bind_buf(bld, &lo_buf);
-    umbra_ptr const hip  = umbra_bind_buf(bld, &hi_buf);
+    umbra_ptr const u    = umbra_early_bind_uniforms(bld, uniforms, 2);
+    umbra_ptr const lop  = umbra_early_bind_buf(bld, &lo_buf);
+    umbra_ptr const hip  = umbra_early_bind_buf(bld, &hi_buf);
     umbra_interval const ia = {umbra_uniform_32(bld, u, 0),
                                umbra_uniform_32(bld, u, 1)};
     umbra_interval const r = op(bld, ia);
@@ -142,9 +142,9 @@ static iv eval_square(iv a) {
                      hi_buf = {.ptr = &hi_out, .count = 1};
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr const u    = umbra_bind_uniforms(bld, uniforms, 2);
-    umbra_ptr const lop  = umbra_bind_buf(bld, &lo_buf);
-    umbra_ptr const hip  = umbra_bind_buf(bld, &hi_buf);
+    umbra_ptr const u    = umbra_early_bind_uniforms(bld, uniforms, 2);
+    umbra_ptr const lop  = umbra_early_bind_buf(bld, &lo_buf);
+    umbra_ptr const hip  = umbra_early_bind_buf(bld, &hi_buf);
     umbra_interval const ia = {umbra_uniform_32(bld, u, 0),
                                umbra_uniform_32(bld, u, 1)};
     umbra_interval const r = umbra_interval_mul_f32(bld, ia, ia);
@@ -181,9 +181,9 @@ static iv eval_exact_binary(umbra_interval (*op)(struct umbra_builder*,
                      hi_buf = {.ptr = &hi_out, .count = 1};
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr const u    = umbra_bind_uniforms(bld, uniforms, 2);
-    umbra_ptr const lop  = umbra_bind_buf(bld, &lo_buf);
-    umbra_ptr const hip  = umbra_bind_buf(bld, &hi_buf);
+    umbra_ptr const u    = umbra_early_bind_uniforms(bld, uniforms, 2);
+    umbra_ptr const lop  = umbra_early_bind_buf(bld, &lo_buf);
+    umbra_ptr const hip  = umbra_early_bind_buf(bld, &hi_buf);
     umbra_val32 const va = umbra_uniform_32(bld, u, 0),
                       vb = umbra_uniform_32(bld, u, 1);
     umbra_interval const ia = {va, va},
@@ -213,9 +213,9 @@ static iv eval_exact_unary(umbra_interval (*op)(struct umbra_builder*, umbra_int
                      hi_buf = {.ptr = &hi_out, .count = 1};
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr const u    = umbra_bind_uniforms(bld, uniforms, 1);
-    umbra_ptr const lop  = umbra_bind_buf(bld, &lo_buf);
-    umbra_ptr const hip  = umbra_bind_buf(bld, &hi_buf);
+    umbra_ptr const u    = umbra_early_bind_uniforms(bld, uniforms, 1);
+    umbra_ptr const lop  = umbra_early_bind_buf(bld, &lo_buf);
+    umbra_ptr const hip  = umbra_early_bind_buf(bld, &hi_buf);
     umbra_val32 const va = umbra_uniform_32(bld, u, 0);
     umbra_interval const ia = {va, va};
     umbra_interval const r = op(bld, ia);
@@ -276,11 +276,11 @@ TEST(interval_loop) {
                      hi_buf = {.ptr = &hi_out, .count = 1};
 
     struct umbra_builder *bld = umbra_builder();
-    umbra_ptr const u    = umbra_bind_uniforms(bld, &uniforms,
+    umbra_ptr const u    = umbra_early_bind_uniforms(bld, &uniforms,
                                             (int)(sizeof uniforms / 4));
-    umbra_ptr const lop  = umbra_bind_buf(bld, &lo_buf);
-    umbra_ptr const hip  = umbra_bind_buf(bld, &hi_buf);
-    umbra_ptr const data = umbra_bind_buf(bld, &ab_buf);
+    umbra_ptr const lop  = umbra_early_bind_buf(bld, &lo_buf);
+    umbra_ptr const hip  = umbra_early_bind_buf(bld, &hi_buf);
+    umbra_ptr const data = umbra_early_bind_buf(bld, &ab_buf);
     umbra_val32 const n    = umbra_uniform_32(bld, u, n_off);
     umbra_interval const x = {umbra_uniform_32(bld, u, x_off),
                               umbra_uniform_32(bld, u, x_off + 1)};

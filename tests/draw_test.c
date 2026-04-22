@@ -18,7 +18,7 @@ TEST(test_draw_builder_flat_solid) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -56,7 +56,7 @@ TEST(test_solid_src) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -89,7 +89,7 @@ TEST(test_solid_src_n1) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0, 0, 1, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -115,7 +115,7 @@ TEST(test_solid_src_n9) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0, 1, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -142,7 +142,7 @@ TEST(test_solid_src_n16) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 1, 1, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -166,7 +166,7 @@ TEST(test_srcover_8888) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0, 0.5f, 0, 0.5f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -198,7 +198,7 @@ TEST(test_dstover_8888) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -221,7 +221,7 @@ TEST(test_dstover_transparent) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -247,7 +247,7 @@ TEST(test_multiply_8888) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 1, 1, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -279,7 +279,7 @@ TEST(test_solid_src_fp16) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0.25f, 0.5f, 0.75f, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy,
@@ -308,7 +308,7 @@ TEST(test_srcover_fp16) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0, 0.5f, 0, 0.5f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy,
@@ -347,7 +347,7 @@ TEST(test_coverage_rect) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {2.0f, 0.0f, 5.0f, 1.0f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -379,7 +379,7 @@ TEST(test_coverage_rect_scalar) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {1.0f, 0.0f, 3.0f, 1.0f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -409,7 +409,7 @@ TEST(test_coverage_rect_n9) {
     umbra_color color = {0, 1, 0, 1};
     umbra_rect rect = {3.0f, 0.0f, 7.0f, 1.0f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -440,7 +440,7 @@ TEST(test_coverage_rect_offset) {
     umbra_color color = {0, 1, 0, 1};
     umbra_rect rect = {1.0f, 0.0f, 3.0f, 10.0f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -468,7 +468,7 @@ TEST(test_coverage_rect_outside_y) {
     umbra_color color = {1, 1, 1, 1};
     umbra_rect rect = {0.0f, 5.0f, 10.0f, 10.0f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -495,7 +495,7 @@ TEST(test_coverage_rect_outside_y) {
 TEST(test_no_shader) {
     struct umbra_buf dst_slot = {0};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -523,7 +523,7 @@ TEST(test_no_blend) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 1, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -555,7 +555,7 @@ static umbra_color_val32 test_gradient_fn(void *ctx, struct umbra_builder *build
                                           umbra_val32 x, umbra_val32 y) {
     struct test_gradient_state const *self = ctx;
     (void)y;
-    umbra_ptr const u = umbra_bind_uniforms(builder, self, 2);
+    umbra_ptr const u = umbra_early_bind_uniforms(builder, self, 2);
     umbra_val32 const w    = umbra_uniform_32(builder, u, 0),
                       a    = umbra_uniform_32(builder, u, 1),
                       t    = umbra_div_f32(builder, x, w),
@@ -567,7 +567,7 @@ TEST(test_gradient_shader) {
     struct umbra_buf dst_slot = {0};
     struct test_gradient_state state = {.w = 4.0f, .a = 1.0f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -594,7 +594,7 @@ TEST(test_multiply_half_alpha) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 0.5f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -626,7 +626,7 @@ TEST(test_srcover_8888_n9) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 0.5f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -656,7 +656,7 @@ TEST(test_full_pipeline) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {2.0f, 0.0f, 7.0f, 1.0f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -693,7 +693,7 @@ TEST(test_solid_src_fp16_n9) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0.125f, 0.25f, 0.5f, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16, dx, dy,
@@ -723,7 +723,7 @@ TEST(test_coverage_rect_white_dst) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {0, 0, 0, 0};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -771,7 +771,7 @@ TEST(test_coverage_bitmap) {
     uint16_t cov_data[8] = {0, 128, 255, 0, 0, 0, 0, 0};
     struct umbra_buf buf = {.ptr=cov_data, .count=8};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -801,7 +801,7 @@ TEST(test_coverage_bitmap_565) {
     for (int i = 0; i < 16; i++) { cov_data[i] = 255; }
     struct umbra_buf buf = {.ptr=cov_data, .count=16};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_565, dx, dy,
@@ -829,7 +829,7 @@ TEST(test_coverage_sdf) {
     uint16_t cov_data[8] = {0, 100, 128, 200, 255, 0, 0, 0};
     struct umbra_buf buf = {.ptr=cov_data, .count=8};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -859,7 +859,7 @@ TEST(test_coverage_bitmap_matrix) {
     };
     struct umbra_matrix mat = {1, 0, 0, 0, 1, 0, 0, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_point_val32 const p = umbra_transform_perspective(&mat, builder, dx, dy);
@@ -892,7 +892,7 @@ TEST(test_coverage_bitmap_matrix_565) {
     };
     struct umbra_matrix mat = {1, 0, 0, 0, 1, 0, 0, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_point_val32 const p = umbra_transform_perspective(&mat, builder, dx, dy);
@@ -924,7 +924,7 @@ TEST(test_coverage_bitmap_matrix_oob) {
     };
     struct umbra_matrix mat = {1, 0, 0, 0, 1, 0, 0.001f, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_point_val32 const p = umbra_transform_perspective(&mat, builder, dx, dy);
@@ -956,7 +956,7 @@ TEST(test_linear_2) {
         .c1         = (umbra_color){0, 0, 1, 1},
     };
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -990,7 +990,7 @@ TEST(test_radial_2) {
         .c1         = (umbra_color){0, 0, 0, 1},
     };
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -1028,7 +1028,7 @@ TEST(test_linear_grad_evenly_spaced) {
         .colors     = {.ptr=planar, .count=3 * 4},
     };
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -1069,7 +1069,7 @@ TEST(test_radial_grad_evenly_spaced) {
         .colors     = {.ptr=planar, .count=4 * 4},
     };
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -1104,7 +1104,7 @@ TEST(test_linear_stops) {
         .pos        = {.ptr=pos, .count=3},
     };
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -1142,7 +1142,7 @@ TEST(test_linear_stops_fp16_planar) {
         .pos        = {.ptr=pos, .count=3},
     };
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy,
@@ -1175,7 +1175,7 @@ TEST(test_supersample) {
         .samples   = 4,
     };
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -1209,7 +1209,7 @@ TEST(test_page_aligned_buffer) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0, 1, 0, 1};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -1254,8 +1254,8 @@ TEST(test_565_round_trip) {
                      dst_buf = {.ptr=dst, .count=W565};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const sp = umbra_bind_buf(b, &src_buf),
-                      dp = umbra_bind_buf(b, &dst_buf);
+    umbra_ptr const sp = umbra_early_bind_buf(b, &src_buf),
+                      dp = umbra_early_bind_buf(b, &dst_buf);
     umbra_color_val32 c = umbra_load_565(b, sp);
     umbra_store_565(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -1281,8 +1281,8 @@ TEST(test_1010102_round_trip) {
                      dst_buf = {.ptr=dst, .count=7};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const sp = umbra_bind_buf(b, &src_buf),
-                      dp = umbra_bind_buf(b, &dst_buf);
+    umbra_ptr const sp = umbra_early_bind_buf(b, &src_buf),
+                      dp = umbra_early_bind_buf(b, &dst_buf);
     umbra_color_val32 c = umbra_load_1010102(b, sp);
     umbra_store_1010102(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -1306,8 +1306,8 @@ TEST(test_fp16_planar_round_trip) {
                      dst_buf = {.ptr=dst, .count=WP * 4, .stride=WP};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const sp = umbra_bind_buf(b, &src_buf),
-                      dp = umbra_bind_buf(b, &dst_buf);
+    umbra_ptr const sp = umbra_early_bind_buf(b, &src_buf),
+                      dp = umbra_early_bind_buf(b, &dst_buf);
     umbra_color_val32 c = umbra_load_fp16_planar(b, sp);
     umbra_store_fp16_planar(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -1327,7 +1327,7 @@ TEST(test_solid_src_565) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 1};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(b, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(b, umbra_x(b)),
                       dy = umbra_f32_from_i32(b, umbra_y(b));
     umbra_build_draw(b, dst_ptr, umbra_fmt_565, dx, dy,
@@ -1353,7 +1353,7 @@ TEST(test_solid_src_1010102) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0, 1, 0, 1};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(b, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(b, umbra_x(b)),
                       dy = umbra_f32_from_i32(b, umbra_y(b));
     umbra_build_draw(b, dst_ptr, umbra_fmt_1010102, dx, dy,
@@ -1380,7 +1380,7 @@ TEST(test_solid_src_fp16_planar) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0, 0, 1, 1};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(b, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(b, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(b, umbra_x(b)),
                       dy = umbra_f32_from_i32(b, umbra_y(b));
     umbra_build_draw(b, dst_ptr, umbra_fmt_fp16_planar, dx, dy,
@@ -1427,7 +1427,7 @@ static void coverage_rect_tail_matrix_case(int W, int H) {
             umbra_color color = {1, 0, 0, 1};
             umbra_rect  rect  = {l, 0.0f, r, (float)H};
             struct umbra_builder *builder = umbra_builder();
-            umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+            umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
             umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                               dy = umbra_f32_from_i32(builder, umbra_y(builder));
             umbra_build_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -1476,7 +1476,7 @@ TEST(test_coverage_rect_tail_srcover_fp16_planar) {
     umbra_color color = {1, 0, 0, 1};
     umbra_rect rect = {8.0f, 1.0f, 18.0f, 3.0f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy,
@@ -1513,7 +1513,7 @@ TEST(test_srcover_fp16_planar) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {0, 0.5f, 0, 0.5f};
     struct umbra_builder *builder = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_early_bind_buf(builder, &dst_slot);
     umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
                       dy = umbra_f32_from_i32(builder, umbra_y(builder));
     umbra_build_draw(builder, dst_ptr, umbra_fmt_fp16_planar, dx, dy,
@@ -1544,7 +1544,7 @@ TEST(test_srcover_fp16_planar) {
 static umbra_interval test_rect_fn(void *ctx, struct umbra_builder *b,
                                     umbra_interval x, umbra_interval y) {
     umbra_rect const *self = ctx;
-    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
     umbra_interval const l  = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
                          t  = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
                          r  = umbra_interval_exact(umbra_uniform_32(b, u, 2)),
@@ -1574,7 +1574,7 @@ TEST(test_sdf_dispatch_rect) {
 
             // Draw program on the target backend.
             struct umbra_builder *db = umbra_builder();
-            umbra_ptr   const dst_ptr = umbra_bind_buf(db, &dst_slot);
+            umbra_ptr   const dst_ptr = umbra_early_bind_buf(db, &dst_slot);
             umbra_val32 const dx = umbra_f32_from_i32(db, umbra_x(db)),
                               dy = umbra_f32_from_i32(db, umbra_y(db));
             umbra_build_sdf_draw(db, dst_ptr, umbra_fmt_8888, dx, dy,
@@ -1634,7 +1634,7 @@ struct test_circle_state {
 static umbra_interval test_circle_fn(void *ctx, struct umbra_builder *b,
                                       umbra_interval x, umbra_interval y) {
     struct test_circle_state const *self = ctx;
-    umbra_ptr const u = umbra_bind_uniforms(b, self, 3);
+    umbra_ptr const u = umbra_early_bind_uniforms(b, self, 3);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
                          cy = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
                          r  = umbra_interval_exact(umbra_uniform_32(b, u, 2));
@@ -1662,7 +1662,7 @@ TEST(test_sdf_dispatch_tiling) {
 
     // Tiled draw program.
     struct umbra_builder *db = umbra_builder();
-    umbra_ptr   const td_dst = umbra_bind_buf(db, &tiled_dst_slot);
+    umbra_ptr   const td_dst = umbra_early_bind_buf(db, &tiled_dst_slot);
     umbra_val32 const tx     = umbra_f32_from_i32(db, umbra_x(db)),
                       ty     = umbra_f32_from_i32(db, umbra_y(db));
     umbra_build_sdf_draw(db, td_dst, umbra_fmt_8888, tx, ty,
@@ -1681,7 +1681,7 @@ TEST(test_sdf_dispatch_tiling) {
 
     // Flat reference: same shader+coverage, no tiling.
     struct umbra_builder *fb = umbra_builder();
-    umbra_ptr   const fdst = umbra_bind_buf(fb, &flat_dst_slot);
+    umbra_ptr   const fdst = umbra_early_bind_buf(fb, &flat_dst_slot);
     umbra_val32 const fx   = umbra_f32_from_i32(fb, umbra_x(fb)),
                       fy   = umbra_f32_from_i32(fb, umbra_y(fb));
     umbra_build_sdf_draw(fb, fdst, umbra_fmt_8888, fx, fy,
@@ -1738,9 +1738,9 @@ TEST(test_metal_loop_gather) {
     struct umbra_buf out_buf = {.ptr = &out, .count = 1};
 
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const u    = umbra_bind_uniforms(b, &uniforms, (int)(sizeof uniforms / 4));
-    umbra_ptr const dst  = umbra_bind_buf(b, &out_buf);
-    umbra_ptr const data = umbra_bind_buf(b, &arr_buf);
+    umbra_ptr const u    = umbra_early_bind_uniforms(b, &uniforms, (int)(sizeof uniforms / 4));
+    umbra_ptr const dst  = umbra_early_bind_buf(b, &out_buf);
+    umbra_ptr const data = umbra_early_bind_buf(b, &arr_buf);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_slot);
 
     umbra_var32 sum = umbra_declare_var32(b);

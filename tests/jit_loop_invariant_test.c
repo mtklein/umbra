@@ -31,7 +31,7 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
 static umbra_interval two_circle_union(void *ctx, struct umbra_builder *b,
                                        umbra_interval x, umbra_interval y) {
     struct two_circle const *self = ctx;
-    umbra_ptr const u = umbra_bind_uniforms(b, self, 6);
+    umbra_ptr const u = umbra_early_bind_uniforms(b, self, 6);
     umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
                          cy1 = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
                          r1  = umbra_interval_exact(umbra_uniform_32(b, u, 2)),

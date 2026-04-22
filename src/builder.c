@@ -125,7 +125,7 @@ static int bind_buf(builder *b, struct umbra_buf const *buf) {
     return ix;
 }
 
-umbra_ptr umbra_bind_uniforms(builder *b, void const *slot, int slots) {
+umbra_ptr umbra_early_bind_uniforms(builder *b, void const *slot, int slots) {
     assume(((uintptr_t)slot & 3u) == 0);
     assume(slots >= 0);
     int const ix = reserve_binding(b);
@@ -137,7 +137,7 @@ umbra_ptr umbra_bind_uniforms(builder *b, void const *slot, int slots) {
     return (umbra_ptr){.ix = ix};
 }
 
-umbra_ptr umbra_bind_buf(builder *b, struct umbra_buf const *buf) {
+umbra_ptr umbra_early_bind_buf(builder *b, struct umbra_buf const *buf) {
     return (umbra_ptr){.ix = bind_buf(b, buf)};
 }
 

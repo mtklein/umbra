@@ -49,8 +49,8 @@ struct umbra_buf {
     int   count;
     int   stride;
 };
-umbra_ptr umbra_bind_buf     (struct umbra_builder*, struct umbra_buf const*);
-umbra_ptr umbra_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
+umbra_ptr umbra_early_bind_buf     (struct umbra_builder*, struct umbra_buf const*);
+umbra_ptr umbra_early_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
 
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
