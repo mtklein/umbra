@@ -355,13 +355,12 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
               yt = (b - t + T - 1) / T,
               tiles = xt * yt;
 
-    uint8_t    *cov      = calloc((size_t)tiles, sizeof *cov);
-    float const uniforms[4] = {(float)l, (float)t, (float)T, (float)T};
+    uint8_t *cov = calloc((size_t)tiles, sizeof *cov);
+    float const uniforms[] = {(float)l, (float)t, (float)T, (float)T};
+
     struct umbra_late_binding const bounds_late[] = {
-        {.ptr = bounds->cov_ptr,
-         .buf = {.ptr = cov, .count = tiles, .stride = xt}},
-        {.ptr      = bounds->uniform_ptr,
-         .uniforms = uniforms},
+        {.ptr = bounds->cov_ptr    , .buf = {.ptr = cov, .count = tiles, .stride = xt}},
+        {.ptr = bounds->uniform_ptr, .uniforms = uniforms},
     };
     bounds->prog->queue(bounds->prog, 0, 0, xt, yt, bounds_late, count(bounds_late));
     uint8_t const *c = cov;
