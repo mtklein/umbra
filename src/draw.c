@@ -345,7 +345,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
                         int l, int t, int r, int b,
-                        int lates, struct umbra_late_binding const *late) {
+                        struct umbra_late_binding const *late, int lates) {
     if (!draw_partial->backend->program_switch_is_cheap) {
         draw_full = draw_partial;
     }
@@ -363,7 +363,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
         {.ptr      = bounds->uniform_ptr,
          .uniforms = uniforms},
     };
-    bounds->prog->queue(bounds->prog, 0, 0, xt, yt, count(bounds_late), bounds_late);
+    bounds->prog->queue(bounds->prog, 0, 0, xt, yt, bounds_late, count(bounds_late));
     uint16_t const *c = cov;
 
     // We coalesce horizontally adjacent tiles into runs, breaking when the
@@ -385,7 +385,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                 if (run_prog) {
                     int const tl = l + run_start * T,
                               tr = l + tx * T < r ? l + tx * T : r;
-                    run_prog->queue(run_prog, tl, tt, tr, tb, lates, late);
+                    run_prog->queue(run_prog, tl, tt, tr, tb, late, lates);
                 }
                 run_start = tx;
                 run_prog  = prog;

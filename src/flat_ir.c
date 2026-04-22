@@ -32,7 +32,7 @@ _Bool flat_ir_has_early_writes(struct umbra_flat_ir const *ir) {
 
 void resolve_bindings(struct umbra_buf *out,
                       struct buffer_binding const *binding, int bindings,
-                      int lates, struct umbra_late_binding const *late) {
+                      struct umbra_late_binding const *late, int lates) {
     for (int i = 0; i < bindings; i++) {
         struct buffer_binding const *bb = &binding[i];
         if      (bb->kind == BIND_EARLY_BUF)      { out[bb->ix] = *bb->buf; }

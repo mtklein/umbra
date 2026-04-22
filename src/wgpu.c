@@ -460,7 +460,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
 
 static void wgpu_program_queue(struct umbra_program *prog,
                                int l, int t, int r, int b,
-                               int lates, struct umbra_late_binding const *late) {
+                               struct umbra_late_binding const *late, int lates) {
     struct wgpu_program *p  = (struct wgpu_program *)prog;
     struct wgpu_backend *be = p->be;
 
@@ -468,7 +468,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
 
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    resolve_bindings(buf, p->binding, p->bindings, lates, late);
+    resolve_bindings(buf, p->binding, p->bindings, late, lates);
 
     begin_batch(be);
 

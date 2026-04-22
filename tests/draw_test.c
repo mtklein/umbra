@@ -1596,7 +1596,7 @@ TEST(test_sdf_dispatch_rect) {
             uint32_t dst[W * H];
             __builtin_memset(dst, 0, sizeof dst);
             dst_slot = (struct umbra_buf){.ptr = dst, .count = W * H, .stride = W};
-            umbra_sdf_dispatch(bounds, draw, draw, 0, 0, W, H, 0, NULL);
+            umbra_sdf_dispatch(bounds, draw, draw, 0, 0, W, H, NULL, 0);
             bes[bi]->flush(bes[bi]);
 
             for (int y = 0; y < H; y++) {
@@ -1698,10 +1698,10 @@ TEST(test_sdf_dispatch_tiling) {
     uint32_t *flat_buf  = calloc(W * H, sizeof *flat_buf);
 
     tiled_dst_slot = (struct umbra_buf){.ptr = tiled_buf, .count = W * H, .stride = W};
-    umbra_sdf_dispatch(bounds, tiled, tiled, 0, 0, W, H, 0, NULL);
+    umbra_sdf_dispatch(bounds, tiled, tiled, 0, 0, W, H, NULL, 0);
 
     flat_dst_slot = (struct umbra_buf){.ptr = flat_buf, .count = W * H, .stride = W};
-    flat->queue(flat, 0, 0, W, H, 0, NULL);
+    flat->queue(flat, 0, 0, W, H, NULL, 0);
 
     be->flush(be);
 
@@ -1755,7 +1755,7 @@ struct sdf_fire_ctx {
 static void sdf_fire(void *v) {
     struct sdf_fire_ctx *c = v;
     *c->dst_slot = (struct umbra_buf){.ptr = c->dst, .count = c->W * c->H, .stride = c->W};
-    umbra_sdf_dispatch(c->bounds, c->draw, c->draw, 0, 0, c->W, c->H, 0, NULL);
+    umbra_sdf_dispatch(c->bounds, c->draw, c->draw, 0, 0, c->W, c->H, NULL, 0);
 }
 
 static void sdf_thread_safety_for(struct umbra_backend *be) {
@@ -1841,7 +1841,7 @@ struct strip_fire_ctx {
 };
 static void strip_fire(void *v) {
     struct strip_fire_ctx *c = v;
-    c->p->queue(c->p, c->l, c->t, c->r, c->b, 0, NULL);
+    c->p->queue(c->p, c->l, c->t, c->r, c->b, NULL, 0);
 }
 
 static void draw_thread_safety_for(struct umbra_backend *be) {
@@ -1869,7 +1869,7 @@ static void draw_thread_safety_for(struct umbra_backend *be) {
 
     uint32_t *baseline = calloc(W * H, sizeof *baseline);
     dst_slot.ptr = baseline;
-    p->queue(p, 0, 0, W, H, 0, NULL);
+    p->queue(p, 0, 0, W, H, NULL, 0);
     be->flush(be);
 
     // N threads, disjoint y-strips, all dispatching against the shared
@@ -1956,7 +1956,7 @@ TEST(test_metal_loop_gather) {
         if (bes[bi]) {
             struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
             out = 0;
-            prog->queue(prog, 0, 0, 1, 1, 0, NULL);
+            prog->queue(prog, 0, 0, 1, 1, NULL, 0);
             bes[bi]->flush(bes[bi]);
             equiv(out, 60.0f) here;
             umbra_program_free(prog);

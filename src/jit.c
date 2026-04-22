@@ -90,10 +90,10 @@ void jit_release_code_buf(struct jit_backend *be, void *mem, size_t size) {
 }
 
 static void run_jit(struct umbra_program *prog, int l, int t, int r, int b,
-                    int lates, struct umbra_late_binding const *late) {
+                    struct umbra_late_binding const *late, int lates) {
     struct jit_program *j = (struct jit_program*)prog;
     struct umbra_buf buf[32];
-    resolve_bindings(buf, j->binding, j->bindings, lates, late);
+    resolve_bindings(buf, j->binding, j->bindings, late, lates);
     jit_program_run(j, l, t, r, b, buf);
 }
 

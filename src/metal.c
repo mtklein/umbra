@@ -1249,7 +1249,7 @@ static void encode_dispatch(
 static void metal_submit_cmdbuf(struct metal_backend *be);
 
 static void metal_program_queue(struct metal_program *p, int l, int t, int r, int b,
-                                int lates, struct umbra_late_binding const *late) {
+                                struct umbra_late_binding const *late, int lates) {
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
 
@@ -1257,7 +1257,7 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
 
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    resolve_bindings(buf, p->binding, p->bindings, lates, late);
+    resolve_bindings(buf, p->binding, p->bindings, late, lates);
 
     void *pool = objc_autoreleasePoolPush();
     {
@@ -1324,8 +1324,8 @@ static void metal_program_dump(
 }
 
 static void run_metal(struct umbra_program *prog, int l, int t, int r, int b,
-                      int lates, struct umbra_late_binding const *late) {
-    metal_program_queue((struct metal_program*)prog, l, t, r, b, lates, late);
+                      struct umbra_late_binding const *late, int lates) {
+    metal_program_queue((struct metal_program*)prog, l, t, r, b, late, lates);
 }
 static void dump_metal(struct umbra_program const *prog, FILE *f) {
     metal_program_dump((struct metal_program const*)prog, f);

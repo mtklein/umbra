@@ -141,7 +141,7 @@ TEST(test_perspective_text) {
     }
 
     dst_slot = (struct umbra_buf){.ptr=pixels, .count=BW};
-    interp->queue(interp, 0, 0, BW, 1, 0, NULL);
+    interp->queue(interp, 0, 0, BW, 1, NULL, 0);
     be->flush(be);
 
     pixels[8] == 0xffffffff here;
@@ -181,7 +181,7 @@ TEST(test_perspective_text) {
     }
     {
         dst_slot = (struct umbra_buf){.ptr=px2, .count=W * H, .stride=W};
-        interp->queue(interp, 0, 0, W, H, 0, NULL);
+        interp->queue(interp, 0, 0, W, H, NULL, 0);
         be->flush(be);
     }
     int changed = 0;
@@ -239,7 +239,7 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         int const N = 12000;
         for (int i = 0; i < N; i++) {
             color.r = (float)((i & 0xff) / 255.0f);
-            p->queue(p, 0, 0, 1, 1, 0, NULL);
+            p->queue(p, 0, 0, 1, 1, NULL, 0);
         }
         be->flush(be);
 
@@ -295,11 +295,11 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
             for (int i = 0; i < BW * BH; i++) { data[i] = sentinel; }
 
             __builtin_memset(data, 0, half_sz);
-            p->queue(p, 0, 0, BW, BH / 2, 0, NULL);
+            p->queue(p, 0, 0, BW, BH / 2, NULL, 0);
             be->flush(be);
 
             __builtin_memset((char *)data + half_sz, 0, half_sz);
-            p->queue(p, 0, BH / 2, BW, BH, 0, NULL);
+            p->queue(p, 0, BH / 2, BW, BH, NULL, 0);
             be->flush(be);
 
             for (int i = 0; i < BW * BH; i++) {
@@ -353,7 +353,7 @@ TEST(test_wgpu_misc) {
         p->dump(p, devnull);
         fclose(devnull);
 
-        p->queue(p, 0, 0, 1, 1, 0, NULL);
+        p->queue(p, 0, 0, 1, 1, NULL, 0);
         be->flush(be);
 
         (pixel & 0xff)   == 0xff here;

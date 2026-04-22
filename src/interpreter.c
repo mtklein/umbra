@@ -475,10 +475,10 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 }
 
 static void interp_program_run(struct interp_program *p, int l, int t, int r, int b,
-                               int lates, struct umbra_late_binding const *late) {
+                               struct umbra_late_binding const *late, int lates) {
     assume(p->ptrs <= 64);
     struct umbra_buf buf[64];
-    resolve_bindings(buf, p->binding, p->bindings, lates, late);
+    resolve_bindings(buf, p->binding, p->bindings, late, lates);
 
     // TODO: thread-local cached scratch would save two mallocs per dispatch
     // on CPU-heavy workloads; fine for now since interp is already slow.
@@ -1290,8 +1290,8 @@ static void interp_program_free(struct interp_program *p) {
 }
 
 static void run_interp(struct umbra_program *prog, int l, int t, int r, int b,
-                       int lates, struct umbra_late_binding const *late) {
-    interp_program_run((struct interp_program*)prog, l, t, r, b, lates, late);
+                       struct umbra_late_binding const *late, int lates) {
+    interp_program_run((struct interp_program*)prog, l, t, r, b, late, lates);
 }
 static void free_interp(struct umbra_program *prog) {
     interp_program_free((struct interp_program*)prog);

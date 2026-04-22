@@ -44,9 +44,9 @@ struct umbra_buf {
     int   stride;
 };
 umbra_ptr umbra_early_bind_buf     (struct umbra_builder*, struct umbra_buf const*);
-umbra_ptr umbra_early_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
 umbra_ptr umbra_late_bind_buf      (struct umbra_builder*);
-umbra_ptr umbra_late_bind_uniforms (struct umbra_builder*, int slots);
+umbra_ptr umbra_early_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
+umbra_ptr umbra_late_bind_uniforms (struct umbra_builder*,                         int slots);
 
 struct umbra_late_binding {
     umbra_ptr ptr; int :32;
@@ -58,11 +58,10 @@ struct umbra_late_binding {
 
 struct umbra_program {
     void (*queue)(struct umbra_program*, int l, int t, int r, int b,
-                  int lates, struct umbra_late_binding const*);
+                  struct umbra_late_binding const[], int late_bindings);
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
-    // Set by CPU backends iff the IR stores only to late bindings.  GPU backends leave it 0.
     _Bool                 queue_is_threadsafe; int :24,:32;
 };
 void umbra_program_free(struct umbra_program*);

@@ -186,13 +186,13 @@ static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double 
 static void readback_row(void *dst, void *src, int n) {
     readback_pipe.src_buf = (struct umbra_buf){.ptr=src, .count=n};
     readback_pipe.dst_buf = (struct umbra_buf){.ptr=dst, .count=n};
-    readback_pipe.program->queue(readback_pipe.program, 0, 0, n, 1, 0, NULL);
+    readback_pipe.program->queue(readback_pipe.program, 0, 0, n, 1, NULL, 0);
 }
 
 static void to_hdr_row(__fp16 *dst, void *src, int n) {
     hdr_pipe.src_buf = (struct umbra_buf){.ptr=src, .count=n};
     hdr_pipe.dst_buf = (struct umbra_buf){.ptr=dst, .count=n};
-    hdr_pipe.program->queue(hdr_pipe.program, 0, 0, n, 1, 0, NULL);
+    hdr_pipe.program->queue(hdr_pipe.program, 0, 0, n, 1, NULL, 0);
 }
 
 struct tile_work {
@@ -400,7 +400,7 @@ int main(void) {
                 readback_pipe.dst_buf = (struct umbra_buf){
                     .ptr = rows + y * tex_pitch, .count = W,
                 };
-                readback_pipe.program->queue(readback_pipe.program, 0, y, W, y + 1, 0, NULL);
+                readback_pipe.program->queue(readback_pipe.program, 0, y, W, y + 1, NULL, 0);
             }
         } else {
             for (int y = 0; y < H; y++) {
@@ -419,7 +419,7 @@ int main(void) {
                     hdr_pipe.dst_buf = (struct umbra_buf){
                         .ptr = hdata + y * W * 4, .count = W,
                     };
-                    hdr_pipe.program->queue(hdr_pipe.program, 0, y, W, y + 1, 0, NULL);
+                    hdr_pipe.program->queue(hdr_pipe.program, 0, y, W, y + 1, NULL, 0);
                 }
             } else {
                 for (int y = 0; y < H; y++) {

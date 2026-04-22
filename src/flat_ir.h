@@ -51,7 +51,7 @@ _Bool binding_is_uniform(enum binding_kind);
 
 void resolve_bindings(struct umbra_buf *out,
                       struct buffer_binding const *binding, int bindings,
-                      int lates, struct umbra_late_binding const *late);
+                      struct umbra_late_binding const *late, int lates);
 
 // True iff the IR stores to any early-bound buffer.  Used to tag compiled
 // programs as thread-safe (along with the backend's own threadsafe bit).

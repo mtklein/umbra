@@ -261,7 +261,7 @@ static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
 
 static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
-                             int lates, struct umbra_late_binding const *late) {
+                             struct umbra_late_binding const *late, int lates) {
     struct vk_program *vp = (struct vk_program *)p;
     struct vk_backend *be = vp->be;
 
@@ -270,7 +270,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     assume(vp->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    resolve_bindings(buf, vp->binding, vp->bindings, lates, late);
+    resolve_bindings(buf, vp->binding, vp->bindings, late, lates);
 
     double const encode_t0 = now();
     begin_batch(be);
