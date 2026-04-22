@@ -3,6 +3,7 @@
 #include "../slides/gradient.h"
 #include "../src/count.h"
 #include "test.h"
+#include <pthread.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -1715,6 +1716,97 @@ TEST(test_sdf_dispatch_tiling) {
     free(tiled_buf);
     umbra_program_free(flat);
     umbra_program_free(tiled);
+    umbra_sdf_bounds_program_free(bounds);
+    umbra_backend_free(be);
+}
+
+struct sdf_race_ctx {
+    struct umbra_sdf_bounds_program *bounds;
+    struct umbra_program            *draw;
+    struct umbra_buf                *dst_slot;
+    uint32_t                        *dst;
+    uint32_t const                  *baseline;
+    int                              W, H, iters, mismatches;
+};
+
+static void* sdf_race_worker(void *v) {
+    struct sdf_race_ctx *c = v;
+    for (int it = 0; it < c->iters; it++) {
+        __builtin_memset(c->dst, 0, (size_t)c->W * (size_t)c->H * sizeof *c->dst);
+        *c->dst_slot = (struct umbra_buf){.ptr = c->dst, .count = c->W * c->H, .stride = c->W};
+        umbra_sdf_dispatch(c->bounds, c->draw, c->draw, 0, 0, c->W, c->H);
+        for (int p = 0; p < c->W * c->H; p++) {
+            if (c->dst[p] != c->baseline[p]) { c->mismatches++; }
+        }
+    }
+    return NULL;
+}
+
+TEST(test_sdf_dispatch_thread_safety) {
+    enum { W = 256, H = 256, N_THREADS = 4, ITERS = 8 };
+
+    struct test_circle_state sdf   = {.cx = 128, .cy = 128, .r = 64};
+    umbra_color              color = {1, 0, 0, 1};
+
+    struct umbra_backend *be = umbra_backend_jit();
+    if (!be) { be = umbra_backend_interp(); }
+
+    struct umbra_builder *bb = umbra_builder();
+    struct umbra_sdf_bounds_program *bounds =
+        umbra_sdf_bounds_program(bb, NULL, test_circle_fn, &sdf);
+    umbra_builder_free(bb);
+
+    // Per-thread draw program + dst slot so the draw side isn't also racing.
+    struct umbra_program *draw[N_THREADS];
+    struct umbra_buf      dst_slot[N_THREADS] = {{0}};
+    uint32_t             *dst[N_THREADS];
+    for (int i = 0; i < N_THREADS; i++) {
+        struct umbra_builder *db = umbra_builder();
+        umbra_ptr   const dp = umbra_early_bind_buf(db, &dst_slot[i]);
+        umbra_val32 const dx = umbra_f32_from_i32(db, umbra_x(db)),
+                          dy = umbra_f32_from_i32(db, umbra_y(db));
+        umbra_build_sdf_draw(db, dp, umbra_fmt_8888, dx, dy,
+                             test_circle_fn,      &sdf,
+                             umbra_shader_color,  &color,
+                             umbra_blend_srcover, NULL);
+        struct umbra_flat_ir *ir = umbra_flat_ir(db);
+        umbra_builder_free(db);
+        draw[i] = be->compile(be, ir);
+        umbra_flat_ir_free(ir);
+        dst[i] = calloc(W * H, sizeof *dst[i]);
+    }
+
+    // Serial baseline on thread 0.
+    uint32_t *baseline = calloc(W * H, sizeof *baseline);
+    dst_slot[0] = (struct umbra_buf){.ptr = baseline, .count = W * H, .stride = W};
+    umbra_sdf_dispatch(bounds, draw[0], draw[0], 0, 0, W, H);
+    be->flush(be);
+
+    // Concurrent dispatches -- each thread should produce an identical dst.
+    pthread_t           th [N_THREADS];
+    struct sdf_race_ctx ctx[N_THREADS];
+    for (int i = 0; i < N_THREADS; i++) {
+        ctx[i] = (struct sdf_race_ctx){
+            .bounds = bounds, .draw = draw[i],
+            .dst_slot = &dst_slot[i], .dst = dst[i],
+            .baseline = baseline, .W = W, .H = H, .iters = ITERS,
+        };
+        pthread_create(&th[i], NULL, sdf_race_worker, &ctx[i]);
+    }
+    for (int i = 0; i < N_THREADS; i++) {
+        pthread_join(th[i], NULL);
+    }
+    be->flush(be);
+
+    for (int i = 0; i < N_THREADS; i++) {
+        ctx[i].mismatches == 0 here;
+    }
+
+    free(baseline);
+    for (int i = 0; i < N_THREADS; i++) {
+        free(dst[i]);
+        umbra_program_free(draw[i]);
+    }
     umbra_sdf_bounds_program_free(bounds);
     umbra_backend_free(be);
 }

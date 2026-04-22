@@ -1,6 +1,7 @@
 #include "../include/umbra_draw.h"
 
 #include "assume.h"
+#include "count.h"
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -242,26 +243,20 @@ enum umbra_sdf_tile {
 struct umbra_sdf_bounds_program {
     struct umbra_backend *be;   // owned; freed in umbra_sdf_bounds_program_free()
     struct umbra_program *prog;
-    struct umbra_buf      cov_buf;
-    uint16_t             *cov;
-    int                   cov_cap, :32;
-    // base_x/base_y/tile_w/tile_h sit contiguously so the bounds program can
-    // bind them as a 4-slot uniform block via &base_x.  Dispatch fills these
-    // in each call.
-    float                 base_x, base_y,
-                          tile_w, tile_h;
+    umbra_ptr             cov_ptr;      // late-bound cov buffer
+    umbra_ptr             uniform_ptr;  // late-bound {base_x, base_y, tile_w, tile_h}
 };
 
 // Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()), sourced from
-// the bounds program's grid uniforms.
+// a 4-slot uniform block supplied per dispatch by umbra_sdf_dispatch.
 static void sdf_tile_intervals(struct umbra_builder *bb,
                                struct umbra_sdf_bounds_program *bounds,
                                umbra_interval *ix, umbra_interval *iy) {
-    umbra_ptr const g = umbra_early_bind_uniforms(bb, &bounds->base_x, 4);
-    umbra_val32 const base_x = umbra_uniform_32(bb, g, 0),
-                      base_y = umbra_uniform_32(bb, g, 1),
-                      tile_w = umbra_uniform_32(bb, g, 2),
-                      tile_h = umbra_uniform_32(bb, g, 3);
+    bounds->uniform_ptr = umbra_late_bind_uniforms(bb, 4);
+    umbra_val32 const base_x = umbra_uniform_32(bb, bounds->uniform_ptr, 0),
+                      base_y = umbra_uniform_32(bb, bounds->uniform_ptr, 1),
+                      tile_w = umbra_uniform_32(bb, bounds->uniform_ptr, 2),
+                      tile_h = umbra_uniform_32(bb, bounds->uniform_ptr, 3);
     umbra_val32 const xf = umbra_f32_from_i32(bb, umbra_x(bb)),
                       yf = umbra_f32_from_i32(bb, umbra_y(bb));
     umbra_val32 const one = umbra_imm_f32(bb, 1.0f);
@@ -302,7 +297,7 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *
                                                           umbra_sdf sdf_fn, void *sdf_ctx) {
     struct umbra_sdf_bounds_program *bounds = calloc(1, sizeof *bounds);
 
-    umbra_ptr const cov = umbra_early_bind_buf(b, &bounds->cov_buf);
+    bounds->cov_ptr = umbra_late_bind_buf(b);
     umbra_interval x, y;
     sdf_tile_intervals(b, bounds, &x, &y);
     if (transform) {
@@ -326,7 +321,7 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *
                       full    = umbra_lt_f32(b, f.hi, zero_f);
     umbra_val32 const base = umbra_sel_32(b, partial, partial_i, none_i);
     umbra_val32 const tri  = umbra_sel_32(b, full,    full_i,    base);
-    umbra_store_16(b, cov, umbra_i16_from_i32(b, tri));
+    umbra_store_16(b, bounds->cov_ptr, umbra_i16_from_i32(b, tri));
 
     // Snapshot + compile internally.  Leave `b` alive; caller owns its
     // lifetime and may inspect/dump/recompile after this returns.
@@ -342,27 +337,10 @@ void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
     if (b) {
         umbra_program_free(b->prog);
         umbra_backend_free(b->be);
-        free(b->cov);
         free(b);
     }
 }
 
-// TODO: umbra_sdf_dispatch is not thread-safe.  The bounds program's
-// uniforms (base_x/y/tile_w/h) and cov buffer are mutable state on the
-// shared `bounds` struct, and the compiled bounds program has its
-// bindings baked to point into that struct.  Two threads calling this
-// concurrently race on the realloc, trample each other's uniforms, and
-// overwrite cov[] before reading it back.
-//
-// Two possible fixes:
-//   (a) Expose a binding-override mechanism on queue() so callers can
-//       pass thread-local umbra_buf pointers per call.  Public API keeps
-//       its "queue_is_threadsafe" promise; caller shoulders the scratch
-//       allocation.
-//   (b) Drop the external thread-safety promise for umbra_sdf_dispatch
-//       and have it manage its own worker pool / per-thread scratch
-//       internally.  Narrower API change, limits parallelism to what
-//       we know how to manage.
 void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
@@ -377,20 +355,16 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
               yt = (b - t + T - 1) / T,
               tiles = xt * yt;
 
-    if (tiles > bounds->cov_cap) {
-        bounds->cov     = realloc(bounds->cov, (size_t)tiles * sizeof *bounds->cov);
-        bounds->cov_cap = tiles;
-    }
-    bounds->base_x = (float)l;
-    bounds->base_y = (float)t;
-    bounds->tile_w = (float)T;
-    bounds->tile_h = (float)T;
-    bounds->cov_buf = (struct umbra_buf){
-        .ptr = bounds->cov, .count = tiles, .stride = xt,
+    uint16_t   *cov      = calloc((size_t)tiles, sizeof *cov);
+    float const uniforms[4] = {(float)l, (float)t, (float)T, (float)T};
+    struct umbra_late_binding const lates[] = {
+        {.ptr = bounds->cov_ptr,
+         .buf = {.ptr = cov, .count = tiles, .stride = xt}},
+        {.ptr      = bounds->uniform_ptr,
+         .uniforms = uniforms},
     };
-    __builtin_memset(bounds->cov, 0, (size_t)tiles * sizeof *bounds->cov);
-    bounds->prog->queue(bounds->prog, 0, 0, xt, yt, 0, NULL);
-    uint16_t const *c = bounds->cov;
+    bounds->prog->queue(bounds->prog, 0, 0, xt, yt, count(lates), lates);
+    uint16_t const *c = cov;
 
     // We coalesce horizontally adjacent tiles into runs, breaking when the
     // draw program changes (partial vs full vs NONE).  Each run becomes one
@@ -418,6 +392,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
             }
         }
     }
+    free(cov);
 }
 
 umbra_color_val32 umbra_shader_color(void *ctx, struct umbra_builder *b,
