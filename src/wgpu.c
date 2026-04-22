@@ -778,12 +778,10 @@ struct umbra_backend* umbra_backend_wgpu(void) {
         .ctx = be,
     };
     be->base = (struct umbra_backend){
-        .compile        = wgpu_compile_fn,
-        .flush          = wgpu_flush,
-        .free           = (void (*)(struct umbra_backend *))wgpu_free,
-        .stats          = wgpu_stats,
-        .queue_is_cheap          = 0,
-        .program_switch_is_cheap = 0,
+        .compile = wgpu_compile_fn,
+        .flush   = wgpu_flush,
+        .free    = (void (*)(struct umbra_backend *))wgpu_free,
+        .stats   = wgpu_stats,
     };
 
     be->uni_pool = (struct uniform_ring_pool){

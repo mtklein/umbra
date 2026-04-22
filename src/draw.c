@@ -350,7 +350,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
         draw_full = draw_partial;
     }
 
-    int const T = draw_partial->backend->queue_is_cheap ? 8 : 64,
+    int const T = draw_partial->backend->program_queue_is_cheap ? 8 : 64,
               xt = (r - l + T - 1) / T,
               yt = (b - t + T - 1) / T,
               tiles = xt * yt;

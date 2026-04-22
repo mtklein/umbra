@@ -835,12 +835,10 @@ struct umbra_backend* umbra_backend_vulkan(void) {
         VkFenceCreateInfo fi = { .sType=VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
         vkCreateFence(device, &fi, 0, &v->frame_fences[i]);
     }
-    v->base.compile        = vk_compile;
-    v->base.flush          = vk_flush;
-    v->base.free           = vk_free;
-    v->base.stats          = vk_stats;
-    v->base.queue_is_cheap           = 0;
-    v->base.program_switch_is_cheap  = 0;
+    v->base.compile = vk_compile;
+    v->base.flush   = vk_flush;
+    v->base.free    = vk_free;
+    v->base.stats   = vk_stats;
     return &v->base;
 }
 

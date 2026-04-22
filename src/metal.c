@@ -1368,12 +1368,10 @@ struct umbra_backend* umbra_backend_metal(void) {
     struct metal_backend *mbe = metal_backend_create();
     if (mbe) {
         mbe->base = (struct umbra_backend){
-            .compile        = compile_metal,
-            .flush          = flush_be_metal,
-            .free           = free_be_metal,
-            .stats          = stats_metal,
-            .queue_is_cheap       = 0,
-            .program_switch_is_cheap = 0,
+            .compile = compile_metal,
+            .flush   = flush_be_metal,
+            .free    = free_be_metal,
+            .stats   = stats_metal,
         };
         mbe->cache = (struct gpu_buf_cache){
             .ops = {metal_cache_alloc, metal_cache_upload, metal_cache_download,
