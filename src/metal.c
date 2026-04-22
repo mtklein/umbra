@@ -64,6 +64,29 @@ static id nsstr(char const *s) {
     return msg_s((id)objc_getClass("NSString"), sel("stringWithUTF8String:"), s);
 }
 
+// Selectors hit every dispatch / batch / submit.  Populated once in
+// metal_backend_create(); sel_registerName is idempotent across backend
+// instances so the cache is process-global.
+static SEL SEL_setComputePipelineState,
+           SEL_setBytes_length_atIndex,
+           SEL_setBuffer_offset_atIndex,
+           SEL_dispatchThreads_threadsPerThreadgroup,
+           SEL_commandBuffer,
+           SEL_computeCommandEncoderWithDispatchType,
+           SEL_endEncoding,
+           SEL_commit;
+
+static void init_sel_cache(void) {
+    SEL_setComputePipelineState               = sel("setComputePipelineState:");
+    SEL_setBytes_length_atIndex               = sel("setBytes:length:atIndex:");
+    SEL_setBuffer_offset_atIndex              = sel("setBuffer:offset:atIndex:");
+    SEL_dispatchThreads_threadsPerThreadgroup = sel("dispatchThreads:threadsPerThreadgroup:");
+    SEL_commandBuffer                         = sel("commandBuffer");
+    SEL_computeCommandEncoderWithDispatchType = sel("computeCommandEncoderWithDispatchType:");
+    SEL_endEncoding                           = sel("endEncoding");
+    SEL_commit                                = sel("commit");
+}
+
 typedef struct umbra_flat_ir IR;
 
 static double now(void) {
@@ -972,6 +995,7 @@ static void metal_wait_frame(int frame, void *ctx) {
 }
 
 static struct metal_backend* metal_backend_create(void) {
+    init_sel_cache();
     void *pool = objc_autoreleasePoolPush();
     id device = (id)MTLCreateSystemDefaultDevice();
     id queue = device
@@ -1175,7 +1199,7 @@ static void encode_dispatch(
     int w = r - l, h = b - t, x0 = l, y0 = t;
     struct metal_backend *be = (struct metal_backend*)p->base.backend;
 
-    (void)msg_v_p(enc, sel("setComputePipelineState:"), (id)p->pipeline);
+    (void)msg_v_p(enc, SEL_setComputePipelineState, (id)p->pipeline);
 
     int tb = p->total_bufs;
     uint32_t buf_count[33] = {0};
@@ -1220,13 +1244,13 @@ static void encode_dispatch(
     __builtin_memcpy(meta + 3 + tb, buf_stride, (size_t)tb * sizeof(uint32_t));
     size_t const meta_bytes = (size_t)(3 + 2 * tb) * sizeof(uint32_t);
     (void)msg_v_vuu(
-        enc, sel("setBytes:length:atIndex:"),
+        enc, SEL_setBytes_length_atIndex,
         meta, (NSUInteger)meta_bytes, (NSUInteger)0);
 
     for (int i = 0; i < tb; i++) {
         if (bind_handle[i]) {
             (void)msg_v_puu(
-                enc, sel("setBuffer:offset:atIndex:"),
+                enc, SEL_setBuffer_offset_atIndex,
                 (id)bind_handle[i], (NSUInteger)bind_offset[i], (NSUInteger)(i + 1));
         }
     }
@@ -1238,7 +1262,7 @@ static void encode_dispatch(
     }
     MTLSize grid  = {(NSUInteger)w, (NSUInteger)h, 1};
     MTLSize group = {(NSUInteger)tg_size, 1, 1};
-    msg_v_ss(enc, sel("dispatchThreads:threadsPerThreadgroup:"), grid, group);
+    msg_v_ss(enc, SEL_dispatchThreads_threadsPerThreadgroup, grid, group);
     be->total_dispatches++;
 }
 
@@ -1258,17 +1282,16 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
     void *pool = objc_autoreleasePoolPush();
     {
         if (!be->batch_cmdbuf) {
-            be->batch_cmdbuf = (void*)retain(msg(
-                be->queue, sel("commandBuffer")));
+            be->batch_cmdbuf = (void*)retain(msg(be->queue, SEL_commandBuffer));
         }
         id enc = msg_u(
             (id)be->batch_cmdbuf,
-            sel("computeCommandEncoderWithDispatchType:"),
+            SEL_computeCommandEncoderWithDispatchType,
             (NSUInteger)MTLDispatchTypeSerial);
         double const t0 = now();
         encode_dispatch(p, l, t, r, b, buf, enc);
         be->encode_time_accum += now() - t0;
-        (void)msg(enc, sel("endEncoding"));
+        (void)msg(enc, SEL_endEncoding);
     }
     objc_autoreleasePoolPop(pool);
 }
@@ -1278,7 +1301,7 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
         double const t0 = now();
         void *pool = objc_autoreleasePoolPush();
         {
-            (void)msg((id)be->batch_cmdbuf, sel("commit"));
+            (void)msg((id)be->batch_cmdbuf, SEL_commit);
         }
         objc_autoreleasePoolPop(pool);
         be->submit_time_accum += now() - t0;
