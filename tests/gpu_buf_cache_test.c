@@ -86,27 +86,37 @@ TEST(test_gpu_buf_cache_end_batch_resets_uploaded) {
     gpu_buf_cache_free(&c);
 }
 
-TEST(test_gpu_buf_cache_writable_invalidates_fp) {
+TEST(test_gpu_buf_cache_writable_skip_reupload) {
     struct mock_ctx m = {0};
     struct gpu_buf_cache c = make_cache(&m);
 
     char data[64];
     memset(data, 0x42, sizeof data);
 
+    // First access: seed upload.
     gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
     m.uploads == 1 here;
     c.entry[0].copy_tracked here;
 
-    // Within batch: uploaded flag skips.
+    // Within batch: no re-upload, no re-hash (uploaded flag skips block).
     gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
     m.uploads == 1 here;
 
-    // End batch: writable entries get fp invalidated.
-    gpu_buf_cache_end_batch(&c);
-    !c.entry[0].copy_tracked here;
-    c.entry[0].hashed_size == 0 here;
+    // Simulate a flush: GPU wrote new bytes, copyback brings them to host and
+    // refreshes the fingerprint so it reflects post-copyback host state.
+    memset(c.entry[0].buf.ptr, 0xAB, sizeof data);
+    gpu_buf_cache_copyback(&c);
+    m.downloads == 1 here;
 
-    // Next get must re-upload (fp invalid even though data unchanged).
+    gpu_buf_cache_end_batch(&c);
+
+    // Next batch: host unchanged since copyback → hash matches → skip upload.
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
+    m.uploads == 1 here;
+
+    // If user modifies host between flushes, hash mismatches → re-upload.
+    data[0] = 0x7F;
+    gpu_buf_cache_end_batch(&c);
     gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
     m.uploads == 2 here;
 
@@ -143,7 +153,7 @@ TEST(test_gpu_buf_cache_multiple_buffers) {
     // Hits on both.
     gpu_buf_cache_get(&c, a, sizeof a, BUF_READ) == 0 here;
     gpu_buf_cache_get(&c, b, sizeof b, BUF_WRITTEN) == 1 here;
-    m.uploads == 2 here; // only the initial uploads
+    m.uploads == 2 here; // only the initial seeds
 
     gpu_buf_cache_free(&c);
 }

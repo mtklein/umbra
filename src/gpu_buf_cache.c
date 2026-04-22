@@ -3,12 +3,13 @@
 
 int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
                       uint8_t rw) {
+    _Bool const writable = rw & BUF_WRITTEN;
     for (int i = 0; i < c->n; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->host == host && ce->buf.size >= bytes) {
             if (host && bytes
-                    && !ce->nocopy              // Zero-copy: GPU reads host directly.
-                    && !(ce->uploaded && ce->writable)) {  // Umbra owns writable bufs.
+                    && !ce->nocopy                         // Zero-copy: GPU reads host directly.
+                    && !(ce->uploaded && ce->writable)) {  // Umbra owns writable bufs within a batch.
                 fingerprint const fp = fingerprint_hash(host, bytes);
                 if (!ce->hashed_size || !fingerprint_eq(ce->fp, fp)) {
                     c->ops.upload(ce->buf, host, bytes, c->ctx);
@@ -18,7 +19,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
                 }
                 ce->uploaded = 1;
             }
-            if ((rw & BUF_WRITTEN) && !ce->copy_tracked && host && bytes) {
+            if (writable && !ce->copy_tracked && host && bytes) {
                 ce->copy_tracked = 1;
             }
             return i;
@@ -40,10 +41,10 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
         if (imported.ptr) {
             ce->buf      = imported;
             ce->host     = host;
-            ce->writable = rw & BUF_WRITTEN;
+            ce->writable = writable;
             ce->nocopy   = 1;
             ce->uploaded = 1;
-            if (rw & BUF_WRITTEN) { ce->copy_tracked = 1; }
+            if (writable) { ce->copy_tracked = 1; }
             return idx;
         }
     }
@@ -51,7 +52,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     size_t const alloc_size = bytes ? bytes : 4;
     ce->buf = c->ops.alloc(alloc_size, c->ctx);
     ce->host     = host;
-    ce->writable = rw & BUF_WRITTEN;
+    ce->writable = writable;
     if (host && bytes) {
         c->ops.upload(ce->buf, host, bytes, c->ctx);
         c->upload_bytes += bytes;
@@ -59,7 +60,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
         ce->hashed_size = bytes;
         ce->uploaded = 1;
     }
-    if ((rw & BUF_WRITTEN) && host && bytes) {
+    if (writable && host && bytes) {
         ce->copy_tracked = 1;
     }
     return idx;
@@ -71,6 +72,10 @@ void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
         if (ce->copy_tracked && !ce->nocopy && ce->host) {
             size_t const bytes = ce->hashed_size ? ce->hashed_size : ce->buf.size;
             c->ops.download(ce->buf, ce->host, bytes, c->ctx);
+            // Host now matches GPU.  Refresh fingerprint so next batch can
+            // skip the upload if the user doesn't modify the buffer.
+            ce->fp          = fingerprint_hash(ce->host, bytes);
+            ce->hashed_size = bytes;
         }
     }
 }
@@ -79,9 +84,6 @@ void gpu_buf_cache_end_batch(struct gpu_buf_cache *c) {
     for (int i = 0; i < c->n; i++) {
         c->entry[i].copy_tracked = 0;
         c->entry[i].uploaded     = 0;
-        if (c->entry[i].writable) {
-            c->entry[i].hashed_size = 0;
-        }
     }
 }
 

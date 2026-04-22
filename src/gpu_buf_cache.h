@@ -41,7 +41,8 @@ int  gpu_buf_cache_get      (struct gpu_buf_cache *, void *host, size_t bytes, u
 // Download writable buffers from GPU back to their host pointers.
 void gpu_buf_cache_copyback (struct gpu_buf_cache *);
 
-// Reset per-batch flags.  Invalidate fingerprints for writable entries.
+// Reset per-batch flags.  Fingerprints persist across batches so unmodified
+// writable buffers can skip re-upload on the next batch.
 void gpu_buf_cache_end_batch(struct gpu_buf_cache *);
 
 // Release all GPU buffers and free the cache.
