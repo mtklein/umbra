@@ -39,7 +39,8 @@ struct vk_backend {
     VkCommandPool         cmd_pool;
     uint32_t              queue_family;
     uint32_t              mem_type_host;
-    uint32_t              mem_type_host_import; int :32;
+    uint32_t              mem_type_host_import;
+    _Bool                 batch_has_dispatch; int :24;    // whether batch_cmd holds any work
     PFN_vkGetMemoryHostPointerPropertiesEXT get_host_props;
     VkDeviceSize          host_import_align;
     VkCommandBuffer       batch_cmd;                       // currently-encoding cmdbuf, or NULL
@@ -54,7 +55,6 @@ struct vk_backend {
     struct uniform_ring_pool uni_pool;
     int                   total_dispatches;
     int                   total_submits;
-    _Bool                 batch_has_dispatch; int :24, :32;
     struct dispatch_overlap overlap;
 };
 

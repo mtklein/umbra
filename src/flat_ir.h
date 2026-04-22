@@ -78,15 +78,15 @@ _Bool flat_ir_has_early_writes(struct umbra_flat_ir const*);
 struct umbra_builder {
     struct ir_inst           *inst;
     _Bool                    *var_uniform;
-    int                       insts, cap;
+    struct buffer_binding    *binding;
     struct hash               ht;
-    int                       vars;
-    _Bool                     has_loop, loop_closed; int :16;
+    int                       insts, cap;
+    int                       vars, if_depth;
+    int                       bindings, cap_bindings;
+
     umbra_val32               loop_trip;
     umbra_var32               loop_var;
-    int                       if_depth, :32;
-    struct buffer_binding    *binding;
-    int                       bindings, cap_bindings;
+    _Bool                     has_loop, loop_closed; int :16, :32;
 };
 
 struct umbra_flat_ir {
