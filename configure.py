@@ -9,10 +9,15 @@ fresh clone builds without needing to run configure.py.
 
 import glob
 import os
+import shutil
 
 # Ensure subsequent relative paths and globs resolve from the project root,
 # not wherever the user ran `python3 configure.py` from.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+# Compiler launcher: empty string if ccache isn't installed.  Helps incremental
+# rebuilds across branch switches where identical sources recompile.
+CCACHE = shutil.which('ccache') or ''
 
 
 SRC    = sorted(glob.glob('src/*.c'))
@@ -65,11 +70,12 @@ def link_objs(entry, *extras):
     return ' '.join(objs)
 
 
-BUILD_NINJA = r"""builddir = out
+BUILD_NINJA = fr"""builddir = out
 
 sysroot = /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 llvm    = /opt/homebrew/opt/llvm/bin
 clang   = $llvm/clang -fcolor-diagnostics
+cache   = {CCACHE}
 warn    = -Weverything $
           -Wno-declaration-after-statement $
           -Wno-disabled-macro-expansion $
@@ -85,7 +91,7 @@ warn    = -Weverything $
 profinfo = -fdebug-info-for-profiling
 
 rule compile
-    command = $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
+    command = $cache $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
     depfile = $out.d
     deps    = gcc
 
