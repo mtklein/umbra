@@ -235,9 +235,9 @@ void umbra_build_sdf_draw(struct umbra_builder *b,
 }
 
 enum umbra_sdf_tile {
-    UMBRA_SDF_TILE_NONE    = 0x0000,  // f.lo >= 0: tile entirely outside
-    UMBRA_SDF_TILE_PARTIAL = 0x0001,  // f.lo <  0, f.hi >= 0: edge tile, needs per-pixel SDF eval
-    UMBRA_SDF_TILE_FULL    = 0x0002,  // f.hi <  0: tile entirely inside
+    UMBRA_SDF_TILE_NONE    = 0x00,  // f.lo >= 0: tile entirely outside
+    UMBRA_SDF_TILE_PARTIAL = 0x01,  // f.lo <  0, f.hi >= 0: edge tile, needs per-pixel SDF eval
+    UMBRA_SDF_TILE_FULL    = 0x02,  // f.hi <  0: tile entirely inside
 };
 
 struct umbra_sdf_bounds_program {
