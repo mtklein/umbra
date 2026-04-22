@@ -11,19 +11,6 @@ static _Bool bytes_eq(struct asm_x86 *b, int n, uint8_t const exp[]) {
 
 static void reset(struct asm_x86 *b) { b->size = 0; }
 
-TEST(test_emit) {
-    struct asm_x86 b = {0};
-    emit1(&b, 0xAB);
-    emit4(&b, 0xDEADBEEF);
-    b.size == 5 here;
-    b.byte[0] == 0xAB here;
-    b.byte[1] == 0xEF here;
-    b.byte[2] == 0xBE here;
-    b.byte[3] == 0xAD here;
-    b.byte[4] == 0xDE here;
-    free(b.byte);
-}
-
 TEST(test_ret_vzeroupper_nop) {
     struct asm_x86 b = {0};
     ret(&b);
@@ -100,16 +87,6 @@ TEST(test_gpr) {
     // pop %r12 => 41 5c
     pop_r(&b, R12);
     bytes_eq(&b, 2, (uint8_t[]){0x41, 0x5C}) here;
-    reset(&b);
-
-    // rex.w prefix for rax,rdi => 48
-    rex_w(&b, RAX, RDI);
-    bytes_eq(&b, 1, (uint8_t[]){0x48}) here;
-    reset(&b);
-
-    // rex.w prefix for r10,r11 => 4d
-    rex_w(&b, R10, R11);
-    bytes_eq(&b, 1, (uint8_t[]){0x4D}) here;
     reset(&b);
 
     // shrq $4, %rax => 48 c1 e8 04
@@ -441,31 +418,6 @@ TEST(test_gather) {
     // vpgatherdd ymm2, [rdi+rcx*4], ymm5 => c4 e2 55 90 14 8f
     vpgatherdd(&b, 2, RDI, RCX, 4, 5);
     bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE2, 0x55, 0x90, 0x14, 0x8F}) here;
-    free(b.byte);
-}
-
-TEST(test_vex_helpers) {
-    struct asm_x86 b = {0};
-
-    // vex 2-byte: pp=0,mm=1,W=0,L=1,d=2,v=3,s=4,op=0x58 (same as vaddps 2,3,4)
-    vex(&b, 0, 1, 0, 1, 2, 3, 4, 0x58);
-    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4}) here;
-    reset(&b);
-
-    // vex 3-byte: pp=1,mm=2,W=0,L=1,d=2,v=3,s=4,op=0x98 (same as vfmadd132ps 2,3,4)
-    vex(&b, 1, 2, 0, 1, 2, 3, 4, 0x98);
-    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x65, 0x98, 0xD4}) here;
-    reset(&b);
-
-    // vex_rrr: pp=0,mm=1,L=1,op=0x58,d=2,v=3,s=4 => same as vaddps
-    vex_rrr(&b, 0, 1, 1, 0x58, 2, 3, 4);
-    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x58, 0xD4}) here;
-    reset(&b);
-
-    // vex_mem: pp=2,mm=1,W=0,L=1,reg=3,v=0,op=0x6f,base=RDI,index=RCX,scale=4,disp=0
-    // (same as vmov_load L=1,3,RDI,RCX,4,0)
-    vex_mem(&b, 2, 1, 0, 1, 3, 0, 0x6f, RDI, RCX, 4, 0);
-    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE1, 0x7E, 0x6F, 0x1C, 0x8F}) here;
     free(b.byte);
 }
 

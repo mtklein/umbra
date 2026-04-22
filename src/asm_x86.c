@@ -4,21 +4,21 @@
 
 typedef struct asm_x86 Buf;
 
-void emit1(Buf *b, uint8_t v) {
+static void emit1(Buf *b, uint8_t v) {
     if (b->size == b->cap) {
         b->cap = b->cap ? 2 * b->cap : 4096;
         b->byte = realloc(b->byte, b->cap);
     }
     b->byte[b->size++] = v;
 }
-void emit4(Buf *b, uint32_t v) {
+static void emit4(Buf *b, uint32_t v) {
     emit1(b, (uint8_t)v);
     emit1(b, (uint8_t)(v >> 8));
     emit1(b, (uint8_t)(v >> 16));
     emit1(b, (uint8_t)(v >> 24));
 }
 
-void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op) {
+static void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op) {
     int const R = ~d >> 3,
               X = 1,
               B = ~s >> 3;
@@ -34,7 +34,7 @@ void vex(Buf *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op) 
     emit1(b, (uint8_t)(0xc0 | ((d & 7) << 3) | (s & 7)));
 }
 
-void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s) {
+static void vex_rrr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int v, int s) {
     vex(b, pp, mm, 0, L, d, v, s, op);
 }
 static void vex_rr(Buf *b, int pp, int mm, int L, uint8_t op, int d, int s) {
@@ -45,8 +45,8 @@ static void vex_shift(Buf *b, int pp, int mm, int L, uint8_t op, int ext, int d,
     vex(b, pp, mm, 0, L, ext, d, s, op);
     emit1(b, imm);
 }
-void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
-             int index, int scale, int disp) {
+static void vex_mem(Buf *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
+                    int index, int scale, int disp) {
     int const R = ~reg   >> 3,
               X = ~index >> 3,
               B = ~base  >> 3;
@@ -89,7 +89,7 @@ void vmov_store(Buf *b, int L, int reg, int base, int index, int scale, int disp
     vex_mem(b, 2, 1, 0, L, reg, 0, 0x7f, base, index, scale, disp);
 }
 
-void rex_w(Buf *b, int r, int breg) {
+static void rex_w(Buf *b, int r, int breg) {
     emit1(b, (uint8_t)(0x48 | ((r >> 3) << 2) | (breg >> 3)));
 }
 void push_r(Buf *b, int r) {

@@ -7,19 +7,13 @@ struct asm_x86 {
     size_t   size, cap;
 };
 
-void emit1(struct asm_x86 *b, uint8_t v);
-void emit4(struct asm_x86 *b, uint32_t v);
-
-void vex(struct asm_x86 *b, int pp, int mm, int W, int L, int d, int v, int s, uint8_t op);
-void vex_rrr(struct asm_x86 *b, int pp, int mm, int L, uint8_t op, int d, int v, int s);
-void vex_mem(struct asm_x86 *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op, int base,
-             int index, int scale, int disp);
-
+// vex_rip is used by the IMM-op dispatcher to build rip-relative variants of
+// many ops whose (pp, mm, opcode) differ.  Returns the offset of the disp32
+// field so the caller can patch in the pool reference.
 int  vex_rip(struct asm_x86 *b, int pp, int mm, int W, int L, int reg, int v, uint8_t op);
 void vmov_load(struct asm_x86 *b, int L, int reg, int base, int index, int scale, int disp);
 void vmov_store(struct asm_x86 *b, int L, int reg, int base, int index, int scale, int disp);
 
-void rex_w(struct asm_x86 *b, int r, int breg);
 void push_r(struct asm_x86 *b, int r);
 void pop_r(struct asm_x86 *b, int r);
 void add_ri(struct asm_x86 *b, int d, int32_t imm);
