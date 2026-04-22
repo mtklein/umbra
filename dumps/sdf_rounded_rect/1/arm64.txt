@@ -68,13 +68,13 @@ stp	x13, x15, [sp, #-0x10]!
 # loop_top:
 sub	x10, x0, x9
 cmp	x10, #0x8
-b.lt	0x49c <ltmp0+0x49c>
+b.lt	0x494 <ltmp0+0x494>
 # simd_body:
 dup.4s	v14, w9
 mov.16b	v15, v14
-ldr	q4, 0x850 <ltmp0+0x850>
+ldr	q4, 0x840 <ltmp0+0x840>
 add.4s	v14, v14, v4
-ldr	q4, 0x860 <ltmp0+0x860>
+ldr	q4, 0x850 <ltmp0+0x850>
 add.4s	v15, v15, v4
 movi.4s	v4, #0x0
 mov.16b	v5, v4
@@ -268,16 +268,14 @@ movi.4s	v6, #0x2
 mov.16b	v7, v6
 bsl.16b	v16, v6, v14
 bsl.16b	v17, v7, v15
-xtn.4h	v16, v16
-xtn.4h	v17, v17
 ldr	x8, [x2]
 ldr	w10, [x2, #0xc]
-lsl	x10, x10, #1
 madd	x8, x14, x10, x8
-lsl	x10, x9, #1
-add	x10, x8, x10
-str	d16, [x10]
-str	d17, [x10, #0x8]
+xtn.4h	v0, v16
+xtn2.8h	v0, v17
+xtn.8b	v0, v0
+add	x10, x8, x9
+str	d0, [x10]
 movi.4s	v4, #0x0
 mov.16b	v5, v4
 ldr	q6, [x15]
@@ -298,7 +296,7 @@ add	x9, x9, #0x8
 b	0x108 <ltmp0+0x108>
 # tail_top:
 cmp	x9, x0
-b.ge	0x754 <ltmp0+0x754>
+b.ge	0x744 <ltmp0+0x744>
 movi.4s	v4, #0x0
 mov.16b	v5, v4
 ldr	x8, [x2, #0x10]
@@ -463,20 +461,18 @@ fcmgt.4s	v16, v24, v16
 movi.4s	v6, #0x2
 mov.16b	v7, v6
 bsl.16b	v16, v6, v14
-xtn.4h	v16, v16
 ldr	x8, [x2]
 ldr	w10, [x2, #0xc]
-lsl	x10, x10, #1
 madd	x8, x14, x10, x8
-str	h16, [x8, x9, lsl #1]
+str	b16, [x8, x9, lsl #0]
 add	x9, x9, #0x1
-b	0x49c <ltmp0+0x49c>
+b	0x494 <ltmp0+0x494>
 # row_done:
 add	x14, x14, #0x1
 add	x9, x1, #0x0
 ldr	x10, [sp]
 cmp	x14, x10
-b.ge	0x828 <ltmp0+0x828>
+b.ge	0x818 <ltmp0+0x818>
 # next_row:
 movi.4s	v4, #0x0
 mov.16b	v5, v4
