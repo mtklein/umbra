@@ -480,11 +480,13 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     struct umbra_buf buf[64];
     resolve_bindings(buf, p->binding, p->bindings, late, lates);
 
-    // TODO: thread-local cached scratch would save two mallocs per dispatch
-    // on CPU-heavy workloads; fine for now since interp is already slow.
-    ival *const v_base = malloc((size_t)p->v_slots * sizeof *v_base);
-    int  const           vars = p->vars;
-    ival *const var  = vars ? calloc((size_t)vars, sizeof *var) : NULL;
+    // TODO: thread-local cached scratch would save one malloc per dispatch on
+    // CPU-heavy workloads; fine for now since interp is already slow.  var is
+    // zeroed at the top of each tile iteration below, so malloc (not calloc).
+    int  const  vars   = p->vars;
+    ival *const scratch = malloc(((size_t)p->v_slots + (size_t)vars) * sizeof *scratch);
+    ival *const v_base = scratch;
+    ival *const var    = scratch + p->v_slots;
 
     int const      P   = p->preamble;
     I32                   if_mask_stack[8];
@@ -1272,8 +1274,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             next_tile:;
         }
     }
-    free(var);
-    free(v_base);
+    free(scratch);
 }
 #undef F32_IMM
 #undef DISPATCH
