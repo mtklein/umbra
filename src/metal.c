@@ -95,6 +95,7 @@ struct metal_backend {
     void *device;
     void *queue;
     void *batch_cmdbuf;     // currently-encoding cmdbuf for uni_pool.cur, or NULL
+    void *batch_enc;        // serial compute encoder on batch_cmdbuf, or NULL
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
     struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
@@ -1255,10 +1256,12 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
         if (!be->batch_cmdbuf) {
             be->batch_cmdbuf = (void*)retain(msg(be->queue, SEL_commandBuffer));
         }
-        id enc = msg_u((id)be->batch_cmdbuf, SEL_computeCommandEncoderWithDispatchType,
-                       (NSUInteger)MTLDispatchTypeSerial);
-        encode_dispatch(p, l, t, r, b, buf, enc);
-        (void)msg(enc, SEL_endEncoding);
+        if (!be->batch_enc) {
+            be->batch_enc = (void*)retain(msg_u(
+                (id)be->batch_cmdbuf, SEL_computeCommandEncoderWithDispatchType,
+                (NSUInteger)MTLDispatchTypeSerial));
+        }
+        encode_dispatch(p, l, t, r, b, buf, (id)be->batch_enc);
     }
     objc_autoreleasePoolPop(pool);
 }
@@ -1267,6 +1270,11 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (be->batch_cmdbuf) {
         void *pool = objc_autoreleasePoolPush();
         {
+            if (be->batch_enc) {
+                (void)msg((id)be->batch_enc, SEL_endEncoding);
+                release(be->batch_enc);
+                be->batch_enc = NULL;
+            }
             (void)msg((id)be->batch_cmdbuf, SEL_commit);
         }
         objc_autoreleasePoolPop(pool);
