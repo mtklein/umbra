@@ -61,7 +61,6 @@ void             slide_bg_draw(struct slide_bg*, umbra_color,
                                int l, int t, int r, int b, struct umbra_buf dst);
 void             slide_bg_free(struct slide_bg*);
 
-// TODO: replace dst_buf with a umbra_late_bind_buf handle threaded through queue().
 struct slide_runtime {
     struct umbra_program            *draw;
     struct umbra_program            *draw_full; // NULL iff bounds == NULL (non-SDF)
@@ -69,22 +68,23 @@ struct slide_runtime {
 
     struct umbra_fmt                 fmt;
     int                              w, h;
-    struct umbra_buf                 dst_buf;
+    umbra_ptr                        dst_ptr;   // late-bound dst for draw/draw_full
+    int :32;
 };
 
 struct slide_runtime* slide_runtime(struct slide*, int w, int h,
                                     struct umbra_backend*, struct umbra_fmt,
                                     union transform const *pre_transform);
 void   slide_runtime_animate(struct slide*, double secs);
-void   slide_runtime_draw   (struct slide_runtime*, int l, int t, int r, int b);
+void   slide_runtime_draw   (struct slide_runtime*, struct umbra_buf dst,
+                             int l, int t, int r, int b);
 void   slide_runtime_free   (struct slide_runtime*);
 
 // Build a fresh draw-side builder for a slide, without compiling.  Returns
 // NULL for slides that don't draw anything (no build_draw / build_sdf_draw).
-// `dst` is a stable umbra_buf whose address the returned builder binds as
-// the dst; keep it alive until any IR / program derived from this builder
-// is freed.
+// The dst is late-bound; `out_dst_ptr` (nullable) receives the handle the
+// caller needs to supply at queue() time.
 struct umbra_builder* slide_draw_builder(struct slide*,
-                                         struct umbra_buf *dst,
+                                         umbra_ptr *out_dst_ptr,
                                          struct umbra_fmt,
                                          union transform const *pre);

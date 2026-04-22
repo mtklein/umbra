@@ -146,7 +146,7 @@ static void build_slide_fmt(struct slide *s, int fmt, int W, int H) {
     saved_ir = NULL;
     if (slide_rt) {
         struct umbra_builder *draw =
-            slide_draw_builder(s, &slide_rt->dst_buf, *fmt_enums[fmt], NULL);
+            slide_draw_builder(s, NULL, *fmt_enums[fmt], NULL);
         if (draw) {
             saved_ir = umbra_flat_ir(draw);
             umbra_builder_free(draw);
@@ -205,7 +205,7 @@ struct tile_work {
 static void tile_fn(void *arg) {
     struct tile_work *tw = arg;
     if (is_leaf(tw->s)) {
-        slide_runtime_draw(slide_rt, tw->l, tw->t, tw->r, tw->b);
+        slide_runtime_draw(slide_rt, tw->dst, tw->l, tw->t, tw->r, tw->b);
     } else {
         tw->s->draw(tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b, tw->dst);
     }
@@ -349,11 +349,11 @@ int main(void) {
         if (!is_leaf(s) && s->prepare) {
             s->prepare(s, bes[cur_backend], *fmt_enums[cur_fmt]);
         }
+        struct umbra_buf const pix_dst = {
+            .ptr=pixbuf, .count=W*H*planes, .stride=W,
+        };
         if (is_leaf(s) && slide_rt) {
-            slide_rt->dst_buf = (struct umbra_buf){
-                .ptr=pixbuf, .count=W*H*planes, .stride=W,
-            };
-            slide_bg_draw(slide_bg_cur, s->bg, 0, 0, W, H, slide_rt->dst_buf);
+            slide_bg_draw(slide_bg_cur, s->bg, 0, 0, W, H, pix_dst);
         }
 
         {
@@ -366,14 +366,11 @@ int main(void) {
 
             if (is_leaf(s)) { slide_runtime_animate(s, secs); }
 
-            struct umbra_buf const dst = {
-                .ptr=pixbuf, .count=W*H*planes, .stride=W,
-            };
             struct tile_work *work = malloc((size_t)nt * sizeof *work);
             for (int t = 0; t < nt; t++) {
                 int y0 = t * sh;
                 int y1 = y0 + sh > H ? H : y0 + sh;
-                work[t] = (struct tile_work){s, secs, 0, y0, W, y1, dst};
+                work[t] = (struct tile_work){s, secs, 0, y0, W, y1, pix_dst};
             }
             if (nt <= 1 || !extra_progs[1]->queue_is_threadsafe) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }

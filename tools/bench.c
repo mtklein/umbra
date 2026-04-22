@@ -22,16 +22,14 @@ struct slide_draw_ctx {
     struct slide         *s;
     struct slide_runtime *rt;
     struct slide_bg      *bg;
+    struct umbra_buf      dst;
     int                   w, h;
-#if INTPTR_MAX != INT64_MAX
-    int                   :32;
-#endif
 };
 static void slide_draw(void *vctx) {
     struct slide_draw_ctx *c = vctx;
-    slide_bg_draw(c->bg, c->s->bg, 0, 0, c->w, c->h, c->rt->dst_buf);
+    slide_bg_draw(c->bg, c->s->bg, 0, 0, c->w, c->h, c->dst);
     slide_runtime_animate(c->s, c->secs);
-    slide_runtime_draw(c->rt, 0, 0, c->w, c->h);
+    slide_runtime_draw(c->rt, c->dst, 0, 0, c->w, c->h);
     c->secs += 1.0 / 60.0;
 }
 
@@ -122,7 +120,8 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
 static void compile_all_builders(struct slide_runtime *rt, struct slide *s,
                                  struct umbra_fmt fmt,
                                  struct umbra_backend *be) {
-    struct umbra_builder *b = slide_draw_builder(s, &rt->dst_buf, fmt, NULL);
+    (void)rt;
+    struct umbra_builder *b = slide_draw_builder(s, NULL, fmt, NULL);
     if (b) {
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -317,11 +316,11 @@ int main(int argc, char *argv[]) {
                 if ((be_mask & (1 << bi)) && bes[bi]) {
                     struct slide_runtime *rt = slide_runtime(s, W, H, bes[bi], fmt, NULL);
                     struct slide_bg      *bg = slide_bg(bes[bi], fmt);
-                    rt->dst_buf = (struct umbra_buf){
+                    struct umbra_buf const dst = {
                         .ptr=buf, .count=W*H*fmt.planes, .stride=W,
                     };
                     struct slide_draw_ctx sctx = {
-                        .s=s, .rt=rt, .bg=bg, .secs=0.0, .w=W, .h=H,
+                        .s=s, .rt=rt, .bg=bg, .dst=dst, .secs=0.0, .w=W, .h=H,
                     };
                     ns_px[bi] = bench(slide_draw, &sctx, bes[bi], W, H, samples, target_secs,
                                       &gpu[bi], &bstats[bi]);

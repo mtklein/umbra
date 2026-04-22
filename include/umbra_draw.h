@@ -122,7 +122,10 @@ void   umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program*);
 // shape edge; `draw_full` runs on tiles entirely inside the shape, where
 // coverage=1 is known and the SDF eval can be skipped.  Passing the same
 // program for both is legal, just forfeits the FULL-tile speedup.
+// `lates` are forwarded to each internal draw->queue() call; typically a
+// single {dst_ptr, dst} binding so callers can supply per-dispatch dsts.
 void   umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                           struct umbra_program            *draw_partial,
                           struct umbra_program            *draw_full,
-                          int l, int t, int r, int b);
+                          int l, int t, int r, int b,
+                          int lates, struct umbra_late_binding const *late);

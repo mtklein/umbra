@@ -50,12 +50,12 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
             rt[bi] = slide_runtime(s, W, H, bes[bi], fmt, NULL);
             bg[bi] = slide_bg(bes[bi], fmt);
 
-            rt[bi]->dst_buf = (struct umbra_buf){
+            struct umbra_buf const dst = {
                 .ptr=pbuf[bi], .count=W * H * fmt.planes, .stride=W,
             };
-            slide_bg_draw(bg[bi], s->bg, 0, 0, W, H, rt[bi]->dst_buf);
+            slide_bg_draw(bg[bi], s->bg, 0, 0, W, H, dst);
             slide_runtime_animate(s, 0);
-            slide_runtime_draw(rt[bi], 0, 0, W, H);
+            slide_runtime_draw(rt[bi], dst, 0, 0, W, H);
 
             bes[bi]->flush(bes[bi]);
         }

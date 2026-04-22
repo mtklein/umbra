@@ -1,5 +1,6 @@
 #include "slide.h"
 #include "../src/assume.h"
+#include "../src/count.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -105,12 +106,13 @@ void slide_bg_free(struct slide_bg *bg) {
 }
 
 struct umbra_builder* slide_draw_builder(struct slide *s,
-                                         struct umbra_buf *dst,
+                                         umbra_ptr *out_dst_ptr,
                                          struct umbra_fmt fmt,
                                          union transform const *pre) {
     if (s->build_draw || s->build_sdf_draw) {
         struct umbra_builder *b = umbra_builder();
-        umbra_ptr const dst_ptr = umbra_early_bind_buf(b, dst);
+        umbra_ptr const dst_ptr = umbra_late_bind_buf(b);
+        if (out_dst_ptr) { *out_dst_ptr = dst_ptr; }
         umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
                     y = umbra_f32_from_i32(b, umbra_y(b));
         if (pre) {
@@ -126,11 +128,10 @@ struct umbra_builder* slide_draw_builder(struct slide *s,
 }
 
 static struct umbra_builder* slide_draw_full_builder(struct slide *s,
-                                                     struct umbra_buf *dst,
                                                      struct umbra_fmt fmt,
                                                      union transform const *pre) {
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_early_bind_buf(b, dst);
+    umbra_ptr const dst_ptr = umbra_late_bind_buf(b);
     umbra_val32 x = umbra_f32_from_i32(b, umbra_x(b)),
                 y = umbra_f32_from_i32(b, umbra_y(b));
     if (pre) {
@@ -151,7 +152,7 @@ struct slide_runtime* slide_runtime(struct slide *s,
     rt->w   = w;
     rt->h   = h;
 
-    struct umbra_builder *b = slide_draw_builder(s, &rt->dst_buf, fmt, pre);
+    struct umbra_builder *b = slide_draw_builder(s, &rt->dst_ptr, fmt, pre);
     if (b) {
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
         umbra_builder_free(b);
@@ -160,7 +161,7 @@ struct slide_runtime* slide_runtime(struct slide *s,
     }
 
     if (s->build_sdf_draw) {
-        struct umbra_builder *bf = slide_draw_full_builder(s, &rt->dst_buf, fmt, pre);
+        struct umbra_builder *bf = slide_draw_full_builder(s, fmt, pre);
         struct umbra_flat_ir *irf = umbra_flat_ir(bf);
         umbra_builder_free(bf);
         rt->draw_full = be->compile(be, irf);
@@ -178,11 +179,16 @@ void slide_runtime_animate(struct slide *s, double secs) {
     if (s->animate) { s->animate(s, secs); }
 }
 
-void slide_runtime_draw(struct slide_runtime *rt, int l, int t, int r, int b) {
+void slide_runtime_draw(struct slide_runtime *rt, struct umbra_buf dst,
+                        int l, int t, int r, int b) {
+    struct umbra_late_binding const lates[] = {
+        {.ptr = rt->dst_ptr, .buf = dst},
+    };
     if (rt->bounds) {
-        umbra_sdf_dispatch(rt->bounds, rt->draw, rt->draw_full, l, t, r, b);
+        umbra_sdf_dispatch(rt->bounds, rt->draw, rt->draw_full, l, t, r, b,
+                           count(lates), lates);
     } else {
-        rt->draw->queue(rt->draw, l, t, r, b, 0, NULL);
+        rt->draw->queue(rt->draw, l, t, r, b, count(lates), lates);
     }
 }
 

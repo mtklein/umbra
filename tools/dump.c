@@ -239,17 +239,14 @@ static void render_hdr_at(struct slide *s, struct slide_runtime *rt,
     size_t const pixbuf_sz = (size_t)RW * RH * fmt.bpp * (size_t)fmt.planes;
     void *pixbuf = calloc(1, pixbuf_sz);
 
+    struct umbra_buf const dst = {
+        .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
+    };
     if (rt) {
-        rt->dst_buf = (struct umbra_buf){
-            .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
-        };
-        slide_bg_draw(bg, s->bg, 0, 0, RW, RH, rt->dst_buf);
+        slide_bg_draw(bg, s->bg, 0, 0, RW, RH, dst);
         slide_runtime_animate(s, secs);
-        slide_runtime_draw(rt, 0, 0, RW, RH);
+        slide_runtime_draw(rt, dst, 0, 0, RW, RH);
     } else {
-        struct umbra_buf const dst = {
-            .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
-        };
         s->draw(s, secs, 0, 0, RW, RH, dst);
     }
     be->flush(be);
@@ -329,9 +326,8 @@ int main(int argc, char *argv[]) {
 
         if (has_draw) {
             if (unit % shards == shard) {
-                struct umbra_buf dst_dummy = {0};
                 struct umbra_builder *draw =
-                    slide_draw_builder(s, &dst_dummy, umbra_fmt_fp16, NULL);
+                    slide_draw_builder(s, NULL, umbra_fmt_fp16, NULL);
                 char sub[256];
                 snprintf(sub, sizeof sub, "%s/0", dir);
                 mkdir(sub, 0755);
