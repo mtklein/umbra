@@ -79,26 +79,22 @@ struct umbra_builder {
 
 struct umbra_flat_ir {
     struct ir_inst           *inst;
-    int                       insts,      // Total instruction count.
-                              preamble;   // inst[0..preamble) are uniform, [preamble..) varying.
-    int                       loop_begin, // Instruction index of op_loop_begin, or -1.
-                              loop_end;   // Instruction index of op_loop_end,   or -1.
-    int                       vars, pad;
     struct buffer_binding    *binding;
-    int                       bindings, pad2;
-    // TODO: two int pads here, let's reorder fields to compact
 
-    // TODO: this need to be total_bufs + 1 for "user uniforms" sounds like
-    // a memory from several designs of uniform handling ago.
     // Per-ptr buffer metadata, computed at IR construction.  Arrays are
-    // sized [total_bufs + 1] so backends can use max_ptr one past the end
-    // as a synthetic "user uniforms" slot.  total_bufs == max(ptr.bits) + 1;
-    // 0 if no ptr-bearing op is live.
-    int                       total_bufs, pad3;
+    // sized [total_bufs].  total_bufs == max(ptr.bits) + 1, or 0 if no
+    // ptr-bearing op is live.
     uint8_t                  *buf_shift;         // op_elem_shift of any op on this ptr
     uint8_t                  *buf_rw;             // BUF_READ | BUF_WRITTEN flags
     uint8_t                  *buf_is_uniform;     // 1 if binding kind is a uniform kind
     int                      *buf_uniform_slots;  // count of u32 slots for uniform bindings
+
+    int insts,      // Total instruction count.
+        preamble;   // inst[0..preamble) are uniform, [preamble..) varying.
+    int loop_begin, // Instruction index of op_loop_begin, or -1.
+        loop_end;   // Instruction index of op_loop_end,   or -1.
+    int vars, bindings;
+    int total_bufs, :32;
 };
 
 enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };
