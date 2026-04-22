@@ -1720,36 +1720,50 @@ TEST(test_sdf_dispatch_tiling) {
     umbra_backend_free(be);
 }
 
-struct sdf_race_ctx {
-    struct umbra_sdf_bounds_program *bounds;
-    struct umbra_program            *draw;
-    struct umbra_buf                *dst_slot;
-    uint32_t                        *dst;
-    uint32_t const                  *baseline;
-    int                              W, H, iters, mismatches;
+// Concurrent-draw regression tests.  The driving concern is that CPU-backend
+// programs (interp, jit) advertise queue_is_threadsafe=1; TSAN should see a
+// clean run even with N threads dispatching against shared programs.  We pair
+// each run with an equivalent serial baseline and assert every pixel matches.
+
+struct race_ctx {
+    void (*fire)(void *);  // dispatch in the per-thread worker
+    void *ctx;
+    uint32_t const *baseline;
+    uint32_t       *dst;
+    int             pixels, mismatches, iters, :32;
 };
 
-static void* sdf_race_worker(void *v) {
-    struct sdf_race_ctx *c = v;
+static void* race_worker(void *v) {
+    struct race_ctx *c = v;
     for (int it = 0; it < c->iters; it++) {
-        __builtin_memset(c->dst, 0, (size_t)c->W * (size_t)c->H * sizeof *c->dst);
-        *c->dst_slot = (struct umbra_buf){.ptr = c->dst, .count = c->W * c->H, .stride = c->W};
-        umbra_sdf_dispatch(c->bounds, c->draw, c->draw, 0, 0, c->W, c->H);
-        for (int p = 0; p < c->W * c->H; p++) {
+        __builtin_memset(c->dst, 0, (size_t)c->pixels * sizeof *c->dst);
+        c->fire(c->ctx);
+        for (int p = 0; p < c->pixels; p++) {
             if (c->dst[p] != c->baseline[p]) { c->mismatches++; }
         }
     }
     return NULL;
 }
 
-TEST(test_sdf_dispatch_thread_safety) {
+struct sdf_fire_ctx {
+    struct umbra_sdf_bounds_program *bounds;
+    struct umbra_program            *draw;
+    struct umbra_buf                *dst_slot;
+    uint32_t                        *dst;
+    int                              W, H;
+};
+static void sdf_fire(void *v) {
+    struct sdf_fire_ctx *c = v;
+    *c->dst_slot = (struct umbra_buf){.ptr = c->dst, .count = c->W * c->H, .stride = c->W};
+    umbra_sdf_dispatch(c->bounds, c->draw, c->draw, 0, 0, c->W, c->H);
+}
+
+static void sdf_thread_safety_for(struct umbra_backend *be) {
+    if (!be) { return; }
     enum { W = 256, H = 256, N_THREADS = 4, ITERS = 8 };
 
     struct test_circle_state sdf   = {.cx = 128, .cy = 128, .r = 64};
     umbra_color              color = {1, 0, 0, 1};
-
-    struct umbra_backend *be = umbra_backend_jit();
-    if (!be) { be = umbra_backend_interp(); }
 
     struct umbra_builder *bb = umbra_builder();
     struct umbra_sdf_bounds_program *bounds =
@@ -1776,31 +1790,33 @@ TEST(test_sdf_dispatch_thread_safety) {
         dst[i] = calloc(W * H, sizeof *dst[i]);
     }
 
-    // Serial baseline on thread 0.
     uint32_t *baseline = calloc(W * H, sizeof *baseline);
-    dst_slot[0] = (struct umbra_buf){.ptr = baseline, .count = W * H, .stride = W};
-    umbra_sdf_dispatch(bounds, draw[0], draw[0], 0, 0, W, H);
+    struct sdf_fire_ctx fire0 = {
+        .bounds = bounds, .draw = draw[0],
+        .dst_slot = &dst_slot[0], .dst = baseline, .W = W, .H = H,
+    };
+    sdf_fire(&fire0);
     be->flush(be);
 
-    // Concurrent dispatches -- each thread should produce an identical dst.
-    pthread_t           th [N_THREADS];
-    struct sdf_race_ctx ctx[N_THREADS];
+    pthread_t           th  [N_THREADS];
+    struct race_ctx     ctx [N_THREADS];
+    struct sdf_fire_ctx fire[N_THREADS];
     for (int i = 0; i < N_THREADS; i++) {
-        ctx[i] = (struct sdf_race_ctx){
+        fire[i] = (struct sdf_fire_ctx){
             .bounds = bounds, .draw = draw[i],
-            .dst_slot = &dst_slot[i], .dst = dst[i],
-            .baseline = baseline, .W = W, .H = H, .iters = ITERS,
+            .dst_slot = &dst_slot[i], .dst = dst[i], .W = W, .H = H,
         };
-        pthread_create(&th[i], NULL, sdf_race_worker, &ctx[i]);
+        ctx[i] = (struct race_ctx){
+            .fire = sdf_fire, .ctx = &fire[i],
+            .baseline = baseline, .dst = dst[i],
+            .pixels = W * H, .iters = ITERS,
+        };
+        pthread_create(&th[i], NULL, race_worker, &ctx[i]);
     }
-    for (int i = 0; i < N_THREADS; i++) {
-        pthread_join(th[i], NULL);
-    }
+    for (int i = 0; i < N_THREADS; i++) { pthread_join(th[i], NULL); }
     be->flush(be);
 
-    for (int i = 0; i < N_THREADS; i++) {
-        ctx[i].mismatches == 0 here;
-    }
+    for (int i = 0; i < N_THREADS; i++) { ctx[i].mismatches == 0 here; }
 
     free(baseline);
     for (int i = 0; i < N_THREADS; i++) {
@@ -1810,6 +1826,88 @@ TEST(test_sdf_dispatch_thread_safety) {
     umbra_sdf_bounds_program_free(bounds);
     umbra_backend_free(be);
 }
+
+TEST(test_sdf_dispatch_thread_safety_interp) { sdf_thread_safety_for(umbra_backend_interp()); }
+TEST(test_sdf_dispatch_thread_safety_jit)    { sdf_thread_safety_for(umbra_backend_jit()); }
+
+// Non-SDF: one shared program, each thread dispatches its own disjoint
+// y-strip of the canvas.  Exercises concurrent access to the program's
+// per-dispatch scratch (interp v/var; jit's register allocation uses stack
+// so it's safe by construction but worth covering).  Dst writes are
+// disjoint between threads, so TSAN only fires on true scratch races.
+struct strip_fire_ctx {
+    struct umbra_program *p;
+    int                   l, t, r, b;
+};
+static void strip_fire(void *v) {
+    struct strip_fire_ctx *c = v;
+    c->p->queue(c->p, c->l, c->t, c->r, c->b, 0, NULL);
+}
+
+static void draw_thread_safety_for(struct umbra_backend *be) {
+    if (!be) { return; }
+    enum { W = 128, H = 128, N_THREADS = 4, ITERS = 16 };
+
+    umbra_color color = {0.25f, 0.5f, 0.75f, 1.0f};
+    umbra_rect  rect  = {8.5f, 8.5f, 120.5f, 120.5f};
+
+    uint32_t         *full     = calloc(W * H, sizeof *full);
+    struct umbra_buf  dst_slot = {.ptr = full, .count = W * H, .stride = W};
+
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr   const dp = umbra_early_bind_buf(b, &dst_slot);
+    umbra_val32 const dx = umbra_f32_from_i32(b, umbra_x(b)),
+                      dy = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_build_draw(b, dp, umbra_fmt_8888, dx, dy,
+                     umbra_coverage_rect, &rect,
+                     umbra_shader_color,  &color,
+                     umbra_blend_srcover, NULL);
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    umbra_builder_free(b);
+    struct umbra_program *p = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
+
+    uint32_t *baseline = calloc(W * H, sizeof *baseline);
+    dst_slot.ptr = baseline;
+    p->queue(p, 0, 0, W, H, 0, NULL);
+    be->flush(be);
+
+    // N threads, disjoint y-strips, all dispatching against the shared
+    // program + shared `full` dst (disjoint pixel ranges, no write overlap).
+    dst_slot.ptr = full;
+    int const           sh = (H + N_THREADS - 1) / N_THREADS;
+    pthread_t             th[N_THREADS];
+    struct race_ctx      ctx[N_THREADS];
+    struct strip_fire_ctx fire[N_THREADS];
+    uint32_t            *tbase[N_THREADS];
+    uint32_t            *tdst [N_THREADS];
+    for (int i = 0; i < N_THREADS; i++) {
+        int const y0 = i * sh,
+                  y1 = y0 + sh > H ? H : y0 + sh;
+        int const pixels = W * (y1 - y0);
+        tbase[i] = baseline + y0 * W;
+        tdst [i] = full     + y0 * W;
+        fire[i]  = (struct strip_fire_ctx){.p = p, .l = 0, .t = y0, .r = W, .b = y1};
+        ctx[i]   = (struct race_ctx){
+            .fire = strip_fire, .ctx = &fire[i],
+            .baseline = tbase[i], .dst = tdst[i],
+            .pixels = pixels, .iters = ITERS,
+        };
+        pthread_create(&th[i], NULL, race_worker, &ctx[i]);
+    }
+    for (int i = 0; i < N_THREADS; i++) { pthread_join(th[i], NULL); }
+    be->flush(be);
+
+    for (int i = 0; i < N_THREADS; i++) { ctx[i].mismatches == 0 here; }
+
+    free(baseline);
+    free(full);
+    umbra_program_free(p);
+    umbra_backend_free(be);
+}
+
+TEST(test_draw_thread_safety_interp) { draw_thread_safety_for(umbra_backend_interp()); }
+TEST(test_draw_thread_safety_jit)    { draw_thread_safety_for(umbra_backend_jit()); }
 
 TEST(test_metal_loop_gather) {
     // Sum of a[i] for i=0..2 via loop + bind_buf + gather.
