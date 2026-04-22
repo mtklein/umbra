@@ -75,9 +75,9 @@ struct slide_runtime {
 struct slide_runtime* slide_runtime(struct slide*, int w, int h,
                                     struct umbra_backend*, struct umbra_fmt,
                                     union transform const *pre_transform);
-void   slide_runtime_draw(struct slide_runtime*, struct slide*,
-                          double secs, int l, int t, int r, int b);
-void   slide_runtime_free(struct slide_runtime*);
+void   slide_runtime_animate(struct slide*, double secs);
+void   slide_runtime_draw   (struct slide_runtime*, int l, int t, int r, int b);
+void   slide_runtime_free   (struct slide_runtime*);
 
 // Build a fresh draw-side builder for a slide, without compiling.  Returns
 // NULL for slides that don't draw anything (no build_draw / build_sdf_draw).

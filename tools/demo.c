@@ -205,7 +205,7 @@ struct tile_work {
 static void tile_fn(void *arg) {
     struct tile_work *tw = arg;
     if (is_leaf(tw->s)) {
-        slide_runtime_draw(slide_rt, tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b);
+        slide_runtime_draw(slide_rt, tw->l, tw->t, tw->r, tw->b);
     } else {
         tw->s->draw(tw->s, tw->secs, tw->l, tw->t, tw->r, tw->b, tw->dst);
     }
@@ -363,6 +363,8 @@ int main(void) {
 
             uint64_t const freq = SDL_GetPerformanceFrequency();
             double const secs = (double)(SDL_GetPerformanceCounter() - t0) / (double)freq;
+
+            if (is_leaf(s)) { slide_runtime_animate(s, secs); }
 
             struct umbra_buf const dst = {
                 .ptr=pixbuf, .count=W*H*planes, .stride=W,

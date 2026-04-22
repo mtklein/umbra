@@ -244,7 +244,8 @@ static void render_hdr_at(struct slide *s, struct slide_runtime *rt,
             .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,
         };
         slide_bg_draw(bg, s->bg, 0, 0, RW, RH, rt->dst_buf);
-        slide_runtime_draw(rt, s, secs, 0, 0, RW, RH);
+        slide_runtime_animate(s, secs);
+        slide_runtime_draw(rt, 0, 0, RW, RH);
     } else {
         struct umbra_buf const dst = {
             .ptr=pixbuf, .count=RW * RH * fmt.planes, .stride=RW,

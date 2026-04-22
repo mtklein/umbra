@@ -30,7 +30,8 @@ struct slide_draw_ctx {
 static void slide_draw(void *vctx) {
     struct slide_draw_ctx *c = vctx;
     slide_bg_draw(c->bg, c->s->bg, 0, 0, c->w, c->h, c->rt->dst_buf);
-    slide_runtime_draw(c->rt, c->s, c->secs, 0, 0, c->w, c->h);
+    slide_runtime_animate(c->s, c->secs);
+    slide_runtime_draw(c->rt, 0, 0, c->w, c->h);
     c->secs += 1.0 / 60.0;
 }
 

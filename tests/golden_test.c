@@ -54,7 +54,8 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
                 .ptr=pbuf[bi], .count=W * H * fmt.planes, .stride=W,
             };
             slide_bg_draw(bg[bi], s->bg, 0, 0, W, H, rt[bi]->dst_buf);
-            slide_runtime_draw(rt[bi], s, 0, 0, 0, W, H);
+            slide_runtime_animate(s, 0);
+            slide_runtime_draw(rt[bi], 0, 0, W, H);
 
             bes[bi]->flush(bes[bi]);
         }

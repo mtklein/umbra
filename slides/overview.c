@@ -199,7 +199,8 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
 
             if (c->sub && c->rt && c->rt->draw) {
                 c->rt->dst_buf = st->out_buf;
-                slide_runtime_draw(c->rt, c->sub, secs, x0, yt, x1, yb);
+                slide_runtime_animate(c->sub, secs);
+                slide_runtime_draw(c->rt, x0, yt, x1, yb);
             }
         }
     }

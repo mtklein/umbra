@@ -174,10 +174,11 @@ struct slide_runtime* slide_runtime(struct slide *s,
     return rt;
 }
 
-void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
-                        double secs, int l, int t, int r, int b) {
+void slide_runtime_animate(struct slide *s, double secs) {
     if (s->animate) { s->animate(s, secs); }
+}
 
+void slide_runtime_draw(struct slide_runtime *rt, int l, int t, int r, int b) {
     if (rt->bounds) {
         umbra_sdf_dispatch(rt->bounds, rt->draw, rt->draw_full, l, t, r, b);
     } else {
