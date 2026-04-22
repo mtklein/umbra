@@ -2,13 +2,13 @@ builddir = out
 
 sysroot = /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 llvm    = /opt/homebrew/opt/llvm/bin
-clang   = $llvm/clang -fcolor-diagnostics
-cache   = /opt/homebrew/bin/ccache
+clang   = /usr/bin/clang -fcolor-diagnostics
 warn    = -Weverything $
           -Wno-declaration-after-statement $
           -Wno-disabled-macro-expansion $
           -Wno-implicit-void-ptr-cast $
           -Wno-nrvo $
+          -Wno-poison-system-directories $
           -Wno-pre-c11-compat $
           -Wno-switch-default $
           -Wno-unsafe-buffer-usage
@@ -19,7 +19,7 @@ warn    = -Weverything $
 profinfo = -fdebug-info-for-profiling
 
 rule compile
-    command = $cache $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
+    command = ccache $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
     depfile = $out.d
     deps    = gcc
 

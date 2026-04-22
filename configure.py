@@ -15,11 +15,6 @@ import shutil
 # not wherever the user ran `python3 configure.py` from.
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
-# Compiler launcher: empty string if ccache isn't installed.  Helps incremental
-# rebuilds across branch switches where identical sources recompile.
-CCACHE = shutil.which('ccache') or ''
-
-
 SRC    = sorted(glob.glob('src/*.c'))
 TESTS  = sorted(glob.glob('tests/*.c'))
 SLIDES = sorted(glob.glob('slides/*.c'))
@@ -70,17 +65,17 @@ def link_objs(entry, *extras):
     return ' '.join(objs)
 
 
-BUILD_NINJA = fr"""builddir = out
+BUILD_NINJA = r"""builddir = out
 
 sysroot = /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk
 llvm    = /opt/homebrew/opt/llvm/bin
-clang   = $llvm/clang -fcolor-diagnostics
-cache   = {CCACHE}
+clang   = /usr/bin/clang -fcolor-diagnostics
 warn    = -Weverything $
           -Wno-declaration-after-statement $
           -Wno-disabled-macro-expansion $
           -Wno-implicit-void-ptr-cast $
           -Wno-nrvo $
+          -Wno-poison-system-directories $
           -Wno-pre-c11-compat $
           -Wno-switch-default $
           -Wno-unsafe-buffer-usage
@@ -91,7 +86,7 @@ warn    = -Weverything $
 profinfo = -fdebug-info-for-profiling
 
 rule compile
-    command = $cache $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
+    command = ccache $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
     depfile = $out.d
     deps    = gcc
 
@@ -261,6 +256,7 @@ include build/project.ninja
 
 
 WASM_NINJA = r"""out  = $builddir/wasm
+clang = $llvm/clang
 cc   = $clang -target wasm32-wasip1 -msimd128 -B /opt/homebrew/opt/lld/bin -D_WASI_EMULATED_MMAN
 exec = env WASMTIME_BACKTRACE_DETAILS=1 wasmtime
 ldflags = -lwasi-emulated-mman
