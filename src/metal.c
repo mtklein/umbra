@@ -96,6 +96,7 @@ struct metal_backend {
     void *queue;
     void *batch_cmdbuf;     // currently-encoding cmdbuf for uni_pool.cur, or NULL
     void *batch_enc;        // serial compute encoder on batch_cmdbuf, or NULL
+    void *batch_pipeline;   // last pipeline set on batch_enc, or NULL
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
     struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
@@ -1185,7 +1186,10 @@ static void encode_dispatch(struct metal_program *p,
     int const w = r - l,
               h = b - t;
 
-    (void)msg_v_p(enc, SEL_setComputePipelineState, (id)p->pipeline);
+    if (be->batch_pipeline != p->pipeline) {
+        (void)msg_v_p(enc, SEL_setComputePipelineState, (id)p->pipeline);
+        be->batch_pipeline = p->pipeline;
+    }
 
     int const tb = p->total_bufs;
     assume(tb <= 32);
@@ -1273,7 +1277,8 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
             if (be->batch_enc) {
                 (void)msg((id)be->batch_enc, SEL_endEncoding);
                 release(be->batch_enc);
-                be->batch_enc = NULL;
+                be->batch_enc      = NULL;
+                be->batch_pipeline = NULL;
             }
             (void)msg((id)be->batch_cmdbuf, SEL_commit);
         }
