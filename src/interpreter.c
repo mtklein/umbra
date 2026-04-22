@@ -168,9 +168,7 @@ struct sw_inst {
 struct interp_program {
     struct umbra_program base;
     struct sw_inst *inst;
-    ival           *v;
-    ival           *var;
-    int             preamble, ptrs, bindings, vars;
+    int             preamble, ptrs, bindings, vars, v_slots, :32;
     struct buffer_binding *binding;
 };
 
@@ -187,8 +185,8 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             slots += 1;
         }
     }
-    p->inst = malloc((size_t)slots * sizeof *p->inst);
-    p->v = malloc((size_t)slots * sizeof *p->v);
+    p->inst    = malloc((size_t)slots * sizeof *p->inst);
+    p->v_slots = slots;
 
     int max_ptr = -1;
     for (int i = 0; i < ir->insts; i++) {
@@ -469,7 +467,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     }
 
     p->vars = ir->vars;
-    p->var    = ir->vars ? calloc((size_t)ir->vars, sizeof *p->var)  : NULL;
 
     free(id);
     umbra_flat_ir_free(resolved);
@@ -483,9 +480,13 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     struct umbra_buf buf[64];
     resolve_bindings(buf, p->binding, p->bindings, lates, late);
 
+    // TODO: thread-local cached scratch would save two mallocs per dispatch
+    // on CPU-heavy workloads; fine for now since interp is already slow.
+    ival *const v_base = malloc((size_t)p->v_slots * sizeof *v_base);
+    int  const           vars = p->vars;
+    ival *const var  = vars ? calloc((size_t)vars, sizeof *var) : NULL;
+
     int const      P   = p->preamble;
-    ival                 *var = p->var;
-    int const             vars = p->vars;
     I32                   if_mask_stack[8];
     int                   if_depth = 0;
 
@@ -494,7 +495,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             int const              end = col + K;
             int const              n   = r;
             struct sw_inst const  *ip  = p->inst + (col == l ? 0 : P);
-            ival                  *v   = p->v    + (col == l ? 0 : P);
+            ival                  *v   = v_base  + (col == l ? 0 : P);
 
             for (int vi = 0; vi < vars; vi++) { var[vi] = (ival){0}; }
             if_depth = 0;
@@ -1271,6 +1272,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             next_tile:;
         }
     }
+    free(var);
+    free(v_base);
 }
 #undef F32_IMM
 #undef DISPATCH
@@ -1281,8 +1284,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 static void interp_program_free(struct interp_program *p) {
     if (p) {
         free(p->inst);
-        free(p->v);
-        free(p->var);
         free(p->binding);
         free(p);
     }
