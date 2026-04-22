@@ -11,11 +11,9 @@ Perform code review of all unpushed commits.
    - **Cut corners needing immediate follow-up** before pushing — fix these now
      and commit the fixes.
    - **Future follow-ups** — leave `// TODO` comments in the code for these.
-   - **Style alignment** with CLAUDE.md guidelines (East const, braces, wrapping,
-     pointer placement, naming conventions, etc.) — fix any violations.
+   - **Style alignment** re-read CLAUDE.md and align these commits with its style guide
    - **Testing gaps** — check coverage output and identify untested paths.
      Write missing tests and commit them.
-   - **Reproducible performance changes** — if the diff touches hot paths, note
-     whether a bench comparison was done and what the results were.
+   - **Performance changes** — summarize results of a before/after run of bench
 4. Run `git grep TODO: -- ':!.claude'` and surface the full list of outstanding TODOs.
-5. Run `ninja` twice: once to verify everything works, once to confirm no-op.
+5. Run `ninja` twice: once to verify everything works, once to confirm dependency tracking no-op.

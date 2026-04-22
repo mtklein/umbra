@@ -15,32 +15,25 @@ buffers, which become visible after a backend `flush()`.
 
 Contributing
 ------------
-The user has final say on all decisions, particularly policy and design.
+The user has the final word on design and policy.
+Don't push to origin or amend a commit without the user's explicit assent.
 
-Never push to origin without the user's explicit permission.
-Always create new commits; never amend commits.
-
-Before each commit run `ninja` twice, once to make sure all builds and tests
-pass, then again to see that `ninja` is a no-op, checking that configure.py
-tracks dependencies correctly.
-
-Create atomic, cleanly-revertable commits that contain only one kind of code
-change and its related tests: a single feature's work and tests for that
-functionality, or a bug fix and a regression test, or no-op refactoring.
+Write cleanly-revertable commits that each contain one kind of code change and
+its related tests: a bug fix and regression test; a single feature's work and
+new tests for that functionality; or no-op refactoring.
 
 Use // TODO in the code to track bugs or anything that may need a follow up.
 
 Code Style
 ----------
-Write comments only for important context that is not obvious and cannot be
-expressed through code.  Never use comments for organization or decoration.  If
-you think you need a comment, see if you can express that information better by
-refactoring, improving identifier names, or by using the type system.
+Write comments very rarely, only for non-obvious context that cannot be
+expressed through code.  Never use comments for organization or decoration.
+Before adding a comment, see if refactoring, improved identifiers, or more
+expressive types can clarify without comments.
 
-Indent with 4 spaces, wrap to 100 columns, and always use {}.  Begin a new line
-after {, even for short expressions, except prefer to align conceptually
-parallel constructs vertically.  Group declarations of the same type and align
-on the =.
+Indent with 4 spaces, wrap to 100 columns, and always use {}.
+Begin a new line after almost every {, even for short expressions, except
+prefer to align conceptually parallel constructs vertically:
 
     if (foo) {
         bar++;
@@ -49,6 +42,8 @@ on the =.
     if (inst.x) { foo(&inst, x); }
     if (inst.y) { foo(&inst, y); }
 
+Group and align declarations of the same type:
+
     int const foo = fn(inst.x),
               bar = fn(inst.y),
               baz = fn(inst.z),
@@ -56,12 +51,15 @@ on the =.
     float const not_int = ...;
 
 Use East `const`, and use it liberally, especially to distinguish locals that
-name an immutable value like `double const start_time = now()` from locals that
-are storage locations to hold a updating value like `double elapsed = 0;
-elapsed += ...`.
+name an immutable value from locals that are storage locations to hold a updating value:
+
+    double const start_time = now();  // start_time is a name for an immutable value
+    double elapsed = 0;               // at a glance we can tell elapsed will change
+    ...
+    elapsed += ...;
 
 But use const pointers only in the extremely unusual situations where it helps
-to clarify which of several pointers will change and which will stay unchanged.
+clarify which of several pointers will change and which will stay unchanged.
 Pointer-to-const is so important that we want almost all uses of pointers and
 const together to be for pointer-to-const:
 
@@ -70,67 +68,91 @@ const together to be for pointer-to-const:
     int const *const p = &x;   // Confusing, avoid this unless really helpful for clarity.
     int       *const p = ...;  // Avoid this especially, looks too much like int const *p.
 
-Pointer `*` placement has two rules and they differ:
+Pointer `*` should be snug with variable and parameter names, or with the type
+of unnamed parameters, but with a function's return type, not a function's name:
 
-  - Variables and parameters: `*` on the name.    `int *p`, `char const *s`
-  - Function return types:    `*` on the type.    `struct foo* foo(...)`, `char const* name(...)`
+    int *foo;
+    char const* bar(int *x, int*);
 
-Never write `struct foo *foo(` — that puts `*` on the name for a return type.
-Never write `int* p` — that puts `*` on the type for a variable.
-Never leave `*` floating alone with spaces on both sides.
-
-    struct foo* foo(int *bar, int const*);    // return type * on type, params * on name
-
-Keep headers especially tidy, with minimal #includes and only inline functions
-when absolutely necessary, e.g. when using a macro like `__LINE__`.
+Keep headers tidy, with minimal #includes and only inline functions if
+technically unavoidable, e.g. when embedding a macro like `__LINE__`.
 
 Don't typedef public type names for enums, or for large struct or union types
 that are meant to be handled by reference, but do use typedef for small value
-struct or union types that are meant to be copied.
+struct or union types that are meant to be copied:
 
-Constructors should be named the type name, and other methods should be
-prefixed with that type name.  Let constructors' return types serve as
-declarations for opaque types.
+    enum umbra_foo {
+        ...
+    };
+    struct umbra_reference_type {
+        void *ptr;
+        int whatever;
+        ...
+    };
+    typedef union {
+        int x;
+        float y;
+    } umbra_value_type;
+
+Within implementation files, use whatever type names you feel make the code
+most clear.  Short type names and typedef aliases are fine, all the way down to
+things like `BB`, `I`, `P` when it's obvious in context what those mean.
+
+A type's constructor should be named the type name, and its other methods
+should be prefixed with that type name.  Let constructors' return types serve
+as declarations for opaque types.
 
     struct foo* foo(...);
     _Bool  foo_is_bar(struct foo const*);
     void   foo_quux  (struct foo*, int x);
     void   foo_free  (struct foo*);
 
-Write positive tests and let control flow nest naturally.
-Don't short-circuit loops or early-return from functions:
+Avoid returning early from functions or short-circuiting loops:
 
-    // good
+    if (!can_foo) {
+        return 0;  // Avoid
+    }
+    foo(...);
+    ...
+    return 1;
+
+    for (int i = 0; i < n; i++) {
+        if (!can_foo(arr[i])) {
+            continue;  // Avoid
+        }
+        foo(arr[i]);
+        ...
+    }
+
+Instead, write positive condition tests and let control flow nest naturally:
+
     if (can_foo) {
         foo(...);
+        ...
         return 1;
     }
     return 0;
 
-    // bad
-    if (!can_foo) {
-        return 0;
-    }
-    foo(...);
-    return 1;
-
-    // good
     for (int i = 0; i < n; i++) {
         if (can_foo(arr[i])) {
             foo(arr[i]);
+            ...
         }
     }
 
-    // bad
-    for (int i = 0; i < n; i++) {
-        if (!can_foo(arr[i])) { continue; }
-        foo(arr[i]);
-    }
-
 Count bytes with `size_t` and anything else with `int`.
+
+Use `size` or `bytes` in the name of `size_t`:
+
+    void   *buf;
+    size_t  size;  // or bytes, of buf_size, or buf_bytes, but not buf_count, not buf_len
+
 Name arrays in the singular and their counts in plural:
+
     struct inst *inst;
-    int          insts;   // not inst_count, not inst_len, not inst_size
+    int          insts;   // not n_inst, not n_insts, not inst_count, not inst_len, not inst_size
+
+Never use `len`; it's too ambiguous whether it refers to bytes or elements.
 
 Use count() to measure the number of elements of an array:
     int const test[] = {1,2,3,4,5};
@@ -139,15 +161,8 @@ Use count() to measure the number of elements of an array:
         bar(test + i);
     }
 
-If necessary include `size` in the name only when counting bytes,
-and very, very rarely `count` in the name when counting other things.
-    void   *buf;
-    size_t  buf_size;  // not buf_count, not buf_len
+Use assume(cond) for assumptions, preconditions, or assertions in non-test code.
 
-Use "size" in the name of byte counts and "count" in others; alway
-avoid "len".  Use count() with arrays.
-
-Use assume(cond) for assertions in non-test code.
-In tests use `here` with no parens:
-    x == 3 here;    // good
-    (x == 3) here;  // bad
+In tests make assertions with `here` using no parens:
+    x == 3 here;    // great
+    (x == 3) here;  // no, () not needed and sometimes can hide logic bugs
