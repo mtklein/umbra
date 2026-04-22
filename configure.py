@@ -108,6 +108,7 @@ rule cov_show
 
 subninja build/host.ninja
 subninja build/xsan.ninja
+subninja build/tsan.ninja
 subninja build/wasm.ninja
 subninja build/x86.ninja
 subninja build/x86_xsan.ninja
@@ -122,6 +123,7 @@ build build.ninja $
       build/project.ninja $
       build/host.ninja $
       build/xsan.ninja $
+      build/tsan.ninja $
       build/wasm.ninja $
       build/x86.ninja $
       build/x86_xsan.ninja $
@@ -281,6 +283,14 @@ include build/project.ninja
 """
 
 
+TSAN_NINJA = r"""out     = $builddir/tsan
+cc      = $clang -fsanitize=thread
+exec    = env TSAN_OPTIONS=halt_on_error=1:second_deadlock_stack=1
+ldflags = -fsanitize=thread -framework Metal -framework Foundation -L/opt/homebrew/lib -lMoltenVK -lwgpu_native
+include build/project.ninja
+"""
+
+
 
 XSAN_NINJA_PREFIX = f"""cov = -fprofile-instr-generate -fcoverage-mapping
 
@@ -357,6 +367,7 @@ FILES = {
     'build/project.ninja':       PROJECT_NINJA,
     'build/host.ninja':          HOST_NINJA,
     'build/xsan.ninja':          XSAN_NINJA,
+    'build/tsan.ninja':          TSAN_NINJA,
     'build/wasm.ninja':          WASM_NINJA,
     'build/x86.ninja':            X86_NINJA,
     'build/x86_xsan.ninja':      X86_XSAN_NINJA,
