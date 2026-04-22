@@ -3,8 +3,8 @@
 #include <stdint.h>
 
 struct text_cov {
-    uint16_t *data;
-    int       w, h;
+    uint8_t *data;
+    int      w, h;
 };
 
 struct text_cov text_rasterize(int W, int H, float font_size, _Bool sdf);

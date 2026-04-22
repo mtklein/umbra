@@ -106,7 +106,7 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
 
 TEST(test_perspective_text) {
     enum { BW = 16, BH = 8 };
-    uint16_t bmp[BW * BH];
+    uint8_t  bmp[BW * BH];
     __builtin_memset(bmp, 0, sizeof bmp);
     bmp[0 * BW + 8] = 255;
 
