@@ -64,6 +64,8 @@ struct umbra_program {
 };
 void umbra_program_free(struct umbra_program*);
 
+// TODO: add umbra_val8 + umbra_{load,store}_8[x4] peers to the 16-bit family
+// (useful for 1-byte coverage buffers and 8-bit-alpha AA paths).
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;
 
