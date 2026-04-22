@@ -108,9 +108,8 @@ struct metal_program {
     void *pipeline;
     char *src;
     struct buffer_metadata *buf;
-    int    max_ptr;
     int    total_bufs;
-    int    bindings, :32;
+    int    bindings;
     struct buffer_binding *binding;
 };
 
@@ -880,7 +879,6 @@ static char* build_source(IR const *orig_ir, struct umbra_flat_ir **out_resolved
     *out_resolved = resolved;
 
     int const total_bufs = ir->total_bufs;
-    int const max_ptr    = total_bufs - 1;
     struct buffer_metadata const *buf = ir->buf;
 
     SrcBuf b = {0};
@@ -912,7 +910,7 @@ static char* build_source(IR const *orig_ir, struct umbra_flat_ir **out_resolved
     emit(&b, "kernel void main0(\n");
     emit(&b,
          "    constant meta &m [[buffer(0)]]");
-    for (int p = 0; p <= max_ptr; p++) {
+    for (int p = 0; p < total_bufs; p++) {
         char const *type = buf[p].shift == 3 ? "half4"
                          : buf[p].shift == 2 ? "uint"
                          : buf[p].shift == 1 ? "ushort"
@@ -1039,7 +1037,6 @@ static struct metal_program* metal_program(
         ir = resolved;
 
         int    const total_bufs = ir->total_bufs;
-        int    const max_ptr    = total_bufs - 1;
         size_t const meta_bytes = (size_t)total_bufs * sizeof *ir->buf;
         struct buffer_metadata *buf = malloc(meta_bytes);
         __builtin_memcpy(buf, ir->buf, meta_bytes);
@@ -1117,7 +1114,6 @@ static struct metal_program* metal_program(
             struct metal_program *p = calloc(1, sizeof *p);
             p->pipeline      = (void*)pso;
             p->src           = src;
-            p->max_ptr       = max_ptr;
             p->total_bufs    = total_bufs;
             p->buf           = buf;
             p->bindings      = ir->bindings;
@@ -1181,37 +1177,26 @@ static void metal_cache_release(gpu_buf buf, void *ctx) {
     release(buf.ptr);
 }
 
-static void encode_dispatch(
-    struct metal_program *p,
-    int l, int t, int r, int b,
-    struct umbra_buf buf[],
-    void *enc
-) {
-    int w = r - l, h = b - t, x0 = l, y0 = t;
+static void encode_dispatch(struct metal_program *p,
+                            int l, int t, int r, int b,
+                            struct umbra_buf buf[], id enc) {
     struct metal_backend *be = (struct metal_backend*)p->base.backend;
+    int const w = r - l,
+              h = b - t;
 
     (void)msg_v_p(enc, SEL_setComputePipelineState, (id)p->pipeline);
 
-    int tb = p->total_bufs;
-    uint32_t buf_count[33] = {0};
-    uint32_t buf_stride[33] = {0};
-    for (int i = 0; i <= p->max_ptr; i++) {
-        if (buf[i].ptr && buf[i].count) {
-            buf_count[i] = (uint32_t)buf[i].count;
-        }
-        buf_stride[i] = (uint32_t)buf[i].stride;
-    }
-
-    void   *bind_handle[32];
-    size_t  bind_offset[32];
-    for (int i = 0; i < tb; i++) { bind_handle[i] = 0; bind_offset[i] = 0; }
+    int const tb = p->total_bufs;
+    assume(tb <= 32);
 
     _Bool pinned[32] = {0};
-    for (int k = 0; k < p->bindings; k++) {
-        if (binding_is_uniform(p->binding[k].kind)) { pinned[p->binding[k].ix] = 1; }
+    for (int i = 0; i < p->bindings; i++) {
+        pinned[p->binding[i].ix] = binding_is_uniform(p->binding[i].kind);
     }
 
-    for (int i = 0; i <= p->max_ptr; i++) {
+    void   *bind_handle[32] = {0};
+    size_t  bind_offset[32] = {0};
+    for (int i = 0; i < tb; i++) {
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << p->buf[i].shift;
             uint8_t const rw = p->buf[i].rw;
@@ -1227,32 +1212,27 @@ static void encode_dispatch(
         }
     }
 
-    uint32_t meta[67] = {0};
+    uint32_t meta[3 + 2*32];
     meta[0] = (uint32_t)w;
-    meta[1] = (uint32_t)x0;
-    meta[2] = (uint32_t)y0;
-    __builtin_memcpy(meta + 3,      buf_count, (size_t)tb * sizeof(uint32_t));
-    __builtin_memcpy(meta + 3 + tb, buf_stride, (size_t)tb * sizeof(uint32_t));
-    size_t const meta_bytes = (size_t)(3 + 2 * tb) * sizeof(uint32_t);
-    (void)msg_v_vuu(
-        enc, SEL_setBytes_length_atIndex,
-        meta, (NSUInteger)meta_bytes, (NSUInteger)0);
+    meta[1] = (uint32_t)l;
+    meta[2] = (uint32_t)t;
+    for (int i = 0; i < tb; i++) {
+        (meta)[3+i   ] = (uint32_t)buf[i].count;
+        (meta)[3+i+tb] = (uint32_t)buf[i].stride;
+    }
+    size_t const meta_bytes = (size_t)(3 + 2*tb) * sizeof(uint32_t);
+    (void)msg_v_vuu(enc, SEL_setBytes_length_atIndex,
+                    meta, (NSUInteger)meta_bytes, (NSUInteger)0);
 
     for (int i = 0; i < tb; i++) {
         if (bind_handle[i]) {
-            (void)msg_v_puu(
-                enc, SEL_setBuffer_offset_atIndex,
-                (id)bind_handle[i], (NSUInteger)bind_offset[i], (NSUInteger)(i + 1));
+            (void)msg_v_puu(enc, SEL_setBuffer_offset_atIndex,
+                            (id)bind_handle[i], (NSUInteger)bind_offset[i], (NSUInteger)(i + 1));
         }
     }
 
-    static int tg_size = 0;
-    if (!tg_size) {
-        char const *tg = getenv("UMBRA_METAL_THREADGROUP");
-        tg_size = tg ? atoi(tg) : 64;
-    }
     MTLSize grid  = {(NSUInteger)w, (NSUInteger)h, 1};
-    MTLSize group = {(NSUInteger)tg_size, 1, 1};
+    MTLSize group = {(NSUInteger)64, 1, 1};
     msg_v_ss(enc, SEL_dispatchThreads_threadsPerThreadgroup, grid, group);
     be->total_dispatches++;
 }
@@ -1266,7 +1246,7 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
 
     struct metal_backend *be = (struct metal_backend*)p->base.backend;
 
-    assume(p->max_ptr + 1 <= 32);
+    assume(p->total_bufs <= 32);
     struct umbra_buf buf[32];
     resolve_bindings(buf, p->binding, p->bindings, late, lates);
 
@@ -1275,10 +1255,8 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
         if (!be->batch_cmdbuf) {
             be->batch_cmdbuf = (void*)retain(msg(be->queue, SEL_commandBuffer));
         }
-        id enc = msg_u(
-            (id)be->batch_cmdbuf,
-            SEL_computeCommandEncoderWithDispatchType,
-            (NSUInteger)MTLDispatchTypeSerial);
+        id enc = msg_u((id)be->batch_cmdbuf, SEL_computeCommandEncoderWithDispatchType,
+                       (NSUInteger)MTLDispatchTypeSerial);
         encode_dispatch(p, l, t, r, b, buf, enc);
         (void)msg(enc, SEL_endEncoding);
     }
