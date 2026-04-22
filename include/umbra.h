@@ -160,6 +160,6 @@ void        umbra_if    (struct umbra_builder*, umbra_val32 cond);
 void        umbra_end_if(struct umbra_builder*);
 
 typedef struct { int id; } umbra_var32;
-umbra_var32 umbra_declare_var32(struct umbra_builder*);
+umbra_var32 umbra_declare_var32(struct umbra_builder*, umbra_val32 init);
 umbra_val32 umbra_load_var32   (struct umbra_builder*, umbra_var32);
 void        umbra_store_var32  (struct umbra_builder*, umbra_var32, umbra_val32);

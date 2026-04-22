@@ -340,15 +340,6 @@ struct jit_program* jit_program(struct jit_backend *be,
     cmp_ri(&c, R11, 8);
     int const br_tail = jcc(&c, 0x0c);
 
-    if (ir->vars > 0) {
-        int8_t zr = ra_alloc(ra, sl, &ns);
-        vpxor(&c, 1, zr, zr, zr);
-        for (int vi = 0; vi < ir->vars; vi++) {
-            vspill(&c, zr, vi);
-        }
-        ra_return_reg(ra, zr);
-    }
-
     int const simd_body_off = (int)c.size;
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 0, &jc);
 
@@ -372,14 +363,6 @@ struct jit_program* jit_program(struct jit_backend *be,
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
 
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
-    if (ir->vars > 0) {
-        int8_t zr = ra_alloc(ra, sl, &ns);
-        vpxor(&c, 1, zr, zr, zr);
-        for (int vi = 0; vi < ir->vars; vi++) {
-            vspill(&c, zr, vi);
-        }
-        ra_return_reg(ra, zr);
-    }
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 1, &jc);
 
     add_ri(&c, XCOL_X86, 1);

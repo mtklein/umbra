@@ -480,9 +480,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     struct umbra_buf buf[64];
     resolve_bindings(buf, p->binding, p->bindings, late, lates);
 
-    // var is zeroed at the top of each tile iteration below, so malloc is fine.
-    int  const  vars   = p->vars;
-    ival *const scratch = malloc(((size_t)p->v_slots + (size_t)vars) * sizeof *scratch);
+    ival *const scratch = malloc(((size_t)p->v_slots + (size_t)p->vars) * sizeof *scratch);
     ival *const v_base = scratch;
     ival *const var    = scratch + p->v_slots;
 
@@ -497,7 +495,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             struct sw_inst const  *ip  = p->inst + (col == l ? 0 : P);
             ival                  *v   = v_base  + (col == l ? 0 : P);
 
-            for (int vi = 0; vi < vars; vi++) { var[vi] = (ival){0}; }
             if_depth = 0;
 
             ival acc = {0};

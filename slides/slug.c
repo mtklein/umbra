@@ -128,10 +128,11 @@ static umbra_val32 coverage_slug_winding(void *vctx, struct umbra_builder *b,
         umbra_and_32(b, umbra_le_f32(b, c.z, x), umbra_lt_f32(b, x, bw)),
         umbra_and_32(b, umbra_le_f32(b, c.z, y), umbra_lt_f32(b, y, bh)));
 
-    umbra_var32 const xacc = umbra_declare_var32(b),
-                      yacc = umbra_declare_var32(b),
-                      xwgt = umbra_declare_var32(b),
-                      ywgt = umbra_declare_var32(b);
+    umbra_val32 const zero_f = umbra_imm_f32(b, 0.0f);
+    umbra_var32 const xacc = umbra_declare_var32(b, zero_f),
+                      yacc = umbra_declare_var32(b, zero_f),
+                      xwgt = umbra_declare_var32(b, zero_f),
+                      ywgt = umbra_declare_var32(b, zero_f);
 
     umbra_val32 j = umbra_loop(b, n); {
         umbra_val32 k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));

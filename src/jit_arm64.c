@@ -339,15 +339,6 @@ struct jit_program* jit_program(struct jit_backend *be,
     int const br_tail = c.words;
     put(&c, Bcond(0xb, 0));
 
-    if (ir->vars > 0) {
-        int8_t zr = ra_alloc(ra, sl, &ns);
-        put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
-        for (int vi = 0; vi < ir->vars; vi++) {
-            put(&c, STP_qi(lo(zr), lo(zr), XS, 2 * vi));
-        }
-        ra_return_reg(ra, zr);
-    }
-
     int const simd_body_off = c.words * 4;
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 0,
              &jc);
@@ -370,14 +361,6 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0,
              &jc);
-    if (ir->vars > 0) {
-        int8_t zr = ra_alloc(ra, sl, &ns);
-        put(&c, EOR_16b(lo(zr), lo(zr), lo(zr)));
-        for (int vi = 0; vi < ir->vars; vi++) {
-            put(&c, STP_qi(lo(zr), lo(zr), XS, 2 * vi));
-        }
-        ra_return_reg(ra, zr);
-    }
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 1,
              &jc);
 

@@ -518,10 +518,8 @@ static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
     umbra_imm_i32(b, 5);
     umbra_imm_i32(b, 6);
 
-    umbra_var32 lo_var = umbra_declare_var32(b);
-    umbra_var32 hi_var = umbra_declare_var32(b);
-    umbra_store_var32(b, lo_var, umbra_imm_f32(b, 1e9f));
-    umbra_store_var32(b, hi_var, umbra_imm_f32(b, 1e9f));
+    umbra_var32 lo_var = umbra_declare_var32(b, umbra_imm_f32(b, 1e9f));
+    umbra_var32 hi_var = umbra_declare_var32(b, umbra_imm_f32(b, 1e9f));
 
     umbra_val32 const j = umbra_loop(b, n); {
         umbra_val32 const k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));
@@ -690,10 +688,8 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
 
     umbra_val32 const n_iter = umbra_shl_i32(b, n, lgN);
 
-    umbra_var32 const dist = umbra_declare_var32(b),
-                      par  = umbra_declare_var32(b);
-    umbra_store_var32(b, dist, umbra_imm_f32(b, 1e9f));
-    umbra_store_var32(b, par,  umbra_imm_i32(b, 0));
+    umbra_var32 const dist = umbra_declare_var32(b, umbra_imm_f32(b, 1e9f)),
+                      par  = umbra_declare_var32(b, umbra_imm_i32(b, 0));
 
     umbra_val32 const j = umbra_loop(b, n_iter); {
         umbra_val32 const curve_id = umbra_shr_u32(b, j, lgN),
@@ -840,10 +836,8 @@ static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
     umbra_ptr const data = umbra_early_bind_buf(b, &self->hp);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_sides));
 
-    umbra_var32 lo_var = umbra_declare_var32(b);
-    umbra_var32 hi_var = umbra_declare_var32(b);
-    umbra_store_var32(b, lo_var, umbra_imm_f32(b, -1e9f));
-    umbra_store_var32(b, hi_var, umbra_imm_f32(b, -1e9f));
+    umbra_var32 lo_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));
+    umbra_var32 hi_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));
 
     umbra_val32 const j = umbra_loop(b, n); {
         umbra_val32 const idx = umbra_mul_i32(b, j, umbra_imm_i32(b, 3));

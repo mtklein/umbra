@@ -537,7 +537,7 @@ umbra_val32 umbra_loop(builder *b, umbra_val32 n) {
     assume(b->inst[n.id].uniform);
     b->has_loop   = 1;
     b->loop_trip  = n;
-    b->loop_var   = umbra_declare_var32(b);
+    b->loop_var   = umbra_declare_var32(b, umbra_imm_i32(b, 0));
     push(b, op_loop_begin, VX(n), .imm = b->loop_var.id);
     return umbra_load_var32(b, b->loop_var);
 }
@@ -551,11 +551,13 @@ void umbra_end_loop(builder *b) {
     push(b, op_loop_end, VX(b->loop_trip), .imm = b->loop_var.id);
 }
 
-umbra_var32 umbra_declare_var32(builder *b) {
+umbra_var32 umbra_declare_var32(builder *b, umbra_val32 init) {
     int const id = b->vars++;
     b->var_uniform = realloc(b->var_uniform, (size_t)b->vars * sizeof *b->var_uniform);
     b->var_uniform[id] = 1;
-    return (umbra_var32){.id = id};
+    umbra_var32 const v = {.id = id};
+    umbra_store_var32(b, v, init);
+    return v;
 }
 
 umbra_val32 umbra_load_var32(builder *b, umbra_var32 v) {

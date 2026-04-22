@@ -33,7 +33,7 @@ TEST(resolve_with_loop) {
     struct umbra_builder *b = umbra_builder();
     umbra_ptr const u   = umbra_early_bind_uniforms(b, uni, 1);
     umbra_ptr const dst = umbra_early_bind_buf(b, &dummy);
-    umbra_var32 acc = umbra_declare_var32(b);
+    umbra_var32 acc = umbra_declare_var32(b, umbra_imm_i32(b, 0));
     umbra_val32 trip = umbra_uniform_32(b, u, 0);
     umbra_val32 j = umbra_loop(b, trip); {
         umbra_val32 prev = umbra_load_var32(b, acc);

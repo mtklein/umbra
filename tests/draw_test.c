@@ -1933,8 +1933,7 @@ TEST(test_metal_loop_gather) {
     umbra_ptr const data = umbra_early_bind_buf(b, &arr_buf);
     umbra_val32 const n    = umbra_uniform_32(b, u, n_slot);
 
-    umbra_var32 sum = umbra_declare_var32(b);
-    umbra_store_var32(b, sum, umbra_imm_f32(b, 0.0f));
+    umbra_var32 sum = umbra_declare_var32(b, umbra_imm_f32(b, 0.0f));
 
     umbra_val32 const j = umbra_loop(b, n); {
         umbra_val32 const val = umbra_gather_32(b, data, j);

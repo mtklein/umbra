@@ -285,10 +285,8 @@ TEST(interval_loop) {
     umbra_interval const x = {umbra_uniform_32(bld, u, x_off),
                               umbra_uniform_32(bld, u, x_off + 1)};
 
-    umbra_var32 lo_var = umbra_declare_var32(bld);
-    umbra_var32 hi_var = umbra_declare_var32(bld);
-    umbra_store_var32(bld, lo_var, umbra_imm_f32(bld, -1e9f));
-    umbra_store_var32(bld, hi_var, umbra_imm_f32(bld, -1e9f));
+    umbra_var32 lo_var = umbra_declare_var32(bld, umbra_imm_f32(bld, -1e9f));
+    umbra_var32 hi_var = umbra_declare_var32(bld, umbra_imm_f32(bld, -1e9f));
 
     umbra_val32 const j = umbra_loop(bld, n); {
         umbra_val32 const idx = umbra_mul_i32(bld, j, umbra_imm_i32(bld, 2));
