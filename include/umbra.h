@@ -26,10 +26,9 @@ struct umbra_backend {
     void                       (*flush  )(struct umbra_backend*);
     void                       (*free   )(struct umbra_backend*);
     struct umbra_backend_stats (*stats  )(struct umbra_backend const*);
-    _Bool queue_is_threadsafe;      // two queue() calls on different programs may overlap
     _Bool queue_is_cheap;           // OK to do many small queue() calls
     _Bool program_switch_is_cheap;  // OK to alternate programs between dispatches
-    int :8, :32;
+    int :16, :32;
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
@@ -63,7 +62,7 @@ struct umbra_program {
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
-    // backend->queue_is_threadsafe && IR stores only to late bindings.
+    // Set by CPU backends iff the IR stores only to late bindings.  GPU backends leave it 0.
     _Bool                 queue_is_threadsafe; int :24,:32;
 };
 void umbra_program_free(struct umbra_program*);

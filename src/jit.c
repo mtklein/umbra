@@ -116,7 +116,7 @@ static struct umbra_program* compile_jit(struct umbra_backend *be, struct umbra_
         .dump       = dump_jit,
         .free       = free_jit,
         .backend    = be,
-        .queue_is_threadsafe = be->queue_is_threadsafe && !flat_ir_has_early_writes(ir),
+        .queue_is_threadsafe = !flat_ir_has_early_writes(ir),
     };
     return &j->base;
 }
@@ -143,7 +143,6 @@ struct umbra_backend* umbra_backend_jit(void) {
         .flush   = flush_be_noop,
         .free    = free_be_jit,
         .stats   = stats_zero,
-        .queue_is_threadsafe     = 1,
         .queue_is_cheap          = 1,
         .program_switch_is_cheap = 1,
     };

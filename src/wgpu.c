@@ -691,7 +691,6 @@ static struct umbra_program* wgpu_compile_fn(struct umbra_backend *be,
     p->dump    = wgpu_program_dump;
     p->free    = wgpu_program_free;
     p->backend = be;
-    p->queue_is_threadsafe = be->queue_is_threadsafe && !flat_ir_has_early_writes(ir);
     return p;
 }
 

@@ -553,7 +553,6 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     p->base.dump    = vk_program_dump;
     p->base.free    = vk_program_free;
     p->base.backend = be;
-    p->base.queue_is_threadsafe = be->queue_is_threadsafe && !flat_ir_has_early_writes(ir);
     return &p->base;
 }
 
