@@ -88,7 +88,7 @@ umbra_blend umbra_blend_src,
 //   out = blend(src,dst)
 //   fmt.store(lerp(cov, dst,out))
 // NULL effects provide default behavior: coverage=1, shader={0,0,0,0}, blend=src.
-// dst_ptr must already be bound on the builder via umbra_early_bind_buf().
+// dst_ptr must already be bound on the builder (early or late).
 void umbra_build_draw(struct umbra_builder*,
                       umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                       umbra_val32 x, umbra_val32 y,
