@@ -13,8 +13,6 @@ void   umbra_flat_ir_dump(struct umbra_flat_ir const*, FILE*);
 
 struct umbra_backend_stats {
     double gpu_sec;
-    double encode_sec;
-    double submit_sec;
     size_t upload_bytes, pad;
     int    uniform_ring_rotations;
     int    dispatches;

@@ -14,7 +14,6 @@ struct umbra_backend* umbra_backend_metal(void) { return 0; }
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 #include <unistd.h>
 
 typedef void* id;
@@ -89,12 +88,6 @@ static void init_sel_cache(void) {
 
 typedef struct umbra_flat_ir IR;
 
-static double now(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
-}
-
 enum { METAL_N_FRAMES = 2 };
 
 struct metal_backend {
@@ -106,8 +99,6 @@ struct metal_backend {
     struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
     double gpu_time_accum;
-    double encode_time_accum;
-    double submit_time_accum;
     int    total_dispatches;
     int    total_submits;
 };
@@ -1288,9 +1279,7 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
             (id)be->batch_cmdbuf,
             SEL_computeCommandEncoderWithDispatchType,
             (NSUInteger)MTLDispatchTypeSerial);
-        double const t0 = now();
         encode_dispatch(p, l, t, r, b, buf, enc);
-        be->encode_time_accum += now() - t0;
         (void)msg(enc, SEL_endEncoding);
     }
     objc_autoreleasePoolPop(pool);
@@ -1298,13 +1287,11 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
 
 static void metal_submit_cmdbuf(struct metal_backend *be) {
     if (be->batch_cmdbuf) {
-        double const t0 = now();
         void *pool = objc_autoreleasePoolPush();
         {
             (void)msg((id)be->batch_cmdbuf, SEL_commit);
         }
         objc_autoreleasePoolPop(pool);
-        be->submit_time_accum += now() - t0;
         be->total_submits++;
         be->frame_committed[be->uni_pool.cur] = be->batch_cmdbuf;
         be->batch_cmdbuf                      = NULL;
@@ -1374,8 +1361,6 @@ static struct umbra_backend_stats stats_metal(struct umbra_backend const *be) {
     struct metal_backend const *mbe = (struct metal_backend const*)be;
     return (struct umbra_backend_stats){
         .gpu_sec                = mbe->gpu_time_accum,
-        .encode_sec             = mbe->encode_time_accum,
-        .submit_sec             = mbe->submit_time_accum,
         .uniform_ring_rotations = mbe->uni_pool.rotations,
         .dispatches             = mbe->total_dispatches,
         .submits                = mbe->total_submits,

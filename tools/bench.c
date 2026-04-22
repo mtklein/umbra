@@ -91,8 +91,6 @@ static double bench(draw_fn draw, void *ctx, struct umbra_backend *be,
             best = dt;
             best_stats = (struct umbra_backend_stats){
                 .gpu_sec    = gpu_dt,
-                .encode_sec = s1.encode_sec - s0.encode_sec,
-                .submit_sec = s1.submit_sec - s0.submit_sec,
                 .dispatches = s1.dispatches - s0.dispatches,
                 .submits    = s1.submits    - s0.submits,
                 .upload_bytes = s1.upload_bytes - s0.upload_bytes,

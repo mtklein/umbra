@@ -14,13 +14,6 @@ struct umbra_backend* umbra_backend_vulkan(void) { return 0; }
 #else
 
 #include <vulkan/vulkan.h>
-#include <time.h>
-
-static double now(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
-}
 
 struct vk_buf_handle {
     VkBuffer       buf;
@@ -49,8 +42,6 @@ struct vk_backend {
     VkQueryPool           ts_pool;                         // 2 timestamps per frame
     double                timestamp_period;                // ns per tick
     double                gpu_time_accum;
-    double                encode_time_accum;
-    double                submit_time_accum;
     struct gpu_buf_cache  cache;
     struct uniform_ring_pool uni_pool;
     int                   total_dispatches;
@@ -270,7 +261,6 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     struct umbra_buf buf[32];
     resolve_bindings(buf, vp->binding, vp->bindings, late, lates);
 
-    double const encode_t0 = now();
     begin_batch(be);
 
     int n = vp->total_bufs;
@@ -388,7 +378,6 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     be->batch_has_dispatch = 1;
     uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     vkCmdDispatch(be->batch_cmd, gx, (uint32_t)h, 1);
-    be->encode_time_accum += now() - encode_t0;
     be->total_dispatches++;
 
     for (int i = 0; i < n; i++) {
@@ -579,8 +568,6 @@ static void vk_wait_frame(int frame, void *ctx) {
 // running) and resets that ring. Cache entries stay live across rotation.
 static void vk_submit_cmdbuf(struct vk_backend *v) {
     if (v->batch_cmd) {
-        double const t0 = now();
-
         if (v->ts_pool) {
             vkCmdWriteTimestamp(v->batch_cmd, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                                 v->ts_pool, (uint32_t)v->uni_pool.cur * 2 + 1);
@@ -593,7 +580,6 @@ static void vk_submit_cmdbuf(struct vk_backend *v) {
             .pCommandBuffers=&v->batch_cmd,
         };
         vkQueueSubmit(v->queue, 1, &si, v->frame_fences[v->uni_pool.cur]);
-        v->submit_time_accum += now() - t0;
         v->total_submits++;
 
         v->frame_committed[v->uni_pool.cur] = v->batch_cmd;
@@ -618,8 +604,6 @@ static struct umbra_backend_stats vk_stats(struct umbra_backend const *be) {
     struct vk_backend const *v = (struct vk_backend const*)be;
     return (struct umbra_backend_stats){
         .gpu_sec                = v->gpu_time_accum,
-        .encode_sec             = v->encode_time_accum,
-        .submit_sec             = v->submit_time_accum,
         .uniform_ring_rotations = v->uni_pool.rotations,
         .dispatches             = v->total_dispatches,
         .submits                = v->total_submits,
