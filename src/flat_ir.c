@@ -59,8 +59,8 @@ void resolve_bindings(struct umbra_buf *out,
 
 struct sched {
     int last_use[4], // Per-channel: latest instruction that reads this value, or -1.
-        n_deps,      // Unscheduled instructions this one still waits on.  Ready at 0.
-        n_users,     // Instructions that read this one's values.  Decremented as scheduled.
+        deps,        // Unscheduled instructions this one still waits on.  Ready at 0.
+        users,       // Instructions that read this one's values.  Decremented as scheduled.
         user_off,    // Start index into the users[] array for this instruction's user list.
         ready_idx;   // This instruction's position in the ready[] worklist.
 };
@@ -91,8 +91,8 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
 
     {
         int readied_ops = 0;
-        for (int u = meta[c].user_off; u < meta[c].user_off + meta[c].n_users; u++) {
-            readied_ops += meta[users[u]].n_deps == 1/*i.e. this op*/;
+        for (int u = meta[c].user_off; u < meta[c].user_off + meta[c].users; u++) {
+            readied_ops += meta[users[u]].deps == 1/*i.e. this op*/;
         }
 
         score += readied_ops * reg_pressure;
@@ -138,16 +138,16 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
                 int const d = deps[k].id;
                 meta[d].last_use[deps[k].chan] = i;
                 if (is_body(in + d) && d >= region_lo && d < region_hi) {
-                    meta[i].n_deps++;
-                    meta[d].n_users++;
+                    meta[i].deps++;
+                    meta[d].users++;
                 }
             }
             if (in[i].op == op_store_var) {
                 for (int j = region_lo; j < i; j++) {
                     if (in[j].op == op_load_var && in[j].imm == in[i].imm
                             && is_body(in + j)) {
-                        meta[i].n_deps++;
-                        meta[j].n_users++;
+                        meta[i].deps++;
+                        meta[j].users++;
                         meta[j].last_use[0] = i;
                     }
                 }
@@ -156,8 +156,8 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
     }
 
     for (int i = 0; i < n; i++) {
-        meta[i + 1].user_off = meta[i].user_off + meta[i].n_users;
-        meta[i].n_users = 0;
+        meta[i + 1].user_off = meta[i].user_off + meta[i].users;
+        meta[i].users = 0;
     }
     int *buf = calloc((size_t)(meta[n].user_off + n), sizeof *buf);
     int *users = buf;
@@ -169,14 +169,14 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
             for (int k = 0; k < 4; k++) {
                 if (is_body(in + deps[k]) && deps[k] >= region_lo && deps[k] < region_hi) {
                     int const d = deps[k];
-                    users[meta[d].user_off + meta[d].n_users++] = i;
+                    users[meta[d].user_off + meta[d].users++] = i;
                 }
             }
             if (in[i].op == op_store_var) {
                 for (int j = region_lo; j < i; j++) {
                     if (in[j].op == op_load_var && in[j].imm == in[i].imm
                             && is_body(in + j)) {
-                        users[meta[j].user_off + meta[j].n_users++] = i;
+                        users[meta[j].user_off + meta[j].users++] = i;
                     }
                 }
             }
@@ -185,7 +185,7 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
 
     int nready = 0;
     for (int i = 0; i < n; i++) {
-        if (is_body(in + i) && i >= region_lo && i < region_hi && meta[i].n_deps == 0) {
+        if (is_body(in + i) && i >= region_lo && i < region_hi && meta[i].deps == 0) {
             ready[nready++] = i;
         }
     }
@@ -218,8 +218,8 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
         out[j++] = in[id];
         prev = id;
 
-        for (int u = meta[id].user_off; u < meta[id].user_off + meta[id].n_users; u++) {
-            if (--meta[users[u]].n_deps == 0) {
+        for (int u = meta[id].user_off; u < meta[id].user_off + meta[id].users; u++) {
+            if (--meta[users[u]].deps == 0) {
                 meta[users[u]].ready_idx = nready;
                 ready[nready++] = users[u];
             }
