@@ -173,33 +173,36 @@ umbra_val32 umbra_imm_f32(builder *b, float v) {
     return umbra_imm_i32(b, u.i);
 }
 
-umbra_val16 umbra_gather_16(builder *b, umbra_ptr src, umbra_val32 ix) {
-    return push16(b, op_gather_16, VX(ix), .ptr = {.p = src});
-}
-umbra_val32 umbra_gather_8(builder *b, umbra_ptr src, umbra_val32 ix) {
-    return push32(b, op_gather_8, VX(ix), .ptr = {.p = src});
-}
-umbra_val32 umbra_load_32(builder *b, umbra_ptr src) {
-    return push32(b, op_load_32, .ptr = {.p = src});
-}
-umbra_val16 umbra_load_16(builder *b, umbra_ptr src) {
-    return push16(b, op_load_16, .ptr = {.p = src});
-}
-umbra_val32 umbra_load_8(builder *b, umbra_ptr src) {
-    return push32(b, op_load_8, .ptr = {.p = src});
-}
 umbra_val32 umbra_uniform_32(builder *b, umbra_ptr src, int slot) {
     return push32(b, op_uniform_32, .imm = slot, .ptr = {.p = src});
+}
+
+umbra_val16 umbra_gather_16(builder *b, umbra_ptr src, umbra_val32 ix) {
+    return push16(b, op_gather_16, VX(ix), .ptr = {.p = src});
 }
 umbra_val32 umbra_gather_32(builder *b, umbra_ptr src, umbra_val32 ix) {
     enum op const op = b->inst[ix.id].uniform ? op_gather_uniform_32 : op_gather_32;
     return push32(b, op, VX(ix), .ptr = {.p = src});
 }
-void umbra_store_32(builder *b, umbra_ptr dst, umbra_val32 v) {
-    push(b, op_store_32, VY(v), .ptr = {.p = dst});
+umbra_val32 umbra_gather_8(builder *b, umbra_ptr src, umbra_val32 ix) {
+    return push32(b, op_gather_8, VX(ix), .ptr = {.p = src});
 }
+
+umbra_val16 umbra_load_16(builder *b, umbra_ptr src) {
+    return push16(b, op_load_16, .ptr = {.p = src});
+}
+umbra_val32 umbra_load_32(builder *b, umbra_ptr src) {
+    return push32(b, op_load_32, .ptr = {.p = src});
+}
+umbra_val32 umbra_load_8(builder *b, umbra_ptr src) {
+    return push32(b, op_load_8, .ptr = {.p = src});
+}
+
 void umbra_store_16(builder *b, umbra_ptr dst, umbra_val16 v) {
     push(b, op_store_16, VY(v), .ptr = {.p = dst});
+}
+void umbra_store_32(builder *b, umbra_ptr dst, umbra_val32 v) {
+    push(b, op_store_32, VY(v), .ptr = {.p = dst});
 }
 void umbra_store_8(builder *b, umbra_ptr dst, umbra_val32 v) {
     push(b, op_store_8, VY(v), .ptr = {.p = dst});
