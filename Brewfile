@@ -1,3 +1,4 @@
+brew "ccache"
 brew "gcc"
 brew "lld"
 brew "llvm"
