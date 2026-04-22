@@ -347,6 +347,22 @@ void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
     }
 }
 
+// TODO: umbra_sdf_dispatch is not thread-safe.  The bounds program's
+// uniforms (base_x/y/tile_w/h) and cov buffer are mutable state on the
+// shared `bounds` struct, and the compiled bounds program has its
+// bindings baked to point into that struct.  Two threads calling this
+// concurrently race on the realloc, trample each other's uniforms, and
+// overwrite cov[] before reading it back.
+//
+// Two possible fixes:
+//   (a) Expose a binding-override mechanism on queue() so callers can
+//       pass thread-local umbra_buf pointers per call.  Public API keeps
+//       its "queue_is_threadsafe" promise; caller shoulders the scratch
+//       allocation.
+//   (b) Drop the external thread-safety promise for umbra_sdf_dispatch
+//       and have it manage its own worker pool / per-thread scratch
+//       internally.  Narrower API change, limits parallelism to what
+//       we know how to manage.
 void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
