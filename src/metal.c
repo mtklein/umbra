@@ -1197,7 +1197,7 @@ static void encode_dispatch(
 
     _Bool pinned[32] = {0};
     for (int k = 0; k < p->bindings; k++) {
-        if (!p->binding[k].buf) { pinned[p->binding[k].ix] = 1; }
+        if (binding_is_uniform(p->binding[k].kind)) { pinned[p->binding[k].ix] = 1; }
     }
 
     for (int i = 0; i <= p->max_ptr; i++) {
@@ -1248,7 +1248,8 @@ static void encode_dispatch(
 
 static void metal_submit_cmdbuf(struct metal_backend *be);
 
-static void metal_program_queue(struct metal_program *p, int l, int t, int r, int b) {
+static void metal_program_queue(struct metal_program *p, int l, int t, int r, int b,
+                                int lates, struct umbra_late_binding const *late) {
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
 
@@ -1256,9 +1257,7 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
 
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < p->bindings; i++) {
-        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].uniforms;
-    }
+    resolve_bindings(buf, p->binding, p->bindings, lates, late);
 
     void *pool = objc_autoreleasePoolPush();
     {
@@ -1324,8 +1323,9 @@ static void metal_program_dump(
     }
 }
 
-static void run_metal(struct umbra_program *prog, int l, int t, int r, int b) {
-    metal_program_queue((struct metal_program*)prog, l, t, r, b);
+static void run_metal(struct umbra_program *prog, int l, int t, int r, int b,
+                      int lates, struct umbra_late_binding const *late) {
+    metal_program_queue((struct metal_program*)prog, l, t, r, b, lates, late);
 }
 static void dump_metal(struct umbra_program const *prog, FILE *f) {
     metal_program_dump((struct metal_program const*)prog, f);

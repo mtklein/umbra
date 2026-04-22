@@ -1700,7 +1700,7 @@ TEST(test_sdf_dispatch_tiling) {
     umbra_sdf_dispatch(bounds, tiled, tiled, 0, 0, W, H);
 
     flat_dst_slot = (struct umbra_buf){.ptr = flat_buf, .count = W * H, .stride = W};
-    flat->queue(flat, 0, 0, W, H);
+    flat->queue(flat, 0, 0, W, H, 0, NULL);
 
     be->flush(be);
 
@@ -1766,7 +1766,7 @@ TEST(test_metal_loop_gather) {
         if (bes[bi]) {
             struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
             out = 0;
-            prog->queue(prog, 0, 0, 1, 1);
+            prog->queue(prog, 0, 0, 1, 1, 0, NULL);
             bes[bi]->flush(bes[bi]);
             equiv(out, 60.0f) here;
             umbra_program_free(prog);

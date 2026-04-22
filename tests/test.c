@@ -57,7 +57,7 @@ struct test_backends test_backends_make(struct umbra_flat_ir const *ir) {
 
 _Bool test_backends_run(struct test_backends *B, int bi, int r, int b) {
     if (B->p[bi]) {
-        B->p[bi]->queue(B->p[bi], 0, 0, r, b);
+        B->p[bi]->queue(B->p[bi], 0, 0, r, b, 0, NULL);
         B->be[bi]->flush(B->be[bi]);
         return 1;
     }

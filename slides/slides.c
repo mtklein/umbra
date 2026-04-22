@@ -94,7 +94,7 @@ void slide_bg_draw(struct slide_bg *bg, umbra_color color,
                    int l, int t, int r, int b, struct umbra_buf dst) {
     bg->color   = color;
     bg->dst_buf = dst;
-    bg->prog->queue(bg->prog, l, t, r, b);
+    bg->prog->queue(bg->prog, l, t, r, b, 0, NULL);
 }
 
 void slide_bg_free(struct slide_bg *bg) {
@@ -181,7 +181,7 @@ void slide_runtime_draw(struct slide_runtime *rt, struct slide *s,
     if (rt->bounds) {
         umbra_sdf_dispatch(rt->bounds, rt->draw, rt->draw_full, l, t, r, b);
     } else {
-        rt->draw->queue(rt->draw, l, t, r, b);
+        rt->draw->queue(rt->draw, l, t, r, b, 0, NULL);
     }
 }
 

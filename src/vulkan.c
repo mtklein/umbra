@@ -260,7 +260,8 @@ static void vk_cache_release(gpu_buf buf, void *ctx) {
 static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
 
-static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b) {
+static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
+                             int lates, struct umbra_late_binding const *late) {
     struct vk_program *vp = (struct vk_program *)p;
     struct vk_backend *be = vp->be;
 
@@ -269,10 +270,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     assume(vp->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < vp->bindings; i++) {
-        struct buffer_binding const *bb = &vp->binding[i];
-        buf[bb->ix] = bb->buf ? *bb->buf : bb->uniforms;
-    }
+    resolve_bindings(buf, vp->binding, vp->bindings, lates, late);
 
     double const encode_t0 = now();
     begin_batch(be);
@@ -295,7 +293,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     _Bool pinned[32] = {0};
     for (int k = 0; k < vp->bindings; k++) {
-        if (!vp->binding[k].buf) { pinned[vp->binding[k].ix] = 1; }
+        if (binding_is_uniform(vp->binding[k].kind)) { pinned[vp->binding[k].ix] = 1; }
     }
 
     for (int i = 0; i <= vp->max_ptr; i++) {

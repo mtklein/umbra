@@ -34,15 +34,6 @@ struct umbra_backend* umbra_backend_vulkan(void);
 struct umbra_backend* umbra_backend_wgpu  (void);
 void   umbra_backend_free(struct umbra_backend*);
 
-struct umbra_program {
-    void (*queue)(struct umbra_program*, int l, int t, int r, int b);
-    void (*dump )(struct umbra_program const*, FILE*);
-    void (*free )(struct umbra_program*);
-    struct umbra_backend *backend;
-    _Bool                 queue_is_threadsafe; int :24,:32;
-};
-void umbra_program_free(struct umbra_program*);
-
 typedef struct { int ix; } umbra_ptr;
 struct umbra_buf {
     void *ptr;
@@ -51,6 +42,27 @@ struct umbra_buf {
 };
 umbra_ptr umbra_early_bind_buf     (struct umbra_builder*, struct umbra_buf const*);
 umbra_ptr umbra_early_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
+umbra_ptr umbra_late_bind_buf      (struct umbra_builder*);
+umbra_ptr umbra_late_bind_uniforms (struct umbra_builder*, int slots);
+
+struct umbra_late_binding {
+    umbra_ptr ptr; int :32;
+    union {
+        struct umbra_buf  buf;       // for umbra_late_bind_buf
+        void const       *uniforms;  // for umbra_late_bind_uniforms
+    };
+};
+
+struct umbra_program {
+    void (*queue)(struct umbra_program*, int l, int t, int r, int b,
+                  int lates, struct umbra_late_binding const*);
+    void (*dump )(struct umbra_program const*, FILE*);
+    void (*free )(struct umbra_program*);
+    struct umbra_backend *backend;
+    // TODO: derive queue_is_threadsafe from IR (threadsafe backend + no early binding is written).
+    _Bool                 queue_is_threadsafe; int :24,:32;
+};
+void umbra_program_free(struct umbra_program*);
 
 typedef struct { int id:30; unsigned chan:2; } umbra_val16;
 typedef struct { int id:30; unsigned chan:2; } umbra_val32;

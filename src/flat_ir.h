@@ -27,17 +27,31 @@ struct ir_inst {
     int   final_id;
 };
 
-// A caller-owned buf registration pinned to a specific ptr handle (.ix).
-// Programs auto-populate buf[.ix] at dispatch time so callers don't thread
-// these through queue() args.  If buf != NULL, the dispatch reads the current
-// contents of *buf (fully mutable between dispatches).  Otherwise the binding
-// was registered by umbra_early_bind_uniforms and `uniforms` carries the fixed
-// (slot, slots) snapshot captured at that time.
+// A buf registration pinned to a specific ptr handle (.ix).  The resolver
+// populates buf[.ix] at dispatch time; how depends on `kind`:
+//
+//   BIND_EARLY_BUF       caller-owned umbra_buf*, dereferenced each dispatch
+//   BIND_EARLY_UNIFORMS  umbra_buf snapshot (ptr + slot count) captured at build
+//   BIND_LATE_BUF        umbra_buf supplied at queue() via umbra_late_binding
+//   BIND_LATE_UNIFORMS   data pointer supplied at queue(); slot count baked
+enum binding_kind {
+    BIND_EARLY_BUF,
+    BIND_EARLY_UNIFORMS,
+    BIND_LATE_BUF,
+    BIND_LATE_UNIFORMS,
+};
 struct buffer_binding {
+    enum binding_kind       kind; int :32;
     struct umbra_buf const *buf;
     struct umbra_buf        uniforms;
     int                     ix, pad;
 };
+
+_Bool binding_is_uniform(enum binding_kind);
+
+void resolve_bindings(struct umbra_buf *out,
+                      struct buffer_binding const *binding, int bindings,
+                      int lates, struct umbra_late_binding const *late);
 
 struct umbra_builder {
     struct ir_inst           *inst;

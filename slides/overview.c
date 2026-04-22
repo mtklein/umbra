@@ -205,7 +205,7 @@ static void overview_draw(struct slide *s, double secs, int l, int t, int r, int
     }
 
     // Overlay: slide numbers + empty-slot X-boxes, white srcover.
-    if (st->overlay_prog) { st->overlay_prog->queue(st->overlay_prog, 0, t, w, b); }
+    if (st->overlay_prog) { st->overlay_prog->queue(st->overlay_prog, 0, t, w, b, 0, NULL); }
 }
 
 static void overview_free(struct slide *s) {

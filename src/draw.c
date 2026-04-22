@@ -389,7 +389,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
         .ptr = bounds->cov, .count = tiles, .stride = xt,
     };
     __builtin_memset(bounds->cov, 0, (size_t)tiles * sizeof *bounds->cov);
-    bounds->prog->queue(bounds->prog, 0, 0, xt, yt);
+    bounds->prog->queue(bounds->prog, 0, 0, xt, yt, 0, NULL);
     uint16_t const *c = bounds->cov;
 
     // We coalesce horizontally adjacent tiles into runs, breaking when the
@@ -411,7 +411,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                 if (run_prog) {
                     int const tl = l + run_start * T,
                               tr = l + tx * T < r ? l + tx * T : r;
-                    run_prog->queue(run_prog, tl, tt, tr, tb);
+                    run_prog->queue(run_prog, tl, tt, tr, tb, 0, NULL);
                 }
                 run_start = tx;
                 run_prog  = prog;

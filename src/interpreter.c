@@ -477,12 +477,11 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     return p;
 }
 
-static void interp_program_run(struct interp_program *p, int l, int t, int r, int b) {
+static void interp_program_run(struct interp_program *p, int l, int t, int r, int b,
+                               int lates, struct umbra_late_binding const *late) {
     assume(p->ptrs <= 64);
     struct umbra_buf buf[64];
-    for (int i = 0; i < p->bindings; i++) {
-        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].uniforms;
-    }
+    resolve_bindings(buf, p->binding, p->bindings, lates, late);
 
     int const      P   = p->preamble;
     ival                 *var = p->var;
@@ -1289,8 +1288,9 @@ static void interp_program_free(struct interp_program *p) {
     }
 }
 
-static void run_interp(struct umbra_program *prog, int l, int t, int r, int b) {
-    interp_program_run((struct interp_program*)prog, l, t, r, b);
+static void run_interp(struct umbra_program *prog, int l, int t, int r, int b,
+                       int lates, struct umbra_late_binding const *late) {
+    interp_program_run((struct interp_program*)prog, l, t, r, b, lates, late);
 }
 static void free_interp(struct umbra_program *prog) {
     interp_program_free((struct interp_program*)prog);

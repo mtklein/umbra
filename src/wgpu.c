@@ -459,7 +459,8 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
 }
 
 static void wgpu_program_queue(struct umbra_program *prog,
-                               int l, int t, int r, int b) {
+                               int l, int t, int r, int b,
+                               int lates, struct umbra_late_binding const *late) {
     struct wgpu_program *p  = (struct wgpu_program *)prog;
     struct wgpu_backend *be = p->be;
 
@@ -467,9 +468,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
 
     assume(p->max_ptr + 1 <= 32);
     struct umbra_buf buf[32];
-    for (int i = 0; i < p->bindings; i++) {
-        buf[p->binding[i].ix] = p->binding[i].buf ? *p->binding[i].buf : p->binding[i].uniforms;
-    }
+    resolve_bindings(buf, p->binding, p->bindings, lates, late);
 
     begin_batch(be);
 
@@ -487,7 +486,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
 
     _Bool pinned[32] = {0};
     for (int k = 0; k < p->bindings; k++) {
-        if (!p->binding[k].buf) { pinned[p->binding[k].ix] = 1; }
+        if (binding_is_uniform(p->binding[k].kind)) { pinned[p->binding[k].ix] = 1; }
     }
 
     for (int i = 0; i <= p->max_ptr; i++) {

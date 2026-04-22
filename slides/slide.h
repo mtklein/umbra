@@ -61,6 +61,7 @@ void             slide_bg_draw(struct slide_bg*, umbra_color,
                                int l, int t, int r, int b, struct umbra_buf dst);
 void             slide_bg_free(struct slide_bg*);
 
+// TODO: replace dst_buf with a umbra_late_bind_buf handle threaded through queue().
 struct slide_runtime {
     struct umbra_program            *draw;
     struct umbra_program            *draw_full; // NULL iff bounds == NULL (non-SDF)

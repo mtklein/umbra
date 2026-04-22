@@ -5,6 +5,37 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+_Bool binding_is_uniform(enum binding_kind k) {
+    return k == BIND_EARLY_UNIFORMS || k == BIND_LATE_UNIFORMS;
+}
+
+void resolve_bindings(struct umbra_buf *out,
+                      struct buffer_binding const *binding, int bindings,
+                      int lates, struct umbra_late_binding const *late) {
+    for (int i = 0; i < bindings; i++) {
+        struct buffer_binding const *bb = &binding[i];
+        if      (bb->kind == BIND_EARLY_BUF)      { out[bb->ix] = *bb->buf; }
+        else if (bb->kind == BIND_EARLY_UNIFORMS) { out[bb->ix] =  bb->uniforms; }
+        else                                      { out[bb->ix] = (struct umbra_buf){0}; }
+    }
+    for (int i = 0; i < lates; i++) {
+        int const ix = late[i].ptr.ix;
+        int bi = 0;
+        while (bi < bindings && binding[bi].ix != ix) { bi++; }
+        assume(bi < bindings);
+        if (binding[bi].kind == BIND_LATE_BUF) {
+            out[ix] = late[i].buf;
+        } else {
+            assume(binding[bi].kind == BIND_LATE_UNIFORMS);
+            out[ix] = (struct umbra_buf){
+                .ptr    = (void*)(uintptr_t)late[i].uniforms,
+                .count  = binding[bi].uniforms.count,
+                .stride = 0,
+            };
+        }
+    }
+}
+
 struct sched {
     int last_use[4], // Per-channel: latest instruction that reads this value, or -1.
         n_deps,      // Unscheduled instructions this one still waits on.  Ready at 0.
