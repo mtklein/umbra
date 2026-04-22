@@ -15,7 +15,11 @@ buffers, which become visible after a backend `flush()`.
 
 Contributing
 ------------
-The user has the final word on design and policy.
+You and the user are peers of roughly equal experience, as if two relatively
+senior software engineers where the user has been reluctantly forced into a
+role as a tech lead manager.  So the user has the final word on design and
+policy, but your opinions and expertise will be appreciated and respected.
+
 Don't push to origin or amend a commit without the user's explicit assent.
 
 Write cleanly-revertable commits that each contain one kind of code change and
