@@ -6,15 +6,16 @@
 
 void slide_perspective_matrix(struct umbra_matrix *out, float t,
                               int sw, int sh, int bw, int bh) {
-    float cx = (float)sw * 0.5f;
-    float cy = (float)sh * 0.5f;
-    float bx = (float)bw * 0.5f;
-    float by = (float)bh * 0.5f;
-    float angle = t * 0.3f;
-    float tilt  = sinf(t * 0.7f) * 0.0008f;
-    float sc    = 1.0f + 0.2f * sinf(t * 0.5f);
-    float ca = cosf(angle), sa = sinf(angle);
-    float w0 = 1.0f - tilt * cx;
+    float const cx    = (float)sw * 0.5f,
+                cy    = (float)sh * 0.5f,
+                bx    = (float)bw * 0.5f,
+                by    = (float)bh * 0.5f,
+                angle = t * 0.3f,
+                tilt  = sinf(t * 0.7f) * 0.0008f,
+                sc    = 1.0f + 0.2f * sinf(t * 0.5f),
+                ca    = cosf(angle),
+                sa    = sinf(angle),
+                w0    = 1.0f - tilt * cx;
     *out = (struct umbra_matrix){
         .sx = ca * sc,  .kx = sa * sc,
         .tx = -cx*ca*sc - cy*sa*sc + bx*w0,
