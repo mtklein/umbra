@@ -996,14 +996,11 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                 emit1(c, (uint8_t)((0 << 6) | ((XCOL_X86 & 7) << 3) | (base & 7)));
             } else {
-                // Narrow 8 x u32 -> 8 x u8 (across both 128-bit halves).
-                // Assumes each u32 lane already fits in a byte (callers produce 0..255).
                 int8_t t   = ra_alloc(ra, sl, ns);
                 int8_t thi = ra_alloc(ra, sl, ns);
-                vpackusdw(c, t, ry, ry);        // each 128 lane: [a,b,c,d,a,b,c,d] as 8 u16
-                vextracti128(c, thi, t, 1);     // thi lo 64 = e,f,g,h (as u16)
-                vpunpcklqdq(c, t, t, thi);      // t.xmm = [a,b,c,d,e,f,g,h] as 8 u16
-                vpackuswb(c, t, t, t);          // t.xmm low 64 = 8 u8
+                vextracti128(c, thi, ry, 1);
+                vpackusdw(c, t, ry, thi);
+                vpackuswb(c, t, t, t);
                 vmovq_store(c, t, base, XCOL_X86, 1, 0);
                 ra_return_reg(ra, thi);
                 ra_return_reg(ra, t);
@@ -1171,8 +1168,9 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 patch_jcc(c, skip);
             } else {
                 int8_t hi_idx = ra_alloc(ra, sl, ns);
+                int8_t tmp    = ra_alloc(ra, sl, ns);
                 vextracti128(c, hi_idx, rx, 1);
-                vpxor(c, 0, s.rd, s.rd, s.rd);
+                vpxor(c, 0, tmp, tmp, tmp);
                 for (int k = 0; k < 8; k++) {
                     int src = (k < 4) ? rx : hi_idx;
                     int lane = k & 3;
@@ -1192,10 +1190,12 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                         emit1(c, (uint8_t)(((RAX & 7) << 3) | 4));
                         emit1(c, (uint8_t)((0 << 6) | ((RAX & 7) << 3) | (base & 7)));
                     }
-                    vex(c, 1, 1, 0, 0, s.rd, s.rd, RAX, 0xC4);
+                    vex(c, 1, 1, 0, 0, tmp, tmp, RAX, 0xC4);
                     emit1(c, (uint8_t)k);
                     patch_jcc(c, skip);
                 }
+                vpmovzxwd(c, s.rd, tmp);
+                ra_return_reg(ra, tmp);
                 ra_return_reg(ra, hi_idx);
                 ra_free_chan(ra, inst->x, i);
             }
