@@ -43,14 +43,17 @@ enum binding_kind {
 };
 
 enum { BUF_READ = 1, BUF_WRITTEN = 2 };
+
+// buf and uniforms are kind-disjoint: BIND_EARLY_BUF reads *buf, the two
+// UNIFORMS kinds read uniforms (the full snapshot for EARLY_UNIFORMS,
+// .count alone for LATE_UNIFORMS), and BIND_LATE_BUF reads neither.
 struct buffer_binding {
-    // TODO: two int pads here, reorder to compact
-    // TODO: *buf and uniforms predate binding_kind, do we still need both?
-    //       is it maybe enough to track (kind, ix, umbra_buf early)
-    enum binding_kind       kind; int :32;
-    struct umbra_buf const *buf;
-    struct umbra_buf        uniforms;
-    int                     ix, pad;
+    enum binding_kind kind;
+    int               ix;
+    union {
+        struct umbra_buf const *buf;
+        struct umbra_buf        uniforms;
+    };
 };
 
 _Bool binding_is_uniform(enum binding_kind);
