@@ -3,8 +3,7 @@
 
 struct slug_curves {
     float *data;
-    int    count;
-    int    pad;
+    int    count, :32;
     float  w, h;
 };
 

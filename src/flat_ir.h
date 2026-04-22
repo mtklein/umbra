@@ -24,7 +24,7 @@ struct ir_inst {
     int     imm;
 
     // Bookkeeping metadata, doesn't need to be hashed.
-    _Bool live, uniform, varying, pad;
+    _Bool live, uniform, varying; int :8;
     int   final_id;
 };
 
@@ -81,10 +81,10 @@ struct umbra_builder {
     int                       insts, cap;
     struct hash               ht;
     int                       vars;
-    _Bool                     has_loop, loop_closed, pad0[2];
+    _Bool                     has_loop, loop_closed; int :16;
     umbra_val32               loop_trip;
     umbra_var32               loop_var;
-    int                       if_depth, pad1;
+    int                       if_depth, :32;
     struct buffer_binding    *binding;
     int                       bindings, cap_bindings;
 };

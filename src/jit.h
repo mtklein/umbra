@@ -8,8 +8,7 @@ void jit_release_code_buf(struct jit_backend*, void  *mem, size_t  size);
 
 struct jit_label {
     char const *name;
-    int         byte_off;
-    int         pad;
+    int         byte_off, :32;
 };
 
 struct jit_program {

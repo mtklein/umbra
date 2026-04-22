@@ -97,7 +97,7 @@ struct wgpu_program {
     // bind group survives across dispatches whose offsets differ.  When
     // false, only push data is dynamic -- the pipeline layout's dynamic
     // slot budget wasn't enough to cover every read-only binding.
-    _Bool     dynamic_offset_bindings, pad[3];
+    _Bool     dynamic_offset_bindings; int :24;
     int       spirv_words;
     uint32_t *spirv;
 
