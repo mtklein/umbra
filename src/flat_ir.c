@@ -350,6 +350,8 @@ static void compute_buf_meta(struct umbra_flat_ir *ir) {
             max_ptr = ir->inst[i].ptr.bits;
         }
     }
+
+    // TODO: these SoA might be clearer as an array of a new `struct buffer_metadata`.
     int const total = max_ptr + 1;
     ir->total_bufs        = total;
     ir->buf_shift         = calloc((size_t)(total + 1), sizeof *ir->buf_shift);

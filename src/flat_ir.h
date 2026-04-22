@@ -44,6 +44,9 @@ enum binding_kind {
 
 enum { BUF_READ = 1, BUF_WRITTEN = 2 };
 struct buffer_binding {
+    // TODO: two int pads here, reorder to compact
+    // TODO: *buf and uniforms predate binding_kind, do we still need both?
+    //       is it maybe enough to track (kind, ix, umbra_buf early)
     enum binding_kind       kind; int :32;
     struct umbra_buf const *buf;
     struct umbra_buf        uniforms;
@@ -83,7 +86,10 @@ struct umbra_flat_ir {
     int                       vars, pad;
     struct buffer_binding    *binding;
     int                       bindings, pad2;
+    // TODO: two int pads here, let's reorder fields to compact
 
+    // TODO: this need to be total_bufs + 1 for "user uniforms" sounds like
+    // a memory from several designs of uniform handling ago.
     // Per-ptr buffer metadata, computed at IR construction.  Arrays are
     // sized [total_bufs + 1] so backends can use max_ptr one past the end
     // as a synthetic "user uniforms" slot.  total_bufs == max(ptr.bits) + 1;
