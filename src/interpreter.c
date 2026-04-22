@@ -386,14 +386,13 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     // Register variant upgrade: find values that die immediately (last_use == i+1)
     // and upgrade their op tags to register variants.
     {
-        // Compute last_use[i] = last instruction that reads value i.
-        int *lu = calloc((size_t)n, sizeof *lu);
+        int *last_use = calloc((size_t)n, sizeof *last_use);
         for (int i = 0; i < n; i++) {
             struct sw_inst const *s = &p->inst[i];
-            if (s->x < 0) { int src = i + s->x; if (src >= 0) { lu[src] = i; } }
-            if (s->y < 0) { int src = i + s->y; if (src >= 0) { lu[src] = i; } }
-            if (s->z < 0) { int src = i + s->z; if (src >= 0) { lu[src] = i; } }
-            if (s->w < 0) { int src = i + s->w; if (src >= 0) { lu[src] = i; } }
+            if (s->x < 0) { int src = i + s->x; if (src >= 0) { last_use[src] = i; } }
+            if (s->y < 0) { int src = i + s->y; if (src >= 0) { last_use[src] = i; } }
+            if (s->z < 0) { int src = i + s->z; if (src >= 0) { last_use[src] = i; } }
+            if (s->w < 0) { int src = i + s->w; if (src >= 0) { last_use[src] = i; } }
         }
 
         // Walk forward, upgrading tags.
@@ -410,7 +409,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             }
 
             _Bool out_r = 0;
-            if (lu[i] == i + 1 && i + 1 != p->preamble) {
+            if (last_use[i] == i + 1 && i + 1 != p->preamble) {
                 int const next_tag = p->inst[i + 1].tag;
 #define CHECK_BINARY(name, ...) || (next_tag == op_##name                            \
                     && p->inst[i + 1].x != p->inst[i + 1].y                            \
@@ -467,7 +466,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 
             prev_r = (s->tag != tag) ? out_r : 0;
         }
-        free(lu);
+        free(last_use);
     }
 
     p->vars = ir->vars;
