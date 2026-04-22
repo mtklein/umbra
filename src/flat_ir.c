@@ -90,9 +90,10 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
     }
 
     {
+        // deps == 1 means c is the sole remaining dep; scheduling c readies that user.
         int readied_ops = 0;
         for (int u = meta[c].user_off; u < meta[c].user_off + meta[c].users; u++) {
-            readied_ops += meta[users[u]].deps == 1/*i.e. this op*/;
+            readied_ops += meta[users[u]].deps == 1;
         }
 
         score += readied_ops * reg_pressure;
