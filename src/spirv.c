@@ -726,8 +726,8 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     result.total_bufs = total_bufs;
     B.total_bufs      = total_bufs;
 
-    B.buf_is_16   = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
-    B.buf_is_16x4 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16x4);
+    B.buf_is_16   = calloc((size_t)total_bufs, sizeof *B.buf_is_16);
+    B.buf_is_16x4 = calloc((size_t)total_bufs, sizeof *B.buf_is_16x4);
     for (int i = 0; i < ir->insts; i++) {
         enum op op = ir->inst[i].op;
         int p = op_has_ptr(op) ? ir->inst[i].ptr.bits : -1;
@@ -744,14 +744,14 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
 
     // Local int-sized copies for the emitter's internal use; kept separate from
     // ir->buf_is_uniform (which is uint8_t) so we can pass them by pointer.
-    B.buf_is_uniform    = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_uniform);
-    B.buf_uniform_slots = calloc((size_t)(total_bufs + 1), sizeof *B.buf_uniform_slots);
+    B.buf_is_uniform    = calloc((size_t)total_bufs, sizeof *B.buf_is_uniform);
+    B.buf_uniform_slots = calloc((size_t)total_bufs, sizeof *B.buf_uniform_slots);
     for (int p = 0; p < total_bufs; p++) {
         B.buf_is_uniform   [p] = ir->buf_is_uniform[p];
         B.buf_uniform_slots[p] = ir->buf_uniform_slots[p];
     }
 
-    size_t const meta_bytes = (size_t)(total_bufs + 1);
+    size_t const meta_bytes = (size_t)total_bufs;
     uint8_t *buf_rw         = malloc(meta_bytes);
     uint8_t *buf_shift      = malloc(meta_bytes);
     uint8_t *buf_is_uniform = malloc(meta_bytes);

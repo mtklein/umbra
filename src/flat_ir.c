@@ -354,10 +354,10 @@ static void compute_buf_meta(struct umbra_flat_ir *ir) {
     // TODO: these SoA might be clearer as an array of a new `struct buffer_metadata`.
     int const total = max_ptr + 1;
     ir->total_bufs        = total;
-    ir->buf_shift         = calloc((size_t)(total + 1), sizeof *ir->buf_shift);
-    ir->buf_rw            = calloc((size_t)(total + 1), sizeof *ir->buf_rw);
-    ir->buf_is_uniform    = calloc((size_t)(total + 1), sizeof *ir->buf_is_uniform);
-    ir->buf_uniform_slots = calloc((size_t)(total + 1), sizeof *ir->buf_uniform_slots);
+    ir->buf_shift         = calloc((size_t)total, sizeof *ir->buf_shift);
+    ir->buf_rw            = calloc((size_t)total, sizeof *ir->buf_rw);
+    ir->buf_is_uniform    = calloc((size_t)total, sizeof *ir->buf_is_uniform);
+    ir->buf_uniform_slots = calloc((size_t)total, sizeof *ir->buf_uniform_slots);
     for (int i = 0; i < ir->insts; i++) {
         enum op const op = ir->inst[i].op;
         if (op_has_ptr(op)) {

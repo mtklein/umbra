@@ -1027,7 +1027,7 @@ static struct metal_program* metal_program(
 
         int     const total_bufs = ir->total_bufs;
         int     const max_ptr    = total_bufs - 1;
-        size_t  const meta_bytes = (size_t)(total_bufs + 1);
+        size_t  const meta_bytes = (size_t)total_bufs;
         uint8_t *buf_shift = malloc(meta_bytes);
         uint8_t *buf_rw    = malloc(meta_bytes);
         __builtin_memcpy(buf_shift, ir->buf_shift, meta_bytes);
