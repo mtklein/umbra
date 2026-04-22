@@ -782,6 +782,8 @@ struct umbra_backend* umbra_backend_wgpu(void) {
         .flush          = wgpu_flush,
         .free           = (void (*)(struct umbra_backend *))wgpu_free,
         .stats          = wgpu_stats,
+        .queue_is_cheap          = 0,
+        .program_switch_is_cheap = 0,
     };
 
     be->uni_pool = (struct uniform_ring_pool){

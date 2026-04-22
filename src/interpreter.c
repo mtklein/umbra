@@ -1321,6 +1321,8 @@ struct umbra_backend* umbra_backend_interp(void) {
         .flush   = flush_be_noop,
         .free    = free_be_interp,
         .stats   = stats_zero,
+        .queue_is_cheap       = 1,
+        .program_switch_is_cheap = 1,
     };
     return be;
 }

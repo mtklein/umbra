@@ -345,12 +345,11 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
                         int l, int t, int r, int b) {
-    _Bool const backend_is_cpu = draw_partial->queue_is_threadsafe;
-    if (!backend_is_cpu) {
-        draw_full = draw_partial;  // Program switching is expensive on GPU.
+    if (!draw_partial->backend->program_switch_is_cheap) {
+        draw_full = draw_partial;
     }
 
-    int const T = backend_is_cpu ? 8 : 64,
+    int const T = draw_partial->backend->queue_is_cheap ? 8 : 64,
               xt = (r - l + T - 1) / T,
               yt = (b - t + T - 1) / T,
               tiles = xt * yt;

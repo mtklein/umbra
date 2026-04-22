@@ -26,6 +26,9 @@ struct umbra_backend {
     void                       (*flush  )(struct umbra_backend*);
     void                       (*free   )(struct umbra_backend*);
     struct umbra_backend_stats (*stats  )(struct umbra_backend const*);
+    _Bool queue_is_cheap;           // OK to do many small queue() calls
+    _Bool program_switch_is_cheap;  // OK to alternate programs between dispatches
+    int :16, :32;
 };
 struct umbra_backend* umbra_backend_interp(void);
 struct umbra_backend* umbra_backend_jit   (void);
