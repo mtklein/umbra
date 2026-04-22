@@ -26,9 +26,9 @@ struct uniform_ring_loc uniform_ring_alloc(struct uniform_ring *r, void const *b
 }
 
 size_t uniform_ring_used(struct uniform_ring const *r) {
-    size_t total = 0;
-    for (int i = 0; i < r->n; i++) { total += r->chunks[i].used; }
-    return total;
+    size_t total_bytes = 0;
+    for (int i = 0; i < r->n; i++) { total_bytes += r->chunks[i].used; }
+    return total_bytes;
 }
 
 void uniform_ring_reset(struct uniform_ring *r) {

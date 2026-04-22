@@ -143,17 +143,17 @@ struct vk_ring_chunk {
 
 static struct uniform_ring_chunk vk_ring_new_chunk(size_t min_bytes, void *ctx) {
     struct vk_backend *be = ctx;
-    size_t cap = min_bytes > VK_RING_HIGH_WATER ? min_bytes : VK_RING_HIGH_WATER;
+    size_t cap_bytes = min_bytes > VK_RING_HIGH_WATER ? min_bytes : VK_RING_HIGH_WATER;
     struct vk_ring_chunk *chunk = calloc(1, sizeof *chunk);
-    chunk->buf = create_buffer(be->device, (VkDeviceSize)cap);
+    chunk->buf = create_buffer(be->device, (VkDeviceSize)cap_bytes);
     chunk->mem = alloc_and_bind(be->device, chunk->buf, be->mem_type_host);
     void *mapped = 0;
-    VkResult rc = vkMapMemory(be->device, chunk->mem, 0, (VkDeviceSize)cap, 0, &mapped);
+    VkResult rc = vkMapMemory(be->device, chunk->mem, 0, (VkDeviceSize)cap_bytes, 0, &mapped);
     assume(rc == VK_SUCCESS);
     return (struct uniform_ring_chunk){
         .handle=chunk,
         .mapped=mapped,
-        .cap=cap,
+        .cap=cap_bytes,
         .used=0,
     };
 }
@@ -411,8 +411,8 @@ static void vk_program_dump(struct umbra_program const *p, FILE *f) {
     char tmp[] = "/tmp/umbra_spirv_XXXXXX";
     int fd = mkstemp(tmp);
     if (fd >= 0) {
-        size_t n = (size_t)vp->spirv_words * sizeof(uint32_t);
-        if (write(fd, vp->spirv, n) == (ssize_t)n) {
+        size_t bytes = (size_t)vp->spirv_words * sizeof(uint32_t);
+        if (write(fd, vp->spirv, bytes) == (ssize_t)bytes) {
             close(fd);
             char cmd[256];
             snprintf(cmd, sizeof cmd, "spirv-dis --no-color '%s' 2>/dev/null", tmp);
