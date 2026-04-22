@@ -2,6 +2,7 @@
 #include "../include/umbra.h"
 #include "hash.h"
 #include "op.h"
+#include <stdint.h>
 
 typedef union {
     int         bits;
@@ -40,6 +41,8 @@ enum binding_kind {
     BIND_LATE_BUF,
     BIND_LATE_UNIFORMS,
 };
+
+enum { BUF_READ = 1, BUF_WRITTEN = 2 };
 struct buffer_binding {
     enum binding_kind       kind; int :32;
     struct umbra_buf const *buf;
@@ -80,6 +83,16 @@ struct umbra_flat_ir {
     int                       vars, pad;
     struct buffer_binding    *binding;
     int                       bindings, pad2;
+
+    // Per-ptr buffer metadata, computed at IR construction.  Arrays are
+    // sized [total_bufs + 1] so backends can use max_ptr one past the end
+    // as a synthetic "user uniforms" slot.  total_bufs == max(ptr.bits) + 1;
+    // 0 if no ptr-bearing op is live.
+    int                       total_bufs, pad3;
+    uint8_t                  *buf_shift;         // op_elem_shift of any op on this ptr
+    uint8_t                  *buf_rw;             // BUF_READ | BUF_WRITTEN flags
+    uint8_t                  *buf_is_uniform;     // 1 if binding kind is a uniform kind
+    int                      *buf_uniform_slots;  // count of u32 slots for uniform bindings
 };
 
 enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };

@@ -720,17 +720,11 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     memset(&B, 0, sizeof B);
     B.next_id = 1; // 0 is reserved
 
-    int max_ptr = -1;
-    for (int i = 0; i < ir->insts; i++) {
-        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits > max_ptr) {
-            max_ptr = ir->inst[i].ptr.bits;
-        }
-    }
-    result.max_ptr = max_ptr;
-
-    int const total_bufs = max_ptr + 1;
+    int const total_bufs = ir->total_bufs;
+    int const max_ptr    = total_bufs - 1;
+    result.max_ptr    = max_ptr;
     result.total_bufs = total_bufs;
-    B.total_bufs = total_bufs;
+    B.total_bufs      = total_bufs;
 
     B.buf_is_16   = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16);
     B.buf_is_16x4 = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_16x4);
@@ -748,35 +742,25 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
         }
     }
 
-    // Classify uniform-kind bindings: emitted as Uniform blocks with baked slot count.
+    // Local int-sized copies for the emitter's internal use; kept separate from
+    // ir->buf_is_uniform (which is uint8_t) so we can pass them by pointer.
     B.buf_is_uniform    = calloc((size_t)(total_bufs + 1), sizeof *B.buf_is_uniform);
     B.buf_uniform_slots = calloc((size_t)(total_bufs + 1), sizeof *B.buf_uniform_slots);
-    for (int i = 0; i < ir->bindings; i++) {
-        int const p = ir->binding[i].ix;
-        if (0 <= p && p < total_bufs && binding_is_uniform(ir->binding[i].kind)) {
-            B.buf_is_uniform   [p] = 1;
-            B.buf_uniform_slots[p] = ir->binding[i].uniforms.count;
-        }
+    for (int p = 0; p < total_bufs; p++) {
+        B.buf_is_uniform   [p] = ir->buf_is_uniform[p];
+        B.buf_uniform_slots[p] = ir->buf_uniform_slots[p];
     }
 
-    uint8_t *buf_rw    = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
-    uint8_t *buf_shift = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
-    for (int i = 0; i < ir->insts; i++) {
-        enum op const op = ir->inst[i].op;
-        if (op_has_ptr(op)) {
-            int const p = ir->inst[i].ptr.bits;
-            buf_rw[p]   |= op_is_store(op) ? BUF_WRITTEN : BUF_READ;
-            buf_shift[p] = (uint8_t)op_elem_shift(op);
-        }
-    }
-    uint8_t *buf_is_uniform_out = calloc((size_t)(total_bufs + 1),
-                                         sizeof *buf_is_uniform_out);
-    for (int p = 0; p < total_bufs; p++) {
-        buf_is_uniform_out[p] = (uint8_t)B.buf_is_uniform[p];
-    }
+    size_t const meta_bytes = (size_t)(total_bufs + 1);
+    uint8_t *buf_rw         = malloc(meta_bytes);
+    uint8_t *buf_shift      = malloc(meta_bytes);
+    uint8_t *buf_is_uniform = malloc(meta_bytes);
+    __builtin_memcpy(buf_rw,         ir->buf_rw,         meta_bytes);
+    __builtin_memcpy(buf_shift,      ir->buf_shift,      meta_bytes);
+    __builtin_memcpy(buf_is_uniform, ir->buf_is_uniform, meta_bytes);
     result.buf_rw         = buf_rw;
     result.buf_shift      = buf_shift;
-    result.buf_is_uniform = buf_is_uniform_out;
+    result.buf_is_uniform = buf_is_uniform;
 
     // Push constant layout: w, x0, y0, buf_count[total_bufs], buf_stride[total_bufs].
     // User uniforms (buf[0]) go through the per-batch uniform ring as a

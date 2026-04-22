@@ -236,6 +236,8 @@ static _Bool is_cf(enum op op) {
         || op == op_if_begin   || op == op_if_end;
 }
 
+static void compute_buf_meta(struct umbra_flat_ir *ir);
+
 struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     assume(!b->has_loop || b->loop_closed);
     assume(b->if_depth == 0);
@@ -337,7 +339,38 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
             }
         }
     }
+    compute_buf_meta(result);
     return result;
+}
+
+static void compute_buf_meta(struct umbra_flat_ir *ir) {
+    int max_ptr = -1;
+    for (int i = 0; i < ir->insts; i++) {
+        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits > max_ptr) {
+            max_ptr = ir->inst[i].ptr.bits;
+        }
+    }
+    int const total = max_ptr + 1;
+    ir->total_bufs        = total;
+    ir->buf_shift         = calloc((size_t)(total + 1), sizeof *ir->buf_shift);
+    ir->buf_rw            = calloc((size_t)(total + 1), sizeof *ir->buf_rw);
+    ir->buf_is_uniform    = calloc((size_t)(total + 1), sizeof *ir->buf_is_uniform);
+    ir->buf_uniform_slots = calloc((size_t)(total + 1), sizeof *ir->buf_uniform_slots);
+    for (int i = 0; i < ir->insts; i++) {
+        enum op const op = ir->inst[i].op;
+        if (op_has_ptr(op)) {
+            int const p = ir->inst[i].ptr.bits;
+            ir->buf_shift[p] = (uint8_t)op_elem_shift(op);
+            ir->buf_rw   [p] |= op_is_store(op) ? BUF_WRITTEN : BUF_READ;
+        }
+    }
+    for (int i = 0; i < ir->bindings; i++) {
+        int const p = ir->binding[i].ix;
+        if (0 <= p && p < total && binding_is_uniform(ir->binding[i].kind)) {
+            ir->buf_is_uniform   [p] = 1;
+            ir->buf_uniform_slots[p] = ir->binding[i].uniforms.count;
+        }
+    }
 }
 
 static val remap_val(val v, int const *remap) {
@@ -429,6 +462,7 @@ struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
     free(remap);
     free(live);
     free(inst);
+    compute_buf_meta(result);
     return result;
 }
 
@@ -436,6 +470,10 @@ void umbra_flat_ir_free(struct umbra_flat_ir *ir) {
     if (ir) {
         free(ir->inst);
         free(ir->binding);
+        free(ir->buf_shift);
+        free(ir->buf_rw);
+        free(ir->buf_is_uniform);
+        free(ir->buf_uniform_slots);
         free(ir);
     }
 }

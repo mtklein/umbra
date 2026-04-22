@@ -1,10 +1,10 @@
 #pragma once
 #include "fingerprint.h"
+#include "flat_ir.h"
 #include <stddef.h>
 #include <stdint.h>
 
 struct deref_info { int buf_idx, src_buf, off; };
-enum { BUF_READ = 1, BUF_WRITTEN = 2 };
 
 // Backend-specific handle for a GPU buffer.
 typedef struct { void *ptr; size_t size; } gpu_buf;

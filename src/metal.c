@@ -861,37 +861,15 @@ static void emit_ops(SrcBuf *b, IR const *ir,
     }
 }
 
-static char* build_source(IR const *orig_ir,
-                           int *out_max_ptr,
-                           int *out_total_bufs,
-                           uint8_t **out_buf_shift,
-                           struct umbra_flat_ir **out_resolved) {
+static char* build_source(IR const *orig_ir, struct umbra_flat_ir **out_resolved) {
     struct umbra_flat_ir *resolved = flat_ir_resolve(orig_ir, JOIN_PREFER_IMM);
     IR const *ir = resolved;
     *out_resolved = resolved;
 
-    int max_ptr = -1;
-    for (int i = 0; i < ir->insts; i++) {
-        if (op_has_ptr(ir->inst[i].op) && ir->inst[i].ptr.bits > max_ptr) {
-            max_ptr = ir->inst[i].ptr.bits;
-        }
-    }
-    *out_max_ptr = max_ptr;
-
-    int total_bufs = max_ptr + 1;
-    *out_total_bufs = total_bufs;
-
-    uint8_t *buf_shift   = calloc((size_t)(total_bufs + 1), sizeof *buf_shift);
-    _Bool   *buf_written = calloc((size_t)(total_bufs + 1), sizeof *buf_written);
-    *out_buf_shift = buf_shift;
-    for (int i = 0; i < ir->insts; i++) {
-        enum op const op = ir->inst[i].op;
-        if (op_has_ptr(op)) {
-            int const bi = ir->inst[i].ptr.bits;
-            if (op_is_store(op)) { buf_written[bi] = 1; }
-            buf_shift[bi] = (uint8_t)op_elem_shift(op);
-        }
-    }
+    int     const  total_bufs = ir->total_bufs;
+    int     const  max_ptr    = total_bufs - 1;
+    uint8_t const *buf_shift  = ir->buf_shift;
+    uint8_t const *buf_rw     = ir->buf_rw;
 
     SrcBuf b = {0};
 
@@ -927,7 +905,7 @@ static char* build_source(IR const *orig_ir,
                          : buf_shift[p] == 2 ? "uint"
                          : buf_shift[p] == 1 ? "ushort"
                                              : "uchar";
-        char const *qual = buf_written[p] ? "device" : "device const";
+        char const *qual = (buf_rw[p] & BUF_WRITTEN) ? "device" : "device const";
         emit(&b,
              ",\n    %s %s * __restrict p%d"
              " [[buffer(%d)]]",
@@ -950,7 +928,6 @@ static char* build_source(IR const *orig_ir,
     emit(&b, "}\n");
 
     free(is_f);
-    free(buf_written);
 
     char *src = malloc(b.size + 1);
     __builtin_memcpy(src, b.text, b.size);
@@ -1044,12 +1021,17 @@ static struct metal_program* metal_program(
     struct metal_program *result = 0;
     void *pool = objc_autoreleasePoolPush();
     {
-        int  max_ptr = -1, total_bufs = 0;
-        uint8_t *buf_shift = NULL;
         struct umbra_flat_ir *resolved = NULL;
-        char *src = build_source(ir, &max_ptr, &total_bufs,
-                                 &buf_shift, &resolved);
+        char *src = build_source(ir, &resolved);
         ir = resolved;
+
+        int     const total_bufs = ir->total_bufs;
+        int     const max_ptr    = total_bufs - 1;
+        size_t  const meta_bytes = (size_t)(total_bufs + 1);
+        uint8_t *buf_shift = malloc(meta_bytes);
+        uint8_t *buf_rw    = malloc(meta_bytes);
+        __builtin_memcpy(buf_shift, ir->buf_shift, meta_bytes);
+        __builtin_memcpy(buf_rw,    ir->buf_rw,    meta_bytes);
 
         char const *override = getenv("UMBRA_METAL_OVERRIDE");
         if (override) {
@@ -1080,14 +1062,6 @@ static struct metal_program* metal_program(
             } else {
                 fprintf(stderr, "UMBRA_METAL_OVERRIDE: skipping %d-inst program (want %d)\n",
                         ir->insts, want_insts);
-            }
-        }
-
-        uint8_t *buf_rw = calloc((size_t)(total_bufs + 1), sizeof *buf_rw);
-        for (int i = 0; i < ir->insts; i++) {
-            if (op_has_ptr(ir->inst[i].op)) {
-                int bi = ir->inst[i].ptr.bits;
-                buf_rw[bi] |= op_is_store(ir->inst[i].op) ? BUF_WRITTEN : BUF_READ;
             }
         }
 
