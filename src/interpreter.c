@@ -486,6 +486,19 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     int  const           vars = p->vars;
     ival *const var  = vars ? calloc((size_t)vars, sizeof *var) : NULL;
 
+    // The dispatch loop reads/writes v_base and var as 64-byte ival vectors,
+    // which TSAN skips (its compiler pass only instruments <=128-bit accesses).
+    // Annotate them as write-ranges so concurrent races on shared scratch do
+    // fire TSAN.  We allocate per call above, so this should never fire.
+#if defined(__has_feature) && __has_feature(thread_sanitizer)
+    #pragma clang diagnostic push
+    #pragma clang diagnostic ignored "-Wreserved-identifier"
+    extern void __tsan_write_range(void *addr, unsigned long size);
+    #pragma clang diagnostic pop
+    __tsan_write_range(v_base, (unsigned long)p->v_slots * sizeof *v_base);
+    if (var) { __tsan_write_range(var, (unsigned long)vars * sizeof *var); }
+#endif
+
     int const      P   = p->preamble;
     I32                   if_mask_stack[8];
     int                   if_depth = 0;
