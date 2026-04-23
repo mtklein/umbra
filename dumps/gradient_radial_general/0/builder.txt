@@ -13,112 +13,110 @@
   v12  = square_add_f32  v8 v11
   v13  = imm_32          0x5f3759df
   v14  = imm_32          0x1
-  v15  = imm_32          0x3fc00000
-  v16  = imm_32          0xbf000000
-  v17  = shr_u32         v12 v14
-  v18  = sub_i32         v13 v17
-  v19  = square_f32      v18
-  v20  = mul_f32         v12 v19
-  v21  = mul_f32         v16 v20
-  v22  = fma_f32         v16 v20 v15
-  v23  = mul_f32         v18 v22
-  v24  = square_f32      v23
-  v25  = mul_f32         v12 v24
-  v26  = mul_f32         v16 v25
-  v27  = fma_f32         v16 v25 v15
-  v28  = mul_f32         v23 v27
+  v15  = imm_32          0x3f800000
+  v16  = imm_32          0x3f000000
+  v17  = imm_32          0x3ec00000
+  v18  = shr_u32         v12 v14
+  v19  = sub_i32         v13 v18
+  v20  = square_f32      v19
+  v21  = mul_f32         v12 v20
+  v22  = fms_f32         v12 v20 v15
+  v23  = square_f32      v22
+  v24  = mul_f32         v16 v22
+  v25  = mul_f32         v17 v23
+  v26  = fma_f32         v16 v22 v25
+  v27  = add_f32         v15 v26
+  v28  = mul_f32         v19 v27
   v29  = mul_f32         v12 v28
   v30  = square_f32      v29
   v31  = square_sub_f32  v29 v12
-  v32  = imm_32          0x3f000000
-  v33  = mul_f32         v28 v32
-  v34  = mul_f32         v31 v33
-  v35  = fma_f32         v12 v28 v34
-  v36  = eq_f32          v0 v12
-  v37  = sel_32          v36 v0 v35
-  v38  = mul_f32         v7 v37
-  v39  = max_f32         v0 v38
-  v40  = imm_32          0x3f800000
-  v41  = min_f32         v39 v40
-  v42  = uniform_32      p2 [4]
-  v43  = i32_from_f32    v42
-  v44  = sub_i32         v43 v14
-  v45  = add_i32         v43 v43
-  v46  = add_i32         v43 v45
+  v32  = mul_f32         v16 v28
+  v33  = mul_f32         v31 v32
+  v34  = fma_f32         v12 v28 v33
+  v35  = eq_f32          v0 v12
+  v36  = sel_32          v35 v0 v34
+  v37  = mul_f32         v7 v36
+  v38  = max_f32         v0 v37
+  v39  = min_f32         v15 v38
+  v40  = uniform_32      p2 [4]
+  v41  = i32_from_f32    v40
+  v42  = sub_i32         v41 v14
+  v43  = add_i32         v41 v41
+  v44  = add_i32         v41 v43
       store_var       var0 v0
       store_var       var1 v0
       store_var       var2 v0
       store_var       var3 v0
       store_var       var4 v0
-  v52  = loop_begin      v44
-  v53  = load_var        var4
-  v54  = add_i32         v14 v53
-  v55  = gather_uniform_32 p4 v53
-  v56  = gather_uniform_32 p4 v54
-  v57  = le_f32          v55 v41
-  v58  = le_f32          v41 v56
-  v59  = and_32          v57 v58
-  v60  = if_begin        v59
-  v61  = sub_f32         v41 v55
-  v62  = sub_f32         v56 v55
-  v63  = imm_32          0x7ef127ea
-  v64  = imm_32          0x40000000
-  v65  = sub_i32         v63 v62
-  v66  = mul_f32         v62 v65
-  v67  = fms_f32         v62 v65 v64
-  v68  = mul_f32         v65 v67
-  v69  = mul_f32         v62 v68
-  v70  = fms_f32         v62 v68 v64
-  v71  = mul_f32         v68 v70
-  v72  = mul_f32         v62 v71
-  v73  = fms_f32         v62 v71 v64
-  v74  = mul_f32         v71 v73
-  v75  = mul_f32         v61 v74
-  v76  = mul_f32         v62 v75
-  v77  = fms_f32         v62 v75 v61
-  v78  = mul_f32         v74 v77
-  v79  = fma_f32         v61 v74 v78
-  v80  = gather_uniform_32 p3 v53
-  v81  = gather_uniform_32 p3 v54
-  v82  = add_i32         v43 v53
+  v50  = loop_begin      v42
+  v51  = load_var        var4
+  v52  = add_i32         v14 v51
+  v53  = gather_uniform_32 p4 v51
+  v54  = gather_uniform_32 p4 v52
+  v55  = le_f32          v53 v39
+  v56  = le_f32          v39 v54
+  v57  = and_32          v55 v56
+  v58  = if_begin        v57
+  v59  = sub_f32         v39 v53
+  v60  = sub_f32         v54 v53
+  v61  = imm_32          0x7ef127ea
+  v62  = imm_32          0x40000000
+  v63  = sub_i32         v61 v60
+  v64  = mul_f32         v60 v63
+  v65  = fms_f32         v60 v63 v62
+  v66  = mul_f32         v63 v65
+  v67  = mul_f32         v60 v66
+  v68  = fms_f32         v60 v66 v62
+  v69  = mul_f32         v66 v68
+  v70  = mul_f32         v60 v69
+  v71  = fms_f32         v60 v69 v62
+  v72  = mul_f32         v69 v71
+  v73  = mul_f32         v59 v72
+  v74  = mul_f32         v60 v73
+  v75  = fms_f32         v60 v73 v59
+  v76  = mul_f32         v72 v75
+  v77  = fma_f32         v59 v72 v76
+  v78  = gather_uniform_32 p3 v51
+  v79  = gather_uniform_32 p3 v52
+  v80  = add_i32         v41 v51
+  v81  = gather_uniform_32 p3 v80
+  v82  = add_i32         v41 v52
   v83  = gather_uniform_32 p3 v82
-  v84  = add_i32         v43 v54
+  v84  = add_i32         v43 v51
   v85  = gather_uniform_32 p3 v84
-  v86  = add_i32         v45 v53
+  v86  = add_i32         v43 v52
   v87  = gather_uniform_32 p3 v86
-  v88  = add_i32         v45 v54
+  v88  = add_i32         v44 v51
   v89  = gather_uniform_32 p3 v88
-  v90  = add_i32         v46 v53
+  v90  = add_i32         v44 v52
   v91  = gather_uniform_32 p3 v90
-  v92  = add_i32         v46 v54
-  v93  = gather_uniform_32 p3 v92
-  v94  = sub_f32         v81 v80
-  v95  = mul_f32         v79 v94
-  v96  = fma_f32         v79 v94 v80
-      store_var       var0 v96
-  v98  = sub_f32         v85 v83
-  v99  = mul_f32         v79 v98
-  v100 = fma_f32         v79 v98 v83
-      store_var       var1 v100
-  v102 = sub_f32         v89 v87
-  v103 = mul_f32         v79 v102
-  v104 = fma_f32         v79 v102 v87
-      store_var       var2 v104
-  v106 = sub_f32         v93 v91
-  v107 = mul_f32         v79 v106
-  v108 = fma_f32         v79 v106 v91
-      store_var       var3 v108
+  v92  = sub_f32         v79 v78
+  v93  = mul_f32         v77 v92
+  v94  = fma_f32         v77 v92 v78
+      store_var       var0 v94
+  v96  = sub_f32         v83 v81
+  v97  = mul_f32         v77 v96
+  v98  = fma_f32         v77 v96 v81
+      store_var       var1 v98
+  v100 = sub_f32         v87 v85
+  v101 = mul_f32         v77 v100
+  v102 = fma_f32         v77 v100 v85
+      store_var       var2 v102
+  v104 = sub_f32         v91 v89
+  v105 = mul_f32         v77 v104
+  v106 = fma_f32         v77 v104 v89
+      store_var       var3 v106
       if_end
-  v111 = load_var        var4
-  v112 = add_i32         v14 v111
-      store_var       var4 v112
+  v109 = load_var        var4
+  v110 = add_i32         v14 v109
+      store_var       var4 v110
       loop_end
-  v115 = load_var        var0
-  v116 = load_var        var1
-  v117 = load_var        var2
-  v118 = load_var        var3
+  v113 = load_var        var0
+  v114 = load_var        var1
+  v115 = load_var        var2
+  v116 = load_var        var3
+  v117 = f16_from_f32    v113
+  v118 = f16_from_f32    v114
   v119 = f16_from_f32    v115
   v120 = f16_from_f32    v116
-  v121 = f16_from_f32    v117
-  v122 = f16_from_f32    v118
-      store_16x4      p0 v119 v120 v121 v122
+      store_16x4      p0 v117 v118 v119 v120
