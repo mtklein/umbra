@@ -1610,7 +1610,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     break;
                 case op_sqrt_f32: {
                     uint32_t const xf = as_f32(&B, get_val(&B, inst->x), xid);
-                    if (flags & SPIRV_FLOAT_CONTROLS) {
+                    if (flags & SPIRV_PRECISE_SQRT) {
                         B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450Sqrt, xf);
                     } else {
                         uint32_t const c_23   = spv_const_u32(&B, 23);

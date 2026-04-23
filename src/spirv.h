@@ -6,7 +6,8 @@
 enum { SPIRV_WG_SIZE = 64 };
 
 enum {
-    SPIRV_FLOAT_CONTROLS = 1,
+    SPIRV_FLOAT_CONTROLS = 1,  // SPV_KHR_float_controls cap+exec mode (Safe FP mode)
+    SPIRV_PRECISE_SQRT   = 2,  // emit GLSLstd450Sqrt directly; else synthesize via rsqrt+NR
     SPIRV_PUSH_VIA_SSBO  = 4,
     SPIRV_NO_CONTRACT    = 8,  // lower add/sub/mul/square to Fma wrappers
 };
