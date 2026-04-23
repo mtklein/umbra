@@ -136,11 +136,29 @@ static void usage(void) {
         "Usage: bench [options]\n"
         "  --fmt FORMAT     destination format: 8888, 565, 1010102, fp16, fp16_planar\n"
         "  --backend NAME   run only: interp, jit, metal, vulkan, wgpu\n"
-        "  --match SUBSTR   run only slides whose title contains SUBSTR\n"
+        "  --match SUBSTR   run only slides whose title contains SUBSTR (repeatable; OR)\n"
+        "  --exclude SUBSTR skip slides whose title contains SUBSTR (repeatable; OR)\n"
         "  --samples N      timing samples per measurement, take min (default 5)\n"
         "  --target-ms N    target ms per sample (default 15)\n"
         "  --width N        canvas width in pixels (default 4096)\n"
         "  --help           show this help\n");
+}
+
+static _Bool any_substring(char const *name, char const *const *terms, int n) {
+    for (int i = 0; i < n; i++) {
+        if (strstr(name, terms[i])) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static _Bool passes(char const *name,
+                    char const *const *matches,  int n_matches,
+                    char const *const *excludes, int n_excludes) {
+    _Bool const match_ok = n_matches == 0 || any_substring(name, matches,  n_matches);
+    _Bool const excluded =                   any_substring(name, excludes, n_excludes);
+    return match_ok && !excluded;
 }
 
 static struct umbra_fmt parse_fmt(char const *s) {
@@ -257,7 +275,9 @@ int main(int argc, char *argv[]) {
     int              be_mask   = 0x1f;
     int              samples   = 5;
     int              target_ms = 15;
-    char const      *match     = NULL;
+    char const      *matches [32] = {0};
+    char const      *excludes[32] = {0};
+    int              n_matches = 0, n_excludes = 0;
     _Bool            verbose   = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -273,7 +293,12 @@ int main(int argc, char *argv[]) {
             if (be_mask == 0x1f) { be_mask = 0; }
             be_mask |= bit;
         }
-        else if (streq(argv[i], "--match")     && i+1 < argc) { match = argv[++i]; }
+        else if (streq(argv[i], "--match")     && i+1 < argc) {
+            if (n_matches < (int)count(matches)) { matches[n_matches++] = argv[++i]; }
+        }
+        else if (streq(argv[i], "--exclude")   && i+1 < argc) {
+            if (n_excludes < (int)count(excludes)) { excludes[n_excludes++] = argv[++i]; }
+        }
         else if (streq(argv[i], "--samples")   && i+1 < argc) { samples = atoi(argv[++i]); }
         else if (streq(argv[i], "--target-ms") && i+1 < argc) { target_ms = atoi(argv[++i]); }
         else if (streq(argv[i], "--width")     && i+1 < argc) { W = atoi(argv[++i]); }
@@ -302,7 +327,7 @@ int main(int argc, char *argv[]) {
     for (int si = 0; si < ns; si++) {
         struct slide *s = slide_get(si);
         if ((s->build_draw || s->build_sdf_draw)
-                && (!match || strstr(s->title, match))) {
+                && passes(s->title, matches, n_matches, excludes, n_excludes)) {
             size_t const bpp    = fmt.bpp;
             size_t const planes = (size_t)fmt.planes;
             void        *buf    = calloc((size_t)(W * H) * planes, bpp);
@@ -347,13 +372,17 @@ int main(int argc, char *argv[]) {
     }
 
     // Compile-time benchmarks.
-    if (!match || strstr("compile", match)) {
+    if (passes("compile", matches, n_matches, excludes, n_excludes)) {
+        _Bool const compile_matched = any_substring("compile", matches, n_matches);
         print_compile_header(be_mask);
 
         for (int si = 0; si < ns; si++) {
             struct slide *s = slide_get(si);
-            if ((s->build_draw || s->build_sdf_draw)
-                    && (!match || strstr(s->title, match) || strstr("compile", match))) {
+            _Bool const match_ok = n_matches == 0
+                                || compile_matched
+                                || any_substring(s->title, matches, n_matches);
+            _Bool const excluded = any_substring(s->title, excludes, n_excludes);
+            if ((s->build_draw || s->build_sdf_draw) && match_ok && !excluded) {
                 double us_call[5] = {-1, -1, -1, -1, -1};
                 struct slide_runtime *rt = calloc(1, sizeof *rt);
                 for (int bi = 0; bi < nb; bi++) {
