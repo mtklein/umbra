@@ -839,7 +839,8 @@ static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
                                   umbra_interval x, umbra_interval y) {
     struct ngon_sdf_ctx const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->hp);
+    // hp_data is recomputed every frame by ngon_animate; not host-readonly.
+    umbra_ptr const data = umbra_bind_buf(b, &self->hp);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_sides));
 
     umbra_var32 lo_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));
