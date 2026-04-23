@@ -32,16 +32,22 @@ struct ir_inst {
 // populates buf[.ix] at dispatch time by (optionally) reading the early
 // default stored here, then letting any matching umbra_late_binding win.
 //
-//   BIND_BUF       `.buf` is a caller-owned umbra_buf* (or NULL) dereferenced
-//                  on every dispatch.
-//   BIND_UNIFORMS  `.uniforms` carries the slot count; `.uniforms.ptr` is
-//                  the optional early-default pointer (or NULL).
+//   BIND_BUF                `.buf` is a caller-owned umbra_buf* (or NULL)
+//                           dereferenced on every dispatch.
+//   BIND_HOST_READONLY_BUF  Same storage as BIND_BUF, but the caller promises
+//                           the host bytes don't change after binding -- the
+//                           cache may skip fingerprinting and re-uploads.
+//   BIND_UNIFORMS           `.uniforms` carries the slot count; `.uniforms.ptr`
+//                           is the optional early-default pointer (or NULL).
 enum binding_kind {
     BIND_BUF,
+    BIND_HOST_READONLY_BUF,
     BIND_UNIFORMS,
 };
 
-enum { BUF_READ = 1, BUF_WRITTEN = 2 };
+// The cache reads BUF_HOST_READONLY alongside BUF_READ/BUF_WRITTEN to decide
+// whether to skip fingerprinting and re-uploads for an entry.
+enum { BUF_READ = 1, BUF_WRITTEN = 2, BUF_HOST_READONLY = 4 };
 
 struct buffer_binding {
     enum binding_kind kind;
@@ -54,11 +60,11 @@ struct buffer_binding {
 
 // Per-ptr metadata gathered by a single IR walk; indexed by ptr.bits.
 struct buffer_metadata {
-    uint8_t shift;        // op_elem_shift of any op on this ptr
-    uint8_t rw;           // BUF_READ | BUF_WRITTEN flags
-    uint8_t is_uniform;   // 1 if the binding's kind is a uniform kind
-    int    :8;
-    int     uniform_slots; // u32 slot count for uniform bindings, else 0
+    uint8_t shift;            // op_elem_shift of any op on this ptr
+    uint8_t rw;               // BUF_READ | BUF_WRITTEN flags
+    uint8_t is_uniform;       // 1 if the binding's kind is a uniform kind
+    uint8_t host_readonly;    // 1 if the binding is BIND_HOST_READONLY_BUF
+    int     uniform_slots;    // u32 slot count for uniform bindings, else 0
 };
 
 _Bool binding_is_uniform(enum binding_kind);

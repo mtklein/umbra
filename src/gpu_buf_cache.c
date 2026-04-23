@@ -3,13 +3,15 @@
 
 int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
                       uint8_t rw) {
-    _Bool const writable = rw & BUF_WRITTEN;
+    _Bool const writable      = rw & BUF_WRITTEN,
+                host_readonly = rw & BUF_HOST_READONLY;
     for (int i = 0; i < c->n; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->host == host && ce->buf.size >= bytes) {
             if (host && bytes
-                    && !ce->nocopy                         // Zero-copy: GPU reads host directly.
-                    && !(ce->uploaded && ce->writable)) {  // Umbra owns writable bufs within a batch.
+                    && !ce->nocopy                        // Zero-copy: GPU reads host directly.
+                    && !ce->host_readonly                 // Host promised not to mutate.
+                    && !(ce->uploaded && ce->writable)) { // Umbra owns writable bufs within a batch.
                 fingerprint const fp = fingerprint_hash(host, bytes);
                 if (!ce->hashed_size || !fingerprint_eq(ce->fp, fp)) {
                     c->ops.upload(ce->buf, host, bytes, c->ctx);
@@ -51,13 +53,14 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
 
     size_t const alloc_size = bytes ? bytes : 4;
     ce->buf = c->ops.alloc(alloc_size, c->ctx);
-    ce->host     = host;
-    ce->writable = writable;
+    ce->host          = host;
+    ce->writable      = writable;
+    ce->host_readonly = host_readonly;
     if (host && bytes) {
         c->ops.upload(ce->buf, host, bytes, c->ctx);
         c->upload_bytes += bytes;
-        ce->fp          = fingerprint_hash(host, bytes);
-        ce->hashed_size = bytes;
+        ce->fp          = host_readonly ? (fingerprint){0} : fingerprint_hash(host, bytes);
+        ce->hashed_size = host_readonly ? 0 : bytes;
         ce->uploaded = 1;
     }
     if (writable && host && bytes) {
@@ -72,10 +75,12 @@ void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
         if (ce->copy_tracked && !ce->nocopy && ce->host) {
             size_t const bytes = ce->hashed_size ? ce->hashed_size : ce->buf.size;
             c->ops.download(ce->buf, ce->host, bytes, c->ctx);
-            // Host now matches GPU.  Refresh fingerprint so next batch can
-            // skip the upload if the user doesn't modify the buffer.
-            ce->fp          = fingerprint_hash(ce->host, bytes);
-            ce->hashed_size = bytes;
+            if (!ce->host_readonly) {
+                // Host now matches GPU.  Refresh fingerprint so next batch can
+                // skip the upload if the user doesn't modify the buffer.
+                ce->fp          = fingerprint_hash(ce->host, bytes);
+                ce->hashed_size = bytes;
+            }
         }
     }
 }

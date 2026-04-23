@@ -10,11 +10,15 @@ _Bool binding_is_uniform(enum binding_kind k) {
     return k == BIND_UNIFORMS;
 }
 
+static _Bool kind_is_buf(enum binding_kind k) {
+    return k == BIND_BUF || k == BIND_HOST_READONLY_BUF;
+}
+
 _Bool flat_ir_has_early_writes(struct umbra_flat_ir const *ir) {
     _Bool is_early_buf[32] = {0};
     for (int k = 0; k < ir->bindings; k++) {
         struct buffer_binding const *bb = &ir->binding[k];
-        if (bb->kind == BIND_BUF && bb->buf) {
+        if (kind_is_buf(bb->kind) && bb->buf) {
             int const ix = bb->ix;
             assume(0 <= ix && ix < (int)count(is_early_buf));
             is_early_buf[ix] = 1;
@@ -36,7 +40,7 @@ void resolve_bindings(struct umbra_buf *out,
                       struct umbra_late_binding const *late, int lates) {
     for (int i = 0; i < bindings; i++) {
         struct buffer_binding const *bb = &binding[i];
-        if (bb->kind == BIND_BUF) {
+        if (kind_is_buf(bb->kind)) {
             out[bb->ix] = bb->buf ? *bb->buf : (struct umbra_buf){0};
         } else {
             out[bb->ix] = bb->uniforms;
@@ -47,7 +51,7 @@ void resolve_bindings(struct umbra_buf *out,
         int bi = 0;
         while (bi < bindings && binding[bi].ix != ix) { bi++; }
         assume(bi < bindings);
-        if (binding[bi].kind == BIND_BUF) {
+        if (kind_is_buf(binding[bi].kind)) {
             out[ix] = late[i].buf;
         } else {
             out[ix] = (struct umbra_buf){
@@ -366,9 +370,14 @@ static void compute_buf_meta(struct umbra_flat_ir *ir) {
     }
     for (int i = 0; i < ir->bindings; i++) {
         int const p = ir->binding[i].ix;
-        if (0 <= p && p < total && binding_is_uniform(ir->binding[i].kind)) {
-            ir->buf[p].is_uniform    = 1;
-            ir->buf[p].uniform_slots = ir->binding[i].uniforms.count;
+        if (0 <= p && p < total) {
+            if (binding_is_uniform(ir->binding[i].kind)) {
+                ir->buf[p].is_uniform    = 1;
+                ir->buf[p].uniform_slots = ir->binding[i].uniforms.count;
+            }
+            if (ir->binding[i].kind == BIND_HOST_READONLY_BUF) {
+                ir->buf[p].host_readonly = 1;
+            }
         }
     }
 }

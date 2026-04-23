@@ -1204,7 +1204,8 @@ static void encode_dispatch(struct metal_program *p,
     for (int i = 0; i < tb; i++) {
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << p->buf[i].shift;
-            uint8_t const rw = p->buf[i].rw;
+            uint8_t const rw = (uint8_t)(p->buf[i].rw
+                             | (p->buf[i].host_readonly ? BUF_HOST_READONLY : 0));
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
