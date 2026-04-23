@@ -267,25 +267,6 @@ static val math_(builder *b, struct ir_inst inst) {
 }
 #define math(b, ...) math_(b, (struct ir_inst){.op = __VA_ARGS__})
 
-static val try_join_imm(builder *b, val d, enum op fused, val x, val y) {
-    if (is_imm(b, d.id)) { return d; }
-    int const imm_id = is_imm(b, x.id) ? x.id : is_imm(b, y.id) ? y.id : -1;
-    if (imm_id >= 0) {
-        val const other = imm_id == x.id ? y : x;
-        val const f = push(b, fused, VX(other), .imm = b->inst[imm_id].imm);
-        return push(b, op_join, .x = d, .y = f);
-    }
-    return d;
-}
-
-static val join_imm_y(builder *b, val d, enum op fused, val x, val y) {
-    if (!is_imm(b, d.id) && is_imm(b, y.id)) {
-        val const f = push(b, fused, VX(x), .imm = b->inst[y.id].imm);
-        return push(b, op_join, .x = d, .y = f);
-    }
-    return d;
-}
-
 static void sort(umbra_val32 *a, umbra_val32 *b) {
     if ((val){.v32 = *b}.bits < (val){.v32 = *a}.bits) {
         umbra_val32 const t = *a;
@@ -294,29 +275,20 @@ static void sort(umbra_val32 *a, umbra_val32 *b) {
     }
 }
 
-// op_join wraps a regular op and its imm-folded equivalent so backends can
-// pick the cheaper form.  When checking for fma/square fusion we want the
-// underlying operand op, so peel any joins off the top.
-static int unjoin(builder *b, int id) {
-    while (b->inst[id].op == op_join) { id = b->inst[id].x.id; }
-    return id;
-}
-
 umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (is_imm32(b, x.id, 0)) { return y; }
-    int const xu = unjoin(b, x.id), yu = unjoin(b, y.id);
-    if (b->inst[xu].op == op_mul_f32) {
-        return math(b, op_fma_f32, .x = b->inst[xu].x, .y = b->inst[xu].y, VZ(y)).v32;
+    if (b->inst[x.id].op == op_mul_f32) {
+        return math(b, op_fma_f32, .x = b->inst[x.id].x, .y = b->inst[x.id].y, VZ(y)).v32;
     }
-    if (b->inst[yu].op == op_mul_f32) {
-        return math(b, op_fma_f32, .x = b->inst[yu].x, .y = b->inst[yu].y, VZ(x)).v32;
+    if (b->inst[y.id].op == op_mul_f32) {
+        return math(b, op_fma_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
     }
-    if (b->inst[xu].op == op_square_f32) {
-        return math(b, op_square_add_f32, .x = b->inst[xu].x, VY(y)).v32;
+    if (b->inst[x.id].op == op_square_f32) {
+        return math(b, op_square_add_f32, .x = b->inst[x.id].x, VY(y)).v32;
     }
-    if (b->inst[yu].op == op_square_f32) {
-        return math(b, op_square_add_f32, .x = b->inst[yu].x, VY(x)).v32;
+    if (b->inst[y.id].op == op_square_f32) {
+        return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
     }
     // Distribute through min / max / sel when an arm is a mul or square,
     // so the recursive add above collapses that arm into fma / square_add.
@@ -357,21 +329,18 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
             }
         }
     }
-    return try_join_imm(b, math(b, op_add_f32, VX(x), VY(y)), op_add_f32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_add_f32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_sub_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    int const yu = unjoin(b, y.id);
-    if (b->inst[yu].op == op_mul_f32) {
-        return math(b, op_fms_f32, .x = b->inst[yu].x, .y = b->inst[yu].y, VZ(x)).v32;
+    if (b->inst[y.id].op == op_mul_f32) {
+        return math(b, op_fms_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
     }
-    if (b->inst[yu].op == op_square_f32) {
-        return math(b, op_square_sub_f32, .x = b->inst[yu].x, VY(x)).v32;
+    if (b->inst[y.id].op == op_square_f32) {
+        return math(b, op_square_sub_f32, .x = b->inst[y.id].x, VY(x)).v32;
     }
-    return join_imm_y(b, math(b, op_sub_f32, VX(x), VY(y)), op_sub_f32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_sub_f32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_mul_f32(builder *b, umbra_val32 x, umbra_val32 y) {
@@ -381,14 +350,12 @@ umbra_val32 umbra_mul_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) {
         return math(b, op_square_f32, VX(x)).v32;
     }
-    return try_join_imm(b, math(b, op_mul_f32, VX(x), VY(y)), op_mul_f32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_mul_f32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_div_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
-    return join_imm_y(b, math(b, op_div_f32, VX(x), VY(y)), op_div_f32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_div_f32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_min_f32(builder *b, umbra_val32 x, umbra_val32 y) {
@@ -396,16 +363,14 @@ umbra_val32 umbra_min_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     // min(v, v) = v — legal across the entire f32 domain: min(NaN, NaN) = NaN,
     // min(±inf, ±inf) = ±inf, min(finite, finite) = v.
     if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) { return x; }
-    return try_join_imm(b, math(b, op_min_f32, VX(x), VY(y)), op_min_f32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_min_f32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_max_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     // max(v, v) = v — same reasoning as min_f32 above.
     if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) { return x; }
-    return try_join_imm(b, math(b, op_max_f32, VX(x), VY(y)), op_max_f32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_max_f32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_sqrt_f32(builder *b, umbra_val32 x) {
@@ -451,15 +416,13 @@ umbra_val32 umbra_ceil_i32(builder *b, umbra_val32 x) { return math(b, op_ceil_i
 umbra_val32 umbra_add_i32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (is_imm32(b, x.id, 0)) { return y; }
-    return try_join_imm(b, math(b, op_add_i32, VX(x), VY(y)), op_add_i32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_add_i32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_sub_i32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0)) { return x; }
     if (x.id == y.id) { return umbra_imm_i32(b, 0); }
-    return join_imm_y(b, math(b, op_sub_i32, VX(x), VY(y)), op_sub_i32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_sub_i32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_mul_i32(builder *b, umbra_val32 x, umbra_val32 y) {
@@ -475,24 +438,20 @@ umbra_val32 umbra_mul_i32(builder *b, umbra_val32 x, umbra_val32 y) {
         int const shift = __builtin_ctz((unsigned)b->inst[y.id].imm);
         return umbra_shl_i32(b, x, umbra_imm_i32(b, shift));
     }
-    return try_join_imm(b, math(b, op_mul_i32, VX(x), VY(y)), op_mul_i32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_mul_i32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_shl_i32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    return join_imm_y(b, math(b, op_shl_i32, VX(x), VY(y)), op_shl_i32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_shl_i32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_shr_u32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    return join_imm_y(b, math(b, op_shr_u32, VX(x), VY(y)), op_shr_u32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_shr_u32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_shr_s32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    return join_imm_y(b, math(b, op_shr_s32, VX(x), VY(y)), op_shr_s32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_shr_s32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_and_32(builder *b, umbra_val32 x, umbra_val32 y) {
@@ -503,8 +462,7 @@ umbra_val32 umbra_and_32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, x.id, 0)) { return x; }
     if (is_imm32(b, x.id, 0x7fffffff)) { return umbra_abs_f32(b, y); }
     if (is_imm32(b, y.id, 0x7fffffff)) { return umbra_abs_f32(b, x); }
-    return try_join_imm(b, math(b, op_and_32, VX(x), VY(y)), op_and_32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_and_32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_or_32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
@@ -512,15 +470,13 @@ umbra_val32 umbra_or_32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, x.id, 0)) { return y; }
     if (is_imm32(b, x.id, -1)) { return x; }
     if (is_imm32(b, y.id, -1)) { return y; }
-    return try_join_imm(b, math(b, op_or_32, VX(x), VY(y)), op_or_32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_or_32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_xor_32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (x.id == y.id) { return umbra_imm_i32(b, 0); }
     if (is_imm32(b, x.id, 0)) { return y; }
-    return try_join_imm(b, math(b, op_xor_32, VX(x), VY(y)), op_xor_32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_xor_32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_sel_32(builder *b, umbra_val32 c, umbra_val32 t, umbra_val32 fv) {
     if (t.id == fv.id) { return t; }
@@ -538,8 +494,7 @@ umbra_val32 umbra_i32_from_f32(builder *b, umbra_val32 x) {
 
 umbra_val32 umbra_eq_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
-    return try_join_imm(b, math(b, op_eq_f32, VX(x), VY(y)), op_eq_f32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_eq_f32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_lt_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     // lt(v, v) = 0 — legal across the entire f32 domain: IEEE `<` is false
@@ -548,26 +503,21 @@ umbra_val32 umbra_lt_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     // NOT similarly foldable: NaN ≤ NaN is false but finite x ≤ x is true,
     // so no single constant covers both cases.
     if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) { return umbra_imm_i32(b, 0); }
-    return join_imm_y(b, math(b, op_lt_f32, VX(x), VY(y)), op_lt_f32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_lt_f32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_le_f32(builder *b, umbra_val32 x, umbra_val32 y) {
-    return join_imm_y(b, math(b, op_le_f32, VX(x), VY(y)), op_le_f32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_le_f32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_eq_i32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (x.id == y.id) { return umbra_imm_i32(b, -1); }
-    return try_join_imm(b, math(b, op_eq_i32, VX(x), VY(y)), op_eq_i32_imm, (val){.v32 = x},
-                        (val){.v32 = y}).v32;
+    return math(b, op_eq_i32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_lt_s32(builder *b, umbra_val32 x, umbra_val32 y) {
-    return join_imm_y(b, math(b, op_lt_s32, VX(x), VY(y)), op_lt_s32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_lt_s32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_le_s32(builder *b, umbra_val32 x, umbra_val32 y) {
-    return join_imm_y(b, math(b, op_le_s32, VX(x), VY(y)), op_le_s32_imm,
-                      (val){.v32 = x}, (val){.v32 = y}).v32;
+    return math(b, op_le_s32, VX(x), VY(y)).v32;
 }
 umbra_val32 umbra_lt_u32(builder *b, umbra_val32 x, umbra_val32 y) {
     return math(b, op_lt_u32, VX(x), VY(y)).v32;

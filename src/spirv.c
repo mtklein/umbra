@@ -287,12 +287,6 @@ static uint32_t spv_const_u32(SpvBuilder *b, uint32_t value) {
     return spv_const(b, b->t_u32, value);
 }
 
-static uint32_t spv_const_i32(SpvBuilder *b, int32_t value) {
-    uint32_t bits;
-    memcpy(&bits, &value, 4);
-    return spv_const(b, b->t_i32, bits);
-}
-
 static uint32_t spv_const_f32(SpvBuilder *b, float value) {
     uint32_t bits;
     memcpy(&bits, &value, 4);
@@ -696,9 +690,6 @@ static _Bool produces_float(enum op op) {
         || op == op_round_f32   || op == op_floor_f32  || op == op_ceil_f32
         || op == op_fma_f32     || op == op_fms_f32
         || op == op_square_add_f32 || op == op_square_sub_f32
-        || op == op_add_f32_imm || op == op_sub_f32_imm
-        || op == op_mul_f32_imm || op == op_div_f32_imm
-        || op == op_min_f32_imm || op == op_max_f32_imm
         || op == op_f32_from_i32
         || op == op_f32_from_f16;
 }
@@ -710,9 +701,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     flags |= SPIRV_NO_CONTRACT;
 #endif
     struct spirv_result result = {0};
-
-    struct umbra_flat_ir *resolved = flat_ir_resolve(ir, JOIN_PREFER_IMM);
-    ir = resolved;
 
     SpvBuilder B;
     memset(&B, 0, sizeof B);
@@ -1291,7 +1279,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                 case op_imm_32:
                     B.val[i] = spv_const_u32(&B, (uint32_t)inst->imm);
                     break;
-                case op_join: __builtin_unreachable();
 
                 case op_uniform_32: {
                     int p = resolve_ptr(&B, inst);
@@ -1762,139 +1749,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
                 } break;
 
-                case op_shl_i32_imm:
-                    B.val[i] = spv_binop(&B, SpvOpShiftLeftLogical, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          spv_const_u32(&B, (uint32_t)inst->imm));
-                    break;
-                case op_shr_u32_imm:
-                    B.val[i] = spv_binop(&B, SpvOpShiftRightLogical, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          spv_const_u32(&B, (uint32_t)inst->imm));
-                    break;
-                case op_shr_s32_imm: {
-                    uint32_t sx = spv_bitcast(&B, B.t_i32, as_u32(&B, get_val(&B, inst->x), xid));
-                    uint32_t r = spv_binop(&B, SpvOpShiftRightArithmetic, B.t_i32,
-                                            sx, spv_const_u32(&B, (uint32_t)inst->imm));
-                    B.val[i] = spv_bitcast(&B, B.t_u32, r);
-                } break;
-                case op_and_32_imm:
-                    B.val[i] = spv_binop(&B, SpvOpBitwiseAnd, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          spv_const_u32(&B, (uint32_t)inst->imm));
-                    break;
-                case op_or_32_imm:
-                    B.val[i] = spv_binop(&B, SpvOpBitwiseOr, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          spv_const_u32(&B, (uint32_t)inst->imm));
-                    break;
-                case op_xor_32_imm:
-                    B.val[i] = spv_binop(&B, SpvOpBitwiseXor, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          spv_const_u32(&B, (uint32_t)inst->imm));
-                    break;
-
-                case op_add_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_fadd(&B, flags,
-                                        as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                } break;
-                case op_sub_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_fsub(&B, flags,
-                                        as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                } break;
-                case op_mul_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_fmul(&B, flags,
-                                        as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                } break;
-                case op_div_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_binop(&B, SpvOpFDiv, B.t_f32,
-                                          as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                } break;
-                case op_min_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_glsl_2(&B, B.t_f32, GLSLstd450FMin,
-                                            as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                } break;
-                case op_max_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    B.val[i] = spv_glsl_2(&B, B.t_f32, GLSLstd450FMax,
-                                            as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                } break;
-                case op_add_i32_imm:
-                    B.val[i] = spv_binop(&B, SpvOpIAdd, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          spv_const_u32(&B, (uint32_t)inst->imm));
-                    break;
-                case op_sub_i32_imm:
-                    B.val[i] = spv_binop(&B, SpvOpISub, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          spv_const_u32(&B, (uint32_t)inst->imm));
-                    break;
-                case op_mul_i32_imm:
-                    B.val[i] = spv_binop(&B, SpvOpIMul, B.t_u32,
-                                          as_u32(&B, get_val(&B, inst->x), xid),
-                                          spv_const_u32(&B, (uint32_t)inst->imm));
-                    break;
-
-                case op_eq_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    uint32_t r = spv_binop(&B, SpvOpFOrdEqual, B.t_bool,
-                                            as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                    B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
-                } break;
-                case op_lt_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    uint32_t r = spv_binop(&B, SpvOpFOrdLessThan, B.t_bool,
-                                            as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                    B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
-                } break;
-                case op_le_f32_imm: {
-                    float fval;
-                    memcpy(&fval, &inst->imm, sizeof fval);
-                    uint32_t imm_f = spv_const_f32(&B, fval);
-                    uint32_t r = spv_binop(&B, SpvOpFOrdLessThanEqual, B.t_bool,
-                                            as_f32(&B, get_val(&B, inst->x), xid), imm_f);
-                    B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
-                } break;
-                case op_eq_i32_imm: {
-                    uint32_t r = spv_binop(&B, SpvOpIEqual, B.t_bool,
-                                            as_u32(&B, get_val(&B, inst->x), xid),
-                                            spv_const_u32(&B, (uint32_t)inst->imm));
-                    B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
-                } break;
-                case op_lt_s32_imm: {
-                    uint32_t sx = spv_bitcast(&B, B.t_i32, as_u32(&B, get_val(&B, inst->x), xid));
-                    uint32_t sy = spv_const_i32(&B, inst->imm);
-                    uint32_t r = spv_binop(&B, SpvOpSLessThan, B.t_bool, sx, sy);
-                    B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
-                } break;
-                case op_le_s32_imm: {
-                    uint32_t sx = spv_bitcast(&B, B.t_i32, as_u32(&B, get_val(&B, inst->x), xid));
-                    uint32_t sy = spv_const_i32(&B, inst->imm);
-                    uint32_t r = spv_binop(&B, SpvOpSLessThanEqual, B.t_bool, sx, sy);
-                    B.val[i] = spv_select(&B, B.t_u32, r, B.c_allones, B.c_0);
-                } break;
-
                 case op_loop_begin: {
                     uint32_t label_header   = spv_id(&B);
                     uint32_t label_loop     = spv_id(&B);
@@ -2052,8 +1906,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
     free(B.t_ptr_uniform_struct);
     free(B.const_cache);
     free(v_vars);
-
-    umbra_flat_ir_free(resolved);
 
     result.spirv = spirv;
     return result;

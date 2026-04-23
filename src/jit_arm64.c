@@ -272,9 +272,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
 
 struct jit_program* jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *ir) {
-    struct umbra_flat_ir *resolved = flat_ir_resolve(ir, JOIN_KEEP_X);
-    ir = resolved;
-
     int *sl = malloc((size_t)ir->insts * sizeof(int));
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
     int  ns = 0;
@@ -434,7 +431,6 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     ra_destroy(ra);
-    umbra_flat_ir_free(resolved);
     free(sl);
 
     size_t const code_sz = (size_t)c.words * 4,
@@ -1001,7 +997,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             arm64_pool_load(c, &jc->pool, lo(s.rd), (uint32_t)inst->imm);
             put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
         } break;
-        case op_join: __builtin_unreachable();
 
         case op_add_f32:
         case op_sub_f32:
@@ -1052,11 +1047,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             }
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
         } break;
-
-        #define IMM_UNREACHABLE(name, flags) case op_##name:
-        IMM_OPS(IMM_UNREACHABLE)
-        #undef IMM_UNREACHABLE
-            __builtin_unreachable();
 
         case op_load_var: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);

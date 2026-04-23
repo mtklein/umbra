@@ -118,7 +118,7 @@ typedef union {
     F32 f32;
 } ival;
 
-// Tag values: all enum op values (0..op_le_s32_imm), plus interpreter-only ops.
+// Tag values: all enum op values, plus interpreter-only ops.
 //
 // Register variants: op_<ret>_<name>_<params> where r=register, m=memory.
 // The existing op_<name> is the all-memory variant (mm->m for binary, m->m for unary).
@@ -131,7 +131,7 @@ static uint8_t const binary_flags[] = { BINARY_OPS(COMM_FLAG) };
 static _Bool is_commutative(enum op op) { return !!(binary_flags[op] & OP_COMMUTATIVE); }
 
 enum {
-    SW_DONE = op_le_s32_imm + 1,
+    SW_DONE = op_i16_from_i32 + 1,
 
 #define BINARY_ENUM(name, ...) op_r_##name##_mm, op_r_##name##_rm, op_m_##name##_rm,
     BINARY_OPS(BINARY_ENUM)
@@ -140,10 +140,6 @@ enum {
 #define UNARY_ENUM(name, ...) op_r_##name##_r, op_m_##name##_r,
     UNARY_OPS(UNARY_ENUM)
 #undef UNARY_ENUM
-
-#define IMM_ENUM(name, ...) op_r_##name##_r, op_m_##name##_r,
-    IMM_OPS(IMM_ENUM)
-#undef IMM_ENUM
 
     op_r_imm_32, op_r_x, op_r_y,
     op_r_fma_f32_mmm, op_r_fma_f32_mmr, op_m_fma_f32_mmr,
@@ -198,11 +194,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
         p->binding = NULL;
     }
 
-    struct umbra_flat_ir *resolved = NULL;
-#if !__has_feature(address_sanitizer)
-    ir = resolved = flat_ir_resolve(ir, JOIN_KEEP_X);
-#endif
-
     int n = 0;
     int loop_begin_sw_n = -1;
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
@@ -220,7 +211,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             case op_x:      emit(.tag = op_x);      break;
             case op_y:      emit(.tag = op_y);      break;
             case op_imm_32: emit(.tag = op_imm_32, .x = inst->imm); break;
-            case op_join:   emit(.tag = op_join, .x = X, .y = Y); break;
 
             case op_uniform_32:
                 emit(.tag = op_uniform_32, .ptr = RESOLVE_PTR(inst), .x = inst->imm);
@@ -297,30 +287,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             case op_store_8x4:
                 emit(.tag = op_store_8x4, .ptr = RESOLVE_PTR(inst),
                      .x = X, .y = Y, .z = Z, .w = W);
-                break;
-
-            case op_shl_i32_imm:
-            case op_shr_u32_imm:
-            case op_shr_s32_imm:
-            case op_and_32_imm:
-            case op_or_32_imm:
-            case op_xor_32_imm:
-            case op_add_f32_imm:
-            case op_sub_f32_imm:
-            case op_mul_f32_imm:
-            case op_div_f32_imm:
-            case op_min_f32_imm:
-            case op_max_f32_imm:
-            case op_add_i32_imm:
-            case op_sub_i32_imm:
-            case op_mul_i32_imm:
-            case op_eq_f32_imm:
-            case op_lt_f32_imm:
-            case op_le_f32_imm:
-            case op_eq_i32_imm:
-            case op_lt_s32_imm:
-            case op_le_s32_imm:
-                emit(.tag = inst->op, .x = X, .y = inst->imm);
                 break;
 
             case op_add_f32:
@@ -409,8 +375,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
                     && (p->inst[i + 1].x == -1                                          \
                      || (p->inst[i + 1].y == -1 && is_commutative(op_##name))))
 #define CHECK_UNARY(name, ...)  || next_tag == op_##name
-#define CHECK_IMM(name, ...)    || next_tag == op_##name
-                out_r = 0 BINARY_OPS(CHECK_BINARY) UNARY_OPS(CHECK_UNARY) IMM_OPS(CHECK_IMM)
+                out_r = 0 BINARY_OPS(CHECK_BINARY) UNARY_OPS(CHECK_UNARY)
                         || (next_tag == op_sel_32 && p->inst[i + 1].x == -1)
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
                         || ((next_tag == op_fma_f32 || next_tag == op_fms_f32)
@@ -419,7 +384,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
                         ;
 #undef CHECK_BINARY
 #undef CHECK_UNARY
-#undef CHECK_IMM
             }
 
             int const tag = s->tag;
@@ -431,7 +395,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
                 [op_sel_32] = {op_r_sel_32_rm, op_m_sel_32_rm, op_r_sel_32_mm},
 #define UV(name,...) [op_##name] = {op_r_##name##_r, op_m_##name##_r, 0},
                 UNARY_OPS(UV)
-                IMM_OPS(UV)
 #undef UV
             };
 
@@ -465,7 +428,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     p->vars = ir->vars;
 
     free(id);
-    umbra_flat_ir_free(resolved);
 
     return p;
 }
@@ -494,7 +456,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             if_depth = 0;
 
             ival acc = {0};
-#define F32_IMM union { int i; float f; } const u = {.i = ip->y}; F32 const imm = (F32){0} + u.f
             // Computed goto on native, switch on WASM.
 #if defined(__GNUC__) && !defined(__wasm__)
     #define DISPATCH    goto *labels[ip->tag]
@@ -517,7 +478,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
                 [op_gather_8]  = &&L_op_gather_8,
-                [op_join] = &&L_op_join,
                 [op_loop_begin] = &&L_op_loop_begin, [op_loop_end] = &&L_op_loop_end,
                 [op_if_begin] = &&L_op_if_begin, [op_if_end] = &&L_op_if_end,
                 [op_load_var] = &&L_op_load_var, [op_store_var] = &&L_op_store_var,
@@ -550,19 +510,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_eq_i32] = &&L_op_eq_i32, [op_lt_s32] = &&L_op_lt_s32,
                 [op_le_s32] = &&L_op_le_s32,
                 [op_lt_u32] = &&L_op_lt_u32, [op_le_u32] = &&L_op_le_u32,
-                [op_shl_i32_imm] = &&L_op_shl_i32_imm, [op_shr_u32_imm] = &&L_op_shr_u32_imm,
-                [op_shr_s32_imm] = &&L_op_shr_s32_imm,
-                [op_and_32_imm] = &&L_op_and_32_imm, [op_or_32_imm] = &&L_op_or_32_imm,
-                [op_xor_32_imm] = &&L_op_xor_32_imm,
-                [op_add_f32_imm] = &&L_op_add_f32_imm, [op_sub_f32_imm] = &&L_op_sub_f32_imm,
-                [op_mul_f32_imm] = &&L_op_mul_f32_imm, [op_div_f32_imm] = &&L_op_div_f32_imm,
-                [op_min_f32_imm] = &&L_op_min_f32_imm, [op_max_f32_imm] = &&L_op_max_f32_imm,
-                [op_eq_f32_imm] = &&L_op_eq_f32_imm, [op_lt_f32_imm] = &&L_op_lt_f32_imm,
-                [op_le_f32_imm] = &&L_op_le_f32_imm,
-                [op_add_i32_imm] = &&L_op_add_i32_imm, [op_sub_i32_imm] = &&L_op_sub_i32_imm,
-                [op_mul_i32_imm] = &&L_op_mul_i32_imm,
-                [op_eq_i32_imm] = &&L_op_eq_i32_imm, [op_lt_s32_imm] = &&L_op_lt_s32_imm,
-                [op_le_s32_imm] = &&L_op_le_s32_imm,
                 [SW_DONE] = &&L_SW_DONE,
 
 #define BINARY_LABELS(name, ...) \
@@ -576,12 +523,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_m_##name##_r] = &&L_op_m_##name##_r,
                 UNARY_OPS(UNARY_LABELS)
 #undef UNARY_LABELS
-#define IMM_LABELS(name, ...) \
-                [op_r_##name##_r] = &&L_op_r_##name##_r, \
-                [op_m_##name##_r] = &&L_op_m_##name##_r,
-                IMM_OPS(IMM_LABELS)
-#undef IMM_LABELS
-
                 [op_r_imm_32] = &&L_op_r_imm_32,
                 [op_r_x] = &&L_op_r_x,
                 [op_r_y] = &&L_op_r_y,
@@ -603,16 +544,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             for (;;) { switch (ip->tag) {
 #endif
                 CASE(op_imm_32) v->i32 = (I32){0} + ip->x; NEXT;
-                CASE(op_join) {
-                    I32 ja, jb;
-                    __builtin_memcpy(&ja, &v[ip->x].i32, sizeof ja);
-                    __builtin_memcpy(&jb, &v[ip->y].i32, sizeof jb);
-                    for (int jk = 0; jk < K; jk++) {
-                        assume(ja[jk] == jb[jk]);
-                    }
-
-                    v->i32 = v[ip->x].i32;
-                } NEXT;
                 CASE(op_x) {
                     I32 seq;
                     __builtin_memcpy(&seq, iota, sizeof seq);
@@ -1078,44 +1009,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_lt_u32) v->i32 = (I32)(v[ip->x].u32 <  v[ip->y].u32); NEXT;
                 CASE(op_le_u32) v->i32 = (I32)(v[ip->x].u32 <= v[ip->y].u32); NEXT;
 
-                CASE(op_shl_i32_imm) {
-                    I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 << sh;
-                } NEXT;
-                CASE(op_shr_u32_imm) {
-                    U32 const sh = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 >> sh;
-                } NEXT;
-                CASE(op_shr_s32_imm) {
-                    I32 const sh = (I32){0} + ip->y; v->i32 = v[ip->x].i32 >> sh;
-                } NEXT;
-                CASE(op_and_32_imm)  {
-                    U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 & m;
-                } NEXT;
-                CASE(op_or_32_imm)   {
-                    U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 | m;
-                } NEXT;
-                CASE(op_xor_32_imm)  {
-                    U32 const m = (U32){0} + (uint32_t)ip->y; v->u32 = v[ip->x].u32 ^ m;
-                } NEXT;
-
-                CASE(op_add_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 + imm; } NEXT;
-                CASE(op_sub_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 - imm; } NEXT;
-                CASE(op_mul_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 * imm; } NEXT;
-                CASE(op_div_f32_imm) { F32_IMM; v->f32 = v[ip->x].f32 / imm; } NEXT;
-                CASE(op_min_f32_imm) { F32_IMM; v->f32 = vec_min(v[ip->x].f32, imm); } NEXT;
-                CASE(op_max_f32_imm) { F32_IMM; v->f32 = vec_max(v[ip->x].f32, imm); } NEXT;
-                CASE(op_eq_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 == imm); } NEXT;
-                CASE(op_lt_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <  imm); } NEXT;
-                CASE(op_le_f32_imm)  { F32_IMM; v->i32 = (I32)(v[ip->x].f32 <= imm); } NEXT;
-
-#define I32_IMM I32 const imm = (I32){0} + ip->y
-                CASE(op_add_i32_imm) { I32_IMM; v->i32 = v[ip->x].i32 + imm; } NEXT;
-                CASE(op_sub_i32_imm) { I32_IMM; v->i32 = v[ip->x].i32 - imm; } NEXT;
-                CASE(op_mul_i32_imm) { I32_IMM; v->i32 = v[ip->x].i32 * imm; } NEXT;
-                CASE(op_eq_i32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 == imm); } NEXT;
-                CASE(op_lt_s32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <  imm); } NEXT;
-                CASE(op_le_s32_imm)  { I32_IMM; v->i32 = (I32)(v[ip->x].i32 <= imm); } NEXT;
-#undef I32_IMM
-
                 // Binary acc variants: r_mm (start), r_rm (continue), m_rm (end).
 #define BIN3(name, dst, OP, x_t, y_t)                                                  \
                 CASE(op_r_##name##_mm) acc.dst = v[ip->x].x_t OP v[ip->y].y_t; NEXT;   \
@@ -1214,45 +1107,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     v->u32 = (U32){0}; __builtin_memcpy(v, &u, sizeof u);
                 } NEXT;
 
-                // Imm acc variants: r_r (continue), m_r (end).
-#define IMM2_I(name, dst, EXPR)                                                             \
-                CASE(op_r_##name##_r) { I32 const imm = (I32){0} + ip->y; acc.dst = EXPR; } NEXT; \
-                CASE(op_m_##name##_r) { I32 const imm = (I32){0} + ip->y; v->dst  = EXPR; } NEXT;
-#define IMM2_U(name, dst, EXPR)                                                              \
-                CASE(op_r_##name##_r) {                                                      \
-                    U32 const imm = (U32){0} + (uint32_t)ip->y; acc.dst = EXPR;              \
-                } NEXT;                                                                      \
-                CASE(op_m_##name##_r) {                                                      \
-                    U32 const imm = (U32){0} + (uint32_t)ip->y; v->dst  = EXPR;              \
-                } NEXT;
-#define IMM2_F(name, dst, EXPR)                                             \
-                CASE(op_r_##name##_r) { F32_IMM; acc.dst = EXPR; } NEXT;   \
-                CASE(op_m_##name##_r) { F32_IMM; v->dst  = EXPR; } NEXT;
-                IMM2_I(shl_i32_imm, i32, acc.i32 << imm)
-                IMM2_U(shr_u32_imm, u32, acc.u32 >> imm)
-                IMM2_I(shr_s32_imm, i32, acc.i32 >> imm)
-                IMM2_U(and_32_imm,  u32, acc.u32 & imm)
-                IMM2_U(or_32_imm,   u32, acc.u32 | imm)
-                IMM2_U(xor_32_imm,  u32, acc.u32 ^ imm)
-                IMM2_F(add_f32_imm, f32, acc.f32 + imm)
-                IMM2_F(sub_f32_imm, f32, acc.f32 - imm)
-                IMM2_F(mul_f32_imm, f32, acc.f32 * imm)
-                IMM2_F(div_f32_imm, f32, acc.f32 / imm)
-                IMM2_F(min_f32_imm, f32, vec_min(acc.f32, imm))
-                IMM2_F(max_f32_imm, f32, vec_max(acc.f32, imm))
-                IMM2_I(add_i32_imm, i32, acc.i32 + imm)
-                IMM2_I(sub_i32_imm, i32, acc.i32 - imm)
-                IMM2_I(mul_i32_imm, i32, acc.i32 * imm)
-                IMM2_F(eq_f32_imm,  i32, (I32)(acc.f32 == imm))
-                IMM2_F(lt_f32_imm,  i32, (I32)(acc.f32 <  imm))
-                IMM2_F(le_f32_imm,  i32, (I32)(acc.f32 <= imm))
-                IMM2_I(eq_i32_imm,  i32, (I32)(acc.i32 == imm))
-                IMM2_I(lt_s32_imm,  i32, (I32)(acc.i32 <  imm))
-                IMM2_I(le_s32_imm,  i32, (I32)(acc.i32 <= imm))
-#undef IMM2_I
-#undef IMM2_U
-#undef IMM2_F
-
                 // sel_32 register variants.
 #define SEL(xv,yv,zv) (((xv).i32 & (yv).i32) | (~(xv).i32 & (zv).i32))
                 CASE(op_r_sel_32_mm) acc.i32 = SEL(v[ip->x], v[ip->y], v[ip->z]); NEXT;
@@ -1303,7 +1157,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     }
     free(scratch);
 }
-#undef F32_IMM
 #undef DISPATCH
 #undef CASE
 #undef NEXT

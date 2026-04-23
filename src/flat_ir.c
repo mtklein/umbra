@@ -272,10 +272,21 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
                           || b->inst[b->inst[i].w.id].varying;
     }
     {
+        // Ops inside a loop or if region execute per-iteration / per-lane, so
+        // their values and scopes must stay inside that region.  op_imm_32 and
+        // op_uniform_32 are exceptions: literals and reads of read-only
+        // uniforms are loop-invariant.  CSE may reuse a single such node from
+        // both inside and outside the enclosing region (e.g. an immediate
+        // shift count shared by loop-body and post-loop code), and that only
+        // works if the node lives in the preamble.
         int depth = 0;
         for (int i = 0; i < n; i++) {
             if (b->inst[i].op == op_loop_begin || b->inst[i].op == op_if_begin) { depth++; }
-            if (depth > 0) { b->inst[i].varying = 1; }
+            if (depth > 0
+                    && b->inst[i].op != op_imm_32
+                    && b->inst[i].op != op_uniform_32) {
+                b->inst[i].varying = 1;
+            }
             if (b->inst[i].op == op_loop_end || b->inst[i].op == op_if_end) { depth--; }
         }
     }
@@ -382,99 +393,6 @@ static void compute_buf_meta(struct umbra_flat_ir *ir) {
     }
 }
 
-static val remap_val(val v, int const *remap) {
-    return (val){.id = remap[v.id], .chan = v.chan};
-}
-
-struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const *ir,
-                                            enum join_policy jp) {
-    int const n = ir->insts;
-    struct ir_inst *inst = malloc((size_t)n * sizeof *inst);
-    __builtin_memcpy(inst, ir->inst, (size_t)n * sizeof *inst);
-
-    for (int i = 0; i < n; i++) {
-        struct ir_inst *ip = inst + i;
-        if (ip->op == op_join) {
-            if (jp == JOIN_PREFER_IMM && op_is_fused_imm(inst[ip->y.id].op)) {
-                ip->x = ip->y;
-            }
-            ip->y = (val){0};
-        }
-    }
-
-    for (int i = 0; i < n; i++) {
-        struct ir_inst *ip = inst + i;
-        if (inst[ip->x.id].op == op_join) { ip->x.id = inst[ip->x.id].x.id; }
-        if (inst[ip->y.id].op == op_join) { ip->y.id = inst[ip->y.id].x.id; }
-        if (inst[ip->z.id].op == op_join) { ip->z.id = inst[ip->z.id].x.id; }
-        if (inst[ip->w.id].op == op_join) { ip->w.id = inst[ip->w.id].x.id; }
-        assume(inst[ip->x.id].op != op_join);
-        assume(inst[ip->y.id].op != op_join);
-        assume(inst[ip->z.id].op != op_join);
-        assume(inst[ip->w.id].op != op_join);
-    }
-
-    _Bool *live = calloc((size_t)(n + 1), sizeof *live);
-    for (int i = n; i-- > 0;) {
-        struct ir_inst const *ip = &inst[i];
-        if (op_is_store(ip->op) || ip->op == op_loop_begin || ip->op == op_loop_end
-                                || ip->op == op_if_begin   || ip->op == op_if_end) {
-            live[i] = 1;
-        }
-        if (live[i]) {
-            live[ip->x.id] = 1;
-            live[ip->y.id] = 1;
-            live[ip->z.id] = 1;
-            live[ip->w.id] = 1;
-        }
-    }
-
-    int *remap = calloc((size_t)(n + 1), sizeof *remap);
-    int live_count = 0,
-        new_preamble = 0;
-    for (int i = 0; i < n; i++) {
-        if (i == ir->preamble) {
-            new_preamble = live_count;
-        }
-        if (live[i]) {
-            remap[i] = live_count++;
-        }
-    }
-
-    struct ir_inst *out = malloc((size_t)live_count * sizeof *out);
-    int j = 0;
-    for (int i = 0; i < n; i++) {
-        if (live[i]) {
-            out[j]   = inst[i];
-            out[j].x = remap_val(inst[i].x, remap);
-            out[j].y = remap_val(inst[i].y, remap);
-            out[j].z = remap_val(inst[i].z, remap);
-            out[j].w = remap_val(inst[i].w, remap);
-            j++;
-        }
-    }
-
-    struct umbra_flat_ir *result = calloc(1, sizeof *result);
-    result->inst       = out;
-    result->insts      = live_count;
-    result->vars     = ir->vars;
-    result->preamble   = new_preamble;
-    result->loop_begin = ir->loop_begin >= 0 ? remap[ir->loop_begin] : -1;
-    result->loop_end   = ir->loop_end   >= 0 ? remap[ir->loop_end]   : -1;
-    if (ir->bindings) {
-        size_t const sz = (size_t)ir->bindings * sizeof *ir->binding;
-        result->binding  = malloc(sz);
-        result->bindings = ir->bindings;
-        __builtin_memcpy(result->binding, ir->binding, sz);
-    }
-
-    free(remap);
-    free(live);
-    free(inst);
-    compute_buf_meta(result);
-    return result;
-}
-
 void umbra_flat_ir_free(struct umbra_flat_ir *ir) {
     if (ir) {
         free(ir->inst);
@@ -513,7 +431,6 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
 
         switch (op) {
         case op_imm_32: fprintf(f, " 0x%x", (uint32_t)ip->imm); break;
-        case op_join: fprintf(f, " v%d v%d", ip->x.id, ip->y.id); break;
         case op_uniform_32:
             fprintf(f, " p%d [%d]", ip->ptr.bits, ip->imm);
             break;
@@ -587,31 +504,6 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
         case op_fma_f32:
         case op_fms_f32:
         case op_sel_32: fprintf(f, " v%d v%d v%d", ip->x.id, ip->y.id, ip->z.id); break;
-
-        case op_shl_i32_imm:
-        case op_shr_u32_imm:
-        case op_shr_s32_imm: fprintf(f, " v%d %d", ip->x.id, ip->imm); break;
-        case op_and_32_imm:
-        case op_add_f32_imm:
-        case op_sub_f32_imm:
-        case op_mul_f32_imm:
-        case op_div_f32_imm:
-        case op_min_f32_imm:
-        case op_max_f32_imm:
-        case op_add_i32_imm:
-        case op_sub_i32_imm:
-        case op_mul_i32_imm:
-        case op_or_32_imm:
-        case op_xor_32_imm:
-        case op_eq_f32_imm:
-        case op_lt_f32_imm:
-        case op_le_f32_imm:
-        case op_eq_i32_imm:
-        case op_lt_s32_imm:
-        case op_le_s32_imm:
-            fprintf(f, " v%d 0x%x", ip->x.id, (uint32_t)ip->imm);
-            if (ip->y.bits) { fprintf(f, " (a.k.a. v%d)", ip->y.id); }
-            break;
         }
         fprintf(f, "\n");
     }

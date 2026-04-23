@@ -2255,9 +2255,6 @@ TEST(test_dump) {
         struct umbra_builder *b = umbra_builder();
         umbra_val32            x = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
         umbra_val32            r = umbra_add_f32(b, x, umbra_imm_f32(b, 1.0f));
-        // shl_i32 by an immediate folds to op_shl_i32_imm in the builder, which
-        // dump_insts has its own switch case for; covering it here keeps the
-        // dump table from rotting.
         umbra_val32            s = umbra_shl_i32(b, x, umbra_imm_i32(b, 3));
         umbra_store_32(b, umbra_bind_buf(b, &slot[1]), r);
         umbra_store_32(b, umbra_bind_buf(b, &slot[2]), s);

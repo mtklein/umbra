@@ -4,7 +4,6 @@
 //   OTHER_OPS:  X(name, flags) where flags combine OP_STORE, OP_PTR, OP_VARYING.
 //   BINARY_OPS: X(name, flags) where flags may include OP_COMMUTATIVE.
 //   UNARY_OPS:  X(name, flags) — no flags defined yet, always 0.
-//   IMM_OPS:    X(name, flags) — no flags defined yet, always 0.
 enum {
     OP_STORE       = 1 << 0,
     OP_PTR         = 1 << 1,
@@ -12,12 +11,11 @@ enum {
     OP_COMMUTATIVE = 1 << 3,
 };
 
-// Ops not covered by BINARY_OPS, UNARY_OPS, or IMM_OPS.
+// Ops not covered by BINARY_OPS or UNARY_OPS.
 #define OTHER_OPS(X)                                                                       \
     X(x,                                    OP_VARYING)                                    \
     X(y,                                    OP_VARYING)                                    \
     X(imm_32,                               0)                                             \
-    X(join,                                 0)                                             \
     X(uniform_32,                           OP_PTR)                                        \
     X(load_32,                              OP_PTR|OP_VARYING)                             \
     X(load_16x4,                            OP_PTR|OP_VARYING)                             \
@@ -66,29 +64,17 @@ enum {
     X(f32_from_f16, 0) X(f16_from_f32, 0)                                                 \
     X(i32_from_s16, 0) X(i32_from_u16, 0) X(i16_from_i32, 0)
 
-// _imm ops: x is the only variable input, y is the immediate.
-#define IMM_OPS(X)                                                                         \
-    X(shl_i32_imm, 0) X(shr_u32_imm, 0) X(shr_s32_imm, 0)                                \
-    X(and_32_imm,  0) X(or_32_imm,   0) X(xor_32_imm,   0)                                \
-    X(add_f32_imm, 0) X(sub_f32_imm, 0) X(mul_f32_imm, 0)                                 \
-    X(div_f32_imm, 0) X(min_f32_imm, 0) X(max_f32_imm, 0)                                 \
-    X(add_i32_imm, 0) X(sub_i32_imm, 0) X(mul_i32_imm, 0)                                 \
-    X(eq_f32_imm,  0) X(lt_f32_imm,  0) X(le_f32_imm,  0)                                 \
-    X(eq_i32_imm,  0) X(lt_s32_imm,  0) X(le_s32_imm,  0)
-
 enum op {
 #define OP_ENUM(name, ...) op_##name,
     OTHER_OPS(OP_ENUM)
     BINARY_OPS(OP_ENUM)
     UNARY_OPS(OP_ENUM)
-    IMM_OPS(OP_ENUM)
 #undef OP_ENUM
 };
 
 _Bool       op_is_store    (enum op);
 _Bool       op_has_ptr     (enum op);
 _Bool       op_is_varying  (enum op);
-_Bool       op_is_fused_imm(enum op);
 int         op_values      (enum op);
 int         op_elem_shift  (enum op);
 char const* op_name        (enum op);

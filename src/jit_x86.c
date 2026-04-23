@@ -160,11 +160,9 @@ static void deinterleave_channel(Buf *c, struct jit_ctx *jc,
     vpunpcklqdq(c, dst, dst, px);
 }
 
-static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm,
+static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z,
                          int scratch, int scratch2) {
     switch ((int)op) {
-    case op_imm_32: broadcast_imm32(c, d, (uint32_t)imm); break;
-
     case op_add_f32: vaddps(c, d, x, y); break;
     case op_sub_f32: vsubps(c, d, x, y); break;
     case op_mul_f32: vmulps(c, d, x, y); break;
@@ -267,9 +265,6 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int imm
         vpmaxsd(c, scratch, x, y);
         vpcmpeqd(c, d, y, scratch);
         break;
-    case op_shl_i32_imm: vpslld_i(c, d, x, (uint8_t)imm); break;
-    case op_shr_u32_imm: vpsrld_i(c, d, x, (uint8_t)imm); break;
-    case op_shr_s32_imm: vpsrad_i(c, d, x, (uint8_t)imm); break;
     }
 }
 
@@ -283,9 +278,6 @@ static int resolve_ptr_x86(Buf *c, ptr p, int *last_ptr, int elem_shift) {
 
 struct jit_program* jit_program(struct jit_backend *be,
                                            struct umbra_flat_ir const *ir) {
-    struct umbra_flat_ir *resolved = flat_ir_resolve(ir, JOIN_PREFER_IMM);
-    ir = resolved;
-
     int *sl = malloc((size_t)ir->insts * sizeof(int));
     for (int i = 0; i < ir->insts; i++) {
         sl[i] = -1;
@@ -437,7 +429,6 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     ra_destroy(ra);
-    umbra_flat_ir_free(resolved);
     free(sl);
 
     size_t const code_sz = c.size,
@@ -997,93 +988,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             pool_broadcast(c, &jc->pool, s.rd, (uint32_t)inst->imm);
         } break;
-        case op_join: __builtin_unreachable();
-
-        case op_lt_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
-            int8_t tmp = ra_alloc(ra, sl, ns);
-            pool_broadcast(c, &jc->pool, tmp, (uint32_t)inst->imm);
-            vpcmpgtd(c, s.rd, tmp, s.rx);
-            ra_return_reg(ra, tmp);
-        } break;
-        case op_le_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
-            int8_t tmp = ra_alloc(ra, sl, ns);
-            pool_broadcast(c, &jc->pool, tmp, (uint32_t)inst->imm);
-            vpcmpgtd(c, s.rd, s.rx, tmp);
-            vpcmpeqd(c, tmp, tmp, tmp);
-            vpxor_3(c, 1, s.rd, s.rd, tmp);
-            ra_return_reg(ra, tmp);
-        } break;
-        case op_and_32_imm:
-        case op_add_f32_imm:
-        case op_sub_f32_imm:
-        case op_mul_f32_imm:
-        case op_div_f32_imm:
-        case op_min_f32_imm:
-        case op_max_f32_imm:
-        case op_add_i32_imm:
-        case op_sub_i32_imm:
-        case op_mul_i32_imm:
-        case op_or_32_imm:
-        case op_xor_32_imm:
-        case op_eq_f32_imm:
-        case op_lt_f32_imm:
-        case op_le_f32_imm:
-        case op_eq_i32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
-            uint32_t       v = (uint32_t)inst->imm;
-            uint32_t       bcast[8] = {v, v, v, v, v, v, v, v};
-            int            off = pool_add(&jc->pool, bcast, 32);
-            enum op        o = inst->op;
-            int            pp = 0, mm = 1;
-            uint8_t        vop = 0;
-            if (o == op_and_32_imm) {
-                pp = 1;
-                vop = 0xdb;
-            } else if (o == op_add_f32_imm) {
-                vop = 0x58;
-            } else if (o == op_sub_f32_imm) {
-                vop = 0x5c;
-            } else if (o == op_mul_f32_imm) {
-                vop = 0x59;
-            } else if (o == op_div_f32_imm) {
-                vop = 0x5e;
-            } else if (o == op_min_f32_imm) {
-                vop = 0x5d;
-            } else if (o == op_max_f32_imm) {
-                vop = 0x5f;
-            } else if (o == op_add_i32_imm) {
-                pp = 1;
-                vop = 0xfe;
-            } else if (o == op_sub_i32_imm) {
-                pp = 1;
-                vop = 0xfa;
-            } else if (o == op_mul_i32_imm) {
-                pp = 1;
-                mm = 2;
-                vop = 0x40;
-            } else if (o == op_or_32_imm) {
-                pp = 1;
-                vop = 0xeb;
-            } else if (o == op_xor_32_imm) {
-                pp = 1;
-                vop = 0xef;
-            } else if (o == op_eq_i32_imm) {
-                pp = 1;
-                vop = 0x76;
-            } else {
-                vop = 0xc2;
-            }
-            if (o == op_eq_f32_imm || o == op_lt_f32_imm || o == op_le_f32_imm) {
-                uint8_t pred = o == op_eq_f32_imm ? 0 : o == op_lt_f32_imm ? 1 : 2;
-                int     pos = vcmpps_rip(c, s.rd, s.rx, pred);
-                pool_ref_at(&jc->pool, off, pos, 1);
-            } else {
-                int pos = vex_rip(c, pp, mm, 0, 1, s.rd, s.rx, vop);
-                pool_ref_at(&jc->pool, off, pos, 0);
-            }
-        } break;
 
         case op_abs_f32: {
             struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
@@ -1134,17 +1038,9 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                            : (inst->op == op_le_s32 || inst->op == op_le_u32) ? 1
                                                                               : 0;
             struct ra_step s = ra_step_alu(ra, sl, ns, inst, i, nscratch);
-            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, inst->imm, s.scratch,
-                         s.scratch2);
+            emit_alu_reg(c, inst->op, s.rd, s.rx, s.ry, s.rz, s.scratch, s.scratch2);
             if (s.scratch >= 0) { ra_return_reg(ra, s.scratch); }
             if (s.scratch2 >= 0) { ra_return_reg(ra, s.scratch2); }
-        } break;
-
-        case op_shl_i32_imm:
-        case op_shr_u32_imm:
-        case op_shr_s32_imm: {
-            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
-            emit_alu_reg(c, inst->op, s.rd, s.rx, 0, 0, inst->imm, -1, -1);
         } break;
 
         case op_load_var: {

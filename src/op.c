@@ -6,19 +6,15 @@
 #pragma clang diagnostic ignored "-Wfloat-equal"
 
 // Op flag table generated from X-macro flags at compile time.
-enum { OP_FUSED_IMM = 1 << 4 };
-#define      FLAG(name, flags) [op_##name] = (flags),
-#define FUSED_FLAG(name, flags) [op_##name] = (flags) | OP_FUSED_IMM,
+#define FLAG(name, flags) [op_##name] = (flags),
 static uint8_t const op_flags[] = {
-    OTHER_OPS(FLAG) BINARY_OPS(FLAG) UNARY_OPS(FLAG) IMM_OPS(FUSED_FLAG)
+    OTHER_OPS(FLAG) BINARY_OPS(FLAG) UNARY_OPS(FLAG)
 };
-#undef FUSED_FLAG
 #undef FLAG
 
 _Bool op_is_store    (enum op op) { return !!(op_flags[op] & OP_STORE); }
 _Bool op_has_ptr     (enum op op) { return !!(op_flags[op] & OP_PTR); }
 _Bool op_is_varying  (enum op op) { return !!(op_flags[op] & OP_VARYING); }
-_Bool op_is_fused_imm(enum op op) { return !!(op_flags[op] & OP_FUSED_IMM); }
 
 int op_values(enum op op) {
     switch ((int)op) {
@@ -55,7 +51,6 @@ char const* op_name(enum op op) {
         OTHER_OPS(OP_NAME)
         BINARY_OPS(OP_NAME)
         UNARY_OPS(OP_NAME)
-        IMM_OPS(OP_NAME)
 #undef OP_NAME
     };
     return names[op];
