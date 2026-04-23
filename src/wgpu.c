@@ -76,6 +76,9 @@ struct wgpu_backend {
     WGPUQuerySet              ts_query;
     WGPUBuffer                ts_resolve;
     WGPUBuffer                ts_staging;
+
+    WGPUBuffer                dl_staging;  // pooled cache_download staging
+    size_t                    dl_staging_size;
 };
 
 struct wgpu_program {
@@ -226,12 +229,16 @@ static void wgpu_cache_upload(gpu_buf buf, void const *data, size_t bytes,
 static void wgpu_cache_download(gpu_buf buf, void *host, size_t bytes, void *ctx) {
     struct wgpu_backend *be = ctx;
     size_t aligned_sz = (bytes + 3) & ~(size_t)3;
-    WGPUBuffer staging = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
-        .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
-        .size  = aligned_sz,
-    });
+    if (be->dl_staging_size < aligned_sz) {
+        if (be->dl_staging) { wgpuBufferRelease(be->dl_staging); }
+        be->dl_staging = wgpuDeviceCreateBuffer(be->device, &(WGPUBufferDescriptor){
+            .usage = WGPUBufferUsage_MapRead | WGPUBufferUsage_CopyDst,
+            .size  = aligned_sz,
+        });
+        be->dl_staging_size = aligned_sz;
+    }
     WGPUCommandEncoder enc = wgpuDeviceCreateCommandEncoder(be->device, NULL);
-    wgpuCommandEncoderCopyBufferToBuffer(enc, buf.ptr, 0, staging, 0, aligned_sz);
+    wgpuCommandEncoderCopyBufferToBuffer(enc, buf.ptr, 0, be->dl_staging, 0, aligned_sz);
     WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(enc, NULL);
     wgpuCommandEncoderRelease(enc);
 
@@ -239,13 +246,12 @@ static void wgpu_cache_download(gpu_buf buf, void *host, size_t bytes, void *ctx
     wgpuCommandBufferRelease(cmd);
     wgpuDevicePoll(be->device, 1, &si);
 
-    wgpuBufferMapAsync(staging, WGPUMapMode_Read, 0, aligned_sz,
+    wgpuBufferMapAsync(be->dl_staging, WGPUMapMode_Read, 0, aligned_sz,
         (WGPUBufferMapCallbackInfo){.callback = map_cb});
     wgpuDevicePoll(be->device, 1, NULL);
-    void const *mapped = wgpuBufferGetConstMappedRange(staging, 0, aligned_sz);
+    void const *mapped = wgpuBufferGetConstMappedRange(be->dl_staging, 0, aligned_sz);
     if (mapped) { memcpy(host, mapped, bytes); }
-    wgpuBufferUnmap(staging);
-    wgpuBufferRelease(staging);
+    wgpuBufferUnmap(be->dl_staging);
 }
 
 static void wgpu_cache_release(gpu_buf buf, void *ctx) {
@@ -672,6 +678,7 @@ static void wgpu_free(struct umbra_backend *base) {
     wgpuQuerySetRelease(be->ts_query);
     wgpuBufferRelease(be->ts_resolve);
     wgpuBufferRelease(be->ts_staging);
+    if (be->dl_staging) { wgpuBufferRelease(be->dl_staging); }
     wgpuQueueRelease(be->queue);
     wgpuDeviceRelease(be->device);
     wgpuAdapterRelease(be->adapter);
