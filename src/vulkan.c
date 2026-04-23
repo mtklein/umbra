@@ -439,7 +439,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     struct vk_backend *v = (struct vk_backend *)be;
 
     struct spirv_result const sr =
-        build_spirv(ir, SPIRV_FLOAT_CONTROLS | SPIRV_PRECISE_SQRT);
+        build_spirv(ir, 0);
 
     int descs = sr.total_bufs;
 

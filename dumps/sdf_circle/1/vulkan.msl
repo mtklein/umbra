@@ -38,10 +38,22 @@ kernel void main0(constant _27& _41 [[buffer(0)]], device _14& _38 [[buffer(1)]]
         float _117 = _100 * _100;
         float _118 = _83 * _83;
         float _119 = fast::max(_117, _118);
-        uint _148 = (_57 * _41._m0[6u]) + _56;
-        uint _150 = _148 >> 2u;
-        uint _152 = (_148 & 3u) << 3u;
-        _38._m0[_150] = (_38._m0[_150] & (~(255u << _152))) | (((((((precise::sqrt(fast::max(fma(_95, _95, _119), fma(_90, _90, _119))) - as_type<float>(_40._m0[0u].z)) < 0.0) ? 4294967295u : 0u) != 0u) ? 2u : uint((((precise::sqrt(as_type<float>(((((as_type<float>(0u) < _95) ? 4294967295u : 0u) | ((_90 < 0.0) ? 4294967295u : 0u)) != 0u) ? as_type<uint>(fast::min(_95 * _95, _90 * _90)) : 0u) + as_type<float>(((((as_type<float>(0u) < _100) ? 4294967295u : 0u) | ((_83 < 0.0) ? 4294967295u : 0u)) != 0u) ? as_type<uint>(fast::min(_117, _118)) : 0u)) - as_type<float>(_40._m0[0u].z)) < 0.0) ? 4294967295u : 0u) != 0u)) & 255u) << _152);
+        float _122 = fast::max(fma(_95, _95, _119), fma(_90, _90, _119));
+        uint _128 = as_type<uint>(_122);
+        uint _130 = (_128 >> 23u) - 127u;
+        float _140 = as_type<float>((_128 & 8388607u) | ((127u + (_130 & 1u)) << 23u));
+        float _141 = rsqrt(_140);
+        float _142 = _140 * _141;
+        float _163 = as_type<float>(((((as_type<float>(0u) < _95) ? 4294967295u : 0u) | ((_90 < 0.0) ? 4294967295u : 0u)) != 0u) ? as_type<uint>(fast::min(_95 * _95, _90 * _90)) : 0u) + as_type<float>(((((as_type<float>(0u) < _100) ? 4294967295u : 0u) | ((_83 < 0.0) ? 4294967295u : 0u)) != 0u) ? as_type<uint>(fast::min(_117, _118)) : 0u);
+        uint _164 = as_type<uint>(_163);
+        uint _166 = (_164 >> 23u) - 127u;
+        float _176 = as_type<float>((_164 & 8388607u) | ((127u + (_166 & 1u)) << 23u));
+        float _177 = rsqrt(_176);
+        float _178 = _176 * _177;
+        uint _201 = (_57 * _41._m0[6u]) + _56;
+        uint _203 = _201 >> 2u;
+        uint _205 = (_201 & 3u) << 3u;
+        _38._m0[_203] = (_38._m0[_203] & (~(255u << _205))) | (((((((((_122 == 0.0) ? 0.0 : as_type<float>(as_type<uint>(fma(fma(-_142, _142, _140), _141 * 0.5, _142)) + (uint(int(_130 & 4294967294u) >> int(1u)) << 23u))) - as_type<float>(_40._m0[0u].z)) < 0.0) ? 4294967295u : 0u) != 0u) ? 2u : uint((((((_163 == 0.0) ? 0.0 : as_type<float>(as_type<uint>(fma(fma(-_178, _178, _176), _177 * 0.5, _178)) + (uint(int(_166 & 4294967294u) >> int(1u)) << 23u))) - as_type<float>(_40._m0[0u].z)) < 0.0) ? 4294967295u : 0u) != 0u)) & 255u) << _205);
         return;
     }
 }

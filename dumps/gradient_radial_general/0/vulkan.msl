@@ -50,29 +50,35 @@ kernel void main0(constant _32& _49 [[buffer(0)]], device _18& _44 [[buffer(1)]]
         _53 = 0u;
         float _88 = float(int(_69)) - as_type<float>(_45._m0[0u].x);
         float _92 = float(int(_70)) - as_type<float>(_45._m0[0u].y);
-        float _100 = fast::min(fast::max(as_type<float>(_45._m0[0u].z) * precise::sqrt(fma(_88, _88, _92 * _92)), 0.0), 1.0);
+        float _94 = fma(_88, _88, _92 * _92);
+        uint _100 = as_type<uint>(_94);
+        uint _102 = (_100 >> 23u) - 127u;
+        float _112 = as_type<float>((_100 & 8388607u) | ((127u + (_102 & 1u)) << 23u));
+        float _113 = rsqrt(_112);
+        float _114 = _112 * _113;
+        float _129 = fast::min(fast::max(as_type<float>(_45._m0[0u].z) * ((_94 == 0.0) ? 0.0 : as_type<float>(as_type<uint>(fma(fma(-_114, _114, _112), _113 * 0.5, _114)) + (uint(int(_102 & 4294967294u) >> int(1u)) << 23u))), 0.0), 1.0);
         while (_56 < _82)
         {
-            uint _117 = _48._m0[min(_56, (_49._m0[7u] - 1u))] & ((_56 < _49._m0[7u]) ? 4294967295u : 0u);
-            uint _121 = _56 + 1u;
-            uint _130 = _48._m0[min(_121, (_49._m0[7u] - 1u))] & ((_121 < _49._m0[7u]) ? 4294967295u : 0u);
-            if ((((as_type<float>(_117) <= _100) ? 4294967295u : 0u) & ((_100 <= as_type<float>(_130)) ? 4294967295u : 0u)) != 0u)
+            uint _146 = _48._m0[min(_56, (_49._m0[7u] - 1u))] & ((_56 < _49._m0[7u]) ? 4294967295u : 0u);
+            uint _150 = _56 + 1u;
+            uint _159 = _48._m0[min(_150, (_49._m0[7u] - 1u))] & ((_150 < _49._m0[7u]) ? 4294967295u : 0u);
+            if ((((as_type<float>(_146) <= _129) ? 4294967295u : 0u) & ((_129 <= as_type<float>(_159)) ? 4294967295u : 0u)) != 0u)
             {
-                uint _138 = _84 + _121;
-                float _144 = (_100 - as_type<float>(_117)) / (as_type<float>(_130) - as_type<float>(_117));
-                uint _145 = _81 + _121;
-                uint _146 = _83 + _121;
-                uint _147 = _84 + _56;
-                uint _184 = _47._m0[min(_147, (_49._m0[6u] - 1u))] & ((_147 < _49._m0[6u]) ? 4294967295u : 0u);
-                _55 = as_type<uint>(fma(_144, as_type<float>(_47._m0[min(_138, (_49._m0[6u] - 1u))] & ((_138 < _49._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_184), as_type<float>(_184)));
-                uint _191 = _81 + _56;
-                uint _200 = _47._m0[min(_191, (_49._m0[6u] - 1u))] & ((_191 < _49._m0[6u]) ? 4294967295u : 0u);
-                _53 = as_type<uint>(fma(_144, as_type<float>(_47._m0[min(_145, (_49._m0[6u] - 1u))] & ((_145 < _49._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_200), as_type<float>(_200)));
-                uint _207 = _83 + _56;
-                uint _216 = _47._m0[min(_207, (_49._m0[6u] - 1u))] & ((_207 < _49._m0[6u]) ? 4294967295u : 0u);
-                _54 = as_type<uint>(fma(_144, as_type<float>(_47._m0[min(_146, (_49._m0[6u] - 1u))] & ((_146 < _49._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_216), as_type<float>(_216)));
-                uint _240 = _47._m0[min(_56, (_49._m0[6u] - 1u))] & ((_56 < _49._m0[6u]) ? 4294967295u : 0u);
-                _52 = as_type<uint>(fma(_144, as_type<float>(_47._m0[min(_121, (_49._m0[6u] - 1u))] & ((_121 < _49._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_240), as_type<float>(_240)));
+                uint _167 = _84 + _150;
+                float _173 = (_129 - as_type<float>(_146)) / (as_type<float>(_159) - as_type<float>(_146));
+                uint _174 = _81 + _150;
+                uint _175 = _83 + _150;
+                uint _176 = _84 + _56;
+                uint _213 = _47._m0[min(_176, (_49._m0[6u] - 1u))] & ((_176 < _49._m0[6u]) ? 4294967295u : 0u);
+                _55 = as_type<uint>(fma(_173, as_type<float>(_47._m0[min(_167, (_49._m0[6u] - 1u))] & ((_167 < _49._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_213), as_type<float>(_213)));
+                uint _220 = _81 + _56;
+                uint _229 = _47._m0[min(_220, (_49._m0[6u] - 1u))] & ((_220 < _49._m0[6u]) ? 4294967295u : 0u);
+                _53 = as_type<uint>(fma(_173, as_type<float>(_47._m0[min(_174, (_49._m0[6u] - 1u))] & ((_174 < _49._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_229), as_type<float>(_229)));
+                uint _236 = _83 + _56;
+                uint _245 = _47._m0[min(_236, (_49._m0[6u] - 1u))] & ((_236 < _49._m0[6u]) ? 4294967295u : 0u);
+                _54 = as_type<uint>(fma(_173, as_type<float>(_47._m0[min(_175, (_49._m0[6u] - 1u))] & ((_175 < _49._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_245), as_type<float>(_245)));
+                uint _269 = _47._m0[min(_56, (_49._m0[6u] - 1u))] & ((_56 < _49._m0[6u]) ? 4294967295u : 0u);
+                _52 = as_type<uint>(fma(_173, as_type<float>(_47._m0[min(_150, (_49._m0[6u] - 1u))] & ((_150 < _49._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_269), as_type<float>(_269)));
             }
             _56++;
         }

@@ -36,8 +36,14 @@ kernel void main0(constant _32& _45 [[buffer(0)]], device _18& _42 [[buffer(1)]]
         uint _61 = _45._m0[2u] + gl_GlobalInvocationID.y;
         float _99 = float(int(_60)) - as_type<float>(_43._m0[0u].x);
         float _103 = float(int(_61)) - as_type<float>(_43._m0[0u].y);
-        float _111 = fast::min(fast::max(as_type<float>(_43._m0[0u].z) * precise::sqrt(fma(_99, _99, _103 * _103)), 0.0), 1.0);
-        _42._m0[(_61 * _45._m0[6u]) + _60] = uint2(as_type<uint>(half2(float2(fma(_111, as_type<float>(_44._m0[2u].x) - as_type<float>(_44._m0[1u].x), as_type<float>(_44._m0[1u].x)), 0.0))) | (as_type<uint>(half2(float2(fma(_111, as_type<float>(_44._m0[2u].y) - as_type<float>(_44._m0[1u].y), as_type<float>(_44._m0[1u].y)), 0.0))) << 16u), as_type<uint>(half2(float2(fma(_111, as_type<float>(_44._m0[2u].z) - as_type<float>(_44._m0[1u].z), as_type<float>(_44._m0[1u].z)), 0.0))) | (as_type<uint>(half2(float2(fma(_111, as_type<float>(_44._m0[2u].w) - as_type<float>(_44._m0[1u].w), as_type<float>(_44._m0[1u].w)), 0.0))) << 16u));
+        float _105 = fma(_99, _99, _103 * _103);
+        uint _111 = as_type<uint>(_105);
+        uint _113 = (_111 >> 23u) - 127u;
+        float _123 = as_type<float>((_111 & 8388607u) | ((127u + (_113 & 1u)) << 23u));
+        float _124 = rsqrt(_123);
+        float _125 = _123 * _124;
+        float _140 = fast::min(fast::max(as_type<float>(_43._m0[0u].z) * ((_105 == 0.0) ? 0.0 : as_type<float>(as_type<uint>(fma(fma(-_125, _125, _123), _124 * 0.5, _125)) + (uint(int(_113 & 4294967294u) >> int(1u)) << 23u))), 0.0), 1.0);
+        _42._m0[(_61 * _45._m0[6u]) + _60] = uint2(as_type<uint>(half2(float2(fma(_140, as_type<float>(_44._m0[2u].x) - as_type<float>(_44._m0[1u].x), as_type<float>(_44._m0[1u].x)), 0.0))) | (as_type<uint>(half2(float2(fma(_140, as_type<float>(_44._m0[2u].y) - as_type<float>(_44._m0[1u].y), as_type<float>(_44._m0[1u].y)), 0.0))) << 16u), as_type<uint>(half2(float2(fma(_140, as_type<float>(_44._m0[2u].z) - as_type<float>(_44._m0[1u].z), as_type<float>(_44._m0[1u].z)), 0.0))) | (as_type<uint>(half2(float2(fma(_140, as_type<float>(_44._m0[2u].w) - as_type<float>(_44._m0[1u].w), as_type<float>(_44._m0[1u].w)), 0.0))) << 16u));
         return;
     }
 }

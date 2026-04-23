@@ -1,17 +1,14 @@
 ; SPIR-V
 ; Version: 1.0
 ; Generator: Khronos; 0
-; Bound: 182
+; Bound: 235
 ; Schema: 0
                OpCapability Shader
-               OpCapability SignedZeroInfNanPreserve
-               OpExtension "SPV_KHR_float_controls"
                OpExtension "SPV_KHR_storage_buffer_storage_class"
           %1 = OpExtInstImport "GLSL.std.450"
                OpMemoryModel Logical GLSL450
                OpEntryPoint GLCompute %42 "main" %gl_GlobalInvocationID
                OpExecutionMode %42 LocalSize 64 1 1
-               OpExecutionMode %42 SignedZeroInfNanPreserve 32
                OpDecorate %_runtimearr_uint ArrayStride 4
                OpDecorate %_struct_14 Block
                OpMemberDecorate %_struct_14 0 Offset 0
@@ -67,6 +64,11 @@
     %float_0 = OpConstant %float 0
 %uint_4294967295 = OpConstant %uint 4294967295
     %float_1 = OpConstant %float 1
+    %uint_23 = OpConstant %uint 23
+   %uint_127 = OpConstant %uint 127
+%uint_4294967294 = OpConstant %uint 4294967294
+%uint_8388607 = OpConstant %uint 8388607
+  %float_0_5 = OpConstant %float 0.5
      %uint_6 = OpConstant %uint 6
    %uint_255 = OpConstant %uint 255
 %gl_GlobalInvocationID = OpVariable %_ptr_Input_v3uint Input
@@ -157,62 +159,110 @@
         %122 = OpExtInst %float %1 Fma %92 %92 %121
         %123 = OpExtInst %float %1 Fma %97 %97 %121
         %124 = OpExtInst %float %1 FMax %123 %122
-        %125 = OpExtInst %float %1 Sqrt %124
-        %126 = OpBitcast %float %71
-        %127 = OpFSub %float %125 %126
-        %128 = OpFOrdLessThan %bool %127 %float_0
-        %129 = OpSelect %uint %128 %uint_4294967295 %uint_0
-        %130 = OpExtInst %float %1 FMin %119 %120
-        %131 = OpINotEqual %bool %106 %uint_0
-        %132 = OpBitcast %uint %130
-        %133 = OpSelect %uint %131 %132 %uint_0
-        %134 = OpBitcast %float %118
-        %135 = OpBitcast %float %133
-        %136 = OpFAdd %float %134 %135
-        %137 = OpExtInst %float %1 Sqrt %136
-        %138 = OpBitcast %float %71
-        %139 = OpFSub %float %137 %138
-        %140 = OpBitcast %float %uint_0
-        %141 = OpFOrdLessThan %bool %140 %139
-        %142 = OpSelect %uint %141 %uint_4294967295 %uint_0
-        %143 = OpBitwiseOr %uint %142 %129
-        %144 = OpExtInst %float %1 FAbs %139
-        %145 = OpExtInst %float %1 FAbs %127
-        %146 = OpExtInst %float %1 FMax %144 %145
-        %147 = OpBitcast %float %73
-        %148 = OpFSub %float %146 %147
-        %149 = OpFOrdLessThan %bool %148 %float_0
-        %150 = OpSelect %uint %149 %uint_4294967295 %uint_0
-        %151 = OpExtInst %float %1 FMin %144 %145
-        %152 = OpINotEqual %bool %143 %uint_0
-        %153 = OpBitcast %uint %151
-        %154 = OpSelect %uint %152 %153 %uint_0
-        %155 = OpBitcast %float %154
-        %156 = OpBitcast %float %73
-        %157 = OpFSub %float %155 %156
-        %158 = OpFOrdLessThan %bool %157 %float_0
-        %159 = OpSelect %uint %158 %uint_4294967295 %uint_0
-        %160 = OpINotEqual %bool %159 %uint_0
-        %161 = OpSelect %uint %160 %uint_1 %uint_0
-        %162 = OpINotEqual %bool %150 %uint_0
-        %163 = OpSelect %uint %162 %uint_2 %161
-        %165 = OpAccessChain %_ptr_PushConstant_uint %41 %uint_0 %uint_6
-        %166 = OpLoad %uint %165
-        %167 = OpIMul %uint %57 %166
-        %168 = OpIAdd %uint %167 %56
-        %170 = OpShiftRightLogical %uint %168 %uint_2
-        %171 = OpBitwiseAnd %uint %168 %uint_3
-        %172 = OpShiftLeftLogical %uint %171 %uint_3
-        %173 = OpBitwiseAnd %uint %163 %uint_255
-        %174 = OpShiftLeftLogical %uint %173 %172
-        %175 = OpShiftLeftLogical %uint %uint_255 %172
-        %176 = OpNot %uint %175
-        %177 = OpAccessChain %_ptr_StorageBuffer_uint %38 %uint_0 %170
-        %178 = OpLoad %uint %177
-        %179 = OpBitwiseAnd %uint %178 %176
-        %180 = OpBitwiseOr %uint %179 %174
-        %181 = OpAccessChain %_ptr_StorageBuffer_uint %38 %uint_0 %170
-               OpStore %181 %180
+        %130 = OpBitcast %uint %124
+        %131 = OpShiftRightLogical %uint %130 %uint_23
+        %132 = OpISub %uint %131 %uint_127
+        %133 = OpBitwiseAnd %uint %132 %uint_4294967294
+        %134 = OpBitcast %int %133
+        %135 = OpShiftRightArithmetic %int %134 %uint_1
+        %136 = OpBitcast %uint %135
+        %137 = OpBitwiseAnd %uint %132 %uint_1
+        %138 = OpIAdd %uint %uint_127 %137
+        %139 = OpShiftLeftLogical %uint %138 %uint_23
+        %140 = OpBitwiseAnd %uint %130 %uint_8388607
+        %141 = OpBitwiseOr %uint %140 %139
+        %142 = OpBitcast %float %141
+        %143 = OpExtInst %float %1 InverseSqrt %142
+        %144 = OpFMul %float %142 %143
+        %145 = OpFNegate %float %144
+        %146 = OpExtInst %float %1 Fma %145 %144 %142
+        %147 = OpFMul %float %143 %float_0_5
+        %148 = OpExtInst %float %1 Fma %146 %147 %144
+        %149 = OpBitcast %uint %148
+        %150 = OpShiftLeftLogical %uint %136 %uint_23
+        %151 = OpIAdd %uint %149 %150
+        %152 = OpBitcast %float %151
+        %153 = OpFOrdEqual %bool %124 %float_0
+        %154 = OpSelect %float %153 %float_0 %152
+        %155 = OpBitcast %float %71
+        %156 = OpFSub %float %154 %155
+        %157 = OpFOrdLessThan %bool %156 %float_0
+        %158 = OpSelect %uint %157 %uint_4294967295 %uint_0
+        %159 = OpExtInst %float %1 FMin %119 %120
+        %160 = OpINotEqual %bool %106 %uint_0
+        %161 = OpBitcast %uint %159
+        %162 = OpSelect %uint %160 %161 %uint_0
+        %163 = OpBitcast %float %118
+        %164 = OpBitcast %float %162
+        %165 = OpFAdd %float %163 %164
+        %166 = OpBitcast %uint %165
+        %167 = OpShiftRightLogical %uint %166 %uint_23
+        %168 = OpISub %uint %167 %uint_127
+        %169 = OpBitwiseAnd %uint %168 %uint_4294967294
+        %170 = OpBitcast %int %169
+        %171 = OpShiftRightArithmetic %int %170 %uint_1
+        %172 = OpBitcast %uint %171
+        %173 = OpBitwiseAnd %uint %168 %uint_1
+        %174 = OpIAdd %uint %uint_127 %173
+        %175 = OpShiftLeftLogical %uint %174 %uint_23
+        %176 = OpBitwiseAnd %uint %166 %uint_8388607
+        %177 = OpBitwiseOr %uint %176 %175
+        %178 = OpBitcast %float %177
+        %179 = OpExtInst %float %1 InverseSqrt %178
+        %180 = OpFMul %float %178 %179
+        %181 = OpFNegate %float %180
+        %182 = OpExtInst %float %1 Fma %181 %180 %178
+        %183 = OpFMul %float %179 %float_0_5
+        %184 = OpExtInst %float %1 Fma %182 %183 %180
+        %185 = OpBitcast %uint %184
+        %186 = OpShiftLeftLogical %uint %172 %uint_23
+        %187 = OpIAdd %uint %185 %186
+        %188 = OpBitcast %float %187
+        %189 = OpFOrdEqual %bool %165 %float_0
+        %190 = OpSelect %float %189 %float_0 %188
+        %191 = OpBitcast %float %71
+        %192 = OpFSub %float %190 %191
+        %193 = OpBitcast %float %uint_0
+        %194 = OpFOrdLessThan %bool %193 %192
+        %195 = OpSelect %uint %194 %uint_4294967295 %uint_0
+        %196 = OpBitwiseOr %uint %195 %158
+        %197 = OpExtInst %float %1 FAbs %192
+        %198 = OpExtInst %float %1 FAbs %156
+        %199 = OpExtInst %float %1 FMax %197 %198
+        %200 = OpBitcast %float %73
+        %201 = OpFSub %float %199 %200
+        %202 = OpFOrdLessThan %bool %201 %float_0
+        %203 = OpSelect %uint %202 %uint_4294967295 %uint_0
+        %204 = OpExtInst %float %1 FMin %197 %198
+        %205 = OpINotEqual %bool %196 %uint_0
+        %206 = OpBitcast %uint %204
+        %207 = OpSelect %uint %205 %206 %uint_0
+        %208 = OpBitcast %float %207
+        %209 = OpBitcast %float %73
+        %210 = OpFSub %float %208 %209
+        %211 = OpFOrdLessThan %bool %210 %float_0
+        %212 = OpSelect %uint %211 %uint_4294967295 %uint_0
+        %213 = OpINotEqual %bool %212 %uint_0
+        %214 = OpSelect %uint %213 %uint_1 %uint_0
+        %215 = OpINotEqual %bool %203 %uint_0
+        %216 = OpSelect %uint %215 %uint_2 %214
+        %218 = OpAccessChain %_ptr_PushConstant_uint %41 %uint_0 %uint_6
+        %219 = OpLoad %uint %218
+        %220 = OpIMul %uint %57 %219
+        %221 = OpIAdd %uint %220 %56
+        %223 = OpShiftRightLogical %uint %221 %uint_2
+        %224 = OpBitwiseAnd %uint %221 %uint_3
+        %225 = OpShiftLeftLogical %uint %224 %uint_3
+        %226 = OpBitwiseAnd %uint %216 %uint_255
+        %227 = OpShiftLeftLogical %uint %226 %225
+        %228 = OpShiftLeftLogical %uint %uint_255 %225
+        %229 = OpNot %uint %228
+        %230 = OpAccessChain %_ptr_StorageBuffer_uint %38 %uint_0 %223
+        %231 = OpLoad %uint %230
+        %232 = OpBitwiseAnd %uint %231 %229
+        %233 = OpBitwiseOr %uint %232 %227
+        %234 = OpAccessChain %_ptr_StorageBuffer_uint %38 %uint_0 %223
+               OpStore %234 %233
                OpReturn
          %51 = OpLabel
                OpReturn
