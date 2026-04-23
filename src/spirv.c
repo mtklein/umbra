@@ -707,6 +707,9 @@ static _Bool produces_float(enum op op) {
 // Build the full SPIR-V binary for a flat IR.
 struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                                int flags) {
+#if defined(UMBRA_NO_BACKEND_FP_CONTRACT)
+    flags |= SPIRV_NO_CONTRACT;
+#endif
     struct spirv_result result = {0};
 
     struct umbra_flat_ir *resolved = flat_ir_resolve(ir, JOIN_PREFER_IMM);

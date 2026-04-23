@@ -345,14 +345,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     struct wgpu_backend *be = (struct wgpu_backend *)base;
 
     be->had_error = 0;
-    // SPIRV_NO_CONTRACT forces naga to preserve our IR's mul/add split on
-    // the wgpu path — see src/metal.c for the matching Metal pragma and
-    // UMBRA_NO_BACKEND_FP_CONTRACT rationale.
-    int spirv_flags = SPIRV_PUSH_VIA_SSBO;
-#if defined(UMBRA_NO_BACKEND_FP_CONTRACT)
-    spirv_flags |= SPIRV_NO_CONTRACT;
-#endif
-    struct spirv_result const sr = build_spirv(ir, spirv_flags);
+    struct spirv_result const sr = build_spirv(ir, SPIRV_PUSH_VIA_SSBO);
 
     WGPUShaderSourceSPIRV spirv_src = {
         .chain    = {.sType = WGPUSType_ShaderSourceSPIRV},
