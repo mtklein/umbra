@@ -1,0 +1,81 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _5
+{
+    uint _m0[1];
+};
+
+struct _7
+{
+    uint2 _m0[1];
+};
+
+struct _9
+{
+    uint4 _m0[1];
+};
+
+struct _11
+{
+    uint4 _m0[4];
+};
+
+struct _13
+{
+    uint _m0[13];
+};
+
+kernel void main0(device _7& _14 [[buffer(0)]], constant _9& _15 [[buffer(1)]], constant _11& _16 [[buffer(2)]], device _5& _17 [[buffer(3)]], device _5& _18 [[buffer(4)]], device _13& _19 [[buffer(5)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    uint _55 = 0u;
+    uint _56 = 0u;
+    uint _57 = 0u;
+    uint _58 = 0u;
+    uint _59 = 0u;
+    if (!(gl_GlobalInvocationID.x >= _19._m0[0u]))
+    {
+        uint _72 = _19._m0[1u] + gl_GlobalInvocationID.x;
+        uint _73 = _19._m0[2u] + gl_GlobalInvocationID.y;
+        uint _84 = uint(int(as_type<float>(_16._m0[1u].x)));
+        uint _85 = _84 - 1u;
+        uint _86 = _84 + _84;
+        uint _87 = _84 + _86;
+        _59 = 0u;
+        _55 = 0u;
+        _58 = 0u;
+        _57 = 0u;
+        _56 = 0u;
+        float _99 = fast::min(fast::max(as_type<float>(_15._m0[0u].z) + fma(float(int(_72)), as_type<float>(_15._m0[0u].x), float(int(_73)) * as_type<float>(_15._m0[0u].y)), 0.0), 1.0);
+        while (_59 < _85)
+        {
+            uint _115 = _18._m0[min(_59, (_19._m0[7u] - 1u))] & ((_59 < _19._m0[7u]) ? 4294967295u : 0u);
+            uint _119 = _59 + 1u;
+            uint _128 = _18._m0[min(_119, (_19._m0[7u] - 1u))] & ((_119 < _19._m0[7u]) ? 4294967295u : 0u);
+            if ((((as_type<float>(_115) <= _99) ? 4294967295u : 0u) & ((_99 <= as_type<float>(_128)) ? 4294967295u : 0u)) != 0u)
+            {
+                uint _136 = _87 + _119;
+                float _142 = (_99 - as_type<float>(_115)) / (as_type<float>(_128) - as_type<float>(_115));
+                uint _143 = _84 + _119;
+                uint _144 = _86 + _119;
+                uint _145 = _87 + _59;
+                uint _181 = _17._m0[min(_145, (_19._m0[6u] - 1u))] & ((_145 < _19._m0[6u]) ? 4294967295u : 0u);
+                _58 = as_type<uint>(fma(_142, as_type<float>(_17._m0[min(_136, (_19._m0[6u] - 1u))] & ((_136 < _19._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_181), as_type<float>(_181)));
+                uint _188 = _84 + _59;
+                uint _197 = _17._m0[min(_188, (_19._m0[6u] - 1u))] & ((_188 < _19._m0[6u]) ? 4294967295u : 0u);
+                _56 = as_type<uint>(fma(_142, as_type<float>(_17._m0[min(_143, (_19._m0[6u] - 1u))] & ((_143 < _19._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_197), as_type<float>(_197)));
+                uint _204 = _86 + _59;
+                uint _213 = _17._m0[min(_204, (_19._m0[6u] - 1u))] & ((_204 < _19._m0[6u]) ? 4294967295u : 0u);
+                _57 = as_type<uint>(fma(_142, as_type<float>(_17._m0[min(_144, (_19._m0[6u] - 1u))] & ((_144 < _19._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_213), as_type<float>(_213)));
+                uint _237 = _17._m0[min(_59, (_19._m0[6u] - 1u))] & ((_59 < _19._m0[6u]) ? 4294967295u : 0u);
+                _55 = as_type<uint>(fma(_142, as_type<float>(_17._m0[min(_119, (_19._m0[6u] - 1u))] & ((_119 < _19._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_237), as_type<float>(_237)));
+            }
+            _59++;
+        }
+        _14._m0[(_73 * _19._m0[8u]) + _72] = uint2(as_type<uint>(half2(float2(as_type<float>(_55), 0.0))) | (as_type<uint>(half2(float2(as_type<float>(_56), 0.0))) << 16u), as_type<uint>(half2(float2(as_type<float>(_57), 0.0))) | (as_type<uint>(half2(float2(as_type<float>(_58), 0.0))) << 16u));
+        return;
+    }
+}
+

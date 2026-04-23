@@ -1,0 +1,89 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _5
+{
+    uint _m0[1];
+};
+
+struct _7
+{
+    uint2 _m0[1];
+};
+
+struct _9
+{
+    uint4 _m0[1];
+};
+
+struct _11
+{
+    uint4 _m0[4];
+};
+
+struct _13
+{
+    uint _m0[13];
+};
+
+kernel void main0(device _7& _14 [[buffer(0)]], constant _9& _15 [[buffer(1)]], constant _11& _16 [[buffer(2)]], device _5& _17 [[buffer(3)]], device _5& _18 [[buffer(4)]], device _13& _19 [[buffer(5)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    uint _60 = 0u;
+    uint _61 = 0u;
+    uint _62 = 0u;
+    uint _63 = 0u;
+    uint _64 = 0u;
+    if (!(gl_GlobalInvocationID.x >= _19._m0[0u]))
+    {
+        uint _77 = _19._m0[1u] + gl_GlobalInvocationID.x;
+        uint _78 = _19._m0[2u] + gl_GlobalInvocationID.y;
+        uint _89 = uint(int(as_type<float>(_16._m0[1u].x)));
+        uint _90 = _89 - 1u;
+        uint _91 = _89 + _89;
+        uint _92 = _89 + _91;
+        _64 = 0u;
+        _60 = 0u;
+        _63 = 0u;
+        _62 = 0u;
+        _61 = 0u;
+        float _96 = float(int(_77)) - as_type<float>(_15._m0[0u].x);
+        float _100 = float(int(_78)) - as_type<float>(_15._m0[0u].y);
+        float _102 = fma(_96, _96, _100 * _100);
+        uint _103 = as_type<uint>(_102);
+        uint _105 = (_103 >> 23u) - 127u;
+        float _115 = as_type<float>((_103 & 8388607u) | ((127u + (_105 & 1u)) << 23u));
+        float _116 = rsqrt(_115);
+        float _117 = _115 * _116;
+        float _131 = fast::min(fast::max(as_type<float>(_15._m0[0u].z) * ((_102 == 0.0) ? 0.0 : as_type<float>(as_type<uint>(fma(fma(-_117, _117, _115), _116 * 0.5, _117)) + (uint(int(_105 & 4294967294u) >> int(1u)) << 23u))), 0.0), 1.0);
+        while (_64 < _90)
+        {
+            uint _147 = _18._m0[min(_64, (_19._m0[7u] - 1u))] & ((_64 < _19._m0[7u]) ? 4294967295u : 0u);
+            uint _151 = _64 + 1u;
+            uint _160 = _18._m0[min(_151, (_19._m0[7u] - 1u))] & ((_151 < _19._m0[7u]) ? 4294967295u : 0u);
+            if ((((as_type<float>(_147) <= _131) ? 4294967295u : 0u) & ((_131 <= as_type<float>(_160)) ? 4294967295u : 0u)) != 0u)
+            {
+                uint _168 = _92 + _151;
+                float _174 = (_131 - as_type<float>(_147)) / (as_type<float>(_160) - as_type<float>(_147));
+                uint _175 = _89 + _151;
+                uint _176 = _91 + _151;
+                uint _177 = _92 + _64;
+                uint _213 = _17._m0[min(_177, (_19._m0[6u] - 1u))] & ((_177 < _19._m0[6u]) ? 4294967295u : 0u);
+                _63 = as_type<uint>(fma(_174, as_type<float>(_17._m0[min(_168, (_19._m0[6u] - 1u))] & ((_168 < _19._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_213), as_type<float>(_213)));
+                uint _220 = _89 + _64;
+                uint _229 = _17._m0[min(_220, (_19._m0[6u] - 1u))] & ((_220 < _19._m0[6u]) ? 4294967295u : 0u);
+                _61 = as_type<uint>(fma(_174, as_type<float>(_17._m0[min(_175, (_19._m0[6u] - 1u))] & ((_175 < _19._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_229), as_type<float>(_229)));
+                uint _236 = _91 + _64;
+                uint _245 = _17._m0[min(_236, (_19._m0[6u] - 1u))] & ((_236 < _19._m0[6u]) ? 4294967295u : 0u);
+                _62 = as_type<uint>(fma(_174, as_type<float>(_17._m0[min(_176, (_19._m0[6u] - 1u))] & ((_176 < _19._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_245), as_type<float>(_245)));
+                uint _269 = _17._m0[min(_64, (_19._m0[6u] - 1u))] & ((_64 < _19._m0[6u]) ? 4294967295u : 0u);
+                _60 = as_type<uint>(fma(_174, as_type<float>(_17._m0[min(_151, (_19._m0[6u] - 1u))] & ((_151 < _19._m0[6u]) ? 4294967295u : 0u)) - as_type<float>(_269), as_type<float>(_269)));
+            }
+            _64++;
+        }
+        _14._m0[(_78 * _19._m0[8u]) + _77] = uint2(as_type<uint>(half2(float2(as_type<float>(_60), 0.0))) | (as_type<uint>(half2(float2(as_type<float>(_61), 0.0))) << 16u), as_type<uint>(half2(float2(as_type<float>(_62), 0.0))) | (as_type<uint>(half2(float2(as_type<float>(_63), 0.0))) << 16u));
+        return;
+    }
+}
+

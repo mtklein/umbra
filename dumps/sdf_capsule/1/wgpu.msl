@@ -1,0 +1,83 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _5
+{
+    uint _m0[1];
+};
+
+struct _7
+{
+    uint4 _m0[1];
+};
+
+struct _9
+{
+    uint4 _m0[2];
+};
+
+struct _11
+{
+    uint _m0[9];
+};
+
+kernel void main0(device _5& _12 [[buffer(0)]], constant _7& _13 [[buffer(1)]], constant _9& _14 [[buffer(2)]], device _11& _15 [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    if (!(gl_GlobalInvocationID.x >= _15._m0[0u]))
+    {
+        uint _67 = _15._m0[1u] + gl_GlobalInvocationID.x;
+        uint _68 = _15._m0[2u] + gl_GlobalInvocationID.y;
+        float _89 = as_type<float>(_14._m0[0u].z) - as_type<float>(_14._m0[0u].x);
+        float _92 = as_type<float>(_14._m0[0u].w) - as_type<float>(_14._m0[0u].y);
+        float _94 = fma(_89, _89, _92 * _92);
+        uint _100 = ((as_type<float>(0u) < _94) ? 4294967295u : 0u) | ((_94 < 0.0) ? 4294967295u : 0u);
+        float _102 = as_type<float>(1065353216u) / _94;
+        float _104 = float(int(_67));
+        float _107 = float(int(_68));
+        float _111 = fma(as_type<float>(_13._m0[0u].z), _104 + 1.0, as_type<float>(_13._m0[0u].x));
+        float _114 = fma(as_type<float>(_13._m0[0u].w), _107 + 1.0, as_type<float>(_13._m0[0u].y));
+        float _117 = _92 * (_114 - as_type<float>(_14._m0[0u].y));
+        float _120 = fma(as_type<float>(_13._m0[0u].z), _104, as_type<float>(_13._m0[0u].x));
+        float _123 = fma(as_type<float>(_13._m0[0u].w), _107, as_type<float>(_13._m0[0u].y));
+        float _126 = _92 * (_123 - as_type<float>(_14._m0[0u].y));
+        float _127 = fast::max(_126, _117);
+        float _129 = _120 - as_type<float>(_14._m0[0u].x);
+        float _131 = fast::min(_126, _117);
+        float _133 = _111 - as_type<float>(_14._m0[0u].x);
+        float _136 = fast::max(fma(_89, _129, _127), fma(_89, _133, _127)) * _102;
+        float _140 = fast::min(fma(_89, _129, _131), fma(_89, _133, _131)) * _102;
+        float _153 = fast::min(fast::max(as_type<float>((_100 != 0u) ? as_type<uint>(fast::min(_140, _136)) : 4286578688u), 0.0), 1.0);
+        float _154 = fast::min(fast::max(as_type<float>((_100 != 0u) ? as_type<uint>(fast::max(_140, _136)) : 2139095040u), 0.0), 1.0);
+        float _156 = fma(_92, _154, as_type<float>(_14._m0[0u].y));
+        float _158 = fma(_89, _154, as_type<float>(_14._m0[0u].x));
+        float _160 = fma(_92, _153, as_type<float>(_14._m0[0u].y));
+        float _162 = _123 - fast::max(_160, _156);
+        float _167 = fma(_89, _153, as_type<float>(_14._m0[0u].x));
+        float _169 = _120 - fast::max(_167, _158);
+        float _171 = _111 - fast::min(_167, _158);
+        float _173 = _114 - fast::min(_160, _156);
+        float _189 = _162 * _162;
+        float _190 = _173 * _173;
+        float _191 = fast::max(_189, _190);
+        float _194 = fast::max(fma(_169, _169, _191), fma(_171, _171, _191));
+        uint _195 = as_type<uint>(_194);
+        uint _197 = (_195 >> 23u) - 127u;
+        float _207 = as_type<float>((_195 & 8388607u) | ((127u + (_197 & 1u)) << 23u));
+        float _208 = rsqrt(_207);
+        float _209 = _207 * _208;
+        float _230 = as_type<float>(((((as_type<float>(0u) < _169) ? 4294967295u : 0u) | ((_171 < 0.0) ? 4294967295u : 0u)) != 0u) ? as_type<uint>(fast::min(_169 * _169, _171 * _171)) : 0u) + as_type<float>(((((as_type<float>(0u) < _162) ? 4294967295u : 0u) | ((_173 < 0.0) ? 4294967295u : 0u)) != 0u) ? as_type<uint>(fast::min(_189, _190)) : 0u);
+        uint _231 = as_type<uint>(_230);
+        uint _233 = (_231 >> 23u) - 127u;
+        float _243 = as_type<float>((_231 & 8388607u) | ((127u + (_233 & 1u)) << 23u));
+        float _244 = rsqrt(_243);
+        float _245 = _243 * _244;
+        uint _267 = (_68 * _15._m0[6u]) + _67;
+        uint _268 = _267 >> 2u;
+        uint _270 = (_267 & 3u) << 3u;
+        _12._m0[_268] = (_12._m0[_268] & (~(255u << _270))) | (((((((((_194 == 0.0) ? 0.0 : as_type<float>(as_type<uint>(fma(fma(-_209, _209, _207), _208 * 0.5, _209)) + (uint(int(_197 & 4294967294u) >> int(1u)) << 23u))) - as_type<float>(_14._m0[1u].x)) < 0.0) ? 4294967295u : 0u) != 0u) ? 2u : uint((((((_230 == 0.0) ? 0.0 : as_type<float>(as_type<uint>(fma(fma(-_245, _245, _243), _244 * 0.5, _245)) + (uint(int(_233 & 4294967294u) >> int(1u)) << 23u))) - as_type<float>(_14._m0[1u].x)) < 0.0) ? 4294967295u : 0u) != 0u)) & 255u) << _270);
+        return;
+    }
+}
+

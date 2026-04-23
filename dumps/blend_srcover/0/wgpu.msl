@@ -1,0 +1,54 @@
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using namespace metal;
+
+struct _5
+{
+    uint _m0[1];
+};
+
+struct _7
+{
+    uint2 _m0[1];
+};
+
+struct _9
+{
+    uint4 _m0[1];
+};
+
+struct _11
+{
+    uint4 _m0[1];
+};
+
+struct _13
+{
+    uint _m0[9];
+};
+
+kernel void main0(device _7& _14 [[buffer(0)]], constant _9& _15 [[buffer(1)]], constant _11& _16 [[buffer(2)]], device _13& _17 [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
+{
+    if (!(gl_GlobalInvocationID.x >= _17._m0[0u]))
+    {
+        uint _63 = _17._m0[1u] + gl_GlobalInvocationID.x;
+        uint _64 = _17._m0[2u] + gl_GlobalInvocationID.y;
+        float _82 = float(int(_63));
+        float _91 = float(int(_64));
+        uint _101 = (((((as_type<float>(_15._m0[0u].x) <= _82) ? 4294967295u : 0u) & ((_82 < as_type<float>(_15._m0[0u].z)) ? 4294967295u : 0u)) & (((as_type<float>(_15._m0[0u].y) <= _91) ? 4294967295u : 0u) & ((_91 < as_type<float>(_15._m0[0u].w)) ? 4294967295u : 0u))) != 0u) ? 1065353216u : 0u;
+        uint _105 = (_64 * _17._m0[6u]) + _63;
+        float2 _114 = float2(as_type<half2>(_14._m0[_105].y >> 16u));
+        float _115 = _114.x;
+        float _117 = as_type<float>(1065353216u) - _115;
+        float2 _120 = float2(as_type<half2>(_14._m0[_105].x & 65535u));
+        float _121 = _120.x;
+        float2 _127 = float2(as_type<half2>(_14._m0[_105].x >> 16u));
+        float _128 = _127.x;
+        float2 _134 = float2(as_type<half2>(_14._m0[_105].y & 65535u));
+        float _135 = _134.x;
+        _14._m0[(_64 * _17._m0[6u]) + _63] = uint2(as_type<uint>(half2(float2(fma(as_type<float>(_101), fma(as_type<float>(_16._m0[0u].x), _117, _121) - _121, _121), 0.0))) | (as_type<uint>(half2(float2(fma(as_type<float>(_101), fma(as_type<float>(_16._m0[0u].y), _117, _128) - _128, _128), 0.0))) << 16u), as_type<uint>(half2(float2(fma(as_type<float>(_101), fma(as_type<float>(_16._m0[0u].z), _117, _135) - _135, _135), 0.0))) | (as_type<uint>(half2(float2(fma(as_type<float>(_101), fma(as_type<float>(_16._m0[0u].w), _117, _115) - _115, _115), 0.0))) << 16u));
+        return;
+    }
+}
+

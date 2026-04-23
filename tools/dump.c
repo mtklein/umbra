@@ -128,22 +128,46 @@ static void grab_mvk_msl(char const *dir) {
     }
 }
 
+#ifndef __wasm__
+static void spirv_text_to_msl(char const *spirv_text_path, char const *msl_path) {
+    char cmd[1024];
+    snprintf(cmd, sizeof cmd,
+             "spirv-as '%s' -o /tmp/umbra_spv_cross.spv 2>/dev/null"
+             " && spirv-cross --msl /tmp/umbra_spv_cross.spv --output '%s' 2>/dev/null",
+             spirv_text_path, msl_path);
+    FILE *p = popen(cmd, "r");
+    int ok = 0;
+    if (p) {
+        char buf[256];
+        while (fread(buf, 1, sizeof buf, p) > 0) { }
+        ok = (pclose(p) == 0);
+    }
+    if (!ok) { unlink(msl_path); }
+    unlink("/tmp/umbra_spv_cross.spv");
+}
+#else
+static void spirv_text_to_msl(char const *spirv_text_path, char const *msl_path) {
+    (void)spirv_text_path; (void)msl_path;
+}
+#endif
+
 struct dump_backends {
     struct umbra_backend *be[4];
     char const           *ext[4];
     int                   n;
     int                   vulkan_idx;
+    int                   wgpu_idx, :32;
 };
 
 static struct dump_backends dump_backends_init(void) {
-    struct dump_backends db = {.vulkan_idx = -1};
+    struct dump_backends db = {.vulkan_idx = -1, .wgpu_idx = -1};
     int i = 0;
 #ifdef JIT_EXT
     db.be[i] = umbra_backend_jit();    db.ext[i] = JIT_EXT ".txt"; i++;
 #endif
     db.be[i] = umbra_backend_metal();  db.ext[i] = "metal.msl";    i++;
     db.be[i] = umbra_backend_vulkan(); db.ext[i] = "vulkan.spirv"; db.vulkan_idx = i; i++;
-    db.be[i] = umbra_backend_wgpu();   db.ext[i] = "wgpu.spirv";   i++;
+    db.be[i] = umbra_backend_wgpu();   db.ext[i] = "wgpu.spirv";   db.wgpu_idx = i;   i++;
     db.n = i;
     return db;
 }
@@ -183,6 +207,12 @@ static void dump_ir(struct dump_backends *db,
 
                 if (i == db->vulkan_idx) {
                     grab_mvk_msl(dir);
+                }
+                if (i == db->wgpu_idx) {
+                    char spv_text[256], msl[256];
+                    snprintf(spv_text, sizeof spv_text, "%s/wgpu.spirv", dir);
+                    snprintf(msl,      sizeof msl,      "%s/wgpu.msl",   dir);
+                    spirv_text_to_msl(spv_text, msl);
                 }
             }
         }
