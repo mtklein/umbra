@@ -243,9 +243,12 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
     }
 
     enum { IDX_INTERP = 0, IDX_JIT = 1, IDX_METAL = 2, IDX_VULKAN = 3, IDX_WGPU = 4 };
+    // Pair (a,b) flags an anomaly if a > b (a slower than b).  Metal and Vulkan
+    // are now expected to tie modulo noise, so neither should beat the other on
+    // a permanent basis -- but wgpu is still expected to be the slowest GPU.
     int const pairs[][2] = {
-        {IDX_METAL,  IDX_VULKAN},
         {IDX_METAL,  IDX_WGPU  },
+        {IDX_VULKAN, IDX_WGPU  },
         {IDX_JIT,    IDX_INTERP},
         {IDX_METAL,  IDX_JIT   },
         {IDX_VULKAN, IDX_JIT   },
@@ -265,18 +268,7 @@ static _Bool print_row(char const *title, double ns_px[5], double gpu[5],
         }
     }
 
-    // Advisory: wgpu beating vulkan is curious (both go through Metal on Apple
-    // Silicon, but vulkan's stack is thinner).  Not an error, just worth a look.
-    _Bool advisory = 0;
-    if ((be_mask & (1 << IDX_WGPU)) && (be_mask & (1 << IDX_VULKAN))
-            && ns_px[IDX_WGPU] >= 0 && ns_px[IDX_VULKAN] >= 0) {
-        int rw = (int)(ns_px[IDX_WGPU]   * 100 + 0.5);
-        int rv = (int)(ns_px[IDX_VULKAN] * 100 + 0.5);
-        if (rw < rv) { advisory = 1; }
-    }
-
-    if      (anomaly ) { printf(" !"); }
-    else if (advisory) { printf(" ?"); }
+    if (anomaly) { printf(" !"); }
     printf("\n");
     return anomaly;
 }
