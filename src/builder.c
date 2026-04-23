@@ -398,7 +398,39 @@ umbra_val32 umbra_max_f32(builder *b, umbra_val32 x, umbra_val32 y) {
                         (val){.v32 = y}).v32;
 }
 
-umbra_val32 umbra_sqrt_f32(builder *b, umbra_val32 x) { return math(b, op_sqrt_f32, VX(x)).v32; }
+umbra_val32 umbra_sqrt_f32(builder *b, umbra_val32 x) {
+    // Quake-style fast inverse sqrt synthesis, expressed in IR primitives so
+    // every backend computes bit-identical results.
+    umbra_val32 const c_magic   = umbra_imm_i32(b, 0x5F3759DF);
+    umbra_val32 const c_one_i   = umbra_imm_i32(b, 1);
+    umbra_val32 const c_15      = umbra_imm_f32(b, 1.5f);
+    umbra_val32 const c_neghalf = umbra_imm_f32(b, -0.5f);
+    umbra_val32 const c_zero_f  = umbra_imm_f32(b, 0.0f);
+
+    umbra_val32 y = umbra_sub_i32(b, c_magic, umbra_shr_u32(b, x, c_one_i));
+
+    // Two NR steps refining y ≈ 1/sqrt(x) (Quake gives ~8 bits, each step doubles).
+    umbra_val32 yy  = umbra_mul_f32(b, y, y);
+    umbra_val32 xyy = umbra_mul_f32(b, x, yy);
+    y = umbra_mul_f32(b, y,
+            umbra_add_f32(b, c_15, umbra_mul_f32(b, c_neghalf, xyy)));
+
+    yy  = umbra_mul_f32(b, y, y);
+    xyy = umbra_mul_f32(b, x, yy);
+    y = umbra_mul_f32(b, y,
+            umbra_add_f32(b, c_15, umbra_mul_f32(b, c_neghalf, xyy)));
+
+    // Final NR step on sqrt itself: sn += (x - sn²) * (y/2).
+    // The residual sub(x, mul(sn,sn)) builder-peepholes to fms (exact, single
+    // rounding), then add(mul, sn) peepholes to fma -- so this whole step is
+    // mathematically a correctly-rounded refinement.
+    umbra_val32 sn = umbra_mul_f32(b, x, y);
+    sn = umbra_add_f32(b, sn,
+             umbra_mul_f32(b,
+                 umbra_sub_f32(b, x, umbra_mul_f32(b, sn, sn)),
+                 umbra_mul_f32(b, y, umbra_imm_f32(b, 0.5f))));
+    return umbra_sel_32(b, umbra_eq_f32(b, x, c_zero_f), c_zero_f, sn);
+}
 umbra_val32 umbra_abs_f32(builder *b, umbra_val32 x) { return math(b, op_abs_f32, VX(x)).v32; }
 umbra_val32 umbra_round_f32(builder *b, umbra_val32 x) { return math(b, op_round_f32, VX(x)).v32; }
 umbra_val32 umbra_floor_f32(builder *b, umbra_val32 x) { return math(b, op_floor_f32, VX(x)).v32; }
