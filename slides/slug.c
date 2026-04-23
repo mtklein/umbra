@@ -101,7 +101,7 @@ static void slug_ray(struct umbra_builder *b, struct slug_consts const *c,
 static umbra_val32 coverage_slug_winding(void *vctx, struct umbra_builder *b,
                                          umbra_val32 x, umbra_val32 y) {
     struct slug_cov_ctx const *ctx = vctx;
-    umbra_ptr const curves = umbra_bind_buf(b, ctx->curves);
+    umbra_ptr const curves = umbra_bind_host_readonly_buf(b, ctx->curves);
     umbra_ptr const u      = umbra_bind_uniforms(b, ctx->uni,
                                                  (int)(sizeof *ctx->uni / 4));
 

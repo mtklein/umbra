@@ -495,7 +495,7 @@ static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
                                       umbra_interval x, umbra_interval y) {
     struct sdf_text_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_bind_buf(b, &self->curves);
+    umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves));
 
     umbra_interval const sx = umbra_interval_exact(
@@ -649,7 +649,7 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
                                                umbra_interval x, umbra_interval y) {
     struct sdf_polyline_text_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_bind_buf(b, &self->curves);
+    umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
 
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves)),
                       lgN  = umbra_uniform_32(b, u, SLOT(lg_n));
@@ -833,7 +833,7 @@ static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
                                   umbra_interval x, umbra_interval y) {
     struct ngon_sdf_ctx const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_bind_buf(b, &self->hp);
+    umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->hp);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_sides));
 
     umbra_var32 lo_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));

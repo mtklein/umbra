@@ -156,7 +156,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
 
     umbra_program_free(st->overlay_prog);
     struct umbra_builder *ob = umbra_builder();
-    umbra_ptr const ob_dst = umbra_bind_buf(ob, &st->out_buf);
+    umbra_ptr const ob_dst = umbra_bind_host_readonly_buf(ob, &st->out_buf);
     umbra_val32 const ob_x = umbra_f32_from_i32(ob, umbra_x(ob)),
                       ob_y = umbra_f32_from_i32(ob, umbra_y(ob));
     umbra_build_draw(ob, ob_dst, fmt, ob_x, ob_y,
