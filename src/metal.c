@@ -39,9 +39,7 @@ extern id      msg_p     (id, SEL, id)                                 __asm__("
 extern id      msg_pp    (id, SEL, id, id*)                            __asm__("_objc_msgSend");
 extern id      msg_ppp   (id, SEL, id, id, id*)                        __asm__("_objc_msgSend");
 extern id      msg_vuup  (id, SEL, void*, NSUInteger, NSUInteger, id)  __asm__("_objc_msgSend");
-extern int     msg_sel   (id, SEL, SEL)                                __asm__("_objc_msgSend");
 extern void    msg_v_p   (id, SEL, id)                                 __asm__("_objc_msgSend");
-extern void    msg_v_i   (id, SEL, int)                                __asm__("_objc_msgSend");
 extern void    msg_v_u   (id, SEL, NSUInteger)                         __asm__("_objc_msgSend");
 extern void    msg_v_vuu (id, SEL, void*, NSUInteger, NSUInteger)      __asm__("_objc_msgSend");
 extern void    msg_v_puu (id, SEL, id, NSUInteger, NSUInteger)         __asm__("_objc_msgSend");
@@ -1082,12 +1080,7 @@ static struct metal_program* metal_program(
 
         id opts = msg(
             (id)objc_getClass("MTLCompileOptions"), sel("new"));
-        if (msg_sel(
-                opts, sel("respondsToSelector:"), sel("setMathMode:"))) {
-            (void)msg_v_u(opts, sel("setMathMode:"), 2);
-        } else {
-            (void)msg_v_i(opts, sel("setFastMathEnabled:"), 0);
-        }
+        (void)msg_v_u(opts, sel("setMathMode:"), 2);  // MTLMathModeFast
 
         id source = nsstr(src);
         library = msg_ppp(
