@@ -41,16 +41,22 @@ struct umbra_buf {
     int   count;
     int   stride;
 };
-umbra_ptr umbra_early_bind_buf     (struct umbra_builder*, struct umbra_buf const*);
-umbra_ptr umbra_late_bind_buf      (struct umbra_builder*);
-umbra_ptr umbra_early_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
-umbra_ptr umbra_late_bind_uniforms (struct umbra_builder*,                         int slots);
+// Bind a storage buffer.  Pass a non-NULL `buf` to provide an early default
+// that's dereferenced on every dispatch; pass NULL if the buffer will only
+// ever arrive via umbra_late_binding.  Either way the returned umbra_ptr can
+// be overridden per-queue() call via umbra_late_binding.
+umbra_ptr umbra_bind_buf(struct umbra_builder*, struct umbra_buf const *buf);
+
+// Bind a uniform block of `slots` 32-bit words.  Pass a non-NULL `slot_32bit`
+// to provide an early default pointer, or NULL for purely-late uniforms.
+// Either way the returned umbra_ptr can be overridden per-queue() call.
+umbra_ptr umbra_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
 
 struct umbra_late_binding {
     umbra_ptr ptr; int :32;
     union {
-        struct umbra_buf  buf;       // for umbra_late_bind_buf
-        void const       *uniforms;  // for umbra_late_bind_uniforms
+        struct umbra_buf  buf;       // when overriding an umbra_bind_buf ptr
+        void const       *uniforms;  // when overriding an umbra_bind_uniforms ptr
     };
 };
 

@@ -29,30 +29,26 @@ struct ir_inst {
 };
 
 // A buf registration pinned to a specific ptr handle (.ix).  The resolver
-// populates buf[.ix] at dispatch time; how depends on `kind`:
+// populates buf[.ix] at dispatch time by (optionally) reading the early
+// default stored here, then letting any matching umbra_late_binding win.
 //
-//   BIND_EARLY_BUF       caller-owned umbra_buf*, dereferenced each dispatch
-//   BIND_EARLY_UNIFORMS  umbra_buf snapshot (ptr + slot count) captured at build
-//   BIND_LATE_BUF        umbra_buf supplied at queue() via umbra_late_binding
-//   BIND_LATE_UNIFORMS   data pointer supplied at queue(); slot count baked
+//   BIND_BUF       `.buf` is a caller-owned umbra_buf* (or NULL) dereferenced
+//                  on every dispatch.
+//   BIND_UNIFORMS  `.uniforms` carries the slot count; `.uniforms.ptr` is
+//                  the optional early-default pointer (or NULL).
 enum binding_kind {
-    BIND_EARLY_BUF,
-    BIND_EARLY_UNIFORMS,
-    BIND_LATE_BUF,
-    BIND_LATE_UNIFORMS,
+    BIND_BUF,
+    BIND_UNIFORMS,
 };
 
 enum { BUF_READ = 1, BUF_WRITTEN = 2 };
 
-// buf and uniforms are kind-disjoint: BIND_EARLY_BUF reads *buf, the two
-// UNIFORMS kinds read uniforms (the full snapshot for EARLY_UNIFORMS,
-// .count alone for LATE_UNIFORMS), and BIND_LATE_BUF reads neither.
 struct buffer_binding {
     enum binding_kind kind;
     int               ix;
     union {
-        struct umbra_buf const *buf;
-        struct umbra_buf        uniforms;
+        struct umbra_buf const *buf;       // BIND_BUF: live ptr, may be NULL.
+        struct umbra_buf        uniforms;  // BIND_UNIFORMS: .ptr optional, .count = slots.
     };
 };
 
@@ -71,8 +67,9 @@ void resolve_bindings(struct umbra_buf *out,
                       struct buffer_binding const *binding, int bindings,
                       struct umbra_late_binding const *late, int lates);
 
-// True iff the IR stores to any early-bound buffer.  Used to tag compiled
-// programs as thread-safe (along with the backend's own threadsafe bit).
+// True iff the IR stores to any buffer that has an early default.  Such a
+// buffer is a shared piece of state across concurrent queue() calls, so the
+// backend can't tag the compiled program as thread-safe.
 _Bool flat_ir_has_early_writes(struct umbra_flat_ir const*);
 
 struct umbra_builder {

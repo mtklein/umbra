@@ -7,14 +7,15 @@
 #include <stdlib.h>
 
 _Bool binding_is_uniform(enum binding_kind k) {
-    return k == BIND_EARLY_UNIFORMS || k == BIND_LATE_UNIFORMS;
+    return k == BIND_UNIFORMS;
 }
 
 _Bool flat_ir_has_early_writes(struct umbra_flat_ir const *ir) {
     _Bool is_early_buf[32] = {0};
     for (int k = 0; k < ir->bindings; k++) {
-        if (ir->binding[k].kind == BIND_EARLY_BUF) {
-            int const ix = ir->binding[k].ix;
+        struct buffer_binding const *bb = &ir->binding[k];
+        if (bb->kind == BIND_BUF && bb->buf) {
+            int const ix = bb->ix;
             assume(0 <= ix && ix < (int)count(is_early_buf));
             is_early_buf[ix] = 1;
         }
@@ -35,19 +36,20 @@ void resolve_bindings(struct umbra_buf *out,
                       struct umbra_late_binding const *late, int lates) {
     for (int i = 0; i < bindings; i++) {
         struct buffer_binding const *bb = &binding[i];
-        if      (bb->kind == BIND_EARLY_BUF)      { out[bb->ix] = *bb->buf; }
-        else if (bb->kind == BIND_EARLY_UNIFORMS) { out[bb->ix] =  bb->uniforms; }
-        else                                      { out[bb->ix] = (struct umbra_buf){0}; }
+        if (bb->kind == BIND_BUF) {
+            out[bb->ix] = bb->buf ? *bb->buf : (struct umbra_buf){0};
+        } else {
+            out[bb->ix] = bb->uniforms;
+        }
     }
     for (int i = 0; i < lates; i++) {
         int const ix = late[i].ptr.ix;
         int bi = 0;
         while (bi < bindings && binding[bi].ix != ix) { bi++; }
         assume(bi < bindings);
-        if (binding[bi].kind == BIND_LATE_BUF) {
+        if (binding[bi].kind == BIND_BUF) {
             out[ix] = late[i].buf;
         } else {
-            assume(binding[bi].kind == BIND_LATE_UNIFORMS);
             out[ix] = (struct umbra_buf){
                 .ptr    = (void*)(uintptr_t)late[i].uniforms,
                 .count  = binding[bi].uniforms.count,

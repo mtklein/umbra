@@ -6,7 +6,7 @@
 TEST(resolve_simple_no_joins) {
     struct umbra_buf dummy = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst = umbra_early_bind_buf(b, &dummy);
+    umbra_ptr const dst = umbra_bind_buf(b, &dummy);
     umbra_store_32(b, dst, umbra_imm_i32(b, 42));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
@@ -31,8 +31,8 @@ TEST(resolve_with_loop) {
     int32_t uni[1] = {0};
     struct umbra_buf dummy = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const u   = umbra_early_bind_uniforms(b, uni, 1);
-    umbra_ptr const dst = umbra_early_bind_buf(b, &dummy);
+    umbra_ptr const u   = umbra_bind_uniforms(b, uni, 1);
+    umbra_ptr const dst = umbra_bind_buf(b, &dummy);
     umbra_var32 acc = umbra_declare_var32(b, umbra_imm_i32(b, 0));
     umbra_val32 trip = umbra_uniform_32(b, u, 0);
     umbra_val32 j = umbra_loop(b, trip); {
@@ -65,8 +65,8 @@ TEST(resolve_with_loop) {
 TEST(resolve_eliminates_joins) {
     struct umbra_buf src = {0}, dst = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const sp = umbra_early_bind_buf(b, &src),
-                      dp = umbra_early_bind_buf(b, &dst);
+    umbra_ptr const sp = umbra_bind_buf(b, &src),
+                      dp = umbra_bind_buf(b, &dst);
     umbra_val32 v = umbra_gather_32(b, sp, umbra_x(b));
     umbra_val32 r = umbra_add_f32(b, v, umbra_imm_f32(b, 2.0f));
     umbra_store_32(b, dp, r);
@@ -97,7 +97,7 @@ TEST(resolve_eliminates_joins) {
 TEST(resolve_compaction_renumbers) {
     struct umbra_buf dummy = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst = umbra_early_bind_buf(b, &dummy);
+    umbra_ptr const dst = umbra_bind_buf(b, &dummy);
     umbra_val32 a = umbra_imm_i32(b, 10);
     umbra_val32 unused = umbra_imm_i32(b, 99);
     (void)unused;
@@ -124,8 +124,8 @@ TEST(resolve_compaction_renumbers) {
 TEST(resolve_preserves_channels) {
     struct umbra_buf src = {0}, dst = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr sp = umbra_early_bind_buf(b, &src),
-                dp = umbra_early_bind_buf(b, &dst);
+    umbra_ptr sp = umbra_bind_buf(b, &src),
+                dp = umbra_bind_buf(b, &dst);
     umbra_color_val32 c = umbra_fmt_fp16.load(b, sp);
     umbra_fmt_fp16.store(b, dp, c);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
@@ -147,8 +147,8 @@ TEST(resolve_preserves_channels) {
 TEST(resolve_preserves_ptr) {
     struct umbra_buf src = {0}, dst = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const sp = umbra_early_bind_buf(b, &src),
-                      dp = umbra_early_bind_buf(b, &dst);
+    umbra_ptr const sp = umbra_bind_buf(b, &src),
+                      dp = umbra_bind_buf(b, &dst);
     umbra_val32 v = umbra_gather_32(b, sp, umbra_x(b));
     umbra_store_32(b, dp, v);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);

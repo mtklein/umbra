@@ -122,7 +122,7 @@ TEST(test_perspective_text) {
 
     struct umbra_buf dst_slot = {0};
     struct umbra_builder *b = umbra_builder();
-    umbra_ptr const dst_ptr = umbra_early_bind_buf(b, &dst_slot);
+    umbra_ptr const dst_ptr = umbra_bind_buf(b, &dst_slot);
     umbra_val32 const x = umbra_f32_from_i32(b, umbra_x(b)),
                       y = umbra_f32_from_i32(b, umbra_y(b));
     umbra_point_val32 const p = umbra_transform_perspective(&mat, b, x, y);
@@ -162,7 +162,7 @@ TEST(test_perspective_text) {
     };
 
     b = umbra_builder();
-    umbra_ptr const dst_ptr2 = umbra_early_bind_buf(b, &dst_slot);
+    umbra_ptr const dst_ptr2 = umbra_bind_buf(b, &dst_slot);
     umbra_val32 const x2 = umbra_f32_from_i32(b, umbra_x(b)),
                       y2 = umbra_f32_from_i32(b, umbra_y(b));
     umbra_point_val32 const p2 = umbra_transform_perspective(&mat2, b, x2, y2);
@@ -218,8 +218,8 @@ static void run_long_batch_no_oom(struct umbra_backend *be) {
         struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
         struct umbra_builder *b = umbra_builder();
-        umbra_ptr const cu = umbra_early_bind_uniforms(b, &color, (int)(sizeof color / 4)),
-                        pp = umbra_early_bind_buf(b, &pixel_buf);
+        umbra_ptr const cu = umbra_bind_uniforms(b, &color, (int)(sizeof color / 4)),
+                        pp = umbra_bind_buf(b, &pixel_buf);
         umbra_color_val32 c = {
             umbra_uniform_32(b, cu, 0),
             umbra_uniform_32(b, cu, 1),
@@ -279,7 +279,7 @@ static void run_tiled_writable_sync(struct umbra_backend *be) {
         struct umbra_buf data_buf = {.ptr=data, .count=BW * BH, .stride=BW};
 
         struct umbra_builder *b = umbra_builder();
-        umbra_ptr const dp = umbra_early_bind_buf(b, &data_buf);
+        umbra_ptr const dp = umbra_bind_buf(b, &data_buf);
         umbra_val32 v   = umbra_load_32(b, dp);
         umbra_val32 one = umbra_imm_f32(b, 1.0f);
         umbra_store_32(b, dp, umbra_add_f32(b, v, one));
@@ -333,8 +333,8 @@ TEST(test_wgpu_misc) {
         struct umbra_buf pixel_buf = {.ptr=&pixel, .count=1, .stride=1};
 
         struct umbra_builder *b = umbra_builder();
-        umbra_ptr const cu = umbra_early_bind_uniforms(b, uniform_data, count(uniform_data)),
-                        pp = umbra_early_bind_buf(b, &pixel_buf);
+        umbra_ptr const cu = umbra_bind_uniforms(b, uniform_data, count(uniform_data)),
+                        pp = umbra_bind_buf(b, &pixel_buf);
         umbra_color_val32 c = {
             umbra_uniform_32(b, cu, 0),
             umbra_imm_f32(b, 0.0f),

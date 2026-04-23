@@ -169,7 +169,7 @@ enum {
 umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
                                               struct umbra_builder *b,
                                               umbra_val32 x, umbra_val32 y) {
-    umbra_ptr const u  = umbra_early_bind_uniforms(b, mat, (int)(sizeof *mat / 4));
+    umbra_ptr const u  = umbra_bind_uniforms(b, mat, (int)(sizeof *mat / 4));
     umbra_val32 const sx = umbra_uniform_32(b, u, M_SX),
                       kx = umbra_uniform_32(b, u, M_KX),
                       tx = umbra_uniform_32(b, u, M_TX),
@@ -252,7 +252,7 @@ struct umbra_sdf_bounds_program {
 static void sdf_tile_intervals(struct umbra_builder *bb,
                                struct umbra_sdf_bounds_program *bounds,
                                umbra_interval *ix, umbra_interval *iy) {
-    bounds->uniform_ptr = umbra_late_bind_uniforms(bb, 4);
+    bounds->uniform_ptr = umbra_bind_uniforms(bb, NULL, 4);
     umbra_val32 const base_x = umbra_uniform_32(bb, bounds->uniform_ptr, 0),
                       base_y = umbra_uniform_32(bb, bounds->uniform_ptr, 1),
                       tile_w = umbra_uniform_32(bb, bounds->uniform_ptr, 2),
@@ -273,7 +273,7 @@ static void sdf_tile_intervals(struct umbra_builder *bb,
 static void apply_affine_interval(struct umbra_affine const *a,
                                   struct umbra_builder *b,
                                   umbra_interval *x, umbra_interval *y) {
-    umbra_ptr const u = umbra_early_bind_uniforms(b, a, (int)(sizeof *a / 4));
+    umbra_ptr const u = umbra_bind_uniforms(b, a, (int)(sizeof *a / 4));
     umbra_interval const sx = umbra_interval_exact(umbra_uniform_32(b, u, 0)),
                          kx = umbra_interval_exact(umbra_uniform_32(b, u, 1)),
                          tx = umbra_interval_exact(umbra_uniform_32(b, u, 2)),
@@ -297,7 +297,7 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *
                                                           umbra_sdf sdf_fn, void *sdf_ctx) {
     struct umbra_sdf_bounds_program *bounds = calloc(1, sizeof *bounds);
 
-    bounds->cov_ptr = umbra_late_bind_buf(b);
+    bounds->cov_ptr = umbra_bind_buf(b, NULL);
     umbra_interval x, y;
     sdf_tile_intervals(b, bounds, &x, &y);
     if (transform) {
@@ -398,7 +398,7 @@ umbra_color_val32 umbra_shader_color(void *ctx, struct umbra_builder *b,
                                      umbra_val32 x, umbra_val32 y) {
     umbra_color const *self = ctx;
     (void)x; (void)y;
-    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
     return (umbra_color_val32){
         umbra_uniform_32(b, u, 0),
         umbra_uniform_32(b, u, 1),
@@ -440,7 +440,7 @@ umbra_color_val32 umbra_shader_supersample(void *ctx, struct umbra_builder *b,
 umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
                                  umbra_val32 x, umbra_val32 y) {
     umbra_rect const *self = ctx;
-    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_val32 const l   = umbra_uniform_32(b, u, 0),
                       t   = umbra_uniform_32(b, u, 1),
                       r   = umbra_uniform_32(b, u, 2),

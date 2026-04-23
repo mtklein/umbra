@@ -80,7 +80,7 @@ static void two_circle_gather(struct umbra_builder *b, void *ctx,
                                umbra_interval x, umbra_interval y,
                                umbra_interval *a, umbra_interval *c) {
     struct two_circle_sdf const *self = ctx;
-    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_interval const cx1 = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(cx1))),
                          cy1 = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(cy1))),
                          r1  = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(r1))),
@@ -172,7 +172,7 @@ struct circle_sdf_ctx {
 static umbra_interval circle_build(void *ctx, struct umbra_builder *b,
                                     umbra_interval x, umbra_interval y) {
     struct circle_sdf_ctx const *self = ctx;
-    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(cx))),
                          cy = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(cy))),
                          r  = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(r)));
@@ -236,7 +236,7 @@ struct ring_sdf_ctx {
 static umbra_interval ring_build(void *ctx, struct umbra_builder *b,
                                   umbra_interval x, umbra_interval y) {
     struct ring_sdf_ctx const *self = ctx;
-    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(cx))),
                          cy = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(cy))),
                          r  = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(r))),
@@ -282,7 +282,7 @@ struct rounded_rect_sdf_ctx {
 static umbra_interval rounded_rect_build(void *ctx, struct umbra_builder *b,
                                           umbra_interval x, umbra_interval y) {
     struct rounded_rect_sdf_ctx const *self = ctx;
-    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_interval const cx = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(cx))),
                          cy = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(cy))),
                          hw = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(hw))),
@@ -346,7 +346,7 @@ struct capsule_sdf_ctx {
 static umbra_interval capsule_build(void *ctx, struct umbra_builder *b,
                                      umbra_interval x, umbra_interval y) {
     struct capsule_sdf_ctx const *self = ctx;
-    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_interval const p0x = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(p0x))),
                          p0y = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(p0y))),
                          p1x = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(p1x))),
@@ -420,7 +420,7 @@ struct halfplane_sdf_ctx {
 static umbra_interval halfplane_build(void *ctx, struct umbra_builder *b,
                                        umbra_interval x, umbra_interval y) {
     struct halfplane_sdf_ctx const *self = ctx;
-    umbra_ptr const u = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const u = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_interval const nx = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(nx))),
                          ny = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(ny))),
                          d  = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(d)));
@@ -494,8 +494,8 @@ struct sdf_text_sdf {
 static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
                                       umbra_interval x, umbra_interval y) {
     struct sdf_text_sdf const *self = ctx;
-    umbra_ptr const u    = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_early_bind_buf(b, &self->curves);
+    umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const data = umbra_bind_buf(b, &self->curves);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves));
 
     umbra_interval const sx = umbra_interval_exact(
@@ -648,8 +648,8 @@ struct sdf_polyline_text_sdf {
 static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b,
                                                umbra_interval x, umbra_interval y) {
     struct sdf_polyline_text_sdf const *self = ctx;
-    umbra_ptr const u    = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_early_bind_buf(b, &self->curves);
+    umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const data = umbra_bind_buf(b, &self->curves);
 
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves)),
                       lgN  = umbra_uniform_32(b, u, SLOT(lg_n));
@@ -832,8 +832,8 @@ struct ngon_sdf_ctx {
 static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
                                   umbra_interval x, umbra_interval y) {
     struct ngon_sdf_ctx const *self = ctx;
-    umbra_ptr const u    = umbra_early_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_early_bind_buf(b, &self->hp);
+    umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const data = umbra_bind_buf(b, &self->hp);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_sides));
 
     umbra_var32 lo_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));

@@ -119,43 +119,23 @@ static int reserve_binding(builder *b) {
     return b->bindings++;
 }
 
-umbra_ptr umbra_early_bind_buf(builder *b, struct umbra_buf const *buf) {
+umbra_ptr umbra_bind_buf(builder *b, struct umbra_buf const *buf) {
     int const ix = reserve_binding(b);
     b->binding[ix] = (struct buffer_binding){
-        .kind = BIND_EARLY_BUF,
+        .kind = BIND_BUF,
         .buf  = buf,
         .ix   = ix,
     };
     return (umbra_ptr){.ix = ix};
 }
 
-umbra_ptr umbra_early_bind_uniforms(builder *b, void const *slot, int slots) {
+umbra_ptr umbra_bind_uniforms(builder *b, void const *slot, int slots) {
     assume(((uintptr_t)slot & 3u) == 0);
     assume(slots >= 0);
     int const ix = reserve_binding(b);
     b->binding[ix] = (struct buffer_binding){
-        .kind     = BIND_EARLY_UNIFORMS,
+        .kind     = BIND_UNIFORMS,
         .uniforms = {.ptr = (void*)(uintptr_t)slot, .count = slots, .stride = 0},
-        .ix       = ix,
-    };
-    return (umbra_ptr){.ix = ix};
-}
-
-umbra_ptr umbra_late_bind_buf(builder *b) {
-    int const ix = reserve_binding(b);
-    b->binding[ix] = (struct buffer_binding){
-        .kind = BIND_LATE_BUF,
-        .ix   = ix,
-    };
-    return (umbra_ptr){.ix = ix};
-}
-
-umbra_ptr umbra_late_bind_uniforms(builder *b, int slots) {
-    assume(slots >= 0);
-    int const ix = reserve_binding(b);
-    b->binding[ix] = (struct buffer_binding){
-        .kind     = BIND_LATE_UNIFORMS,
-        .uniforms = {.ptr = NULL, .count = slots, .stride = 0},
         .ix       = ix,
     };
     return (umbra_ptr){.ix = ix};

@@ -23,8 +23,8 @@ struct swatch_ctx {
 static umbra_color_val32 shader_swatch(void *vctx, struct umbra_builder *b,
                                         umbra_val32 x, umbra_val32 y) {
     struct swatch_ctx const *ctx = vctx;
-    umbra_ptr const colors = umbra_early_bind_uniforms(b, swatch_colors, SWATCH_N * 4);
-    umbra_ptr const u      = umbra_early_bind_uniforms(b, &ctx->cw, 2);
+    umbra_ptr const colors = umbra_bind_uniforms(b, swatch_colors, SWATCH_N * 4);
+    umbra_ptr const u      = umbra_bind_uniforms(b, &ctx->cw, 2);
 
     umbra_val32 const cw = umbra_uniform_32(b, u, 0),
                       ch = umbra_uniform_32(b, u, 1);
