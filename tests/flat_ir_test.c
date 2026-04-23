@@ -2834,7 +2834,7 @@ TEST(test_max_f32_imm) {
 
 TEST(test_imm_cmp_i32) {
     struct umbra_buf slot[20] = {0};
-    // Base imm ops (result to store).
+    // cmp(x, imm) with result straight to store (no scalar-variant upgrade).
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
     umbra_val32 m1 = umbra_eq_i32(b, a, umbra_imm_i32(b, 5));
