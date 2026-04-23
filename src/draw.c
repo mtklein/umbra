@@ -346,49 +346,45 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_full,
                         int l, int t, int r, int b,
                         struct umbra_late_binding const *late, int lates) {
-    if (!draw_partial->backend->program_switch_is_cheap) {
-        draw_full = draw_partial;
-    }
+    struct umbra_program* prog_for_cov[] = {
+        [UMBRA_SDF_TILE_NONE   ] = NULL,
+        [UMBRA_SDF_TILE_PARTIAL] = draw_partial,
+        [UMBRA_SDF_TILE_FULL   ] = draw_partial->backend->program_switch_is_cheap ? draw_full
+                                                                                  : draw_partial,
+    };
 
     int const T = draw_partial->backend->program_queue_is_cheap ? 8 : 64,
-              xt = (r - l + T - 1) / T,
-              yt = (b - t + T - 1) / T,
-              tiles = xt * yt;
+              x_tiles = (r - l + T - 1) / T,
+              y_tiles = (b - t + T - 1) / T,
+              tiles = x_tiles * y_tiles;
 
-    uint8_t *cov = calloc((size_t)tiles, sizeof *cov);
+    uint8_t *cov = malloc((size_t)tiles * sizeof *cov);
     float const uniforms[] = {(float)l, (float)t, (float)T, (float)T};
 
     struct umbra_late_binding const bounds_late[] = {
-        {.ptr = bounds->cov_ptr    , .buf = {.ptr = cov, .count = tiles, .stride = xt}},
+        {.ptr = bounds->cov_ptr    , .buf = {.ptr = cov, .count = tiles, .stride = x_tiles}},
         {.ptr = bounds->uniform_ptr, .uniforms = uniforms},
     };
-    bounds->prog->queue(bounds->prog, 0, 0, xt, yt, bounds_late, count(bounds_late));
-    uint8_t const *c = cov;
+    bounds->prog->queue(bounds->prog, 0, 0, x_tiles, y_tiles, bounds_late, count(bounds_late));
 
-    // We coalesce horizontally adjacent tiles into runs, breaking when the
-    // draw program changes (partial vs full vs NONE).  Each run becomes one
-    // draw->queue() call so per-dispatch overhead is amortized across tiles.
-    for (int ty = 0; ty < yt; ty++) {
-        int const tt = t + ty * T,
+    // Coalesce horizontally adjacent tiles with the same program to amortize dispatch overhead.
+    for (int ty = 0; ty < y_tiles; ty++) {
+        int const tt = t + ty*T,
                   tb = tt + T < b ? tt + T : b;
         struct umbra_program *run_prog = NULL;
         int                   run_start = 0;
-        for (int tx = 0; tx <= xt; tx++) {
-            struct umbra_program *prog = NULL;
-            if (tx < xt) {
-                int const cell = c[ty * xt + tx];
-                if (cell != UMBRA_SDF_TILE_NONE) { prog = draw_partial; }
-                if (cell == UMBRA_SDF_TILE_FULL) { prog = draw_full; }
-            }
+        for (int tx = 0; tx < x_tiles; tx++) {
+            struct umbra_program *prog = prog_for_cov[ cov[ty*x_tiles + tx] ];
             if (prog != run_prog) {
                 if (run_prog) {
-                    int const tl = l + run_start * T,
-                              tr = l + tx * T < r ? l + tx * T : r;
-                    run_prog->queue(run_prog, tl, tt, tr, tb, late, lates);
+                    run_prog->queue(run_prog, l + run_start*T, tt, l + tx*T, tb, late, lates);
                 }
-                run_start = tx;
                 run_prog  = prog;
+                run_start = tx;
             }
+        }
+        if (run_prog) {
+            run_prog->queue(run_prog, l + run_start*T, tt, r, tb, late, lates);
         }
     }
     free(cov);
