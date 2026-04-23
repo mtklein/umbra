@@ -118,11 +118,6 @@ TEST(test_avx_f32) {
     bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x59, 0xD4}) here;
     reset(&b);
 
-    // vdivps %ymm4, %ymm3, %ymm2 => c5 e4 5e d4
-    vdivps(&b, 2, 3, 4);
-    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x5E, 0xD4}) here;
-    reset(&b);
-
     // vminps %ymm4, %ymm3, %ymm2 => c5 e4 5d d4
     vminps(&b, 2, 3, 4);
     bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE4, 0x5D, 0xD4}) here;

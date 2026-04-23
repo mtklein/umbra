@@ -62,7 +62,6 @@ void broadcast_imm32(struct asm_x86 *b, int d, uint32_t v);
 void vaddps(struct asm_x86 *b, int d, int v, int s);
 void vsubps(struct asm_x86 *b, int d, int v, int s);
 void vmulps(struct asm_x86 *b, int d, int v, int s);
-void vdivps(struct asm_x86 *b, int d, int v, int s);
 void vminps(struct asm_x86 *b, int d, int v, int s);
 void vmaxps(struct asm_x86 *b, int d, int v, int s);
 void vfmadd132ps(struct asm_x86 *b, int d, int v, int s);

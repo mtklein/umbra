@@ -104,7 +104,6 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z, int scr
     case op_add_f32: put(c, FADD_4s(d, x, y)); break;
     case op_sub_f32: put(c, FSUB_4s(d, x, y)); break;
     case op_mul_f32: put(c, FMUL_4s(d, x, y)); break;
-    case op_div_f32: put(c, FDIV_4s(d, x, y)); break;
     case op_min_f32: put(c, FMINNM_4s(d, x, y)); break;
     case op_max_f32: put(c, FMAXNM_4s(d, x, y)); break;
     case op_abs_f32: put(c, FABS_4s(d, x)); break;
@@ -1001,7 +1000,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_add_f32:
         case op_sub_f32:
         case op_mul_f32:
-        case op_div_f32:
         case op_min_f32:
         case op_max_f32:
         case op_abs_f32:

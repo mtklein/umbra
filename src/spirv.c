@@ -97,7 +97,6 @@ enum {
     SpvOpFMul                 = 133,
     SpvOpUDiv                 = 134,
     SpvOpSDiv                 = 135,
-    SpvOpFDiv                 = 136,
     SpvOpUMod                 = 137,
     SpvOpSMod                 = 139,
     SpvOpFMod                 = 141,
@@ -684,7 +683,7 @@ static uint32_t spv_f32_to_f16(SpvBuilder *b, uint32_t f32_val) {
 
 static _Bool produces_float(enum op op) {
     return op == op_add_f32     || op == op_sub_f32
-        || op == op_mul_f32     || op == op_div_f32
+        || op == op_mul_f32
         || op == op_min_f32     || op == op_max_f32
         || op == op_abs_f32    || op == op_square_f32
         || op == op_round_f32   || op == op_floor_f32  || op == op_ceil_f32
@@ -1551,11 +1550,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     B.val[i] = spv_fmul(&B, flags,
                                         as_f32(&B, get_val(&B, inst->x), xid),
                                         as_f32(&B, get_val(&B, inst->y), yid));
-                    break;
-                case op_div_f32:
-                    B.val[i] = spv_binop(&B, SpvOpFDiv, B.t_f32,
-                                          as_f32(&B, get_val(&B, inst->x), xid),
-                                          as_f32(&B, get_val(&B, inst->y), yid));
                     break;
                 case op_min_f32:
                     B.val[i] = spv_glsl_2(&B, B.t_f32, GLSLstd450FMin,

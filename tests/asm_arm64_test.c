@@ -57,7 +57,6 @@ TEST(test_neon_f32) {
     FADD_4s(4, 5, 6) == 0x4E26D4A4 here;
     FSUB_4s(0, 1, 2) == 0x4EA2D420 here;
     FMUL_4s(7, 8, 9) == 0x6E29DD07 here;
-    FDIV_4s(0, 1, 2) == 0x6E22FC20 here;
     FMLA_4s(0, 1, 2) == 0x4E22CC20 here;
     FMLS_4s(3, 4, 5) == 0x4EA5CC83 here;
     FMINNM_4s(0, 1, 2) == 0x4EA2C420 here;

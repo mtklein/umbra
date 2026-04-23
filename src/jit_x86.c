@@ -166,7 +166,6 @@ static void emit_alu_reg(Buf *c, enum op op, int d, int x, int y, int z,
     case op_add_f32: vaddps(c, d, x, y); break;
     case op_sub_f32: vsubps(c, d, x, y); break;
     case op_mul_f32: vmulps(c, d, x, y); break;
-    case op_div_f32: vdivps(c, d, x, y); break;
     case op_min_f32: vminps(c, d, x, y); break;
     case op_max_f32: vmaxps(c, d, x, y); break;
     case op_square_f32: vmulps(c, d, x, x); break;
@@ -1000,7 +999,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_add_f32:
         case op_sub_f32:
         case op_mul_f32:
-        case op_div_f32:
         case op_min_f32:
         case op_max_f32:
         case op_square_f32:

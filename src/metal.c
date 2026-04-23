@@ -137,7 +137,7 @@ static void emit(SrcBuf *b, char const *fmt, ...) {
 
 static _Bool produces_float(enum op op) {
     return op == op_add_f32     || op == op_sub_f32
-        || op == op_mul_f32     || op == op_div_f32
+        || op == op_mul_f32
         || op == op_min_f32     || op == op_max_f32
         || op == op_abs_f32     || op == op_square_f32
         || op == op_round_f32   || op == op_floor_f32  || op == op_ceil_f32
@@ -426,12 +426,6 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                 break;
             case op_mul_f32:
                 emit(b, "%sfloat v%d = %s * %s;\n",
-                     pad, i,
-                     fv(_fx, vx, xid, is_f),
-                     fv(_fy, vy, yid, is_f));
-                break;
-            case op_div_f32:
-                emit(b, "%sfloat v%d = %s / %s;\n",
                      pad, i,
                      fv(_fx, vx, xid, is_f),
                      fv(_fy, vy, yid, is_f));

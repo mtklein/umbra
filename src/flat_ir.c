@@ -478,7 +478,6 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
         case op_add_f32:
         case op_sub_f32:
         case op_mul_f32:
-        case op_div_f32:
         case op_min_f32:
         case op_max_f32:
         case op_square_add_f32:

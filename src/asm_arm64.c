@@ -191,7 +191,6 @@ enum {
     FADD_4s_ = 0x4e20d400u,
     FSUB_4s_ = 0x4ea0d400u,
     FMUL_4s_ = 0x6e20dc00u,
-    FDIV_4s_ = 0x6e20fc00u,
     FMLA_4s_ = 0x4e20cc00u,
     FMLS_4s_ = 0x4ea0cc00u,
     FMINNM_4s_ = 0x4ea0c400u,
@@ -245,7 +244,6 @@ static uint32_t v2(uint32_t enc, int d, int n) {
 uint32_t FADD_4s(int d, int n, int m) { return v3(FADD_4s_, d, n, m); }
 uint32_t FSUB_4s(int d, int n, int m) { return v3(FSUB_4s_, d, n, m); }
 uint32_t FMUL_4s(int d, int n, int m) { return v3(FMUL_4s_, d, n, m); }
-uint32_t FDIV_4s(int d, int n, int m) { return v3(FDIV_4s_, d, n, m); }
 uint32_t FMLA_4s(int d, int n, int m) { return v3(FMLA_4s_, d, n, m); }
 uint32_t FMLS_4s(int d, int n, int m) { return v3(FMLS_4s_, d, n, m); }
 uint32_t FMINNM_4s(int d, int n, int m) { return v3(FMINNM_4s_, d, n, m); }

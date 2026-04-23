@@ -62,7 +62,6 @@ uint32_t W(uint32_t insn);
 uint32_t FADD_4s(int d, int n, int m);
 uint32_t FSUB_4s(int d, int n, int m);
 uint32_t FMUL_4s(int d, int n, int m);
-uint32_t FDIV_4s(int d, int n, int m);
 uint32_t FMLA_4s(int d, int n, int m);
 uint32_t FMLS_4s(int d, int n, int m);
 uint32_t FMINNM_4s(int d, int n, int m);

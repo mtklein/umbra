@@ -48,7 +48,7 @@ enum {
 // Ops that get register variants in the interpreter.
 #define BINARY_OPS(X)                                                                      \
     X(add_f32, OP_COMMUTATIVE) X(sub_f32, 0) X(mul_f32, OP_COMMUTATIVE)                   \
-    X(div_f32, 0) X(min_f32, OP_COMMUTATIVE) X(max_f32, OP_COMMUTATIVE)                   \
+    X(min_f32, OP_COMMUTATIVE) X(max_f32, OP_COMMUTATIVE)                                 \
     X(add_i32, OP_COMMUTATIVE) X(sub_i32, 0) X(mul_i32, OP_COMMUTATIVE)                   \
     X(shl_i32, 0) X(shr_u32, 0) X(shr_s32, 0)                                            \
     X(and_32,  OP_COMMUTATIVE) X(or_32, OP_COMMUTATIVE) X(xor_32, OP_COMMUTATIVE)         \

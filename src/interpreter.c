@@ -292,7 +292,6 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             case op_add_f32:
             case op_sub_f32:
             case op_mul_f32:
-            case op_div_f32:
             case op_min_f32:
             case op_max_f32:
             case op_abs_f32:
@@ -487,7 +486,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_i16_from_i32] = &&L_op_i16_from_i32,
                 [op_f32_from_i32] = &&L_op_f32_from_i32, [op_i32_from_f32] = &&L_op_i32_from_f32,
                 [op_add_f32] = &&L_op_add_f32, [op_sub_f32] = &&L_op_sub_f32,
-                [op_mul_f32] = &&L_op_mul_f32, [op_div_f32] = &&L_op_div_f32,
+                [op_mul_f32] = &&L_op_mul_f32,
                 [op_min_f32] = &&L_op_min_f32, [op_max_f32] = &&L_op_max_f32,
                 [op_abs_f32] = &&L_op_abs_f32,
                 [op_square_f32] = &&L_op_square_f32,
@@ -946,7 +945,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_add_f32) v->f32 = v[ip->x].f32 + v[ip->y].f32; NEXT;
                 CASE(op_sub_f32) v->f32 = v[ip->x].f32 - v[ip->y].f32; NEXT;
                 CASE(op_mul_f32) v->f32 = v[ip->x].f32 * v[ip->y].f32; NEXT;
-                CASE(op_div_f32) v->f32 = v[ip->x].f32 / v[ip->y].f32; NEXT;
                 CASE(op_min_f32) v->f32 = vec_min(v[ip->x].f32, v[ip->y].f32); NEXT;
                 CASE(op_max_f32) v->f32 = vec_max(v[ip->x].f32, v[ip->y].f32); NEXT;
                 CASE(op_abs_f32)    v->f32 = vec_abs(v[ip->x].f32); NEXT;
@@ -1017,7 +1015,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 BIN3(add_f32, f32, +,  f32, f32)
                 BIN3(sub_f32, f32, -,  f32, f32)
                 BIN3(mul_f32, f32, *,  f32, f32)
-                BIN3(div_f32, f32, /,  f32, f32)
                 BIN3(add_i32, i32, +,  i32, i32)
                 BIN3(sub_i32, i32, -,  i32, i32)
                 BIN3(mul_i32, i32, *,  i32, i32)

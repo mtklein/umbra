@@ -275,7 +275,6 @@ void broadcast_imm32(Buf *b, int d, uint32_t v) {
 void vaddps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x58, d, v, s); }
 void vsubps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x5c, d, v, s); }
 void vmulps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x59, d, v, s); }
-void vdivps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x5e, d, v, s); }
 void vminps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x5d, d, v, s); }
 void vmaxps(Buf *b, int d, int v, int s) { vex_rrr(b, 0, 1, 1, 0x5f, d, v, s); }
 void vfmadd132ps(Buf *b, int d, int v, int s) { vex(b, 1, 2, 0, 1, d, v, s, 0x98); }
