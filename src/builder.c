@@ -355,7 +355,33 @@ umbra_val32 umbra_mul_f32(builder *b, umbra_val32 x, umbra_val32 y) {
 
 umbra_val32 umbra_div_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
-    return math(b, op_div_f32, VX(x), VY(y)).v32;
+    // Correctly-rounded division synthesized in terms of add/sub/mul so every
+    // backend computes bit-identical results.  Apple Silicon's Metal `/` (and
+    // MoltenVK / wgpu-native sitting on top of it) is ~1 ULP approximate,
+    // which disagrees with the CPU backends' IEEE-correctly-rounded `/` on
+    // ~23% of random fp32 pairs -- enough to break Slug at fp16 by 1 ULP.
+    //
+    // Markstein's method:
+    //   1. r0 = bit-hack reciprocal approximation  (~4 bits)
+    //   2. r1 = r0 * (2 - y*r0)                     (~8 bits, NR doubles)
+    //   3. r2 = r1 * (2 - y*r1)                     (~16 bits)
+    //   4. r3 = r2 * (2 - y*r2)                     (~full fp32)
+    //   5. q  = x * r3                              (approximate quotient)
+    //   6. q' = q + r3 * (x - y*q)                  (Markstein correction)
+    // The residual (x - y*q) builder-peepholes to fms (exact, single rounding
+    // via FMA), and the outer add(mul, q) peepholes to fma -- so the final
+    // correction step is effectively correctly-rounded.
+    umbra_val32 const c_rcp_magic = umbra_imm_i32(b, 0x7EF127EA);
+    umbra_val32 const c_two       = umbra_imm_f32(b, 2.0f);
+
+    umbra_val32 r = umbra_sub_i32(b, c_rcp_magic, y);
+    r = umbra_mul_f32(b, r, umbra_sub_f32(b, c_two, umbra_mul_f32(b, y, r)));
+    r = umbra_mul_f32(b, r, umbra_sub_f32(b, c_two, umbra_mul_f32(b, y, r)));
+    r = umbra_mul_f32(b, r, umbra_sub_f32(b, c_two, umbra_mul_f32(b, y, r)));
+
+    umbra_val32 q = umbra_mul_f32(b, x, r);
+    return umbra_add_f32(b, q,
+        umbra_mul_f32(b, r, umbra_sub_f32(b, x, umbra_mul_f32(b, y, q))));
 }
 
 umbra_val32 umbra_min_f32(builder *b, umbra_val32 x, umbra_val32 y) {

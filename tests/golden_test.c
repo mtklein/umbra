@@ -109,18 +109,7 @@ static void test_slide_golden(int slide_idx, struct umbra_fmt fmt) {
 
     _Bool ok = render_and_compare_at(s, slide_idx, fmt, 0.0,
                                      rt, bg, pbuf, pixbuf_sz);
-    if (s->animate
-            // TODO: Slug at sec=1 fails by 1 byte at fp16 (and fp16_planar at
-            // a different layout position but the same source pixel).  All 3
-            // GPU backends agree with each other; both CPU backends agree
-            // with each other; GPU set ≠ CPU set by 1 ULP at fp16 on that
-            // one pixel.  Apple GPU sqrt (precise::sqrt and our NR-rsqrt
-            // synthesis both round to the same fp32 result here) rounds
-            // differently than libm sqrt at the sqrt input(s) that Slug's
-            // perspective-rotated glyph hits at sec=1.  Resolving this
-            // requires either matching libm in the GPU sqrt path or matching
-            // GPU rounding in the CPU sqrt path.
-            && strcmp(s->title, "Slug") != 0) {
+    if (s->animate) {
         // Re-render after animating to sec=1: catches stale-cache bugs where
         // the GPU backend's cached uploads don't see host buffer mutations.
         ok = render_and_compare_at(s, slide_idx, fmt, 1.0,

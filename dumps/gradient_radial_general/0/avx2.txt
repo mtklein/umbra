@@ -17,13 +17,13 @@ addq	%rax, %r11
 vbroadcastss	(%r11), %ymm1
 vbroadcastss	0x4(%r11), %ymm2
 vbroadcastss	0x8(%r11), %ymm3
-vbroadcastss	0xa23(%rip), %ymm4 ## 0xa6c <__text+0xa6c>
+vbroadcastss	0xb9e(%rip), %ymm4 ## 0xbe7 <__text+0xbe7>
 vpcmpeqd	%ymm5, %ymm5, %ymm5
 vpsrld	$0x1f, %ymm5, %ymm5
-vbroadcastss	0xa15(%rip), %ymm6 ## 0xa70 <__text+0xa70>
-vbroadcastss	0xa10(%rip), %ymm7 ## 0xa74 <__text+0xa74>
-vbroadcastss	0xa0b(%rip), %ymm8 ## 0xa78 <__text+0xa78>
-vbroadcastss	0xa06(%rip), %ymm9 ## 0xa7c <__text+0xa7c>
+vbroadcastss	0xb90(%rip), %ymm6 ## 0xbeb <__text+0xbeb>
+vbroadcastss	0xb8b(%rip), %ymm7 ## 0xbef <__text+0xbef>
+vbroadcastss	0xb86(%rip), %ymm8 ## 0xbf3 <__text+0xbf3>
+vbroadcastss	0xb81(%rip), %ymm9 ## 0xbf7 <__text+0xbf7>
 movq	0x20(%rdx), %r11
 movl	0x2c(%rdx), %eax
 shlq	$0x2, %rax
@@ -34,6 +34,8 @@ vcvttps2dq	%ymm10, %ymm10
 vpsubd	%ymm5, %ymm10, %ymm11
 vpaddd	%ymm10, %ymm10, %ymm12
 vpaddd	%ymm12, %ymm10, %ymm13
+vbroadcastss	0xb51(%rip), %ymm14 ## 0xbfb <__text+0xbfb>
+vbroadcastss	0xb4c(%rip), %ymm15 ## 0xbff <__text+0xbff>
 movq	%rsi, %r14
 movq	%rdi, %rsi
 movq	%r10, %rdi
@@ -42,59 +44,66 @@ movq	%rsi, %r10
 movq	%rdi, %r11
 subq	%r10, %r11
 cmpq	$0x8, %r11
-jl	0x568 <__text+0x568>
+jl	0x625 <__text+0x625>
 # simd_body:
 vmovdqu	%ymm0, 0x80(%rsp)
 vmovdqu	%ymm0, (%rsp)
 vmovdqu	%ymm0, 0x60(%rsp)
 vmovdqu	%ymm0, 0x40(%rsp)
 vmovdqu	%ymm0, 0x20(%rsp)
-vmovd	%r10d, %xmm14
-vbroadcastss	%xmm14, %ymm14
-vpaddd	0x990(%rip), %ymm14, %ymm14 ## 0xa80 <__text+0xa80>
-vcvtdq2ps	%ymm14, %ymm14
-vsubps	%ymm1, %ymm14, %ymm14
-vmovd	%r14d, %xmm15
-vbroadcastss	%xmm15, %ymm15
-vcvtdq2ps	%ymm15, %ymm15
-vsubps	%ymm2, %ymm15, %ymm15
-vmulps	%ymm15, %ymm15, %ymm15
-vfmadd231ps	%ymm14, %ymm14, %ymm15 ## ymm15 = (ymm14 * ymm14) + ymm15
-vpsrlvd	%ymm5, %ymm15, %ymm14
-vpsubd	%ymm14, %ymm4, %ymm14
+vmovd	%r10d, %xmm0
+vbroadcastss	%xmm0, %ymm0
+vpaddd	0xb01(%rip), %ymm0, %ymm0 ## 0xc03 <__text+0xc03>
 vmovdqu	%ymm1, 0xa0(%rsp)
-vcmpeqps	%ymm15, %ymm0, %ymm1
+vpxor	%ymm1, %ymm1, %ymm1
+vcvtdq2ps	%ymm0, %ymm0
+vmovdqu	0xa0(%rsp), %ymm1
 vmovdqu	%ymm2, 0xc0(%rsp)
-vmulps	%ymm14, %ymm14, %ymm2
-vmulps	%ymm2, %ymm15, %ymm2
-vfmadd213ps	%ymm6, %ymm7, %ymm2 ## ymm2 = (ymm7 * ymm2) + ymm6
-vpxor	%ymm0, %ymm0, %ymm0
-vmulps	%ymm2, %ymm14, %ymm14
-vmulps	%ymm14, %ymm14, %ymm2
-vmulps	%ymm2, %ymm15, %ymm2
-vfmadd213ps	%ymm6, %ymm7, %ymm2 ## ymm2 = (ymm7 * ymm2) + ymm6
-vpxor	%ymm0, %ymm0, %ymm0
-vmulps	%ymm2, %ymm14, %ymm14
-vmulps	%ymm8, %ymm14, %ymm2
+vpxor	%ymm2, %ymm2, %ymm2
+vsubps	%ymm1, %ymm0, %ymm0
+vmovdqu	%ymm1, 0xa0(%rsp)
+vmovd	%r14d, %xmm1
+vbroadcastss	%xmm1, %ymm1
+vcvtdq2ps	%ymm1, %ymm1
+vmovdqu	0xc0(%rsp), %ymm2
 vmovdqu	%ymm3, 0xe0(%rsp)
-vmulps	%ymm14, %ymm15, %ymm3
-vfnmadd132ps	%ymm3, %ymm15, %ymm3 ## ymm3 = -(ymm3 * ymm3) + ymm15
-vmulps	%ymm2, %ymm3, %ymm3
-vfmadd231ps	%ymm14, %ymm15, %ymm3 ## ymm3 = (ymm15 * ymm14) + ymm3
-vpblendvb	%ymm1, %ymm0, %ymm3, %ymm1
-vmovdqu	0xe0(%rsp), %ymm2
-vmulps	%ymm1, %ymm2, %ymm1
-vmaxps	%ymm1, %ymm0, %ymm1
-vminps	%ymm9, %ymm1, %ymm1
+vpxor	%ymm3, %ymm3, %ymm3
+vsubps	%ymm2, %ymm1, %ymm1
+vmulps	%ymm1, %ymm1, %ymm1
+vfmadd231ps	%ymm0, %ymm0, %ymm1 ## ymm1 = (ymm0 * ymm0) + ymm1
+vpsrlvd	%ymm5, %ymm1, %ymm0
+vpsubd	%ymm0, %ymm4, %ymm0
+vmovdqu	%ymm2, 0xc0(%rsp)
+vcmpeqps	%ymm1, %ymm3, %ymm2
+vmulps	%ymm0, %ymm0, %ymm4
+vmulps	%ymm4, %ymm1, %ymm4
+vfmadd213ps	%ymm6, %ymm7, %ymm4 ## ymm4 = (ymm7 * ymm4) + ymm6
+vpxor	%ymm3, %ymm3, %ymm3
+vmulps	%ymm4, %ymm0, %ymm0
+vmulps	%ymm0, %ymm0, %ymm4
+vmulps	%ymm4, %ymm1, %ymm4
+vfmadd213ps	%ymm6, %ymm7, %ymm4 ## ymm4 = (ymm7 * ymm4) + ymm6
+vpxor	%ymm3, %ymm3, %ymm3
+vmulps	%ymm4, %ymm0, %ymm0
+vmulps	%ymm8, %ymm0, %ymm4
+vmulps	%ymm0, %ymm1, %ymm5
+vfnmadd132ps	%ymm5, %ymm1, %ymm5 ## ymm5 = -(ymm5 * ymm5) + ymm1
+vmulps	%ymm4, %ymm5, %ymm5
+vfmadd231ps	%ymm0, %ymm1, %ymm5 ## ymm5 = (ymm1 * ymm0) + ymm5
+vpblendvb	%ymm2, %ymm3, %ymm5, %ymm2
+vmovdqu	0xe0(%rsp), %ymm0
+vmulps	%ymm2, %ymm0, %ymm2
+vmaxps	%ymm2, %ymm3, %ymm2
+vminps	%ymm9, %ymm2, %ymm2
 vmovd	%xmm11, %r11d
-vmovdqu	%ymm2, 0xe0(%rsp)
+vmovdqu	%ymm0, 0xe0(%rsp)
 vmovdqu	%ymm10, 0x100(%rsp)
 vmovdqu	%ymm11, 0x120(%rsp)
 vmovdqu	%ymm12, 0x140(%rsp)
 vmovdqu	%ymm13, 0x160(%rsp)
-vmovdqu	%ymm1, 0x180(%rsp)
+vmovdqu	%ymm2, 0x180(%rsp)
 cmpq	$0x0, %r11
-jle	0x467 <__text+0x467>
+jle	0x514 <__text+0x514>
 vmovdqu	0x80(%rsp), %ymm0
 vpcmpeqd	%ymm1, %ymm1, %ymm1
 vpsrld	$0x1f, %ymm1, %ymm1
@@ -109,167 +118,192 @@ vmovd	%xmm0, %eax
 movl	0x48(%rdx), %r13d
 vpxor	%ymm4, %ymm4, %ymm4
 cmpq	%r13, %rax
-jae	0x232 <__text+0x232>
+jae	0x26c <__text+0x26c>
 vmovd	(%r11,%rax,4), %xmm4
 vbroadcastss	%xmm4, %ymm4
 vmovd	%xmm3, %eax
 movl	0x48(%rdx), %r13d
 vpxor	%ymm5, %ymm5, %ymm5
 cmpq	%r13, %rax
-jae	0x252 <__text+0x252>
+jae	0x28c <__text+0x28c>
 vmovd	(%r11,%rax,4), %xmm5
 vbroadcastss	%xmm5, %ymm5
 vmovdqu	0x180(%rsp), %ymm6
 vcmpleps	%ymm5, %ymm6, %ymm7
 vcmpleps	%ymm6, %ymm4, %ymm8
 vpand	%ymm7, %ymm8, %ymm8
+vsubps	%ymm4, %ymm5, %ymm5
 vmovdqu	0x160(%rsp), %ymm7
 vpaddd	%ymm3, %ymm7, %ymm9
-vsubps	%ymm4, %ymm5, %ymm5
+vbroadcastss	0x93e(%rip), %ymm10 ## 0xbfb <__text+0xbfb>
+vpsubd	%ymm5, %ymm10, %ymm11
+vmovdqu	0x100(%rsp), %ymm12
+vpaddd	%ymm3, %ymm12, %ymm13
+vmovdqu	0x140(%rsp), %ymm14
+vpaddd	%ymm3, %ymm14, %ymm15
+vpaddd	%ymm0, %ymm7, %ymm1
 vsubps	%ymm4, %ymm6, %ymm6
-vdivps	%ymm5, %ymm6, %ymm6
-vmovdqu	0x100(%rsp), %ymm4
-vpaddd	%ymm3, %ymm4, %ymm5
-vmovdqu	0x140(%rsp), %ymm10
-vpaddd	%ymm3, %ymm10, %ymm11
-vpaddd	%ymm0, %ymm7, %ymm12
 movq	0x30(%rdx), %r11
 movl	0x3c(%rdx), %eax
 shlq	$0x2, %rax
 imulq	%r14, %rax
 addq	%rax, %r11
-vmovd	%xmm5, %eax
+vmovd	%xmm13, %eax
+movl	0x38(%rdx), %r13d
+vpxor	%ymm4, %ymm4, %ymm4
+cmpq	%r13, %rax
+jae	0x315 <__text+0x315>
+vmovd	(%r11,%rax,4), %xmm4
+vbroadcastss	%xmm4, %ymm4
+vmovd	%xmm15, %eax
 movl	0x38(%rdx), %r13d
 vpxor	%ymm13, %ymm13, %ymm13
 cmpq	%r13, %rax
-jae	0x2d3 <__text+0x2d3>
+jae	0x336 <__text+0x336>
 vmovd	(%r11,%rax,4), %xmm13
 vbroadcastss	%xmm13, %ymm13
-vmovd	%xmm11, %eax
-movl	0x38(%rdx), %r13d
-vpxor	%ymm5, %ymm5, %ymm5
-cmpq	%r13, %rax
-jae	0x2f3 <__text+0x2f3>
-vmovd	(%r11,%rax,4), %xmm5
-vbroadcastss	%xmm5, %ymm5
 vmovd	%xmm9, %eax
 movl	0x38(%rdx), %r13d
-vpxor	%ymm11, %ymm11, %ymm11
+vpxor	%ymm15, %ymm15, %ymm15
 cmpq	%r13, %rax
-jae	0x314 <__text+0x314>
-vmovd	(%r11,%rax,4), %xmm11
-vbroadcastss	%xmm11, %ymm11
-vmovd	%xmm12, %eax
+jae	0x357 <__text+0x357>
+vmovd	(%r11,%rax,4), %xmm15
+vbroadcastss	%xmm15, %ymm15
+vmovd	%xmm1, %eax
 movl	0x38(%rdx), %r13d
 vpxor	%ymm9, %ymm9, %ymm9
 cmpq	%r13, %rax
-jae	0x335 <__text+0x335>
+jae	0x378 <__text+0x378>
 vmovd	(%r11,%rax,4), %xmm9
 vbroadcastss	%xmm9, %ymm9
-vsubps	%ymm9, %ymm11, %ymm11
-vfmadd231ps	%ymm11, %ymm6, %ymm9 ## ymm9 = (ymm6 * ymm11) + ymm9
-vmovdqu	0x60(%rsp), %ymm11
-vpblendvb	%ymm8, %ymm9, %ymm11, %ymm11
-vmovdqu	%ymm11, 0x60(%rsp)
-vpaddd	%ymm0, %ymm4, %ymm9
-vmovd	%xmm9, %eax
+vsubps	%ymm9, %ymm15, %ymm15
+vbroadcastss	0x879(%rip), %ymm1 ## 0xbff <__text+0xbff>
+vmovaps	%ymm1, %ymm2
+vfnmadd231ps	%ymm11, %ymm5, %ymm2 ## ymm2 = -(ymm5 * ymm11) + ymm2
+vpxor	%ymm1, %ymm1, %ymm1
+vmulps	%ymm2, %ymm11, %ymm11
+vbroadcastss	0x85f(%rip), %ymm2 ## 0xbff <__text+0xbff>
+vmovaps	%ymm2, %ymm1
+vfnmadd231ps	%ymm11, %ymm5, %ymm1 ## ymm1 = -(ymm5 * ymm11) + ymm1
+vpxor	%ymm2, %ymm2, %ymm2
+vmulps	%ymm1, %ymm11, %ymm11
+vbroadcastss	0x845(%rip), %ymm1 ## 0xbff <__text+0xbff>
+vmovaps	%ymm1, %ymm2
+vfnmadd231ps	%ymm11, %ymm5, %ymm2 ## ymm2 = -(ymm5 * ymm11) + ymm2
+vpxor	%ymm1, %ymm1, %ymm1
+vmulps	%ymm2, %ymm11, %ymm11
+vmulps	%ymm11, %ymm6, %ymm2
+vfnmadd132ps	%ymm2, %ymm6, %ymm5 ## ymm5 = -(ymm5 * ymm2) + ymm6
+vpxor	%ymm1, %ymm1, %ymm1
+vmulps	%ymm5, %ymm11, %ymm5
+vfmadd231ps	%ymm11, %ymm6, %ymm5 ## ymm5 = (ymm6 * ymm11) + ymm5
+vfmadd231ps	%ymm15, %ymm5, %ymm9 ## ymm9 = (ymm5 * ymm15) + ymm9
+vmovdqu	0x60(%rsp), %ymm2
+vpblendvb	%ymm8, %ymm9, %ymm2, %ymm2
+vmovdqu	%ymm2, 0x60(%rsp)
+vpaddd	%ymm0, %ymm12, %ymm2
+vmovd	%xmm2, %eax
 movl	0x38(%rdx), %r13d
-vpxor	%ymm11, %ymm11, %ymm11
+vpxor	%ymm6, %ymm6, %ymm6
 cmpq	%r13, %rax
-jae	0x376 <__text+0x376>
-vmovd	(%r11,%rax,4), %xmm11
-vbroadcastss	%xmm11, %ymm11
-vsubps	%ymm11, %ymm13, %ymm13
-vfmadd231ps	%ymm13, %ymm6, %ymm11 ## ymm11 = (ymm6 * ymm13) + ymm11
-vmovdqu	0x20(%rsp), %ymm9
-vpblendvb	%ymm8, %ymm11, %ymm9, %ymm9
-vmovdqu	%ymm9, 0x20(%rsp)
-vpaddd	%ymm0, %ymm10, %ymm9
-vmovd	%xmm9, %eax
+jae	0x41d <__text+0x41d>
+vmovd	(%r11,%rax,4), %xmm6
+vbroadcastss	%xmm6, %ymm6
+vsubps	%ymm6, %ymm4, %ymm4
+vfmadd231ps	%ymm4, %ymm5, %ymm6 ## ymm6 = (ymm5 * ymm4) + ymm6
+vmovdqu	0x20(%rsp), %ymm2
+vpblendvb	%ymm8, %ymm6, %ymm2, %ymm2
+vmovdqu	%ymm2, 0x20(%rsp)
+vpaddd	%ymm0, %ymm14, %ymm2
+vmovd	%xmm2, %eax
 movl	0x38(%rdx), %r13d
-vpxor	%ymm11, %ymm11, %ymm11
+vpxor	%ymm4, %ymm4, %ymm4
 cmpq	%r13, %rax
-jae	0x3b7 <__text+0x3b7>
-vmovd	(%r11,%rax,4), %xmm11
-vbroadcastss	%xmm11, %ymm11
-vsubps	%ymm11, %ymm5, %ymm5
-vfmadd231ps	%ymm5, %ymm6, %ymm11 ## ymm11 = (ymm6 * ymm5) + ymm11
-vmovdqu	0x40(%rsp), %ymm5
-vpblendvb	%ymm8, %ymm11, %ymm5, %ymm5
-vmovdqu	%ymm5, 0x40(%rsp)
+jae	0x45c <__text+0x45c>
+vmovd	(%r11,%rax,4), %xmm4
+vbroadcastss	%xmm4, %ymm4
+vsubps	%ymm4, %ymm13, %ymm13
+vfmadd231ps	%ymm13, %ymm5, %ymm4 ## ymm4 = (ymm5 * ymm13) + ymm4
+vmovdqu	0x40(%rsp), %ymm2
+vpblendvb	%ymm8, %ymm4, %ymm2, %ymm2
+vmovdqu	%ymm2, 0x40(%rsp)
 vmovd	%xmm3, %eax
 movl	0x38(%rdx), %r13d
-vpxor	%ymm5, %ymm5, %ymm5
+vpxor	%ymm2, %ymm2, %ymm2
 cmpq	%r13, %rax
-jae	0x3f3 <__text+0x3f3>
-vmovd	(%r11,%rax,4), %xmm5
-vbroadcastss	%xmm5, %ymm5
+jae	0x497 <__text+0x497>
+vmovd	(%r11,%rax,4), %xmm2
+vbroadcastss	%xmm2, %ymm2
 vmovd	%xmm0, %eax
 movl	0x38(%rdx), %r13d
 vpxor	%ymm3, %ymm3, %ymm3
 cmpq	%r13, %rax
-jae	0x413 <__text+0x413>
+jae	0x4b7 <__text+0x4b7>
 vmovd	(%r11,%rax,4), %xmm3
 vbroadcastss	%xmm3, %ymm3
-vsubps	%ymm3, %ymm5, %ymm5
-vfmadd231ps	%ymm5, %ymm6, %ymm3 ## ymm3 = (ymm6 * ymm5) + ymm3
+vsubps	%ymm3, %ymm2, %ymm2
+vfmadd231ps	%ymm2, %ymm5, %ymm3 ## ymm3 = (ymm5 * ymm2) + ymm3
 vmovdqu	(%rsp), %ymm0
 vpblendvb	%ymm8, %ymm3, %ymm0, %ymm0
 vmovdqu	%ymm0, (%rsp)
 vmovdqu	0x80(%rsp), %ymm0
-vpaddd	%ymm0, %ymm1, %ymm0
+vpcmpeqd	%ymm2, %ymm2, %ymm2
+vpsrld	$0x1f, %ymm2, %ymm2
+vpaddd	%ymm0, %ymm2, %ymm0
 vmovdqu	%ymm0, 0x80(%rsp)
 vmovdqu	0x120(%rsp), %ymm0
 vmovd	%xmm0, %r11d
 vmovdqu	0x80(%rsp), %ymm3
 vmovd	%xmm3, %r13d
 cmpq	%r11, %r13
-jl	0x1e6 <__text+0x1e6>
+jl	0x220 <__text+0x220>
 vmovdqu	(%rsp), %ymm3
 vcvtps2ph	$0x4, %ymm3, %xmm3
-vmovdqu	0x20(%rsp), %ymm5
+vmovdqu	0x20(%rsp), %ymm4
+vcvtps2ph	$0x4, %ymm4, %xmm4
+vmovdqu	0x40(%rsp), %ymm5
 vcvtps2ph	$0x4, %ymm5, %xmm5
-vmovdqu	0x40(%rsp), %ymm6
+vmovdqu	0x60(%rsp), %ymm6
 vcvtps2ph	$0x4, %ymm6, %xmm6
-vmovdqu	0x60(%rsp), %ymm8
-vcvtps2ph	$0x4, %ymm8, %xmm8
 movq	(%rdx), %r11
 movl	0xc(%rdx), %eax
 shlq	$0x3, %rax
 imulq	%r14, %rax
 addq	%rax, %r11
-vpunpcklwd	%xmm5, %xmm3, %xmm9 ## xmm9 = xmm3[0],xmm5[0],xmm3[1],xmm5[1],xmm3[2],xmm5[2],xmm3[3],xmm5[3]
-vpunpcklwd	%xmm8, %xmm6, %xmm11 ## xmm11 = xmm6[0],xmm8[0],xmm6[1],xmm8[1],xmm6[2],xmm8[2],xmm6[3],xmm8[3]
-vpunpckldq	%xmm11, %xmm9, %xmm12 ## xmm12 = xmm9[0],xmm11[0],xmm9[1],xmm11[1]
-vpunpckhdq	%xmm11, %xmm9, %xmm13 ## xmm13 = xmm9[2],xmm11[2],xmm9[3],xmm11[3]
-vinserti128	$0x1, %xmm13, %ymm12, %ymm12
-vmovdqu	%ymm12, (%r11,%r10,8)
-vpunpckhwd	%xmm5, %xmm3, %xmm9 ## xmm9 = xmm3[4],xmm5[4],xmm3[5],xmm5[5],xmm3[6],xmm5[6],xmm3[7],xmm5[7]
-vpunpckhwd	%xmm8, %xmm6, %xmm11 ## xmm11 = xmm6[4],xmm8[4],xmm6[5],xmm8[5],xmm6[6],xmm8[6],xmm6[7],xmm8[7]
-vpunpckldq	%xmm11, %xmm9, %xmm12 ## xmm12 = xmm9[0],xmm11[0],xmm9[1],xmm11[1]
-vpunpckhdq	%xmm11, %xmm9, %xmm13 ## xmm13 = xmm9[2],xmm11[2],xmm9[3],xmm11[3]
-vinserti128	$0x1, %xmm13, %ymm12, %ymm12
-vmovdqu	%ymm12, 0x20(%r11,%r10,8)
+vpunpcklwd	%xmm4, %xmm3, %xmm8 ## xmm8 = xmm3[0],xmm4[0],xmm3[1],xmm4[1],xmm3[2],xmm4[2],xmm3[3],xmm4[3]
+vpunpcklwd	%xmm6, %xmm5, %xmm9 ## xmm9 = xmm5[0],xmm6[0],xmm5[1],xmm6[1],xmm5[2],xmm6[2],xmm5[3],xmm6[3]
+vpunpckldq	%xmm9, %xmm8, %xmm11 ## xmm11 = xmm8[0],xmm9[0],xmm8[1],xmm9[1]
+vpunpckhdq	%xmm9, %xmm8, %xmm13 ## xmm13 = xmm8[2],xmm9[2],xmm8[3],xmm9[3]
+vinserti128	$0x1, %xmm13, %ymm11, %ymm11
+vmovdqu	%ymm11, (%r11,%r10,8)
+vpunpckhwd	%xmm4, %xmm3, %xmm8 ## xmm8 = xmm3[4],xmm4[4],xmm3[5],xmm4[5],xmm3[6],xmm4[6],xmm3[7],xmm4[7]
+vpunpckhwd	%xmm6, %xmm5, %xmm9 ## xmm9 = xmm5[4],xmm6[4],xmm5[5],xmm6[5],xmm5[6],xmm6[6],xmm5[7],xmm6[7]
+vpunpckldq	%xmm9, %xmm8, %xmm11 ## xmm11 = xmm8[0],xmm9[0],xmm8[1],xmm9[1]
+vpunpckhdq	%xmm9, %xmm8, %xmm13 ## xmm13 = xmm8[2],xmm9[2],xmm8[3],xmm9[3]
+vinserti128	$0x1, %xmm13, %ymm11, %ymm11
+vmovdqu	%ymm11, 0x20(%r11,%r10,8)
 vpxor	%ymm0, %ymm0, %ymm0
 vmovdqu	0xa0(%rsp), %ymm1
 vmovdqu	0xc0(%rsp), %ymm2
 vmovdqu	0xe0(%rsp), %ymm3
-vbroadcastss	0x55e(%rip), %ymm4 ## 0xa6c <__text+0xa6c>
+vbroadcastss	0x62e(%rip), %ymm4 ## 0xbe7 <__text+0xbe7>
 vpcmpeqd	%ymm5, %ymm5, %ymm5
 vpsrld	$0x1f, %ymm5, %ymm5
-vbroadcastss	0x550(%rip), %ymm6 ## 0xa70 <__text+0xa70>
-vbroadcastss	0x54b(%rip), %ymm7 ## 0xa74 <__text+0xa74>
-vbroadcastss	0x546(%rip), %ymm8 ## 0xa78 <__text+0xa78>
-vbroadcastss	0x541(%rip), %ymm9 ## 0xa7c <__text+0xa7c>
+vbroadcastss	0x620(%rip), %ymm6 ## 0xbeb <__text+0xbeb>
+vbroadcastss	0x61b(%rip), %ymm7 ## 0xbef <__text+0xbef>
+vbroadcastss	0x616(%rip), %ymm8 ## 0xbf3 <__text+0xbf3>
+vbroadcastss	0x611(%rip), %ymm9 ## 0xbf7 <__text+0xbf7>
 vmovdqu	0x100(%rsp), %ymm10
 vmovdqu	0x120(%rsp), %ymm11
 vmovdqu	0x140(%rsp), %ymm12
 vmovdqu	0x160(%rsp), %ymm13
+vbroadcastss	0x5e8(%rip), %ymm14 ## 0xbfb <__text+0xbfb>
+vbroadcastss	0x5e3(%rip), %ymm15 ## 0xbff <__text+0xbff>
 addq	$0x8, %r10
-jmp	0xad <__text+0xad>
+jmp	0xbf <__text+0xbf>
 # tail_top:
 cmpq	%rdi, %r10
-jge	0x9bb <__text+0x9bb>
+jge	0xb24 <__text+0xb24>
 vpxor	%ymm0, %ymm0, %ymm0
 movq	0x10(%rdx), %r11
 movl	0x1c(%rdx), %eax
@@ -279,13 +313,13 @@ addq	%rax, %r11
 vbroadcastss	(%r11), %ymm1
 vbroadcastss	0x4(%r11), %ymm2
 vbroadcastss	0x8(%r11), %ymm3
-vbroadcastss	0x4cb(%rip), %ymm4 ## 0xa6c <__text+0xa6c>
+vbroadcastss	0x589(%rip), %ymm4 ## 0xbe7 <__text+0xbe7>
 vpcmpeqd	%ymm5, %ymm5, %ymm5
 vpsrld	$0x1f, %ymm5, %ymm5
-vbroadcastss	0x4bd(%rip), %ymm6 ## 0xa70 <__text+0xa70>
-vbroadcastss	0x4b8(%rip), %ymm7 ## 0xa74 <__text+0xa74>
-vbroadcastss	0x4b3(%rip), %ymm8 ## 0xa78 <__text+0xa78>
-vbroadcastss	0x4ae(%rip), %ymm9 ## 0xa7c <__text+0xa7c>
+vbroadcastss	0x57b(%rip), %ymm6 ## 0xbeb <__text+0xbeb>
+vbroadcastss	0x576(%rip), %ymm7 ## 0xbef <__text+0xbef>
+vbroadcastss	0x571(%rip), %ymm8 ## 0xbf3 <__text+0xbf3>
+vbroadcastss	0x56c(%rip), %ymm9 ## 0xbf7 <__text+0xbf7>
 movq	0x20(%rdx), %r11
 movl	0x2c(%rdx), %eax
 shlq	$0x2, %rax
@@ -296,54 +330,63 @@ vcvttps2dq	%ymm10, %ymm10
 vpsubd	%ymm5, %ymm10, %ymm11
 vpaddd	%ymm10, %ymm10, %ymm12
 vpaddd	%ymm12, %ymm10, %ymm13
+vbroadcastss	0x53c(%rip), %ymm14 ## 0xbfb <__text+0xbfb>
+vbroadcastss	0x537(%rip), %ymm15 ## 0xbff <__text+0xbff>
 vmovdqu	%ymm0, 0x80(%rsp)
 vmovdqu	%ymm0, (%rsp)
 vmovdqu	%ymm0, 0x60(%rsp)
 vmovdqu	%ymm0, 0x40(%rsp)
 vmovdqu	%ymm0, 0x20(%rsp)
-vmovd	%r10d, %xmm14
-vcvtdq2ps	%ymm14, %ymm14
-vsubps	%ymm1, %ymm14, %ymm14
-vmovd	%r14d, %xmm15
-vcvtdq2ps	%ymm15, %ymm15
-vsubps	%ymm2, %ymm15, %ymm15
-vmulps	%ymm15, %ymm15, %ymm15
-vfmadd231ps	%ymm14, %ymm14, %ymm15 ## ymm15 = (ymm14 * ymm14) + ymm15
-vpsrlvd	%ymm5, %ymm15, %ymm14
-vpsubd	%ymm14, %ymm4, %ymm14
+vmovd	%r10d, %xmm0
 vmovdqu	%ymm1, 0x1a0(%rsp)
-vcmpeqps	%ymm15, %ymm0, %ymm1
+vpxor	%ymm1, %ymm1, %ymm1
+vcvtdq2ps	%ymm0, %ymm0
+vmovdqu	0x1a0(%rsp), %ymm1
 vmovdqu	%ymm2, 0x1c0(%rsp)
-vmulps	%ymm14, %ymm14, %ymm2
-vmulps	%ymm2, %ymm15, %ymm2
-vfmadd213ps	%ymm6, %ymm7, %ymm2 ## ymm2 = (ymm7 * ymm2) + ymm6
-vpxor	%ymm0, %ymm0, %ymm0
-vmulps	%ymm2, %ymm14, %ymm14
-vmulps	%ymm14, %ymm14, %ymm2
-vmulps	%ymm2, %ymm15, %ymm2
-vfmadd213ps	%ymm6, %ymm7, %ymm2 ## ymm2 = (ymm7 * ymm2) + ymm6
-vpxor	%ymm0, %ymm0, %ymm0
-vmulps	%ymm2, %ymm14, %ymm14
-vmulps	%ymm8, %ymm14, %ymm2
+vpxor	%ymm2, %ymm2, %ymm2
+vsubps	%ymm1, %ymm0, %ymm0
+vmovdqu	%ymm1, 0x1a0(%rsp)
+vmovd	%r14d, %xmm1
+vcvtdq2ps	%ymm1, %ymm1
+vmovdqu	0x1c0(%rsp), %ymm2
 vmovdqu	%ymm3, 0x1e0(%rsp)
-vmulps	%ymm14, %ymm15, %ymm3
-vfnmadd132ps	%ymm3, %ymm15, %ymm3 ## ymm3 = -(ymm3 * ymm3) + ymm15
-vmulps	%ymm2, %ymm3, %ymm3
-vfmadd231ps	%ymm14, %ymm15, %ymm3 ## ymm3 = (ymm15 * ymm14) + ymm3
-vpblendvb	%ymm1, %ymm0, %ymm3, %ymm1
-vmovdqu	0x1e0(%rsp), %ymm2
-vmulps	%ymm1, %ymm2, %ymm1
-vmaxps	%ymm1, %ymm0, %ymm1
-vminps	%ymm9, %ymm1, %ymm1
+vpxor	%ymm3, %ymm3, %ymm3
+vsubps	%ymm2, %ymm1, %ymm1
+vmulps	%ymm1, %ymm1, %ymm1
+vfmadd231ps	%ymm0, %ymm0, %ymm1 ## ymm1 = (ymm0 * ymm0) + ymm1
+vpsrlvd	%ymm5, %ymm1, %ymm0
+vpsubd	%ymm0, %ymm4, %ymm0
+vmovdqu	%ymm2, 0x1c0(%rsp)
+vcmpeqps	%ymm1, %ymm3, %ymm2
+vmulps	%ymm0, %ymm0, %ymm4
+vmulps	%ymm4, %ymm1, %ymm4
+vfmadd213ps	%ymm6, %ymm7, %ymm4 ## ymm4 = (ymm7 * ymm4) + ymm6
+vpxor	%ymm3, %ymm3, %ymm3
+vmulps	%ymm4, %ymm0, %ymm0
+vmulps	%ymm0, %ymm0, %ymm4
+vmulps	%ymm4, %ymm1, %ymm4
+vfmadd213ps	%ymm6, %ymm7, %ymm4 ## ymm4 = (ymm7 * ymm4) + ymm6
+vpxor	%ymm3, %ymm3, %ymm3
+vmulps	%ymm4, %ymm0, %ymm0
+vmulps	%ymm8, %ymm0, %ymm4
+vmulps	%ymm0, %ymm1, %ymm5
+vfnmadd132ps	%ymm5, %ymm1, %ymm5 ## ymm5 = -(ymm5 * ymm5) + ymm1
+vmulps	%ymm4, %ymm5, %ymm5
+vfmadd231ps	%ymm0, %ymm1, %ymm5 ## ymm5 = (ymm1 * ymm0) + ymm5
+vpblendvb	%ymm2, %ymm3, %ymm5, %ymm2
+vmovdqu	0x1e0(%rsp), %ymm0
+vmulps	%ymm2, %ymm0, %ymm2
+vmaxps	%ymm2, %ymm3, %ymm2
+vminps	%ymm9, %ymm2, %ymm2
 vmovd	%xmm11, %r11d
-vmovdqu	%ymm2, 0x1e0(%rsp)
+vmovdqu	%ymm0, 0x1e0(%rsp)
 vmovdqu	%ymm10, 0x200(%rsp)
 vmovdqu	%ymm11, 0x220(%rsp)
 vmovdqu	%ymm12, 0x240(%rsp)
 vmovdqu	%ymm13, 0x260(%rsp)
-vmovdqu	%ymm1, 0x280(%rsp)
+vmovdqu	%ymm2, 0x280(%rsp)
 cmpq	$0x0, %r11
-jle	0x95e <__text+0x95e>
+jle	0xac8 <__text+0xac8>
 vmovdqu	0x80(%rsp), %ymm0
 vpcmpeqd	%ymm1, %ymm1, %ymm1
 vpsrld	$0x1f, %ymm1, %ymm1
@@ -358,136 +401,159 @@ vmovd	%xmm0, %eax
 movl	0x48(%rdx), %r13d
 vpxor	%xmm4, %xmm4, %xmm4
 cmpq	%r13, %rax
-jae	0x756 <__text+0x756>
+jae	0x84d <__text+0x84d>
 vmovd	(%r11,%rax,4), %xmm4
 vmovd	%xmm3, %eax
 movl	0x48(%rdx), %r13d
 vpxor	%xmm5, %xmm5, %xmm5
 cmpq	%r13, %rax
-jae	0x771 <__text+0x771>
+jae	0x868 <__text+0x868>
 vmovd	(%r11,%rax,4), %xmm5
 vmovdqu	0x280(%rsp), %ymm6
 vcmpleps	%ymm5, %ymm6, %ymm7
 vcmpleps	%ymm6, %ymm4, %ymm8
 vpand	%ymm7, %ymm8, %ymm8
+vsubps	%ymm4, %ymm5, %ymm5
 vmovdqu	0x260(%rsp), %ymm7
 vpaddd	%ymm3, %ymm7, %ymm9
-vsubps	%ymm4, %ymm5, %ymm5
+vbroadcastss	0x362(%rip), %ymm10 ## 0xbfb <__text+0xbfb>
+vpsubd	%ymm5, %ymm10, %ymm11
+vmovdqu	0x200(%rsp), %ymm12
+vpaddd	%ymm3, %ymm12, %ymm13
+vmovdqu	0x240(%rsp), %ymm14
+vpaddd	%ymm3, %ymm14, %ymm15
+vpaddd	%ymm0, %ymm7, %ymm1
 vsubps	%ymm4, %ymm6, %ymm6
-vdivps	%ymm5, %ymm6, %ymm6
-vmovdqu	0x200(%rsp), %ymm4
-vpaddd	%ymm3, %ymm4, %ymm5
-vmovdqu	0x240(%rsp), %ymm10
-vpaddd	%ymm3, %ymm10, %ymm11
-vpaddd	%ymm0, %ymm7, %ymm12
 movq	0x30(%rdx), %r11
 movl	0x3c(%rdx), %eax
 shlq	$0x2, %rax
 imulq	%r14, %rax
 addq	%rax, %r11
-vmovd	%xmm5, %eax
+vmovd	%xmm13, %eax
+movl	0x38(%rdx), %r13d
+vpxor	%xmm4, %xmm4, %xmm4
+cmpq	%r13, %rax
+jae	0x8ec <__text+0x8ec>
+vmovd	(%r11,%rax,4), %xmm4
+vmovd	%xmm15, %eax
 movl	0x38(%rdx), %r13d
 vpxor	%xmm13, %xmm13, %xmm13
 cmpq	%r13, %rax
-jae	0x7ed <__text+0x7ed>
+jae	0x908 <__text+0x908>
 vmovd	(%r11,%rax,4), %xmm13
-vmovd	%xmm11, %eax
-movl	0x38(%rdx), %r13d
-vpxor	%xmm5, %xmm5, %xmm5
-cmpq	%r13, %rax
-jae	0x808 <__text+0x808>
-vmovd	(%r11,%rax,4), %xmm5
 vmovd	%xmm9, %eax
 movl	0x38(%rdx), %r13d
-vpxor	%xmm11, %xmm11, %xmm11
+vpxor	%xmm15, %xmm15, %xmm15
 cmpq	%r13, %rax
-jae	0x824 <__text+0x824>
-vmovd	(%r11,%rax,4), %xmm11
-vmovd	%xmm12, %eax
+jae	0x924 <__text+0x924>
+vmovd	(%r11,%rax,4), %xmm15
+vmovd	%xmm1, %eax
 movl	0x38(%rdx), %r13d
 vpxor	%xmm9, %xmm9, %xmm9
 cmpq	%r13, %rax
-jae	0x840 <__text+0x840>
+jae	0x940 <__text+0x940>
 vmovd	(%r11,%rax,4), %xmm9
-vsubps	%ymm9, %ymm11, %ymm11
-vfmadd231ps	%ymm11, %ymm6, %ymm9 ## ymm9 = (ymm6 * ymm11) + ymm9
-vmovdqu	0x60(%rsp), %ymm11
-vpblendvb	%xmm8, %xmm9, %xmm11, %xmm11
-vmovdqu	%ymm11, 0x60(%rsp)
-vpaddd	%ymm0, %ymm4, %ymm9
-vmovd	%xmm9, %eax
+vsubps	%ymm9, %ymm15, %ymm15
+vbroadcastss	0x2b1(%rip), %ymm1 ## 0xbff <__text+0xbff>
+vmovaps	%ymm1, %ymm2
+vfnmadd231ps	%ymm11, %ymm5, %ymm2 ## ymm2 = -(ymm5 * ymm11) + ymm2
+vpxor	%ymm1, %ymm1, %ymm1
+vmulps	%ymm2, %ymm11, %ymm11
+vbroadcastss	0x297(%rip), %ymm2 ## 0xbff <__text+0xbff>
+vmovaps	%ymm2, %ymm1
+vfnmadd231ps	%ymm11, %ymm5, %ymm1 ## ymm1 = -(ymm5 * ymm11) + ymm1
+vpxor	%ymm2, %ymm2, %ymm2
+vmulps	%ymm1, %ymm11, %ymm11
+vbroadcastss	0x27d(%rip), %ymm1 ## 0xbff <__text+0xbff>
+vmovaps	%ymm1, %ymm2
+vfnmadd231ps	%ymm11, %ymm5, %ymm2 ## ymm2 = -(ymm5 * ymm11) + ymm2
+vpxor	%ymm1, %ymm1, %ymm1
+vmulps	%ymm2, %ymm11, %ymm11
+vmulps	%ymm11, %ymm6, %ymm2
+vfnmadd132ps	%ymm2, %ymm6, %ymm5 ## ymm5 = -(ymm5 * ymm2) + ymm6
+vpxor	%ymm1, %ymm1, %ymm1
+vmulps	%ymm5, %ymm11, %ymm5
+vfmadd231ps	%ymm11, %ymm6, %ymm5 ## ymm5 = (ymm6 * ymm11) + ymm5
+vfmadd231ps	%ymm15, %ymm5, %ymm9 ## ymm9 = (ymm5 * ymm15) + ymm9
+vmovdqu	0x60(%rsp), %ymm2
+vpblendvb	%xmm8, %xmm9, %xmm2, %xmm2
+vmovdqu	%ymm2, 0x60(%rsp)
+vpaddd	%ymm0, %ymm12, %ymm2
+vmovd	%xmm2, %eax
 movl	0x38(%rdx), %r13d
-vpxor	%xmm11, %xmm11, %xmm11
+vpxor	%xmm6, %xmm6, %xmm6
 cmpq	%r13, %rax
-jae	0x87c <__text+0x87c>
-vmovd	(%r11,%rax,4), %xmm11
-vsubps	%ymm11, %ymm13, %ymm13
-vfmadd231ps	%ymm13, %ymm6, %ymm11 ## ymm11 = (ymm6 * ymm13) + ymm11
-vmovdqu	0x20(%rsp), %ymm9
-vpblendvb	%xmm8, %xmm11, %xmm9, %xmm9
-vmovdqu	%ymm9, 0x20(%rsp)
-vpaddd	%ymm0, %ymm10, %ymm9
-vmovd	%xmm9, %eax
+jae	0x9e0 <__text+0x9e0>
+vmovd	(%r11,%rax,4), %xmm6
+vsubps	%ymm6, %ymm4, %ymm4
+vfmadd231ps	%ymm4, %ymm5, %ymm6 ## ymm6 = (ymm5 * ymm4) + ymm6
+vmovdqu	0x20(%rsp), %ymm2
+vpblendvb	%xmm8, %xmm6, %xmm2, %xmm2
+vmovdqu	%ymm2, 0x20(%rsp)
+vpaddd	%ymm0, %ymm14, %ymm2
+vmovd	%xmm2, %eax
 movl	0x38(%rdx), %r13d
-vpxor	%xmm11, %xmm11, %xmm11
+vpxor	%xmm4, %xmm4, %xmm4
 cmpq	%r13, %rax
-jae	0x8b8 <__text+0x8b8>
-vmovd	(%r11,%rax,4), %xmm11
-vsubps	%ymm11, %ymm5, %ymm5
-vfmadd231ps	%ymm5, %ymm6, %ymm11 ## ymm11 = (ymm6 * ymm5) + ymm11
-vmovdqu	0x40(%rsp), %ymm5
-vpblendvb	%xmm8, %xmm11, %xmm5, %xmm5
-vmovdqu	%ymm5, 0x40(%rsp)
+jae	0xa1a <__text+0xa1a>
+vmovd	(%r11,%rax,4), %xmm4
+vsubps	%ymm4, %ymm13, %ymm13
+vfmadd231ps	%ymm13, %ymm5, %ymm4 ## ymm4 = (ymm5 * ymm13) + ymm4
+vmovdqu	0x40(%rsp), %ymm2
+vpblendvb	%xmm8, %xmm4, %xmm2, %xmm2
+vmovdqu	%ymm2, 0x40(%rsp)
 vmovd	%xmm3, %eax
 movl	0x38(%rdx), %r13d
-vpxor	%xmm5, %xmm5, %xmm5
+vpxor	%xmm2, %xmm2, %xmm2
 cmpq	%r13, %rax
-jae	0x8ef <__text+0x8ef>
-vmovd	(%r11,%rax,4), %xmm5
+jae	0xa50 <__text+0xa50>
+vmovd	(%r11,%rax,4), %xmm2
 vmovd	%xmm0, %eax
 movl	0x38(%rdx), %r13d
 vpxor	%xmm3, %xmm3, %xmm3
 cmpq	%r13, %rax
-jae	0x90a <__text+0x90a>
+jae	0xa6b <__text+0xa6b>
 vmovd	(%r11,%rax,4), %xmm3
-vsubps	%ymm3, %ymm5, %ymm5
-vfmadd231ps	%ymm5, %ymm6, %ymm3 ## ymm3 = (ymm6 * ymm5) + ymm3
+vsubps	%ymm3, %ymm2, %ymm2
+vfmadd231ps	%ymm2, %ymm5, %ymm3 ## ymm3 = (ymm5 * ymm2) + ymm3
 vmovdqu	(%rsp), %ymm0
 vpblendvb	%xmm8, %xmm3, %xmm0, %xmm0
 vmovdqu	%ymm0, (%rsp)
 vmovdqu	0x80(%rsp), %ymm0
-vpaddd	%ymm0, %ymm1, %ymm0
+vpcmpeqd	%ymm2, %ymm2, %ymm2
+vpsrld	$0x1f, %ymm2, %ymm2
+vpaddd	%ymm0, %ymm2, %ymm0
 vmovdqu	%ymm0, 0x80(%rsp)
 vmovdqu	0x220(%rsp), %ymm0
 vmovd	%xmm0, %r11d
 vmovdqu	0x80(%rsp), %ymm3
 vmovd	%xmm3, %r13d
 cmpq	%r11, %r13
-jl	0x70f <__text+0x70f>
+jl	0x806 <__text+0x806>
 vmovdqu	(%rsp), %ymm3
 vcvtps2ph	$0x4, %ymm3, %xmm3
-vmovdqu	0x20(%rsp), %ymm5
+vmovdqu	0x20(%rsp), %ymm4
+vcvtps2ph	$0x4, %ymm4, %xmm4
+vmovdqu	0x40(%rsp), %ymm5
 vcvtps2ph	$0x4, %ymm5, %xmm5
-vmovdqu	0x40(%rsp), %ymm6
+vmovdqu	0x60(%rsp), %ymm6
 vcvtps2ph	$0x4, %ymm6, %xmm6
-vmovdqu	0x60(%rsp), %ymm8
-vcvtps2ph	$0x4, %ymm8, %xmm8
 movq	(%rdx), %r11
 movl	0xc(%rdx), %eax
 shlq	$0x3, %rax
 imulq	%r14, %rax
 addq	%rax, %r11
-vpunpcklwd	%xmm5, %xmm3, %xmm11 ## xmm11 = xmm3[0],xmm5[0],xmm3[1],xmm5[1],xmm3[2],xmm5[2],xmm3[3],xmm5[3]
-vpunpcklwd	%xmm8, %xmm6, %xmm12 ## xmm12 = xmm6[0],xmm8[0],xmm6[1],xmm8[1],xmm6[2],xmm8[2],xmm6[3],xmm8[3]
-vpunpckldq	%xmm12, %xmm11, %xmm13 ## xmm13 = xmm11[0],xmm12[0],xmm11[1],xmm12[1]
+vpunpcklwd	%xmm4, %xmm3, %xmm9 ## xmm9 = xmm3[0],xmm4[0],xmm3[1],xmm4[1],xmm3[2],xmm4[2],xmm3[3],xmm4[3]
+vpunpcklwd	%xmm6, %xmm5, %xmm11 ## xmm11 = xmm5[0],xmm6[0],xmm5[1],xmm6[1],xmm5[2],xmm6[2],xmm5[3],xmm6[3]
+vpunpckldq	%xmm11, %xmm9, %xmm13 ## xmm13 = xmm9[0],xmm11[0],xmm9[1],xmm11[1]
 vmovq	%xmm13, (%r11,%r10,8)
 addq	$0x1, %r10
-jmp	0x568 <__text+0x568>
+jmp	0x625 <__text+0x625>
 # row_done:
 addq	$0x1, %r14
 movq	%rsi, %r10
 cmpq	%r12, %r14
-jge	0xa58 <__text+0xa58>
+jge	0xbd3 <__text+0xbd3>
 # next_row:
 vpxor	%ymm0, %ymm0, %ymm0
 movq	0x10(%rdx), %r11
@@ -498,13 +564,13 @@ addq	%rax, %r11
 vbroadcastss	(%r11), %ymm1
 vbroadcastss	0x4(%r11), %ymm2
 vbroadcastss	0x8(%r11), %ymm3
-vbroadcastss	0x71(%rip), %ymm4 ## 0xa6c <__text+0xa6c>
+vbroadcastss	0x83(%rip), %ymm4 ## 0xbe7 <__text+0xbe7>
 vpcmpeqd	%ymm5, %ymm5, %ymm5
 vpsrld	$0x1f, %ymm5, %ymm5
-vbroadcastss	0x63(%rip), %ymm6 ## 0xa70 <__text+0xa70>
-vbroadcastss	0x5e(%rip), %ymm7 ## 0xa74 <__text+0xa74>
-vbroadcastss	0x59(%rip), %ymm8 ## 0xa78 <__text+0xa78>
-vbroadcastss	0x54(%rip), %ymm9 ## 0xa7c <__text+0xa7c>
+vbroadcastss	0x75(%rip), %ymm6 ## 0xbeb <__text+0xbeb>
+vbroadcastss	0x70(%rip), %ymm7 ## 0xbef <__text+0xbef>
+vbroadcastss	0x6b(%rip), %ymm8 ## 0xbf3 <__text+0xbf3>
+vbroadcastss	0x66(%rip), %ymm9 ## 0xbf7 <__text+0xbf7>
 movq	0x20(%rdx), %r11
 movl	0x2c(%rdx), %eax
 shlq	$0x2, %rax
@@ -515,7 +581,9 @@ vcvttps2dq	%ymm10, %ymm10
 vpsubd	%ymm5, %ymm10, %ymm11
 vpaddd	%ymm10, %ymm10, %ymm12
 vpaddd	%ymm12, %ymm10, %ymm13
-jmp	0xad <__text+0xad>
+vbroadcastss	0x36(%rip), %ymm14 ## 0xbfb <__text+0xbfb>
+vbroadcastss	0x31(%rip), %ymm15 ## 0xbff <__text+0xbff>
+jmp	0xbf <__text+0xbf>
 # done_all:
 addq	$0x2a0, %rsp            ## imm = 0x2A0
 popq	%rbx
@@ -532,15 +600,20 @@ sarb	$0x0, (%rdi)
 addb	%al, (%rax)
 movl	$0x3f000000, %edi       ## imm = 0x3F000000
 addb	%al, (%rax)
-cmpb	$0x0, (%rdi)
+cmpb	$-0x16, (%rdi)
+<unknown>
+<unknown>
+jle	0xc00 <__text+0xc00>
 addb	%al, (%rax)
-addb	%al, (%rcx)
 addb	%al, (%rax)
-addb	%al, (%rdx)
 addb	%al, (%rax)
-addb	%al, (%rbx)
+addl	%eax, (%rax)
 addb	%al, (%rax)
-addb	%al, (%rax,%rax)
+addb	(%rax), %al
+addb	%al, (%rax)
+addl	(%rax), %eax
+addb	%al, (%rax)
+addb	$0x0, %al
 addb	%al, (%rax)
 addl	$0x6000000, %eax        ## imm = 0x6000000
 addb	%al, (%rax)
