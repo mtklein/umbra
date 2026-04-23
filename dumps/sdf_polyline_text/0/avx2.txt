@@ -102,7 +102,7 @@ vmovdqu	%ymm1, 0x200(%rsp)
 vmovdqu	%ymm0, 0x220(%rsp)
 vmovdqu	%ymm4, 0x240(%rsp)
 cmpq	$0x0, %r11
-jle	0x4fd <__text+0x4fd>
+jle	0x4f9 <__text+0x4f9>
 vmovdqu	0x40(%rsp), %ymm0
 vmovdqu	0x80(%rsp), %ymm1
 vpxor	%ymm2, %ymm2, %ymm2
@@ -226,7 +226,6 @@ vmulps	%ymm0, %ymm0, %ymm0
 vfmadd231ps	%ymm1, %ymm4, %ymm2 ## ymm2 = (ymm4 * ymm1) + ymm2
 vsubps	%ymm2, %ymm7, %ymm7
 vfmadd231ps	%ymm7, %ymm7, %ymm0 ## ymm0 = (ymm7 * ymm7) + ymm0
-vsqrtps	%ymm0, %ymm0
 vmovdqu	(%rsp), %ymm1
 vminps	%ymm1, %ymm0, %ymm0
 vmovdqu	%ymm0, (%rsp)
@@ -237,6 +236,7 @@ vmovd	%xmm1, %r13d
 cmpq	%r11, %r13
 jl	0x23b <__text+0x23b>
 vmovdqu	(%rsp), %ymm1
+vsqrtps	%ymm1, %ymm1
 vsubps	%ymm1, %ymm14, %ymm2
 vmovdqu	0x20(%rsp), %ymm3
 vpblendvb	%ymm3, %ymm2, %ymm1, %ymm3
@@ -433,7 +433,7 @@ vmovdqu	%ymm1, 0x400(%rsp)
 vmovdqu	%ymm0, 0x420(%rsp)
 vmovdqu	%ymm4, 0x440(%rsp)
 cmpq	$0x0, %r11
-jle	0xc55 <__text+0xc55>
+jle	0xc51 <__text+0xc51>
 vmovdqu	0x40(%rsp), %ymm0
 vmovdqu	0x280(%rsp), %ymm1
 vpxor	%ymm2, %ymm2, %ymm2
@@ -551,7 +551,6 @@ vmulps	%ymm0, %ymm0, %ymm0
 vfmadd231ps	%ymm1, %ymm4, %ymm2 ## ymm2 = (ymm4 * ymm1) + ymm2
 vsubps	%ymm2, %ymm7, %ymm7
 vfmadd231ps	%ymm7, %ymm7, %ymm0 ## ymm0 = (ymm7 * ymm7) + ymm0
-vsqrtps	%ymm0, %ymm0
 vmovdqu	(%rsp), %ymm1
 vminps	%ymm1, %ymm0, %ymm0
 vmovdqu	%ymm0, (%rsp)
@@ -562,6 +561,7 @@ vmovd	%xmm1, %r13d
 cmpq	%r11, %r13
 jl	0x9ae <__text+0x9ae>
 vmovdqu	(%rsp), %ymm1
+vsqrtps	%ymm1, %ymm1
 vsubps	%ymm1, %ymm14, %ymm2
 vmovdqu	0x20(%rsp), %ymm3
 vpblendvb	%ymm3, %ymm2, %ymm1, %ymm3
@@ -685,16 +685,18 @@ addb	%al, (%rcx)
 addb	%al, (%rax)
 addb	%al, (%rcx)
 addb	%al, (%rax)
-addb	%ch, (%rax)
-imull	$0x0, 0x4e(%rsi), %ebp
+addb	%ch, 0xb(%rbx)
+popq	%rsi
+popq	%rbp
 addb	%al, (%rax)
-addb	%al, (%rcx)
 addb	%al, (%rax)
-addb	%al, (%rdx)
+addl	%eax, (%rax)
 addb	%al, (%rax)
-addb	%al, (%rbx)
+addb	(%rax), %al
 addb	%al, (%rax)
-addb	%al, (%rax,%rax)
+addl	(%rax), %eax
+addb	%al, (%rax)
+addb	$0x0, %al
 addb	%al, (%rax)
 addl	$0x6000000, %eax        ## imm = 0x6000000
 addb	%al, (%rax)

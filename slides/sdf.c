@@ -518,8 +518,10 @@ static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
     umbra_imm_i32(b, 5);
     umbra_imm_i32(b, 6);
 
-    umbra_var32 lo_var = umbra_declare_var32(b, umbra_imm_f32(b, 1e9f));
-    umbra_var32 hi_var = umbra_declare_var32(b, umbra_imm_f32(b, 1e9f));
+    // Track squared distance bounds; sqrt them once after the loop.  See
+    // sdf_polyline_text_build for the same trick.
+    umbra_var32 lo2_var = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f));
+    umbra_var32 hi2_var = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f));
 
     umbra_val32 const j = umbra_loop(b, n); {
         umbra_val32 const k = umbra_mul_i32(b, j, umbra_imm_i32(b, 6));
@@ -564,13 +566,15 @@ static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
         umbra_interval const d2 = umbra_interval_add_f32(b,
                                       umbra_interval_mul_f32(b, ex, ex),
                                       umbra_interval_mul_f32(b, ey, ey));
-        umbra_interval const dist = umbra_interval_sqrt_f32(b, d2);
 
-        umbra_store_var32(b, lo_var, umbra_min_f32(b, umbra_load_var32(b, lo_var), dist.lo));
-        umbra_store_var32(b, hi_var, umbra_min_f32(b, umbra_load_var32(b, hi_var), dist.hi));
+        umbra_store_var32(b, lo2_var, umbra_min_f32(b, umbra_load_var32(b, lo2_var), d2.lo));
+        umbra_store_var32(b, hi2_var, umbra_min_f32(b, umbra_load_var32(b, hi2_var), d2.hi));
     } umbra_end_loop(b);
 
-    umbra_interval const min_dist = {umbra_load_var32(b, lo_var), umbra_load_var32(b, hi_var)};
+    umbra_interval const min_dist = {
+        umbra_sqrt_f32(b, umbra_load_var32(b, lo2_var)),
+        umbra_sqrt_f32(b, umbra_load_var32(b, hi2_var)),
+    };
     return umbra_interval_sub_f32(b, min_dist, umbra_interval_exact(umbra_imm_f32(b, 1.5f)));
 }
 
@@ -688,8 +692,11 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
 
     umbra_val32 const n_iter = umbra_shl_i32(b, n, lgN);
 
-    umbra_var32 const dist = umbra_declare_var32(b, umbra_imm_f32(b, 1e9f)),
-                      par  = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+    // Track squared distance in the inner loop and sqrt it once at the end
+    // (min preserves order on non-negative values), to amortize sqrt cost
+    // across the curves*N iterations.
+    umbra_var32 const dist2 = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f)),
+                      par   = umbra_declare_var32(b, umbra_imm_i32(b, 0));
 
     umbra_val32 const j = umbra_loop(b, n_iter); {
         umbra_val32 const curve_id = umbra_shr_u32(b, j, lgN),
@@ -746,10 +753,9 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
                                   umbra_add_f32(b, ax, umbra_mul_f32(b, t, dx))),
                           qy = umbra_sub_f32(b, gy,
                                   umbra_add_f32(b, ay, umbra_mul_f32(b, t, dy)));
-        umbra_val32 const seg_d = umbra_sqrt_f32(b,
-                                      umbra_add_f32(b, umbra_mul_f32(b, qx, qx),
-                                                       umbra_mul_f32(b, qy, qy)));
-        umbra_store_var32(b, dist, umbra_min_f32(b, umbra_load_var32(b, dist), seg_d));
+        umbra_val32 const seg_d2 = umbra_add_f32(b, umbra_mul_f32(b, qx, qx),
+                                                    umbra_mul_f32(b, qy, qy));
+        umbra_store_var32(b, dist2, umbra_min_f32(b, umbra_load_var32(b, dist2), seg_d2));
 
         umbra_val32 const below0 = umbra_lt_f32(b, ay, gy),
                           below1 = umbra_lt_f32(b, cy, gy),
@@ -761,7 +767,7 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
         umbra_store_var32(b, par, umbra_xor_32(b, umbra_load_var32(b, par), cross));
     } umbra_end_loop(b);
 
-    umbra_val32 const d        = umbra_load_var32(b, dist),
+    umbra_val32 const d        = umbra_sqrt_f32(b, umbra_load_var32(b, dist2)),
                       parity   = umbra_load_var32(b, par);
     umbra_val32 const signed_d = umbra_sel_32(b, parity,
                                      umbra_sub_f32(b, z, d), d);
