@@ -4796,7 +4796,7 @@ TEST(test_many_constants) {
     test_backends_free(&B);
 }
 
-TEST(test_join_add_f32_imm) {
+TEST(test_add_f32_imm_smoke) {
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
     umbra_store_32(b, umbra_bind_buf(b, &slot[0]),
