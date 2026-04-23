@@ -65,7 +65,6 @@ void vmulps(struct asm_x86 *b, int d, int v, int s);
 void vdivps(struct asm_x86 *b, int d, int v, int s);
 void vminps(struct asm_x86 *b, int d, int v, int s);
 void vmaxps(struct asm_x86 *b, int d, int v, int s);
-void vsqrtps(struct asm_x86 *b, int d, int s);
 void vfmadd132ps(struct asm_x86 *b, int d, int v, int s);
 void vfmadd213ps(struct asm_x86 *b, int d, int v, int s);
 void vfmadd231ps(struct asm_x86 *b, int d, int v, int s);

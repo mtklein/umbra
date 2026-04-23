@@ -62,7 +62,6 @@ TEST(test_neon_f32) {
     FMLS_4s(3, 4, 5) == 0x4EA5CC83 here;
     FMINNM_4s(0, 1, 2) == 0x4EA2C420 here;
     FMAXNM_4s(3, 4, 5) == 0x4E25C483 here;
-    FSQRT_4s(3, 4) == 0x6EA1F883 here;
     FABS_4s(0, 1) == 0x4EA0F820 here;
     FNEG_4s(2, 3) == 0x6EA0F862 here;
     FRINTN_4s(4, 5) == 0x4E2188A4 here;

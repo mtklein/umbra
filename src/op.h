@@ -59,7 +59,7 @@ enum {
     X(lt_u32,  0) X(le_u32, 0)
 
 #define UNARY_OPS(X)                                                                       \
-    X(sqrt_f32, 0) X(abs_f32, 0) X(square_f32, 0)                                         \
+    X(abs_f32, 0) X(square_f32, 0)                                                        \
     X(round_f32, 0) X(floor_f32, 0) X(ceil_f32, 0)                                        \
     X(round_i32, 0) X(floor_i32, 0) X(ceil_i32, 0)                                        \
     X(f32_from_i32, 0) X(i32_from_f32, 0)                                                 \

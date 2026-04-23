@@ -139,7 +139,7 @@ static _Bool produces_float(enum op op) {
     return op == op_add_f32     || op == op_sub_f32
         || op == op_mul_f32     || op == op_div_f32
         || op == op_min_f32     || op == op_max_f32
-        || op == op_sqrt_f32    || op == op_abs_f32     || op == op_square_f32
+        || op == op_abs_f32     || op == op_square_f32
         || op == op_round_f32   || op == op_floor_f32  || op == op_ceil_f32
         || op == op_fma_f32     || op == op_fms_f32
         || op == op_square_add_f32 || op == op_square_sub_f32
@@ -602,21 +602,6 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      pad, i,
                      fv(_fx, vx, xid, is_f),
                      fv(_fy, vy, yid, is_f));
-                break;
-            case op_sqrt_f32:
-                // TODO: precise::sqrt is measurably more expensive than bare sqrt under
-                // MTLMathModeRelaxed (the Apple Silicon default).  Measured on
-                // SDF Polyline Text @ W=4096: 17.93 -> 15.29 ns/px (-15%); Slug 1.78 ->
-                // 1.49 (-16%); SDF Text 2.30 -> 1.78 (-23%).  Cost of the precision is
-                // up to 1 fp16 ULP of cross-backend divergence (8/98304 bytes on
-                // Gradient Radial Two-Stop in current goldens).  Decide whether the
-                // bit-exact-with-interp/jit invariant is worth the GPU cost; mirror
-                // any change in src/spirv.c op_sqrt_f32 which emits GLSLstd450Sqrt
-                // under SPIRV_FLOAT_CONTROLS for the same reason.
-                emit(b, "%sfloat v%d ="
-                        " precise::sqrt(%s);\n",
-                     pad, i,
-                     fv(_fx, vx, xid, is_f));
                 break;
             case op_abs_f32:
                 emit(b, "%sfloat v%d ="

@@ -542,7 +542,6 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
         case op_store_8x4:
         case op_store_8:   break;
 
-        case op_sqrt_f32:
         case op_abs_f32:
         case op_square_f32:
         case op_round_f32:

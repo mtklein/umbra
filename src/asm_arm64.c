@@ -196,7 +196,6 @@ enum {
     FMLS_4s_ = 0x4ea0cc00u,
     FMINNM_4s_ = 0x4ea0c400u,
     FMAXNM_4s_ = 0x4e20c400u,
-    FSQRT_4s_ = 0x6ea1f800u,
     FABS_4s_ = 0x4ea0f800u,
     FNEG_4s_ = 0x6ea0f800u,
     FRINTN_4s_ = 0x4e218800u,
@@ -251,7 +250,6 @@ uint32_t FMLA_4s(int d, int n, int m) { return v3(FMLA_4s_, d, n, m); }
 uint32_t FMLS_4s(int d, int n, int m) { return v3(FMLS_4s_, d, n, m); }
 uint32_t FMINNM_4s(int d, int n, int m) { return v3(FMINNM_4s_, d, n, m); }
 uint32_t FMAXNM_4s(int d, int n, int m) { return v3(FMAXNM_4s_, d, n, m); }
-uint32_t FSQRT_4s(int d, int n) { return v2(FSQRT_4s_, d, n); }
 uint32_t FABS_4s(int d, int n) { return v2(FABS_4s_, d, n); }
 uint32_t FNEG_4s(int d, int n) { return v2(FNEG_4s_, d, n); }
 uint32_t FRINTN_4s(int d, int n) { return v2(FRINTN_4s_, d, n); }

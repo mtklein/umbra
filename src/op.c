@@ -78,7 +78,6 @@ int op_eval(enum op op, int xb, int yb, int zb, int wb) {
     case op_div_f32: r.f = x.f / y.f; return r.i;
     case op_min_f32: r.f = x.f < y.f ? x.f : y.f; return r.i;
     case op_max_f32: r.f = x.f > y.f ? x.f : y.f; return r.i;
-    case op_sqrt_f32:   r.f = sqrtf(x.f); return r.i;
     case op_abs_f32:    r.f = fabsf(x.f); return r.i;
     case op_square_f32: r.f = x.f * x.f;  return r.i;
     case op_round_f32: r.f = rintf(x.f); return r.i;

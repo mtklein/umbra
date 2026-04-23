@@ -67,7 +67,6 @@ uint32_t FMLA_4s(int d, int n, int m);
 uint32_t FMLS_4s(int d, int n, int m);
 uint32_t FMINNM_4s(int d, int n, int m);
 uint32_t FMAXNM_4s(int d, int n, int m);
-uint32_t FSQRT_4s(int d, int n);
 uint32_t FABS_4s(int d, int n);
 uint32_t FNEG_4s(int d, int n);
 uint32_t FRINTN_4s(int d, int n);
