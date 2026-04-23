@@ -669,7 +669,6 @@ struct umbra_backend* umbra_backend_vulkan(void) {
             "VK_KHR_shader_float16_int8",
             "VK_KHR_external_memory",
             "VK_EXT_external_memory_host",
-            "VK_KHR_shader_float_controls",
             "VK_KHR_push_descriptor",
         };
         VkPhysicalDeviceFloat16Int8FeaturesKHR f16_int8 = {
