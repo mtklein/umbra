@@ -294,20 +294,29 @@ static void sort(umbra_val32 *a, umbra_val32 *b) {
     }
 }
 
+// op_join wraps a regular op and its imm-folded equivalent so backends can
+// pick the cheaper form.  When checking for fma/square fusion we want the
+// underlying operand op, so peel any joins off the top.
+static int unjoin(builder *b, int id) {
+    while (b->inst[id].op == op_join) { id = b->inst[id].x.id; }
+    return id;
+}
+
 umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (is_imm32(b, x.id, 0)) { return y; }
-    if (b->inst[x.id].op == op_mul_f32) {
-        return math(b, op_fma_f32, .x = b->inst[x.id].x, .y = b->inst[x.id].y, VZ(y)).v32;
+    int const xu = unjoin(b, x.id), yu = unjoin(b, y.id);
+    if (b->inst[xu].op == op_mul_f32) {
+        return math(b, op_fma_f32, .x = b->inst[xu].x, .y = b->inst[xu].y, VZ(y)).v32;
     }
-    if (b->inst[y.id].op == op_mul_f32) {
-        return math(b, op_fma_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
+    if (b->inst[yu].op == op_mul_f32) {
+        return math(b, op_fma_f32, .x = b->inst[yu].x, .y = b->inst[yu].y, VZ(x)).v32;
     }
-    if (b->inst[x.id].op == op_square_f32) {
-        return math(b, op_square_add_f32, .x = b->inst[x.id].x, VY(y)).v32;
+    if (b->inst[xu].op == op_square_f32) {
+        return math(b, op_square_add_f32, .x = b->inst[xu].x, VY(y)).v32;
     }
-    if (b->inst[y.id].op == op_square_f32) {
-        return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
+    if (b->inst[yu].op == op_square_f32) {
+        return math(b, op_square_add_f32, .x = b->inst[yu].x, VY(x)).v32;
     }
     // Distribute through min / max / sel when an arm is a mul or square,
     // so the recursive add above collapses that arm into fma / square_add.
@@ -354,11 +363,12 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
 
 umbra_val32 umbra_sub_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    if (b->inst[y.id].op == op_mul_f32) {
-        return math(b, op_fms_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
+    int const yu = unjoin(b, y.id);
+    if (b->inst[yu].op == op_mul_f32) {
+        return math(b, op_fms_f32, .x = b->inst[yu].x, .y = b->inst[yu].y, VZ(x)).v32;
     }
-    if (b->inst[y.id].op == op_square_f32) {
-        return math(b, op_square_sub_f32, .x = b->inst[y.id].x, VY(x)).v32;
+    if (b->inst[yu].op == op_square_f32) {
+        return math(b, op_square_sub_f32, .x = b->inst[yu].x, VY(x)).v32;
     }
     return join_imm_y(b, math(b, op_sub_f32, VX(x), VY(y)), op_sub_f32_imm,
                       (val){.v32 = x}, (val){.v32 = y}).v32;

@@ -12,52 +12,44 @@
   v11  = shr_u32         v7 v4
   v12  = join            v11 v10
   v13  = f32_from_i32    v12
-  v14  = mul_f32         v5 v13
-  v15  = mul_f32_imm     v13 0x3b808081
-  v16  = join            v14 v15
-  v17  = sub_f32         v6 v16
-  v18  = shr_u32_imm     v7 8
-  v19  = join            v8 v18
-  v20  = and_32_imm      v19 0xff
-  v21  = and_32          v1 v19
-  v22  = join            v21 v20
-  v23  = f32_from_i32    v22
-  v24  = mul_f32_imm     v23 0x3b808081
-  v25  = shr_u32_imm     v7 16
-  v26  = join            v9 v25
-  v27  = and_32          v1 v26
-  v28  = and_32_imm      v26 0xff
-  v29  = join            v27 v28
-  v30  = f32_from_i32    v29
-  v31  = mul_f32_imm     v30 0x3b808081
-  v32  = mul_f32         v5 v23
-  v33  = join            v32 v24
-  v34  = mul_f32         v5 v30
-  v35  = join            v34 v31
-  v36  = load_16         p1
+  v14  = fms_f32         v5 v13 v6
+  v15  = shr_u32_imm     v7 8
+  v16  = join            v8 v15
+  v17  = and_32_imm      v16 0xff
+  v18  = and_32          v1 v16
+  v19  = join            v18 v17
+  v20  = f32_from_i32    v19
+  v21  = shr_u32_imm     v7 16
+  v22  = join            v9 v21
+  v23  = and_32          v1 v22
+  v24  = and_32_imm      v22 0xff
+  v25  = join            v23 v24
+  v26  = f32_from_i32    v25
+  v27  = load_16         p1
+  v28  = f32_from_f16    v27
+  v29  = mul_f32         v28 v14
+  v30  = load_16         p2
+  v31  = f32_from_f16    v30
+  v32  = mul_f32         v31 v14
+  v33  = fma_f32         v5 v20 v32
+  v34  = f16_from_f32    v33
+      store_16        p2 v34
+  v36  = load_16         p3
   v37  = f32_from_f16    v36
-  v38  = load_16         p2
-  v39  = f32_from_f16    v38
-  v40  = fma_f32         v39 v17 v33
-  v41  = f16_from_f32    v40
-      store_16        p2 v41
-  v43  = load_16         p3
-  v44  = f32_from_f16    v43
-  v45  = fma_f32         v44 v17 v35
+  v38  = mul_f32         v37 v14
+  v39  = fma_f32         v5 v26 v38
+  v40  = f16_from_f32    v39
+      store_16        p3 v40
+  v42  = load_16         p4
+  v43  = f32_from_f16    v42
+  v44  = mul_f32         v43 v14
+  v45  = fma_f32         v5 v13 v44
   v46  = f16_from_f32    v45
-      store_16        p3 v46
-  v48  = load_16         p4
-  v49  = f32_from_f16    v48
-  v50  = fma_f32         v49 v17 v16
-  v51  = f16_from_f32    v50
-      store_16        p4 v51
-  v53  = and_32          v7 v1
-  v54  = and_32_imm      v7 0xff
-  v55  = join            v53 v54
-  v56  = f32_from_i32    v55
-  v57  = mul_f32_imm     v56 0x3b808081
-  v58  = mul_f32         v5 v56
-  v59  = join            v58 v57
-  v60  = fma_f32         v37 v17 v59
-  v61  = f16_from_f32    v60
-      store_16        p1 v61
+      store_16        p4 v46
+  v48  = and_32          v7 v1
+  v49  = and_32_imm      v7 0xff
+  v50  = join            v48 v49
+  v51  = f32_from_i32    v50
+  v52  = fma_f32         v5 v51 v29
+  v53  = f16_from_f32    v52
+      store_16        p1 v53

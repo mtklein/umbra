@@ -86,8 +86,7 @@ warn    = -Weverything $
 profinfo = -fdebug-info-for-profiling
 
 rule compile
-    # TODO: stop defining UMBRA_NO_BACKEND_FP_CONTRACT once we figure out what's up with sqrt.
-    command = ccache $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -DUMBRA_NO_BACKEND_FP_CONTRACT -MD -MF $out.d -c $in -o $out
+    command = ccache $cc -g $profinfo -O1 -std=c11 -Werror $warn $cflags -MD -MF $out.d -c $in -o $out
     depfile = $out.d
     deps    = gcc
 
