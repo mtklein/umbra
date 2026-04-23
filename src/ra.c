@@ -349,9 +349,10 @@ struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct ir_inst con
         ra->slot[i].reg = s.rd;
         ra->owner[(int)s.rd] = i;
     }
-    // Pin the new value so any subsequent ra_alloc / ra_ensure (e.g. the
-    // backend's ra_ensure for inst->y.id in _imm op handling) cannot evict
-    // it. Stays pinned until the next ra_step_* resets pinned_set.
+    // Pin the new value so any subsequent ra_alloc / ra_ensure inside the
+    // same step (e.g. for a scratch register or another operand the backend
+    // loads after ra_step_unary) cannot evict it.  Stays pinned until the
+    // next ra_step_* resets pinned_set.
     pin_val(ra, i);
     if (x_dead && inst->x.chan) {
         int8_t const r = ra->slot[inst->x.id].chan_reg[(int)inst->x.chan];
