@@ -2942,8 +2942,9 @@ TEST(test_cmp_register_variants) {
 
 TEST(test_regvar_m_patterns) {
     struct umbra_buf slot[20] = {0};
-    // Targets: m_cmp_rm, m_cmp_rr, r_minmax_mm, base max_f32_imm,
-    // m_float_cmp_imm_r, r/m_int_cmp_imm_r.
+    // Targets a mix of scalar-variant shapes: m_cmp_rm, m_cmp_rr, r_minmax_mm,
+    // base max_f32 with imm operand, and cmp-with-imm in both chained and
+    // unchained positions.
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
     umbra_val32 c = umbra_load_32(b, umbra_bind_buf(b, &slot[1]));
@@ -2964,22 +2965,22 @@ TEST(test_regvar_m_patterns) {
     umbra_val32 mn = umbra_min_f32(b, fa, fc);
     umbra_store_32(b, umbra_bind_buf(b, &slot[5]), umbra_i32_from_f32(b, mn));
 
-    // base max_f32_imm: result direct to store (no chain → base op)
+    // base max_f32 with imm: result direct to store (no chain → base op)
     umbra_val32 mx = umbra_max_f32(b, fc, umbra_imm_f32(b, 5.f));
     umbra_store_32(b, umbra_bind_buf(b, &slot[6]), mx);
 
-    // m_float_cmp_imm_r: chain→lt_f32_imm→store (x from acc, result to memory)
+    // m_lt_f32_rm: chain→lt_f32(acc, imm)→store (x from acc, result to memory)
     umbra_val32 fn_ = umbra_sub_f32(b, umbra_imm_f32(b, 0), fc);
     umbra_store_32(b, umbra_bind_buf(b, &slot[7]), umbra_lt_f32(b, fn_, umbra_imm_f32(b, 0.f)));
 
-    // m_int_cmp_imm_r: chain→cmp_imm→store (x from acc, result to memory)
+    // m_int_cmp_rm: chain→cmp(acc, imm)→store (x from acc, result to memory)
     umbra_val32 ai = umbra_add_i32(b, a, umbra_imm_i32(b, 1));
     umbra_store_32(b, umbra_bind_buf(b, &slot[8]), umbra_eq_i32(b, ai, umbra_imm_i32(b, 6)));
     umbra_val32 ai2 = umbra_add_i32(b, a, umbra_imm_i32(b, 2));
     umbra_store_32(b, umbra_bind_buf(b, &slot[9]), umbra_lt_s32(b, ai2, umbra_imm_i32(b, 6)));
     umbra_val32 ai3 = umbra_add_i32(b, a, umbra_imm_i32(b, 3));
     umbra_store_32(b, umbra_bind_buf(b, &slot[10]), umbra_le_s32(b, ai3, umbra_imm_i32(b, 6)));
-    // r_int_cmp_imm_r: chain→cmp_imm→and (result to acc, feeds ALU)
+    // r_int_cmp_rm: chain→cmp(acc, imm)→and (result to acc, feeds ALU)
     umbra_val32 ai4 = umbra_add_i32(b, a, umbra_imm_i32(b, 100));
     umbra_val32 eq_mask = umbra_eq_i32(b, ai4, umbra_imm_i32(b, 105));
     umbra_store_32(b, umbra_bind_buf(b, &slot[11]), umbra_and_32(b, eq_mask, a));
@@ -3213,17 +3214,17 @@ TEST(test_unary_r_m) {
     test_backends_free(&B);
 }
 
-// Exercise base ops that are always upgraded: xor_32_imm, min_f32_imm.
-// Need: op(mem, imm)→store with no chain on either side.
+// Exercise base xor_32 and min_f32 taking an imm operand with no chain on
+// either side, so the scheduler picks the base op tag.
 TEST(test_base_imm_ops) {
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
     umbra_val32 a = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
     umbra_val32 c = umbra_load_32(b, umbra_bind_buf(b, &slot[1]));
-    // xor_32_imm base: neither chained
+    // xor_32: neither chained
     umbra_store_32(b, umbra_bind_buf(b, &slot[2]),
                    umbra_xor_32(b, a, umbra_imm_i32(b, 0xFF)));
-    // min_f32_imm base:
+    // min_f32:
     umbra_val32 fc = umbra_f32_from_i32(b, c);
     umbra_store_32(b, umbra_bind_buf(b, &slot[3]),
                    umbra_min_f32(b, fc, umbra_imm_f32(b, 2.f)));
@@ -3283,7 +3284,7 @@ TEST(test_sel_fms_variants) {
     test_backends_free(&B);
 }
 
-// Exercise missing IMM register variants.
+// Exercise the scalar-variant upgrade for op(acc, imm) feeding the next op.
 TEST(test_imm_regvar) {
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
@@ -3291,8 +3292,8 @@ TEST(test_imm_regvar) {
     umbra_val32 fa = umbra_f32_from_i32(b, a);
     int p = 1;
 
-    // r_*_imm_r for each: chain→imm_op(acc)→chain→store
-    // Need the imm op's result to feed the next ALU (out_r) AND input from acc (x_r).
+    // r_*_rm for each: chain→op(acc, imm)→chain→store.  Need the op's result
+    // to feed the next ALU (out_r) and input from acc (x_r).
 #define IMM_CHAIN_F(op, k) { \
         umbra_val32 src = umbra_add_f32(b, fa, umbra_imm_f32(b, (float)(k))); \
         umbra_val32 r = op(b, src, umbra_imm_f32(b, 2.f)); \
@@ -3312,7 +3313,7 @@ TEST(test_imm_regvar) {
     IMM_CHAIN_I(umbra_xor_32, 3000)
     IMM_CHAIN_I(umbra_mul_i32, 4000)
     IMM_CHAIN_I(umbra_sub_i32, 5000)
-    // Float CMP imm: chain→cmp_imm(acc)→chain
+    // Float CMP: chain→cmp(acc, imm)→chain
     {
         umbra_val32 src = umbra_add_f32(b, fa, umbra_imm_f32(b, 10.f));
         umbra_val32 m = umbra_eq_f32(b, src, umbra_imm_f32(b, 12.f));
@@ -3328,7 +3329,7 @@ TEST(test_imm_regvar) {
         umbra_val32 m = umbra_le_f32(b, src, umbra_imm_f32(b, 32.f));
         umbra_store_32(b, umbra_bind_buf(b, &slot[p++]), umbra_and_32(b, m, umbra_imm_i32(b, 1)));
     }
-    // Int CMP imm r_m variant: chain→cmp_imm(mem)→chain
+    // Int CMP: x from memory, y=imm, mask consumed by next op
     {
         umbra_val32 m = umbra_eq_i32(b, a, umbra_imm_i32(b, 2));
         umbra_store_32(b, umbra_bind_buf(b, &slot[p++]), umbra_and_32(b, m, umbra_imm_i32(b, 1)));
@@ -3454,8 +3455,8 @@ TEST(test_unary_m_r) {
     test_backends_free(&B);
 }
 
-// Exercise base IMM ops: op(mem, imm)→store with no chain.
-// Covers shr_s32_imm, shr_u32_imm, or_32_imm, mul_f32_imm, etc.
+// Exercise op(mem, imm)→store shapes with no chain on either side, so the
+// scheduler picks the base op tag rather than a scalar-variant upgrade.
 TEST(test_base_imm_more) {
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
@@ -3735,7 +3736,7 @@ TEST(test_acc_coverage) {
         test_backends_free(&B);
     }
     {
-        // Imm acc variants: sub(a,b)(r_mm)→imm_op(m_r)→store.
+        // op-with-imm acc variants: sub(a,b)(r_mm)→op(acc, imm)(m_rm)→store.
         // Each in its own builder to avoid dedup across chains.
 #define ACC_IMM_TEST_I(op, k, expected) { \
         struct umbra_builder *b = umbra_builder(); \
