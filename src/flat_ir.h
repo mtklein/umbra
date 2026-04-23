@@ -109,6 +109,8 @@ struct umbra_flat_ir {
     int total_bufs, :32;
 };
 
+// TODO: remove op_join() and all associated code like flat_ir_resolve().
+//       send everyone down the JOIN_KEEP_X path; remove all _imm op variants
 enum join_policy { JOIN_KEEP_X, JOIN_PREFER_IMM };
 
 struct umbra_flat_ir* flat_ir_resolve(struct umbra_flat_ir const*, enum join_policy);
