@@ -1,51 +1,87 @@
+// language: metal3.2
 #include <metal_stdlib>
 #include <simd/simd.h>
 
-using namespace metal;
+using metal::uint;
 
-struct _5
-{
-    uint _m0[1];
+struct _mslBufferSizes {
+    uint size1;
+    uint size2;
 };
 
-struct _7
-{
-    uint2 _m0[1];
+typedef uint type_9[1];
+struct type_10 {
+    type_9 member;
+};
+typedef metal::uint2 type_13[1];
+struct type_14 {
+    type_13 member;
+};
+struct type_17 {
+    metal::uint4 inner[1];
+};
+struct type_18 {
+    type_17 member;
+};
+struct type_21 {
+    uint inner[9];
+};
+struct type_22 {
+    type_21 member;
 };
 
-struct _9
-{
-    uint4 _m0[1];
-};
-
-struct _11
-{
-    uint _m0[9];
-};
-
-kernel void main0(device _7& _12 [[buffer(0)]], device _5& _13 [[buffer(1)]], constant _9& _14 [[buffer(2)]], device _11& _15 [[buffer(3)]], uint3 gl_GlobalInvocationID [[thread_position_in_grid]])
-{
-    if (!(gl_GlobalInvocationID.x >= _15._m0[0u]))
-    {
-        uint _68 = _15._m0[1u] + gl_GlobalInvocationID.x;
-        uint _69 = _15._m0[2u] + gl_GlobalInvocationID.y;
-        float _80 = as_type<float>(1065353216u) - as_type<float>(_14._m0[0u].w);
-        float _82 = float(int(_68));
-        float _85 = float(int(_69));
-        uint _109 = uint(int(floor(fast::min(fast::max(_82, 0.0), 1023.0)))) + (uint(int(floor(fast::min(fast::max(_85, 0.0), 767.0)))) << 10u);
-        uint _113 = min(_109, (_15._m0[4u] - 1u));
-        uint _129 = (((((as_type<float>(0u) <= _82) ? 4294967295u : 0u) & ((_82 < 1024.0) ? 4294967295u : 0u)) & (((as_type<float>(0u) <= _85) ? 4294967295u : 0u) & ((_85 < 768.0) ? 4294967295u : 0u))) != 0u) ? as_type<uint>(float(int(((_13._m0[_113 >> 2u] >> ((_113 & 3u) << 3u)) & 255u) & ((_109 < _15._m0[4u]) ? 4294967295u : 0u))) * 0.0039215688593685626983642578125) : 0u;
-        uint _133 = (_69 * _15._m0[6u]) + _68;
-        float2 _142 = float2(as_type<half2>(_12._m0[_133].x & 65535u));
-        float _143 = _142.x;
-        float2 _149 = float2(as_type<half2>(_12._m0[_133].x >> 16u));
-        float _150 = _149.x;
-        float2 _156 = float2(as_type<half2>(_12._m0[_133].y & 65535u));
-        float _157 = _156.x;
-        float2 _163 = float2(as_type<half2>(_12._m0[_133].y >> 16u));
-        float _164 = _163.x;
-        _12._m0[(_69 * _15._m0[6u]) + _68] = uint2(as_type<uint>(half2(float2(fma(as_type<float>(_129), fma(_143, _80, as_type<float>(_14._m0[0u].x)) - _143, _143), 0.0))) | (as_type<uint>(half2(float2(fma(as_type<float>(_129), fma(_150, _80, as_type<float>(_14._m0[0u].y)) - _150, _150), 0.0))) << 16u), as_type<uint>(half2(float2(fma(as_type<float>(_129), fma(_157, _80, as_type<float>(_14._m0[0u].z)) - _157, _157), 0.0))) | (as_type<uint>(half2(float2(fma(as_type<float>(_129), fma(_164, _80, as_type<float>(_14._m0[0u].w)) - _164, _164), 0.0))) << 16u));
-        return;
-    }
+int naga_f2i32(float value) {
+    return static_cast<int>(metal::clamp(value, -2147483600.0, 2147483500.0));
 }
 
+void function(
+    thread metal::uint3& global,
+    device type_14& global_1,
+    device type_10 const& global_2,
+    constant type_18& global_3,
+    device type_22 const& global_4,
+    constant _mslBufferSizes& _buffer_sizes
+) {
+    metal::uint3 _e25 = global;
+    uint _e30 = global_4.member.inner[0u];
+    if (_e25.x >= _e30) {
+    } else {
+        uint _e34 = global_4.member.inner[1u];
+        uint _e37 = global_4.member.inner[2u];
+        uint _e38 = _e34 + _e25.x;
+        uint _e39 = _e37 + _e25.y;
+        uint _e43 = global_3.member.inner[0u][0u];
+        uint _e47 = global_3.member.inner[0u][1u];
+        uint _e51 = global_3.member.inner[0u][2u];
+        uint _e55 = global_3.member.inner[0u][3u];
+        float _e58 = as_type<float>(1065353216u) - as_type<float>(_e55);
+        float _e60 = static_cast<float>(as_type<int>(_e38));
+        float _e63 = static_cast<float>(as_type<int>(_e39));
+        uint _e88 = as_type<uint>(naga_f2i32(metal::floor(metal::min(metal::max(_e60, 0.0), 1023.0)))) + (as_type<uint>(naga_f2i32(metal::floor(metal::min(metal::max(_e63, 0.0), 767.0)))) << as_type<uint>(10u));
+        uint _e91 = global_4.member.inner[4u];
+        uint _e93 = metal::min(_e88, _e91 - 1u);
+        uint _e103 = global_2.member[metal::min(unsigned(_e93 >> as_type<uint>(2u)), (_buffer_sizes.size2 - 0 - 4) / 4)];
+        uint _e113 = (((((as_type<float>(0u) <= _e60) ? 4294967295u : 0u) & ((_e60 < 1024.0) ? 4294967295u : 0u)) & (((as_type<float>(0u) <= _e63) ? 4294967295u : 0u) & ((_e63 < 768.0) ? 4294967295u : 0u))) != 0u) ? as_type<uint>(static_cast<float>(as_type<int>(((_e103 >> as_type<uint>((_e93 & 3u) << as_type<uint>(3u))) & 255u) & ((_e88 < _e91) ? 4294967295u : 0u))) * 0.003921569) : 0u;
+        uint _e116 = global_4.member.inner[6u];
+        metal::uint2 _e121 = global_1.member[metal::min(unsigned((_e39 * _e116) + _e38), (_buffer_sizes.size1 - 0 - 8) / 8)];
+        uint _e160 = global_4.member.inner[6u];
+        global_1.member[metal::min(unsigned((_e39 * _e160) + _e38), (_buffer_sizes.size1 - 0 - 8) / 8)] = metal::uint2(as_type<uint>(half2(metal::float2(metal::fma(as_type<float>(_e113), metal::fma(float2(as_type<half2>((_e121.x & 65535u))).x, _e58, as_type<float>(_e43)) - float2(as_type<half2>((_e121.x & 65535u))).x, float2(as_type<half2>((_e121.x & 65535u))).x), 0.0))) | (as_type<uint>(half2(metal::float2(metal::fma(as_type<float>(_e113), metal::fma(float2(as_type<half2>((_e121.x >> as_type<uint>(16u)))).x, _e58, as_type<float>(_e47)) - float2(as_type<half2>((_e121.x >> as_type<uint>(16u)))).x, float2(as_type<half2>((_e121.x >> as_type<uint>(16u)))).x), 0.0))) << as_type<uint>(16u)), as_type<uint>(half2(metal::float2(metal::fma(as_type<float>(_e113), metal::fma(float2(as_type<half2>((_e121.y & 65535u))).x, _e58, as_type<float>(_e51)) - float2(as_type<half2>((_e121.y & 65535u))).x, float2(as_type<half2>((_e121.y & 65535u))).x), 0.0))) | (as_type<uint>(half2(metal::float2(metal::fma(as_type<float>(_e113), metal::fma(float2(as_type<half2>((_e121.y >> as_type<uint>(16u)))).x, _e58, as_type<float>(_e55)) - float2(as_type<half2>((_e121.y >> as_type<uint>(16u)))).x, float2(as_type<half2>((_e121.y >> as_type<uint>(16u)))).x), 0.0))) << as_type<uint>(16u)));
+        return;
+    }
+    return;
+}
+
+struct main_Input {
+};
+kernel void main_(
+  metal::uint3 param [[thread_position_in_grid]]
+, device type_14& global_1 [[buffer(0)]]
+, device type_10 const& global_2 [[buffer(1)]]
+, constant type_18& global_3 [[buffer(2)]]
+, device type_22 const& global_4 [[buffer(3)]]
+, constant _mslBufferSizes& _buffer_sizes [[buffer(4)]]
+) {
+    metal::uint3 global = {};
+    global = param;
+    function(global, global_1, global_2, global_3, global_4, _buffer_sizes);
+}

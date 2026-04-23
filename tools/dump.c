@@ -128,28 +128,7 @@ static void grab_mvk_msl(char const *dir) {
     }
 }
 
-#ifndef __wasm__
-static void spirv_text_to_msl(char const *spirv_text_path, char const *msl_path) {
-    char cmd[1024];
-    snprintf(cmd, sizeof cmd,
-             "spirv-as '%s' -o /tmp/umbra_spv_cross.spv 2>/dev/null"
-             " && spirv-cross --msl /tmp/umbra_spv_cross.spv --output '%s' 2>/dev/null",
-             spirv_text_path, msl_path);
-    FILE *p = popen(cmd, "r");
-    int ok = 0;
-    if (p) {
-        char buf[256];
-        while (fread(buf, 1, sizeof buf, p) > 0) { }
-        ok = (pclose(p) == 0);
-    }
-    if (!ok) { unlink(msl_path); }
-    unlink("/tmp/umbra_spv_cross.spv");
-}
-#else
-static void spirv_text_to_msl(char const *spirv_text_path, char const *msl_path) {
-    (void)spirv_text_path; (void)msl_path;
-}
-#endif
+#include "wgpu_msl_intercept.h"
 
 struct dump_backends {
     struct umbra_backend *be[4];
@@ -196,6 +175,11 @@ static void dump_ir(struct dump_backends *db,
             if (i == db->vulkan_idx) {
                 clear_dir(mvk_dump_dir);
             }
+            if (i == db->wgpu_idx) {
+                char msl[256];
+                snprintf(msl, sizeof msl, "%s/wgpu.msl", dir);
+                umbra_wgpu_msl_intercept_to(msl);
+            }
 
             struct umbra_program *prog = db->be[i]->compile(db->be[i], ir);
             if (prog) {
@@ -208,12 +192,10 @@ static void dump_ir(struct dump_backends *db,
                 if (i == db->vulkan_idx) {
                     grab_mvk_msl(dir);
                 }
-                if (i == db->wgpu_idx) {
-                    char spv_text[256], msl[256];
-                    snprintf(spv_text, sizeof spv_text, "%s/wgpu.spirv", dir);
-                    snprintf(msl,      sizeof msl,      "%s/wgpu.msl",   dir);
-                    spirv_text_to_msl(spv_text, msl);
-                }
+            }
+
+            if (i == db->wgpu_idx) {
+                umbra_wgpu_msl_intercept_to(NULL);
             }
         }
     }

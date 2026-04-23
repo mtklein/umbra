@@ -198,7 +198,8 @@ def dump_outputs_block(suffixes):
 
 
 XSAN_DUMP_SUFFIXES    = ['arm64.txt', 'ir.txt', 'builder.txt',
-                         'metal.msl', 'vulkan.spirv', 'vulkan.msl']
+                         'metal.msl', 'vulkan.spirv', 'vulkan.msl',
+                         'wgpu.spirv', 'wgpu.msl']
 X86_DUMP_SUFFIXES     = ['avx2.txt']
 
 
@@ -213,7 +214,8 @@ def render_project_ninja():
         parts.append(compile_line(s))
     for s in TESTS:
         parts.append(compile_line(s))
-    for s in ['tools/test.c', 'tools/bench.c', 'tools/dump.c']:
+    for s in ['tools/test.c', 'tools/bench.c', 'tools/dump.c',
+              'tools/wgpu_msl_intercept.c']:
         parts.append(compile_line(s))
     for s in SLIDES:
         parts.append(compile_line(s))
@@ -222,7 +224,7 @@ def render_project_ninja():
     parts.append(f'build $out/test:  link {link_objs("tools/test.c")}\n')
     parts.append( '    ldflags = $ldflags -lm\n')
     parts.append(f'build $out/bench: link {link_objs("tools/bench.c")}\n')
-    parts.append(f'build $out/dump:  link {link_objs("tools/dump.c", "tools/stb_image_write.c")}\n')
+    parts.append(f'build $out/dump:  link {link_objs("tools/dump.c", "tools/stb_image_write.c", "tools/wgpu_msl_intercept.c")}\n')
     parts.append('\n')
     for s in range(TEST_SHARDS):
         parts.append(f'build $out/test_{s}.log: run $out/test\n')
