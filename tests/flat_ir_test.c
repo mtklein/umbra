@@ -1822,7 +1822,7 @@ TEST(test_gather_deref_large) {
     test_backends_free(&B);
 }
 
-TEST(test_imm_fused) {
+TEST(test_ops_with_imm) {
     struct umbra_buf slot[20] = {0};
     {
         struct umbra_builder *b = umbra_builder();
