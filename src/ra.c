@@ -88,6 +88,17 @@ struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg
         ra->slot[inst->w.id].last_use                          = i;
         ra->slot[inst->w.id].chan_last_use[(int)inst->w.chan]  = i;
     }
+    // Extend each if_begin's condition val through its matching if_end so
+    // the mask register is not evicted from under the body's store_vars.
+    // flat_ir populates if_end.x.id with the matching if_begin's inst id.
+    for (int i = 0; i < n; i++) {
+        if (ir->inst[i].op == op_if_end) {
+            int const ib      = ir->inst[i].x.id;
+            int const cond_id = ir->inst[ib].x.id;
+            ra->slot[cond_id].last_use                                   = i;
+            ra->slot[cond_id].chan_last_use[(int)ir->inst[ib].x.chan]    = i;
+        }
+    }
     for (int i = 0; i < ir->preamble; i++) {
         if (ra->slot[i].last_use >= ir->preamble) {
             ra->slot[i].last_use = n;
