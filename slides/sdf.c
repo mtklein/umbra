@@ -802,34 +802,27 @@ static void sdf_polyline_text_free(struct slide *s) {
 //
 // Signed distance field where per-curve distance is computed analytically
 // via Inigo Quilez's Cardano-form solution of the quadratic-Bezier distance
-// cubic.  See https://iquilezles.org/articles/distfunctions2d/.  All three
-// branches (linear fallback, Cardano h ≥ 0 one root via cbrt, Cardano h < 0
-// three roots via acos/cos/sin) are computed unconditionally and combined
-// with sel() — no umbra_if.  That's both more work on GPU than ideal and
-// a deliberate sidestep of a bit-exactness issue the umbra_if-based draft
-// had between CPU backends; see the TODO below.
+// cubic.  See https://iquilezles.org/articles/distfunctions2d/.
+//
+// The expensive trig branch (h<0 three real roots via acos/cos/sin) lives
+// under umbra_if so GPU backends skip it on tiles where no lane hits the
+// three-roots regime.  The linear fallback and the h≥0 cbrt branch are
+// always computed and combined with sel() — they're cheap enough that
+// branching isn't worth it.
 //
 // Straight-line segments arrive from slug.c as degenerate quadratics with
 // P1 = midpoint(P0, P2), i.e. bb = P0 − 2·P1 + P2 = 0.  We clamp bb_bb with
-// lin_eps so the Cardano path stays finite even on those, and sel out its
-// (wrong) contribution via is_linear.  sqrt and acos arguments are clamped
-// into their valid range for the same reason — the unused branch must be
-// finite so sel() doesn't see backend-divergent NaN handling.
+// lin_eps so Cardano stays finite, and sel out its (wrong-for-linear)
+// contribution via is_linear.  sqrt and acos arguments are clamped into
+// their valid range for the same reason.
 //
-// Sign via horizontal-ray winding parity, computed per-curve with the same
-// sel pattern: a linear crossing test and a curved two-root test are both
-// evaluated and selected by is_linear.
+// Sign via horizontal-ray winding parity: linear crossing test always
+// evaluated, curved two-root test gated by umbra_if(is_curved) so GPU
+// backends skip the quadratic root solve on tiles where every curve nearby
+// is linear.
 //
 // Bounds returned as a Lipschitz-1 ball around the tile center, matching
 // the polyline slide.
-//
-// TODO: revisit with umbra_if once the CPU-backend if-block handling is
-// robust enough to keep interp and jit bit-exact on a body this size.  The
-// first draft (kept in git history) tried that and failed golden_test by
-// ~4200 bytes interp-vs-jit, all backends drawing differently — the kind
-// of pattern that says something in the if-end-if plumbing isn't preserving
-// state the way the sel-based version does.  Using Cardano under umbra_if
-// would let GPU backends skip the trig path on tiles with no h<0 lanes.
 
 struct sdf_analytic_text_sdf {
     float            scale_x, scale_y, off_x, off_y;
@@ -870,8 +863,10 @@ static umbra_interval sdf_analytic_text_build(void *ctx, struct umbra_builder *b
     umbra_val32 const gx = umbra_add_f32(b, umbra_mul_f32(b, bcx, sx), ox),
                       gy = umbra_add_f32(b, umbra_mul_f32(b, bcy, sy), oy);
 
-    umbra_var32 const dist2 = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f)),
-                      par   = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+    umbra_var32 const dist2        = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f)),
+                      par          = umbra_declare_var32(b, umbra_imm_i32(b, 0)),
+                      d2_trig_slot = umbra_declare_var32(b, umbra_imm_f32(b, 0.0f)),
+                      cross_slot   = umbra_declare_var32(b, umbra_imm_i32(b, 0));
 
     umbra_val32 const six = umbra_imm_i32(b, 6);
 
@@ -982,49 +977,54 @@ static umbra_interval sdf_analytic_text_build(void *ctx, struct umbra_builder *b
         umbra_val32 const d2_pos = umbra_add_f32(b, umbra_mul_f32(b, dpx, dpx),
                                                      umbra_mul_f32(b, dpy, dpy));
 
-        // h < 0 branch.  All inputs to sqrt/acos are clamped so the unused
-        // branch is finite and sel() gets a clean bit-for-bit pick.
-        umbra_val32 const neg_p_safe = umbra_max_f32(b,
-                                           umbra_sub_f32(b, zero, p), zero);
-        umbra_val32 const z_v = umbra_sqrt_f32(b, neg_p_safe);
-        umbra_val32 const denom = umbra_mul_f32(b, two, umbra_mul_f32(b, p, z_v));
-        umbra_val32 const arg_raw = umbra_div_f32(b, q, denom);
-        umbra_val32 const neg_one = umbra_sub_f32(b, zero, one);
-        umbra_val32 const arg_safe = umbra_min_f32(b, one,
-                                         umbra_max_f32(b, neg_one, arg_raw));
-        umbra_val32 const v  = umbra_mul_f32(b, third, umbra_acos_f32(b, arg_safe));
-        umbra_val32 const mv = umbra_cos_f32(b, v),
-                          nv = umbra_mul_f32(b, sqrt3, umbra_sin_f32(b, v));
-        umbra_val32 const t0_raw = umbra_sub_f32(b,
-                                       umbra_mul_f32(b, umbra_add_f32(b, mv, mv), z_v),
-                                       kx),
-                          t1_raw = umbra_sub_f32(b,
-                                       umbra_mul_f32(b,
-                                           umbra_sub_f32(b, umbra_sub_f32(b, zero, nv), mv),
-                                           z_v),
-                                       kx);
-        umbra_val32 const t0 = umbra_min_f32(b, one, umbra_max_f32(b, zero, t0_raw)),
-                          t1 = umbra_min_f32(b, one, umbra_max_f32(b, zero, t1_raw));
-        umbra_val32 const d0x = umbra_add_f32(b, dx,
-                                    umbra_mul_f32(b, t0,
-                                        umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t0)))),
-                          d0y = umbra_add_f32(b, dy,
-                                    umbra_mul_f32(b, t0,
-                                        umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t0)))),
-                          d1x = umbra_add_f32(b, dx,
-                                    umbra_mul_f32(b, t1,
-                                        umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t1)))),
-                          d1y = umbra_add_f32(b, dy,
-                                    umbra_mul_f32(b, t1,
-                                        umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t1))));
-        umbra_val32 const d2_t0 = umbra_add_f32(b, umbra_mul_f32(b, d0x, d0x),
-                                                    umbra_mul_f32(b, d0y, d0y)),
-                          d2_t1 = umbra_add_f32(b, umbra_mul_f32(b, d1x, d1x),
-                                                    umbra_mul_f32(b, d1y, d1y));
-        umbra_val32 const d2_neg = umbra_min_f32(b, d2_t0, d2_t1);
+        // h < 0 branch gated so GPU backends skip acos/cos/sin on tiles with
+        // no h<0 lanes.  d2_trig_slot only needs updating in h_neg lanes; the
+        // sel below ignores its value everywhere else, so it does not need a
+        // per-iteration reset.
+        umbra_val32 const h_neg = umbra_lt_f32(b, h, zero);
+        umbra_if(b, h_neg); {
+            umbra_val32 const neg_p_safe = umbra_max_f32(b,
+                                               umbra_sub_f32(b, zero, p), zero);
+            umbra_val32 const z_v = umbra_sqrt_f32(b, neg_p_safe);
+            umbra_val32 const denom = umbra_mul_f32(b, two, umbra_mul_f32(b, p, z_v));
+            umbra_val32 const arg_raw = umbra_div_f32(b, q, denom);
+            umbra_val32 const neg_one = umbra_sub_f32(b, zero, one);
+            umbra_val32 const arg_safe = umbra_min_f32(b, one,
+                                             umbra_max_f32(b, neg_one, arg_raw));
+            umbra_val32 const v  = umbra_mul_f32(b, third, umbra_acos_f32(b, arg_safe));
+            umbra_val32 const mv = umbra_cos_f32(b, v),
+                              nv = umbra_mul_f32(b, sqrt3, umbra_sin_f32(b, v));
+            umbra_val32 const t0_raw = umbra_sub_f32(b,
+                                           umbra_mul_f32(b, umbra_add_f32(b, mv, mv), z_v),
+                                           kx),
+                              t1_raw = umbra_sub_f32(b,
+                                           umbra_mul_f32(b,
+                                               umbra_sub_f32(b, umbra_sub_f32(b, zero, nv), mv),
+                                               z_v),
+                                           kx);
+            umbra_val32 const t0 = umbra_min_f32(b, one, umbra_max_f32(b, zero, t0_raw)),
+                              t1 = umbra_min_f32(b, one, umbra_max_f32(b, zero, t1_raw));
+            umbra_val32 const d0x = umbra_add_f32(b, dx,
+                                        umbra_mul_f32(b, t0,
+                                            umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t0)))),
+                              d0y = umbra_add_f32(b, dy,
+                                        umbra_mul_f32(b, t0,
+                                            umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t0)))),
+                              d1x = umbra_add_f32(b, dx,
+                                        umbra_mul_f32(b, t1,
+                                            umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t1)))),
+                              d1y = umbra_add_f32(b, dy,
+                                        umbra_mul_f32(b, t1,
+                                            umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t1))));
+            umbra_val32 const d2_t0 = umbra_add_f32(b, umbra_mul_f32(b, d0x, d0x),
+                                                        umbra_mul_f32(b, d0y, d0y)),
+                              d2_t1 = umbra_add_f32(b, umbra_mul_f32(b, d1x, d1x),
+                                                        umbra_mul_f32(b, d1y, d1y));
+            umbra_store_var32(b, d2_trig_slot, umbra_min_f32(b, d2_t0, d2_t1));
+        } umbra_end_if(b);
 
-        umbra_val32 const h_neg    = umbra_lt_f32(b, h, zero);
-        umbra_val32 const d2_card  = umbra_sel_32(b, h_neg, d2_neg, d2_pos);
+        umbra_val32 const d2_card  = umbra_sel_32(b, h_neg,
+                                         umbra_load_var32(b, d2_trig_slot), d2_pos);
         umbra_val32 const d2_curve = umbra_sel_32(b, is_linear, d2_linear, d2_card);
         umbra_store_var32(b, dist2,
             umbra_min_f32(b, umbra_load_var32(b, dist2), d2_curve));
@@ -1032,43 +1032,50 @@ static umbra_interval sdf_analytic_text_build(void *ctx, struct umbra_builder *b
         // Curved winding: B(t).y − gy = bb.y·t² + 2·a.y·t + (P0.y − gy) = 0.
         // Both roots are evaluated; out-of-range or complex roots produce
         // cross=0 naturally via the inside/disc_ok AND-mask chain.
-        umbra_val32 const qA = bby,
-                          qB = ccy,
-                          qC = umbra_sub_f32(b, p0y, gy);
-        umbra_val32 const disc = umbra_sub_f32(b,
-                                     umbra_mul_f32(b, qB, qB),
-                                     umbra_mul_f32(b, four, umbra_mul_f32(b, qA, qC)));
-        umbra_val32 const disc_ok   = umbra_le_f32(b, zero, disc);
-        umbra_val32 const disc_safe = umbra_max_f32(b, disc, zero);
-        umbra_val32 const sd     = umbra_sqrt_f32(b, disc_safe);
-        umbra_val32 const inv2A  = umbra_div_f32(b, half, qA);
-        umbra_val32 const neg_qB = umbra_sub_f32(b, zero, qB);
-        umbra_val32 const r0 = umbra_mul_f32(b, inv2A, umbra_add_f32(b, neg_qB, sd)),
-                          r1 = umbra_mul_f32(b, inv2A, umbra_sub_f32(b, neg_qB, sd));
+        // Curved winding: nested umbra_if gates the quadratic root solve so
+        // GPU skips it on linear-only tiles, with disc>=0 nested inside so
+        // the sqrt+div+cross computation is skipped when the ray misses.
+        // Reset cross_slot per iteration; inner branch overwrites when both
+        // conditions hold.
+        umbra_val32 const is_curved = umbra_le_f32(b, lin_eps, bb_bb);
+        umbra_store_var32(b, cross_slot, umbra_imm_i32(b, 0));
+        umbra_if(b, is_curved); {
+            umbra_val32 const qA = bby,
+                              qB = ccy,
+                              qC = umbra_sub_f32(b, p0y, gy);
+            umbra_val32 const disc = umbra_sub_f32(b,
+                                         umbra_mul_f32(b, qB, qB),
+                                         umbra_mul_f32(b, four, umbra_mul_f32(b, qA, qC)));
+            umbra_if(b, umbra_le_f32(b, zero, disc)); {
+                umbra_val32 const sd     = umbra_sqrt_f32(b, disc);
+                umbra_val32 const inv2A  = umbra_div_f32(b, half, qA);
+                umbra_val32 const neg_qB = umbra_sub_f32(b, zero, qB);
+                umbra_val32 const r0 = umbra_mul_f32(b, inv2A, umbra_add_f32(b, neg_qB, sd)),
+                                  r1 = umbra_mul_f32(b, inv2A, umbra_sub_f32(b, neg_qB, sd));
+                umbra_val32 const inside0 = umbra_and_32(b,
+                                                umbra_le_f32(b, zero, r0),
+                                                umbra_le_f32(b, r0, one)),
+                                  inside1 = umbra_and_32(b,
+                                                umbra_le_f32(b, zero, r1),
+                                                umbra_le_f32(b, r1, one));
+                umbra_val32 const bxr0 = umbra_add_f32(b, p0x,
+                                             umbra_mul_f32(b, r0,
+                                                 umbra_add_f32(b, ccx,
+                                                     umbra_mul_f32(b, bbx, r0)))),
+                                  bxr1 = umbra_add_f32(b, p0x,
+                                             umbra_mul_f32(b, r1,
+                                                 umbra_add_f32(b, ccx,
+                                                     umbra_mul_f32(b, bbx, r1))));
+                umbra_val32 const right0 = umbra_lt_f32(b, gx, bxr0),
+                                  right1 = umbra_lt_f32(b, gx, bxr1);
+                umbra_val32 const cross0 = umbra_and_32(b, inside0, right0),
+                                  cross1 = umbra_and_32(b, inside1, right1);
+                umbra_store_var32(b, cross_slot, umbra_xor_32(b, cross0, cross1));
+            } umbra_end_if(b);
+        } umbra_end_if(b);
 
-        umbra_val32 const inside0 = umbra_and_32(b,
-                                        umbra_le_f32(b, zero, r0),
-                                        umbra_le_f32(b, r0, one)),
-                          inside1 = umbra_and_32(b,
-                                        umbra_le_f32(b, zero, r1),
-                                        umbra_le_f32(b, r1, one));
-        umbra_val32 const bxr0 = umbra_add_f32(b, p0x,
-                                     umbra_mul_f32(b, r0,
-                                         umbra_add_f32(b, ccx,
-                                             umbra_mul_f32(b, bbx, r0)))),
-                          bxr1 = umbra_add_f32(b, p0x,
-                                     umbra_mul_f32(b, r1,
-                                         umbra_add_f32(b, ccx,
-                                             umbra_mul_f32(b, bbx, r1))));
-        umbra_val32 const right0 = umbra_lt_f32(b, gx, bxr0),
-                          right1 = umbra_lt_f32(b, gx, bxr1);
-        umbra_val32 const cross0 = umbra_and_32(b, disc_ok,
-                                       umbra_and_32(b, inside0, right0)),
-                          cross1 = umbra_and_32(b, disc_ok,
-                                       umbra_and_32(b, inside1, right1));
-        umbra_val32 const curved_cross = umbra_xor_32(b, cross0, cross1);
-
-        umbra_val32 const cross = umbra_sel_32(b, is_linear, linear_cross, curved_cross);
+        umbra_val32 const cross = umbra_sel_32(b, is_linear, linear_cross,
+                                       umbra_load_var32(b, cross_slot));
         umbra_store_var32(b, par, umbra_xor_32(b, umbra_load_var32(b, par), cross));
     } umbra_end_loop(b);
 
