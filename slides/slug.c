@@ -3,6 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+// TODO: switch to an animated affine matrix and match scale with SDF Text
+// slides so they can be directly compared
+
+// TODO: the AA along the edge of the lowercase r's ear is inconsistent,
+// jagged and uneven.  What's reason for that?
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
 #include "../third_party/stb/stb_truetype.h"
