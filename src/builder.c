@@ -278,6 +278,14 @@ static void sort(umbra_val32 *a, umbra_val32 *b) {
 umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (is_imm32(b, x.id, 0)) { return y; }
+    // TODO: decide whether fma/fms/square_add/square_sub fusion should move
+    // to an explicit API (umbra_fma_f32, ...) instead of being inferred here
+    // and in umbra_sub_f32.  Implicit fusion collapses two roundings into one
+    // -- not strictly IEEE -- but it's uniformly applied across backends (we
+    // turned off Metal's fp contract, so nothing fuses below us) and it picks
+    // up fusions that span units of builder code, e.g. one helper returns a
+    // mul and another adds it to an accumulator.  An explicit API would be
+    // honest about the rounding change but would miss those cross-unit cases.
     if (b->inst[x.id].op == op_mul_f32) {
         return math(b, op_fma_f32, .x = b->inst[x.id].x, .y = b->inst[x.id].y, VZ(y)).v32;
     }
@@ -291,7 +299,11 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
         return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
     }
 
-    // max(a,b)+c == max(a+c,b+c) and similar for min,sel.
+    // TODO: remove.  max(a,b)+c == max(a+c,b+c) algebraically, but as two
+    // independent rounded adds it can disagree with the single-rounded form by
+    // a ULP, and NaN/±0 tie-breaking in max/min/sel is implementation-defined
+    // and sensitive to which lane we feed through.  Same goes for the sel
+    // variant below.
     for (int swap = 0; swap < 2; swap++) {
         umbra_val32 const X = swap ? y : x,
                           Y = swap ? x : y;
