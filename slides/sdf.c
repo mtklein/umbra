@@ -562,7 +562,7 @@ SLIDE(slide_sdf_ngon) {
 // and analytic slides as the simplest baseline in the comparison.
 
 struct sdf_text_outline_sdf {
-    float            scale_x, scale_y, off_x, off_y;
+    struct umbra_affine mat;
     int              n_curves, :32;
     struct umbra_buf curves;
 };
@@ -574,17 +574,17 @@ static umbra_interval sdf_text_outline_build(void *ctx, struct umbra_builder *b,
     umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves));
 
-    umbra_interval const sx = umbra_interval_exact(
-                                  umbra_uniform_32(b, u, SLOT(scale_x))),
-                         sy = umbra_interval_exact(
-                                  umbra_uniform_32(b, u, SLOT(scale_y))),
-                         ox = umbra_interval_exact(
-                                  umbra_uniform_32(b, u, SLOT(off_x))),
-                         oy = umbra_interval_exact(
-                                  umbra_uniform_32(b, u, SLOT(off_y)));
+    umbra_interval const sx = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(mat.sx))),
+                         kx = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(mat.kx))),
+                         tx = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(mat.tx))),
+                         ky = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(mat.ky))),
+                         sy = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(mat.sy))),
+                         ty = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(mat.ty)));
 
-    umbra_interval const gx = umbra_interval_fma_f32(b, x, sx, ox),
-                         gy = umbra_interval_fma_f32(b, y, sy, oy);
+    umbra_interval const gx = umbra_interval_fma_f32(b, sx, x,
+                                  umbra_interval_fma_f32(b, kx, y, tx)),
+                         gy = umbra_interval_fma_f32(b, ky, x,
+                                  umbra_interval_fma_f32(b, sy, y, ty));
 
     umbra_imm_f32(b, 0);
     umbra_imm_f32(b, 1);
@@ -659,21 +659,15 @@ struct sdf_text_outline_slide {
 static void sdf_text_outline_init(struct slide *s) {
     struct sdf_text_outline_slide *st = (struct sdf_text_outline_slide *)s;
     st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
-
-    float const gw = st->slug.w,
-                gh = st->slug.h;
-    float const sx = gw / (float)s->w,
-                sy = gh / (float)s->h;
-    float const scale = sx > sy ? sx : sy;
-    float const pad_x = ((float)s->w * scale - gw) * 0.5f,
-                pad_y = ((float)s->h * scale - gh) * 0.5f;
-    st->sdf.scale_x = scale;
-    st->sdf.scale_y = scale;
-    st->sdf.off_x   = -pad_x;
-    st->sdf.off_y   = -pad_y;
     st->sdf.n_curves = st->slug.count;
     st->sdf.curves   = (struct umbra_buf){.ptr = st->slug.data,
                                            .count = st->slug.count * 6};
+}
+
+static void sdf_text_outline_animate(struct slide *s, double secs) {
+    struct sdf_text_outline_slide *st = (struct sdf_text_outline_slide *)s;
+    slide_affine_matrix(&st->sdf.mat, (float)secs, s->w, s->h,
+                        (int)st->slug.w, (int)st->slug.h);
 }
 
 static void sdf_text_outline_free(struct slide *s) {
@@ -686,10 +680,11 @@ SLIDE(slide_sdf_text_outline) {
     struct sdf_text_outline_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
     st->common.base    = (struct slide){
-        .title = "SDF Text Outline",
-        .bg    = {0.08f, 0.10f, 0.14f, 1},
-        .init  = sdf_text_outline_init,
-        .free  = sdf_text_outline_free,
+        .title   = "SDF Text Outline",
+        .bg      = {0.08f, 0.10f, 0.14f, 1},
+        .init    = sdf_text_outline_init,
+        .animate = sdf_text_outline_animate,
+        .free    = sdf_text_outline_free,
         SDF_COMMON_HOOKS,
     };
     st->common.base.sdf_fn  = sdf_text_outline_build;
@@ -715,7 +710,7 @@ SLIDE(slide_sdf_text_outline) {
 enum { SDF_POLYLINE_SAMPLES = 8 };
 
 struct sdf_text_polyline_sdf {
-    float            scale_x, scale_y, off_x, off_y;
+    struct umbra_affine mat;
     int              n_curves;
     int              lg_n;    // log2(samples_per_curve); mask_n and rcp_n derive from this
     struct umbra_buf curves;
@@ -730,10 +725,12 @@ static umbra_interval sdf_text_polyline_build(void *ctx, struct umbra_builder *b
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves)),
                       lgN  = umbra_uniform_32(b, u, SLOT(lg_n));
 
-    umbra_val32 const sx = umbra_uniform_32(b, u, SLOT(scale_x)),
-                      sy = umbra_uniform_32(b, u, SLOT(scale_y)),
-                      ox = umbra_uniform_32(b, u, SLOT(off_x)),
-                      oy = umbra_uniform_32(b, u, SLOT(off_y));
+    umbra_val32 const msx = umbra_uniform_32(b, u, SLOT(mat.sx)),
+                      mkx = umbra_uniform_32(b, u, SLOT(mat.kx)),
+                      mtx = umbra_uniform_32(b, u, SLOT(mat.tx)),
+                      mky = umbra_uniform_32(b, u, SLOT(mat.ky)),
+                      msy = umbra_uniform_32(b, u, SLOT(mat.sy)),
+                      mty = umbra_uniform_32(b, u, SLOT(mat.ty));
 
     umbra_val32 const z     = umbra_imm_f32(b, 0.0f),
                       o     = umbra_imm_f32(b, 1.0f),
@@ -751,15 +748,17 @@ static umbra_interval sdf_text_polyline_build(void *ctx, struct umbra_builder *b
 
     umbra_val32 const bcx = umbra_mul_f32(b, umbra_add_f32(b, x.lo, x.hi), half),
                       bcy = umbra_mul_f32(b, umbra_add_f32(b, y.lo, y.hi), half);
-    umbra_val32 const hw  = umbra_mul_f32(b, umbra_mul_f32(b, umbra_sub_f32(b, x.hi, x.lo),
-                                                              half), sx),
-                      hh  = umbra_mul_f32(b, umbra_mul_f32(b, umbra_sub_f32(b, y.hi, y.lo),
-                                                              half), sy);
+    umbra_val32 const hwx = umbra_mul_f32(b, umbra_sub_f32(b, x.hi, x.lo), half),
+                      hwy = umbra_mul_f32(b, umbra_sub_f32(b, y.hi, y.lo), half);
+    umbra_val32 const rx  = umbra_fma_f32(b, umbra_abs_f32(b, msx), hwx,
+                                             umbra_mul_f32(b, umbra_abs_f32(b, mkx), hwy)),
+                      ry  = umbra_fma_f32(b, umbra_abs_f32(b, mky), hwx,
+                                             umbra_mul_f32(b, umbra_abs_f32(b, msy), hwy));
     umbra_val32 const r   = umbra_sqrt_f32(b,
-                                umbra_fma_f32(b, hw, hw, umbra_mul_f32(b, hh, hh)));
+                                umbra_fma_f32(b, rx, rx, umbra_mul_f32(b, ry, ry)));
 
-    umbra_val32 const gx = umbra_fma_f32(b, bcx, sx, ox),
-                      gy = umbra_fma_f32(b, bcy, sy, oy);
+    umbra_val32 const gx = umbra_fma_f32(b, msx, bcx, umbra_fma_f32(b, mkx, bcy, mtx)),
+                      gy = umbra_fma_f32(b, mky, bcx, umbra_fma_f32(b, msy, bcy, mty));
 
     umbra_val32 const n_iter = umbra_shl_i32(b, n, lgN);
 
@@ -854,22 +853,16 @@ struct sdf_text_polyline_slide {
 static void sdf_text_polyline_init(struct slide *s) {
     struct sdf_text_polyline_slide *st = (struct sdf_text_polyline_slide *)s;
     st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
-
-    float const gw = st->slug.w,
-                gh = st->slug.h;
-    float const sx = gw / (float)s->w,
-                sy = gh / (float)s->h;
-    float const scale = sx > sy ? sx : sy;
-    float const pad_x = ((float)s->w * scale - gw) * 0.5f,
-                pad_y = ((float)s->h * scale - gh) * 0.5f;
-    st->sdf.scale_x  = scale;
-    st->sdf.scale_y  = scale;
-    st->sdf.off_x    = -pad_x;
-    st->sdf.off_y    = -pad_y;
     st->sdf.n_curves = st->slug.count;
     st->sdf.lg_n     = __builtin_ctz(SDF_POLYLINE_SAMPLES);
     st->sdf.curves   = (struct umbra_buf){.ptr = st->slug.data,
                                            .count = st->slug.count * 6};
+}
+
+static void sdf_text_polyline_animate(struct slide *s, double secs) {
+    struct sdf_text_polyline_slide *st = (struct sdf_text_polyline_slide *)s;
+    slide_affine_matrix(&st->sdf.mat, (float)secs, s->w, s->h,
+                        (int)st->slug.w, (int)st->slug.h);
 }
 
 static void sdf_text_polyline_free(struct slide *s) {
@@ -905,7 +898,7 @@ static void sdf_text_polyline_free(struct slide *s) {
 // the polyline slide.
 
 struct sdf_text_analytic_sdf {
-    float            scale_x, scale_y, off_x, off_y;
+    struct umbra_affine mat;
     int              n_curves, :32;
     struct umbra_buf curves;
 };
@@ -917,10 +910,12 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
     umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
     umbra_val32 const n  = umbra_uniform_32(b, u, SLOT(n_curves));
 
-    umbra_val32 const sx = umbra_uniform_32(b, u, SLOT(scale_x)),
-                      sy = umbra_uniform_32(b, u, SLOT(scale_y)),
-                      ox = umbra_uniform_32(b, u, SLOT(off_x)),
-                      oy = umbra_uniform_32(b, u, SLOT(off_y));
+    umbra_val32 const msx = umbra_uniform_32(b, u, SLOT(mat.sx)),
+                      mkx = umbra_uniform_32(b, u, SLOT(mat.kx)),
+                      mtx = umbra_uniform_32(b, u, SLOT(mat.tx)),
+                      mky = umbra_uniform_32(b, u, SLOT(mat.ky)),
+                      msy = umbra_uniform_32(b, u, SLOT(mat.sy)),
+                      mty = umbra_uniform_32(b, u, SLOT(mat.ty));
 
     umbra_val32 const zero  = umbra_imm_f32(b, 0.0f),
                       one   = umbra_imm_f32(b, 1.0f),
@@ -934,13 +929,17 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
 
     umbra_val32 const bcx = umbra_mul_f32(b, umbra_add_f32(b, x.lo, x.hi), half),
                       bcy = umbra_mul_f32(b, umbra_add_f32(b, y.lo, y.hi), half);
-    umbra_val32 const hw  = umbra_mul_f32(b, umbra_mul_f32(b, umbra_sub_f32(b, x.hi, x.lo), half), sx),
-                      hh  = umbra_mul_f32(b, umbra_mul_f32(b, umbra_sub_f32(b, y.hi, y.lo), half), sy);
+    umbra_val32 const hwx = umbra_mul_f32(b, umbra_sub_f32(b, x.hi, x.lo), half),
+                      hwy = umbra_mul_f32(b, umbra_sub_f32(b, y.hi, y.lo), half);
+    umbra_val32 const rx  = umbra_fma_f32(b, umbra_abs_f32(b, msx), hwx,
+                                             umbra_mul_f32(b, umbra_abs_f32(b, mkx), hwy)),
+                      ry  = umbra_fma_f32(b, umbra_abs_f32(b, mky), hwx,
+                                             umbra_mul_f32(b, umbra_abs_f32(b, msy), hwy));
     umbra_val32 const r   = umbra_sqrt_f32(b,
-                                umbra_fma_f32(b, hw, hw, umbra_mul_f32(b, hh, hh)));
+                                umbra_fma_f32(b, rx, rx, umbra_mul_f32(b, ry, ry)));
 
-    umbra_val32 const gx = umbra_fma_f32(b, bcx, sx, ox),
-                      gy = umbra_fma_f32(b, bcy, sy, oy);
+    umbra_val32 const gx = umbra_fma_f32(b, msx, bcx, umbra_fma_f32(b, mkx, bcy, mtx)),
+                      gy = umbra_fma_f32(b, mky, bcx, umbra_fma_f32(b, msy, bcy, mty));
 
     umbra_var32 const dist2        = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f)),
                       par          = umbra_declare_var32(b, umbra_imm_i32(b, 0)),
@@ -1160,21 +1159,15 @@ struct sdf_text_analytic_slide {
 static void sdf_text_analytic_init(struct slide *s) {
     struct sdf_text_analytic_slide *st = (struct sdf_text_analytic_slide *)s;
     st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
-
-    float const gw = st->slug.w,
-                gh = st->slug.h;
-    float const sx = gw / (float)s->w,
-                sy = gh / (float)s->h;
-    float const scale = sx > sy ? sx : sy;
-    float const pad_x = ((float)s->w * scale - gw) * 0.5f,
-                pad_y = ((float)s->h * scale - gh) * 0.5f;
-    st->sdf.scale_x  = scale;
-    st->sdf.scale_y  = scale;
-    st->sdf.off_x    = -pad_x;
-    st->sdf.off_y    = -pad_y;
     st->sdf.n_curves = st->slug.count;
     st->sdf.curves   = (struct umbra_buf){.ptr = st->slug.data,
                                            .count = st->slug.count * 6};
+}
+
+static void sdf_text_analytic_animate(struct slide *s, double secs) {
+    struct sdf_text_analytic_slide *st = (struct sdf_text_analytic_slide *)s;
+    slide_affine_matrix(&st->sdf.mat, (float)secs, s->w, s->h,
+                        (int)st->slug.w, (int)st->slug.h);
 }
 
 static void sdf_text_analytic_free(struct slide *s) {
@@ -1187,10 +1180,11 @@ SLIDE(slide_sdf_text_analytic) {
     struct sdf_text_analytic_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
     st->common.base    = (struct slide){
-        .title = "SDF Text Analytic",
-        .bg    = {0.08f, 0.10f, 0.14f, 1},
-        .init  = sdf_text_analytic_init,
-        .free  = sdf_text_analytic_free,
+        .title   = "SDF Text Analytic",
+        .bg      = {0.08f, 0.10f, 0.14f, 1},
+        .init    = sdf_text_analytic_init,
+        .animate = sdf_text_analytic_animate,
+        .free    = sdf_text_analytic_free,
         SDF_COMMON_HOOKS,
     };
     st->common.base.sdf_fn  = sdf_text_analytic_build;
@@ -1202,10 +1196,11 @@ SLIDE(slide_sdf_text_polyline) {
     struct sdf_text_polyline_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
     st->common.base    = (struct slide){
-        .title = "SDF Text Polyline",
-        .bg    = {0.08f, 0.10f, 0.14f, 1},
-        .init  = sdf_text_polyline_init,
-        .free  = sdf_text_polyline_free,
+        .title   = "SDF Text Polyline",
+        .bg      = {0.08f, 0.10f, 0.14f, 1},
+        .init    = sdf_text_polyline_init,
+        .animate = sdf_text_polyline_animate,
+        .free    = sdf_text_polyline_free,
         SDF_COMMON_HOOKS,
     };
     st->common.base.sdf_fn  = sdf_text_polyline_build;

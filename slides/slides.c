@@ -26,6 +26,24 @@ void slide_perspective_matrix(struct umbra_matrix *out, float t,
     };
 }
 
+void slide_affine_matrix(struct umbra_affine *out, float t,
+                         int sw, int sh, int bw, int bh) {
+    float const cx    = (float)sw * 0.5f,
+                cy    = (float)sh * 0.5f,
+                bx    = (float)bw * 0.5f,
+                by    = (float)bh * 0.5f,
+                angle = t * 0.3f,
+                sc    = 1.0f + 0.2f * sinf(t * 0.5f),
+                ca    = cosf(angle),
+                sa    = sinf(angle);
+    *out = (struct umbra_affine){
+        .sx = ca * sc,  .kx = sa * sc,
+        .tx = -cx*ca*sc - cy*sa*sc + bx,
+        .ky = -sa * sc, .sy = ca * sc,
+        .ty = cx*sa*sc - cy*ca*sc + by,
+    };
+}
+
 _Bool slide_sdf_stroke_enabled = 0;
 float slide_sdf_stroke_width   = 3.0f;
 

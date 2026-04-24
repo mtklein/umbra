@@ -186,6 +186,21 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const *mat,
     return (umbra_point_val32){xp, yp};
 }
 
+umbra_point_val32 umbra_transform_affine(struct umbra_affine const *mat,
+                                         struct umbra_builder *b,
+                                         umbra_val32 x, umbra_val32 y) {
+    umbra_ptr const u = umbra_bind_uniforms(b, mat, (int)(sizeof *mat / 4));
+    umbra_val32 const sx = umbra_uniform_32(b, u, 0),
+                      kx = umbra_uniform_32(b, u, 1),
+                      tx = umbra_uniform_32(b, u, 2),
+                      ky = umbra_uniform_32(b, u, 3),
+                      sy = umbra_uniform_32(b, u, 4),
+                      ty = umbra_uniform_32(b, u, 5);
+    umbra_val32 const xp = umbra_fma_f32(b, sx, x, umbra_fma_f32(b, kx, y, tx));
+    umbra_val32 const yp = umbra_fma_f32(b, ky, x, umbra_fma_f32(b, sy, y, ty));
+    return (umbra_point_val32){xp, yp};
+}
+
 struct coverage_from_sdf {
     umbra_sdf *sdf_fn;
     void      *sdf_ctx;

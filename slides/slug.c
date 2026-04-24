@@ -3,9 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// TODO: switch to an animated affine matrix and match scale with SDF Text
-// slides so they can be directly compared
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
 #include "../third_party/stb/stb_truetype.h"
@@ -285,7 +282,7 @@ struct slug_slide {
     struct umbra_buf         curves_buf;
     struct slug_cov_uniforms cov_uni;
     struct slug_cov_ctx      cov_ctx;
-    struct umbra_matrix      mat; int :32;
+    struct umbra_affine      mat;
 
     umbra_color              color;
 };
@@ -308,7 +305,7 @@ static void slug_build_draw(struct slide *s, struct umbra_builder *b,
                             umbra_ptr dst_ptr, struct umbra_fmt fmt,
                             umbra_val32 x, umbra_val32 y) {
     struct slug_slide *st = (struct slug_slide *)s;
-    umbra_point_val32 const p = umbra_transform_perspective(&st->mat, b, x, y);
+    umbra_point_val32 const p = umbra_transform_affine(&st->mat, b, x, y);
     umbra_build_draw(b, dst_ptr, fmt, p.x, p.y,
                      coverage_slug_winding, &st->cov_ctx,
                      umbra_shader_color,    &st->color,
@@ -317,8 +314,8 @@ static void slug_build_draw(struct slide *s, struct umbra_builder *b,
 
 static void slug_animate(struct slide *s, double secs) {
     struct slug_slide *st = (struct slug_slide *)s;
-    slide_perspective_matrix(&st->mat, (float)secs, s->w, s->h,
-                             (int)st->slug.w, (int)st->slug.h);
+    slide_affine_matrix(&st->mat, (float)secs, s->w, s->h,
+                        (int)st->slug.w, (int)st->slug.h);
 }
 
 static void slug_free_slide(struct slide *s) {

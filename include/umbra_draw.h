@@ -54,6 +54,11 @@ umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const*,
                                               struct umbra_builder*,
                                               umbra_val32 x, umbra_val32 y);
 
+// 2x3 affine transform: no perspective divide.
+umbra_point_val32 umbra_transform_affine(struct umbra_affine const*,
+                                         struct umbra_builder*,
+                                         umbra_val32 x, umbra_val32 y);
+
 typedef umbra_val32 umbra_coverage(void *ctx, struct umbra_builder*,
                                    umbra_val32 x, umbra_val32 y);
 // Cover a rectangle; ctx is umbra_rect*.
