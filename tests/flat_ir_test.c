@@ -4859,6 +4859,45 @@ TEST(test_if_nested) {
     test_backends_free(&B);
 }
 
+TEST(test_if_nested_mask_combine) {
+    // Regression: on a nested `if`, store_var inside the inner body must only
+    // fire in lanes where BOTH conditions are true.  Earlier JIT backends
+    // pushed only the raw inner condition to the mask stack and relied on it
+    // alone at store time, so any lane where outer=false and inner=true
+    // incorrectly wrote through.  Craft those lanes directly: outer = x<3,
+    // inner = x>0, so lanes 3..7 have outer=false, inner=true.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 x = umbra_x(b);
+    umbra_var32 v = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_if(b, umbra_lt_s32(b, x, umbra_imm_i32(b, 3))); {
+        umbra_if(b, umbra_lt_s32(b, umbra_imm_i32(b, 0), x)); {
+            umbra_store_var32(b, v, umbra_imm_i32(b, 7));
+        } umbra_end_if(b);
+    } umbra_end_if(b);
+
+    umbra_store_32(b, umbra_bind_buf(b, &slot[0]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 1,
+    (struct umbra_buf[]){{.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0 here;  // outer T, inner F
+            dst[1] == 7 here;  // outer T, inner T
+            dst[2] == 7 here;  // outer T, inner T
+            dst[3] == 0 here;  // outer F, inner T — must not leak
+            dst[4] == 0 here;
+            dst[5] == 0 here;
+            dst[6] == 0 here;
+            dst[7] == 0 here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {

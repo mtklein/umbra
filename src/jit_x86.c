@@ -1063,7 +1063,18 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
 
         case op_if_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
-            jc->if_mask_reg[jc->if_depth++] = rx;
+            if (jc->if_depth > 0) {
+                // Nested if: effective mask is outer & inner so store_var masks
+                // against the AND of every enclosing condition, matching the
+                // interpreter's if_mask_stack AND chain.
+                int8_t outer    = jc->if_mask_reg[jc->if_depth - 1];
+                int8_t combined = ra_alloc(ra, sl, ns);
+                vpand(c, scalar ? 0 : 1, combined, rx, outer);
+                ra_free_chan(ra, inst->x, i);
+                jc->if_mask_reg[jc->if_depth++] = combined;
+            } else {
+                jc->if_mask_reg[jc->if_depth++] = rx;
+            }
         } break;
         case op_if_end: {
             int8_t rm = jc->if_mask_reg[--jc->if_depth];
