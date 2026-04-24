@@ -929,6 +929,39 @@ TEST(test_cbrt_f32) {
     test_backends_free(&B);
 }
 
+TEST(test_sin_cos_f32) {
+    struct umbra_buf slot[20] = {0};
+
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const x  = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      s  = umbra_sin_f32(builder, x),
+                      cs = umbra_cos_f32(builder, x);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[1]), s);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[2]), cs);
+    struct test_backends B = make(builder);
+
+    float const pi = 3.14159265358979323846f;
+    float a[] = {
+        0, pi/6, pi/4, pi/3, pi/2, 2*pi/3, 3*pi/4, 5*pi/6, pi,
+        -pi/6, -pi/4, -pi/2, -pi,
+        3*pi/2, 2*pi, -2*pi,
+    };
+    enum { N = (int)(sizeof a / sizeof *a) };
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float zs[N] = {0}, zc[N] = {0};
+        if (run(&B, bi, N, 1, slot, 3,
+    (struct umbra_buf[]){{.ptr=a,  .count=N},
+                         {.ptr=zs, .count=N},
+                         {.ptr=zc, .count=N}})) {
+            for (int i = 0; i < N; i++) {
+                (fabsf(zs[i] - sinf(a[i])) <= 1e-4f) here;
+                (fabsf(zc[i] - cosf(a[i])) <= 1e-4f) here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_abs_f32) {
     struct umbra_buf slot[20] = {0};
     {

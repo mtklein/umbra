@@ -498,6 +498,38 @@ umbra_val32 umbra_cbrt_f32(builder *b, umbra_val32 x) {
                         umbra_sub_f32(b, zero_f, y), y);
 }
 
+static umbra_val32 sin5q(builder *b, umbra_val32 u) {
+    // Skia's degree-5 minimax for sin(u * 2π), valid over u ∈ [-1/4, 1/4].
+    // poly(u²) = A + u²·(B + u²·C); result = u · poly.
+    umbra_val32 const A = umbra_imm_f32(b,   6.28230858f),
+                      B = umbra_imm_f32(b, -41.1693687f),
+                      C = umbra_imm_f32(b,  74.4388885f);
+    umbra_val32 const u2   = umbra_mul_f32(b, u, u);
+    umbra_val32 const poly = umbra_add_f32(b, A,
+                                 umbra_mul_f32(b, u2,
+                                     umbra_add_f32(b, B, umbra_mul_f32(b, u2, C))));
+    return umbra_mul_f32(b, u, poly);
+}
+
+umbra_val32 umbra_cos_f32(builder *b, umbra_val32 x) {
+    // Scale radians to turns, center to [-1/2, 1/2), then Skia's 0.25-|ft|
+    // trick puts the argument in [-1/4, 1/4] for sin5q_, computing cos via
+    // the identity cos(θ) = sin(π/2 − θ).
+    umbra_val32 const inv_2pi = umbra_imm_f32(b, 0.15915494309189535f);
+    umbra_val32 const half    = umbra_imm_f32(b, 0.5f);
+    umbra_val32 const quarter = umbra_imm_f32(b, 0.25f);
+
+    umbra_val32 const t  = umbra_mul_f32(b, x, inv_2pi);
+    umbra_val32 const ft = umbra_sub_f32(b, t,
+                               umbra_floor_f32(b, umbra_add_f32(b, t, half)));
+    return sin5q(b, umbra_sub_f32(b, quarter, umbra_abs_f32(b, ft)));
+}
+
+umbra_val32 umbra_sin_f32(builder *b, umbra_val32 x) {
+    // sin(θ) = cos(θ − π/2); one extra subtraction reuses the cos path.
+    return umbra_cos_f32(b, umbra_sub_f32(b, x, umbra_imm_f32(b, 1.5707963267948966f)));
+}
+
 umbra_val32 umbra_abs_f32(builder *b, umbra_val32 x) { return math(b, op_abs_f32, VX(x)).v32; }
 umbra_val32 umbra_round_f32(builder *b, umbra_val32 x) { return math(b, op_round_f32, VX(x)).v32; }
 umbra_val32 umbra_floor_f32(builder *b, umbra_val32 x) { return math(b, op_floor_f32, VX(x)).v32; }
