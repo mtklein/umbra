@@ -34,7 +34,21 @@ struct slide {
                             umbra_val32 x, umbra_val32 y);
 
     void  (*animate)(struct slide*, double secs);
+
+    // Internal: storage used by slide_effective_sdf when stroke is active.
+    struct umbra_sdf_stroke sdf_stroke;
 };
+
+// Global stroke toggle: when enabled, every SDF slide is drawn as |sdf|-width
+// instead of the raw sdf.  Changing either requires rebuilding every
+// slide_runtime.
+extern _Bool slide_sdf_stroke_enabled;
+extern float slide_sdf_stroke_width;
+
+// Resolve a slide's effective SDF (raw or stroke-wrapped).  Used by both the
+// slide's build_sdf_draw hook and by slide_runtime when building the bounds
+// program so they agree on the shape.
+void slide_effective_sdf(struct slide*, umbra_sdf **out_fn, void **out_ctx);
 
 typedef struct slide *(*slide_factory_fn)(void);
 void slide_register(slide_factory_fn factory);

@@ -45,8 +45,11 @@ static void sdf_common_build_draw(struct slide *s,
                                   umbra_ptr dst_ptr, struct umbra_fmt fmt,
                                   umbra_val32 x, umbra_val32 y) {
     struct sdf_common *c = (struct sdf_common *)s;
+    umbra_sdf *fn;
+    void      *ctx;
+    slide_effective_sdf(s, &fn, &ctx);
     umbra_build_sdf_draw(b, dst_ptr, fmt, x, y,
-                         s->sdf_fn, s->sdf_ctx,
+                         fn, ctx,
                          umbra_shader_color,  &c->color,
                          umbra_blend_srcover, NULL);
 }
@@ -480,10 +483,6 @@ SLIDE(slide_sdf_halfplane) {
 // check each root in [0,1], XOR a parity var when B(root).x > gx.  Final
 // signed distance = sel(parity, -|dist|, +|dist|).  Bounds path returns
 // the conservative {-|dist|.hi, +|dist|.hi} when inputs are non-exact.
-//
-// TODO: add an SDF stroke wrapper (abs(sdf) - width) that can be toggled
-// on any SDF slide, like iv2d's 's' key.  This converts fills to outlines
-// and outlines to double-stroked outlines.
 
 struct sdf_text_sdf {
     float            scale_x, scale_y, off_x, off_y;

@@ -325,6 +325,10 @@ int main(void) {
                     SDL_SetRenderVSync(renderer, vsync ? 1 : 0);
                 } else if (ev.key.key == SDLK_S) {
                     want_dump = 1;
+                } else if (ev.key.key == SDLK_K) {
+                    slide_sdf_stroke_enabled = !slide_sdf_stroke_enabled;
+                    build_slide_fmt(slide_get(cur_slide), cur_fmt, W, H);
+                    rebuild_extra(cur_backend);
                 } else if (ev.key.key == SDLK_ESCAPE) {
                     running = 0;
                 }

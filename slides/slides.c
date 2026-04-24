@@ -26,6 +26,24 @@ void slide_perspective_matrix(struct umbra_matrix *out, float t,
     };
 }
 
+_Bool slide_sdf_stroke_enabled = 0;
+float slide_sdf_stroke_width   = 3.0f;
+
+void slide_effective_sdf(struct slide *s, umbra_sdf **out_fn, void **out_ctx) {
+    if (slide_sdf_stroke_enabled) {
+        s->sdf_stroke = (struct umbra_sdf_stroke){
+            .inner_fn  = s->sdf_fn,
+            .inner_ctx = s->sdf_ctx,
+            .width     = slide_sdf_stroke_width,
+        };
+        *out_fn  = umbra_sdf_stroke;
+        *out_ctx = &s->sdf_stroke;
+    } else {
+        *out_fn  = s->sdf_fn;
+        *out_ctx = s->sdf_ctx;
+    }
+}
+
 enum { MAX_SLIDES = 32 };
 
 struct slide* make_overview(void);
@@ -167,9 +185,12 @@ struct slide_runtime* slide_runtime(struct slide *s,
         rt->draw_full = be->compile(be, irf);
         umbra_flat_ir_free(irf);
 
+        umbra_sdf *bfn;
+        void      *bctx;
+        slide_effective_sdf(s, &bfn, &bctx);
         struct umbra_builder *bb = umbra_builder();
         rt->bounds = umbra_sdf_bounds_program(bb, pre ? &pre->affine : NULL,
-                                              s->sdf_fn, s->sdf_ctx);
+                                              bfn, bctx);
         umbra_builder_free(bb);
     }
     return rt;
