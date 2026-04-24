@@ -347,21 +347,23 @@ umbra_val32 umbra_div_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     //   3. r2 = r1 * (2 - y*r1)                     (~16 bits)
     //   4. r3 = r2 * (2 - y*r2)                     (~full fp32)
     //   5. q  = x * r3                              (approximate quotient)
-    //   6. q' = q + r3 * (x - y*q)                  (Markstein correction)
-    // The residual (x - y*q) builder-peepholes to fms (exact, single rounding
-    // via FMA), and the outer add(mul, q) peepholes to fma -- so the final
-    // correction step is effectively correctly-rounded.
+    //   6. q' = fma(x, r3, r3*(x - y*q))            (Markstein correction)
+    // The residual (x - y*q) is an explicit fms (exact, single rounding via
+    // FMA), and the outer correction step is an explicit fma over x*r3 (one
+    // extra infinite-precision multiply inside the fma buys a bit of accuracy
+    // vs. reusing the already-rounded q) so the final step is effectively
+    // correctly-rounded.
     umbra_val32 const c_rcp_magic = umbra_imm_i32(b, 0x7EF127EA);
     umbra_val32 const c_two       = umbra_imm_f32(b, 2.0f);
 
     umbra_val32 r = umbra_sub_i32(b, c_rcp_magic, y);
-    r = umbra_mul_f32(b, r, umbra_sub_f32(b, c_two, umbra_mul_f32(b, y, r)));
-    r = umbra_mul_f32(b, r, umbra_sub_f32(b, c_two, umbra_mul_f32(b, y, r)));
-    r = umbra_mul_f32(b, r, umbra_sub_f32(b, c_two, umbra_mul_f32(b, y, r)));
+    r = umbra_mul_f32(b, r, umbra_fms_f32(b, y, r, c_two));
+    r = umbra_mul_f32(b, r, umbra_fms_f32(b, y, r, c_two));
+    r = umbra_mul_f32(b, r, umbra_fms_f32(b, y, r, c_two));
 
-    umbra_val32 q = umbra_mul_f32(b, x, r);
-    return umbra_add_f32(b, q,
-        umbra_mul_f32(b, r, umbra_sub_f32(b, x, umbra_mul_f32(b, y, q))));
+    umbra_val32 const q        = umbra_mul_f32(b, x, r);
+    umbra_val32 const residual = umbra_fms_f32(b, y, q, x);
+    return umbra_fma_f32(b, x, r, umbra_mul_f32(b, r, residual));
 }
 
 umbra_val32 umbra_min_f32(builder *b, umbra_val32 x, umbra_val32 y) {
@@ -387,11 +389,11 @@ umbra_val32 umbra_sqrt_f32(builder *b, umbra_val32 x) {
     // (order-3) polynomial refinement, y' = y*(1 + e/2 + 3e²/8) with
     // e = 1 - x*y², triples that to ~12 bits -- a full iteration cheaper than
     // two standard NR steps that get ~16 bits.  The final Newton step on sqrt
-    // itself (sn += (x - sn²) * (y/2)) then doubles precision once more: the
-    // residual sub(x, mul(sn,sn)) builder-peepholes to fms (exact single
-    // rounding) and the outer add(mul, sn) peepholes to fma, so combined
-    // precision lands at max 1 fp32 ULP -- correctly-rounded in practice and
-    // exact on perfect squares.
+    // itself (sn = fma(x, y, (x - sn²) * (y/2))) then doubles precision once
+    // more: the residual x - sn² becomes square_sub (sub(x, square) peephole,
+    // exact single rounding) and the outer explicit fma recomputes x*y
+    // internally at infinite precision, so combined precision lands at max
+    // 1 fp32 ULP -- correctly-rounded in practice and exact on perfect squares.
     umbra_val32 const c_magic  = umbra_imm_i32(b, 0x5F3759DF);
     umbra_val32 const c_one_i  = umbra_imm_i32(b, 1);
     umbra_val32 const c_one    = umbra_imm_f32(b, 1.0f);
@@ -403,21 +405,19 @@ umbra_val32 umbra_sqrt_f32(builder *b, umbra_val32 x) {
 
     // Halley step: e = 1 - x*y²; y' = y * (1 + e*0.5 + e²*0.375)
     umbra_val32 yy  = umbra_mul_f32(b, y, y);
-    umbra_val32 xyy = umbra_mul_f32(b, x, yy);
-    umbra_val32 e   = umbra_sub_f32(b, c_one, xyy);
+    umbra_val32 e   = umbra_fms_f32(b, x, yy, c_one);
     umbra_val32 ee  = umbra_mul_f32(b, e, e);
     umbra_val32 poly = umbra_add_f32(b, c_one,
-                           umbra_add_f32(b, umbra_mul_f32(b, c_half, e),
-                                            umbra_mul_f32(b, c_38,   ee)));
+                           umbra_fma_f32(b, c_half, e,
+                                            umbra_mul_f32(b, c_38, ee)));
     y = umbra_mul_f32(b, y, poly);
 
-    // Final NR step on sqrt itself: sn += (x - sn²) * (y/2).
-    umbra_val32 sn = umbra_mul_f32(b, x, y);
-    sn = umbra_add_f32(b, sn,
-             umbra_mul_f32(b,
-                 umbra_sub_f32(b, x, umbra_mul_f32(b, sn, sn)),
-                 umbra_mul_f32(b, y, c_half)));
-    return umbra_sel_32(b, umbra_eq_f32(b, x, c_zero_f), c_zero_f, sn);
+    // Final NR step on sqrt itself: sn = fma(x, y, (x - sn²) * (y/2)).
+    umbra_val32 const sn       = umbra_mul_f32(b, x, y);
+    umbra_val32 const residual = umbra_sub_f32(b, x, umbra_mul_f32(b, sn, sn));
+    umbra_val32 const yhalf    = umbra_mul_f32(b, y, c_half);
+    umbra_val32 const refined  = umbra_fma_f32(b, x, y, umbra_mul_f32(b, residual, yhalf));
+    return umbra_sel_32(b, umbra_eq_f32(b, x, c_zero_f), c_zero_f, refined);
 }
 
 umbra_val32 umbra_cbrt_f32(builder *b, umbra_val32 x) {
@@ -441,9 +441,8 @@ umbra_val32 umbra_cbrt_f32(builder *b, umbra_val32 x) {
     umbra_val32 const e   = umbra_mul_f32(b, umbra_f32_from_i32(b, ax), inv_223);
     umbra_val32 const m   = umbra_or_32 (b, umbra_and_32(b, ax, mant_m), expo_h);
     umbra_val32 const log2 = umbra_sub_f32(b,
-                                 umbra_sub_f32(b,
-                                     umbra_sub_f32(b, e, umbra_imm_f32(b, 124.225514990f)),
-                                     umbra_mul_f32(b, umbra_imm_f32(b, 1.498030302f), m)),
+                                 umbra_fms_f32(b, umbra_imm_f32(b, 1.498030302f), m,
+                                     umbra_sub_f32(b, e, umbra_imm_f32(b, 124.225514990f))),
                                  umbra_div_f32(b,
                                      umbra_imm_f32(b, 1.725879990f),
                                      umbra_add_f32(b, umbra_imm_f32(b, 0.3520887068f), m)));
@@ -454,9 +453,8 @@ umbra_val32 umbra_cbrt_f32(builder *b, umbra_val32 x) {
     umbra_val32 const L = umbra_mul_f32(b, log2, umbra_imm_f32(b, 1.0f / 3.0f));
     umbra_val32 const f = umbra_sub_f32(b, L, umbra_floor_f32(b, L));
     umbra_val32 const approx = umbra_add_f32(b,
-                                   umbra_sub_f32(b,
-                                       umbra_add_f32(b, L, umbra_imm_f32(b, 121.274057500f)),
-                                       umbra_mul_f32(b, umbra_imm_f32(b, 1.490129070f), f)),
+                                   umbra_fms_f32(b, umbra_imm_f32(b, 1.490129070f), f,
+                                       umbra_add_f32(b, L, umbra_imm_f32(b, 121.274057500f))),
                                    umbra_div_f32(b,
                                        umbra_imm_f32(b, 27.728023300f),
                                        umbra_sub_f32(b, umbra_imm_f32(b, 4.84252568f), f)));
@@ -485,9 +483,9 @@ static umbra_val32 sin5q(builder *b, umbra_val32 u) {
                       B = umbra_imm_f32(b, -41.1693687f),
                       C = umbra_imm_f32(b,  74.4388885f);
     umbra_val32 const u2   = umbra_mul_f32(b, u, u);
-    umbra_val32 const poly = umbra_add_f32(b, A,
-                                 umbra_mul_f32(b, u2,
-                                     umbra_add_f32(b, B, umbra_mul_f32(b, u2, C))));
+    umbra_val32 const poly = umbra_fma_f32(b, u2,
+                                 umbra_fma_f32(b, u2, C, B),
+                                 A);
     return umbra_mul_f32(b, u, poly);
 }
 
@@ -525,15 +523,14 @@ umbra_val32 umbra_acos_f32(builder *b, umbra_val32 x) {
                       c0   = umbra_imm_f32(b,  1.5707288f);
 
     umbra_val32 const ax = umbra_abs_f32(b, x);
-    umbra_val32 const poly = umbra_add_f32(b, c0,
-                                 umbra_mul_f32(b, ax,
-                                     umbra_add_f32(b, c1,
-                                         umbra_mul_f32(b, ax,
-                                             umbra_add_f32(b, c2,
-                                                 umbra_mul_f32(b, ax, c3))))));
+    umbra_val32 const poly = umbra_fma_f32(b, ax,
+                                 umbra_fma_f32(b, ax,
+                                     umbra_fma_f32(b, ax, c3, c2),
+                                     c1),
+                                 c0);
     umbra_val32 const root = umbra_sqrt_f32(b, umbra_sub_f32(b, one, ax));
     umbra_val32 const pos  = umbra_mul_f32(b, root, poly);
-    umbra_val32 const neg  = umbra_sub_f32(b, pi, pos);
+    umbra_val32 const neg  = umbra_fms_f32(b, root, poly, pi);
     return umbra_sel_32(b, umbra_lt_f32(b, x, zero), neg, pos);
 }
 
