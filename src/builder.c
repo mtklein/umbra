@@ -284,6 +284,24 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (b->inst[y.id].op == op_mul_f32) {
         return math(b, op_fma_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
     }
+    // add(fma(a, b, c), y) = a*b + c + y; roll y into the accumulator so the
+    // whole expression rounds once via fma instead of twice.  Matches what
+    // the GPU backend compilers do under fp contract, which otherwise shows
+    // up as a CPU-vs-GPU divergence.
+    if (b->inst[x.id].op == op_fma_f32) {
+        umbra_val32 const az = b->inst[x.id].z.v32;
+        umbra_val32 const cy = umbra_add_f32(b, az, y);
+        return math(b, op_fma_f32,
+                    .x = b->inst[x.id].x, .y = b->inst[x.id].y,
+                    .z = (val){.v32 = cy}).v32;
+    }
+    if (b->inst[y.id].op == op_fma_f32) {
+        umbra_val32 const az = b->inst[y.id].z.v32;
+        umbra_val32 const cx = umbra_add_f32(b, az, x);
+        return math(b, op_fma_f32,
+                    .x = b->inst[y.id].x, .y = b->inst[y.id].y,
+                    .z = (val){.v32 = cx}).v32;
+    }
     if (b->inst[x.id].op == op_square_f32) {
         return math(b, op_square_add_f32, .x = b->inst[x.id].x, VY(y)).v32;
     }

@@ -63,9 +63,9 @@ fmul.4s	v14, v10, v10
 fmul.4s	v15, v11, v11
 fmla.4s	v14, v8, v8
 fmla.4s	v15, v9, v9
-ldr	q4, 0x10b0 <ltmp0+0x10b0>
+ldr	q4, 0x10e0 <ltmp0+0x10e0>
 mov.16b	v5, v4
-ldr	q4, 0x10c0 <ltmp0+0x10c0>
+ldr	q4, 0x10f0 <ltmp0+0x10f0>
 mov.16b	v5, v4
 movi.4s	v4, #0x0
 mov.16b	v5, v4
@@ -79,7 +79,7 @@ fcmgt.4s	v16, v4, v14
 fcmgt.4s	v17, v5, v15
 orr.16b	v6, v6, v16
 orr.16b	v7, v7, v17
-ldr	q16, 0x10d0 <ltmp0+0x10d0>
+ldr	q16, 0x1100 <ltmp0+0x1100>
 mov.16b	v17, v16
 movi.4s	v4, #0x40, lsl #24
 mov.16b	v5, v4
@@ -121,7 +121,7 @@ fmul.4s	v6, v6, v14
 fmul.4s	v7, v7, v15
 fmla.4s	v6, v16, v4
 fmla.4s	v7, v17, v5
-ldr	q4, 0x10e0 <ltmp0+0x10e0>
+ldr	q4, 0x1110 <ltmp0+0x1110>
 mov.16b	v5, v4
 movi.4s	v16, #0x3f, lsl #24
 mov.16b	v17, v16
@@ -136,15 +136,15 @@ stp	x13, x15, [sp, #-0x10]!
 # loop_top:
 sub	x10, x0, x9
 cmp	x10, #0x8
-b.lt	0x8c4 <ltmp0+0x8c4>
+b.lt	0x8dc <ltmp0+0x8dc>
 # simd_body:
 dup.4s	v4, w9
 mov.16b	v5, v4
 str	q6, [x15, #0x80]
 str	q7, [x15, #0x90]
-ldr	q6, 0x10f0 <ltmp0+0x10f0>
+ldr	q6, 0x1120 <ltmp0+0x1120>
 add.4s	v4, v4, v6
-ldr	q6, 0x1100 <ltmp0+0x1100>
+ldr	q6, 0x1130 <ltmp0+0x1130>
 add.4s	v5, v5, v6
 scvtf.4s	v4, v4
 scvtf.4s	v5, v5
@@ -284,7 +284,7 @@ ldr	q8, [x15, #0x40]
 ldr	q9, [x15, #0x50]
 str	q16, [x15, #0x100]
 str	q17, [x15, #0x110]
-ldr	q16, 0x10c0 <ltmp0+0x10c0>
+ldr	q16, 0x10f0 <ltmp0+0x10f0>
 mov.16b	v17, v16
 bif.16b	v30, v16, v8
 bif.16b	v31, v17, v9
@@ -324,7 +324,7 @@ ldr	q24, [x15, #0x40]
 ldr	q25, [x15, #0x50]
 str	q16, [x15, #0x100]
 str	q17, [x15, #0x110]
-ldr	q16, 0x10b0 <ltmp0+0x10b0>
+ldr	q16, 0x10e0 <ltmp0+0x10e0>
 mov.16b	v17, v16
 bif.16b	v22, v16, v24
 bif.16b	v23, v17, v25
@@ -430,7 +430,7 @@ neg.4s	v20, v16
 ushl.4s	v18, v24, v20
 neg.4s	v21, v17
 ushl.4s	v19, v25, v21
-ldr	q20, 0x10e0 <ltmp0+0x10e0>
+ldr	q20, 0x1110 <ltmp0+0x1110>
 mov.16b	v21, v20
 sub.4s	v18, v20, v18
 sub.4s	v19, v21, v19
@@ -446,14 +446,16 @@ fmls.4s	v31, v25, v27
 mov.16b	v27, v31
 fmul.4s	v30, v26, v26
 fmul.4s	v31, v27, v27
-fmul.4s	v30, v14, v30
-fmul.4s	v31, v15, v31
+mov.16b	v16, v28
+fmla.4s	v16, v14, v30
+mov.16b	v30, v16
+mov.16b	v17, v29
+fmla.4s	v17, v15, v31
+mov.16b	v31, v17
 movi.4s	v16, #0x3f, lsl #24
 mov.16b	v17, v16
 fmla.4s	v30, v16, v26
 fmla.4s	v31, v17, v27
-fadd.4s	v30, v28, v30
-fadd.4s	v31, v29, v31
 fmul.4s	v18, v18, v30
 fmul.4s	v19, v19, v31
 fmul.4s	v26, v24, v18
@@ -496,12 +498,16 @@ fmls.4s	v31, v23, v27
 mov.16b	v27, v31
 fmul.4s	v30, v26, v26
 fmul.4s	v31, v27, v27
-fmul.4s	v30, v14, v30
-fmul.4s	v31, v15, v31
+mov.16b	v16, v28
+fmla.4s	v16, v14, v30
+mov.16b	v30, v16
+mov.16b	v17, v29
+fmla.4s	v17, v15, v31
+mov.16b	v31, v17
+movi.4s	v16, #0x3f, lsl #24
+mov.16b	v17, v16
 fmla.4s	v30, v16, v26
 fmla.4s	v31, v17, v27
-fadd.4s	v30, v28, v30
-fadd.4s	v31, v29, v31
 fmul.4s	v24, v24, v30
 fmul.4s	v25, v25, v31
 fmul.4s	v26, v16, v24
@@ -556,7 +562,7 @@ ldr	q10, [x15, #0x120]
 ldr	q11, [x15, #0x130]
 ldr	q6, [x15, #0x80]
 ldr	q7, [x15, #0x90]
-ldr	q4, 0x10e0 <ltmp0+0x10e0>
+ldr	q4, 0x1110 <ltmp0+0x1110>
 mov.16b	v5, v4
 movi.4s	v16, #0x3f, lsl #24
 mov.16b	v17, v16
@@ -564,7 +570,7 @@ add	x9, x9, #0x8
 b	0x218 <ltmp0+0x218>
 # tail_top:
 cmp	x9, x0
-b.ge	0xea8 <ltmp0+0xea8>
+b.ge	0xed0 <ltmp0+0xed0>
 movi.4s	v4, #0x0
 mov.16b	v5, v4
 ldr	x8, [x2, #0x10]
@@ -616,9 +622,9 @@ fmul.4s	v14, v10, v10
 fmul.4s	v15, v11, v11
 fmla.4s	v14, v8, v8
 fmla.4s	v15, v9, v9
-ldr	q4, 0x10b0 <ltmp0+0x10b0>
+ldr	q4, 0x10e0 <ltmp0+0x10e0>
 mov.16b	v5, v4
-ldr	q4, 0x10c0 <ltmp0+0x10c0>
+ldr	q4, 0x10f0 <ltmp0+0x10f0>
 mov.16b	v5, v4
 movi.4s	v4, #0x0
 mov.16b	v5, v4
@@ -632,7 +638,7 @@ fcmgt.4s	v16, v4, v14
 fcmgt.4s	v17, v5, v15
 orr.16b	v6, v6, v16
 orr.16b	v7, v7, v17
-ldr	q16, 0x10d0 <ltmp0+0x10d0>
+ldr	q16, 0x1100 <ltmp0+0x1100>
 mov.16b	v17, v16
 movi.4s	v4, #0x40, lsl #24
 mov.16b	v5, v4
@@ -674,7 +680,7 @@ fmul.4s	v6, v6, v14
 fmul.4s	v7, v7, v15
 fmla.4s	v6, v16, v4
 fmla.4s	v7, v17, v5
-ldr	q4, 0x10e0 <ltmp0+0x10e0>
+ldr	q4, 0x1110 <ltmp0+0x1110>
 mov.16b	v5, v4
 movi.4s	v16, #0x3f, lsl #24
 mov.16b	v17, v16
@@ -784,7 +790,7 @@ ldr	q8, [x15, #0x180]
 ldr	q9, [x15, #0x190]
 str	q16, [x15, #0x240]
 str	q17, [x15, #0x250]
-ldr	q16, 0x10c0 <ltmp0+0x10c0>
+ldr	q16, 0x10f0 <ltmp0+0x10f0>
 mov.16b	v17, v16
 bif.16b	v30, v16, v8
 fmaxnm.4s	v30, v28, v30
@@ -815,7 +821,7 @@ ldr	q24, [x15, #0x180]
 ldr	q25, [x15, #0x190]
 str	q16, [x15, #0x240]
 str	q17, [x15, #0x250]
-ldr	q16, 0x10b0 <ltmp0+0x10b0>
+ldr	q16, 0x10e0 <ltmp0+0x10e0>
 mov.16b	v17, v16
 bif.16b	v22, v16, v24
 fmaxnm.4s	v22, v8, v22
@@ -880,7 +886,7 @@ movi.4s	v16, #0x1
 mov.16b	v17, v16
 neg.4s	v20, v16
 ushl.4s	v18, v24, v20
-ldr	q20, 0x10e0 <ltmp0+0x10e0>
+ldr	q20, 0x1110 <ltmp0+0x1110>
 mov.16b	v21, v20
 sub.4s	v18, v20, v18
 fmul.4s	v26, v18, v18
@@ -890,11 +896,12 @@ mov.16b	v30, v28
 fmls.4s	v30, v24, v26
 mov.16b	v26, v30
 fmul.4s	v30, v26, v26
-fmul.4s	v30, v14, v30
+mov.16b	v16, v28
+fmla.4s	v16, v14, v30
+mov.16b	v30, v16
 movi.4s	v16, #0x3f, lsl #24
 mov.16b	v17, v16
 fmla.4s	v30, v16, v26
-fadd.4s	v30, v28, v30
 fmul.4s	v18, v18, v30
 fmul.4s	v26, v24, v18
 mov.16b	v30, v24
@@ -917,9 +924,12 @@ mov.16b	v30, v28
 fmls.4s	v30, v22, v26
 mov.16b	v26, v30
 fmul.4s	v30, v26, v26
-fmul.4s	v30, v14, v30
+mov.16b	v16, v28
+fmla.4s	v16, v14, v30
+mov.16b	v30, v16
+movi.4s	v16, #0x3f, lsl #24
+mov.16b	v17, v16
 fmla.4s	v30, v16, v26
-fadd.4s	v30, v28, v30
 fmul.4s	v24, v24, v30
 fmul.4s	v26, v16, v24
 fmul.4s	v30, v22, v24
@@ -939,13 +949,13 @@ ldr	w10, [x2, #0xc]
 madd	x8, x14, x10, x8
 str	b4, [x8, x9, lsl #0]
 add	x9, x9, #0x1
-b	0x8c4 <ltmp0+0x8c4>
+b	0x8dc <ltmp0+0x8dc>
 # row_done:
 add	x14, x14, #0x1
 add	x9, x1, #0x0
 ldr	x10, [sp]
 cmp	x14, x10
-b.ge	0x108c <ltmp0+0x108c>
+b.ge	0x10b4 <ltmp0+0x10b4>
 # next_row:
 movi.4s	v4, #0x0
 mov.16b	v5, v4
@@ -998,9 +1008,9 @@ fmul.4s	v14, v10, v10
 fmul.4s	v15, v11, v11
 fmla.4s	v14, v8, v8
 fmla.4s	v15, v9, v9
-ldr	q4, 0x10b0 <ltmp0+0x10b0>
+ldr	q4, 0x10e0 <ltmp0+0x10e0>
 mov.16b	v5, v4
-ldr	q4, 0x10c0 <ltmp0+0x10c0>
+ldr	q4, 0x10f0 <ltmp0+0x10f0>
 mov.16b	v5, v4
 movi.4s	v4, #0x0
 mov.16b	v5, v4
@@ -1014,7 +1024,7 @@ fcmgt.4s	v16, v4, v14
 fcmgt.4s	v17, v5, v15
 orr.16b	v6, v6, v16
 orr.16b	v7, v7, v17
-ldr	q16, 0x10d0 <ltmp0+0x10d0>
+ldr	q16, 0x1100 <ltmp0+0x1100>
 mov.16b	v17, v16
 movi.4s	v4, #0x40, lsl #24
 mov.16b	v5, v4
@@ -1056,7 +1066,7 @@ fmul.4s	v6, v6, v14
 fmul.4s	v7, v7, v15
 fmla.4s	v6, v16, v4
 fmla.4s	v7, v17, v5
-ldr	q4, 0x10e0 <ltmp0+0x10e0>
+ldr	q4, 0x1110 <ltmp0+0x1110>
 mov.16b	v5, v4
 movi.4s	v16, #0x3f, lsl #24
 mov.16b	v17, v16
@@ -1072,4 +1082,6 @@ ldp	q12, q13, [sp, #-0x40]
 ldp	q14, q15, [sp, #-0x20]
 ldp	x29, x30, [sp], #0x10
 ret
+nop
+nop
 nop

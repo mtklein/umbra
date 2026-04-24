@@ -17,7 +17,7 @@ addq	%rax, %r11
 vbroadcastss	(%r11), %ymm1
 vbroadcastss	0x4(%r11), %ymm2
 vbroadcastss	0x8(%r11), %ymm3
-vbroadcastss	0x34b(%rip), %ymm4 ## 0x394 <__text+0x394>
+vbroadcastss	0x343(%rip), %ymm4 ## 0x38c <__text+0x38c>
 movq	0x20(%rdx), %r11
 movl	0x2c(%rdx), %eax
 shlq	$0x2, %rax
@@ -43,18 +43,17 @@ movq	%rsi, %r10
 movq	%rdi, %r11
 subq	%r10, %r11
 cmpq	$0x8, %r11
-jl	0x1b3 <__text+0x1b3>
+jl	0x1af <__text+0x1af>
 # simd_body:
 vmovd	%r10d, %xmm13
 vbroadcastss	%xmm13, %ymm13
-vpaddd	0x2cd(%rip), %ymm13, %ymm13 ## 0x398 <__text+0x398>
+vpaddd	0x2c5(%rip), %ymm13, %ymm13 ## 0x390 <__text+0x390>
 vcvtdq2ps	%ymm13, %ymm13
 vmovd	%r14d, %xmm14
 vbroadcastss	%xmm14, %ymm14
 vcvtdq2ps	%ymm14, %ymm14
-vmulps	%ymm2, %ymm14, %ymm14
+vfmadd132ps	%ymm2, %ymm3, %ymm14 ## ymm14 = (ymm14 * ymm2) + ymm3
 vfmadd231ps	%ymm1, %ymm13, %ymm14 ## ymm14 = (ymm13 * ymm1) + ymm14
-vaddps	%ymm14, %ymm3, %ymm14
 vmaxps	%ymm14, %ymm0, %ymm14
 vminps	%ymm4, %ymm14, %ymm14
 vmovaps	%ymm8, %ymm13
@@ -92,12 +91,12 @@ vpxor	%ymm0, %ymm0, %ymm0
 vmovdqu	(%rsp), %ymm1
 vmovdqu	0x20(%rsp), %ymm2
 vmovdqu	0x40(%rsp), %ymm3
-vbroadcastss	0x1ea(%rip), %ymm4 ## 0x394 <__text+0x394>
+vbroadcastss	0x1e6(%rip), %ymm4 ## 0x38c <__text+0x38c>
 addq	$0x8, %r10
 jmp	0xa8 <__text+0xa8>
 # tail_top:
 cmpq	%rdi, %r10
-jge	0x2e8 <__text+0x2e8>
+jge	0x2e0 <__text+0x2e0>
 vpxor	%ymm0, %ymm0, %ymm0
 movq	0x10(%rdx), %r11
 movl	0x1c(%rdx), %eax
@@ -107,7 +106,7 @@ addq	%rax, %r11
 vbroadcastss	(%r11), %ymm1
 vbroadcastss	0x4(%r11), %ymm2
 vbroadcastss	0x8(%r11), %ymm3
-vbroadcastss	0x1a8(%rip), %ymm4 ## 0x394 <__text+0x394>
+vbroadcastss	0x1a4(%rip), %ymm4 ## 0x38c <__text+0x38c>
 movq	0x20(%rdx), %r11
 movl	0x2c(%rdx), %eax
 shlq	$0x2, %rax
@@ -129,9 +128,8 @@ vmovd	%r10d, %xmm13
 vcvtdq2ps	%ymm13, %ymm13
 vmovd	%r14d, %xmm14
 vcvtdq2ps	%ymm14, %ymm14
-vmulps	%ymm2, %ymm14, %ymm14
+vfmadd132ps	%ymm2, %ymm3, %ymm14 ## ymm14 = (ymm14 * ymm2) + ymm3
 vfmadd231ps	%ymm1, %ymm13, %ymm14 ## ymm14 = (ymm13 * ymm1) + ymm14
-vaddps	%ymm14, %ymm3, %ymm14
 vmaxps	%ymm14, %ymm0, %ymm14
 vminps	%ymm4, %ymm14, %ymm14
 vmovaps	%ymm8, %ymm13
@@ -158,12 +156,12 @@ vpunpcklwd	%xmm13, %xmm14, %xmm3 ## xmm3 = xmm14[0],xmm13[0],xmm14[1],xmm13[1],x
 vpunpckldq	%xmm3, %xmm2, %xmm4 ## xmm4 = xmm2[0],xmm3[0],xmm2[1],xmm3[1]
 vmovq	%xmm4, (%r11,%r10,8)
 addq	$0x1, %r10
-jmp	0x1b3 <__text+0x1b3>
+jmp	0x1af <__text+0x1af>
 # row_done:
 addq	$0x1, %r14
 movq	%rsi, %r10
 cmpq	%r12, %r14
-jge	0x380 <__text+0x380>
+jge	0x378 <__text+0x378>
 # next_row:
 vpxor	%ymm0, %ymm0, %ymm0
 movq	0x10(%rdx), %r11
@@ -174,7 +172,7 @@ addq	%rax, %r11
 vbroadcastss	(%r11), %ymm1
 vbroadcastss	0x4(%r11), %ymm2
 vbroadcastss	0x8(%r11), %ymm3
-vbroadcastss	0x6c(%rip), %ymm4 ## 0x394 <__text+0x394>
+vbroadcastss	0x6c(%rip), %ymm4 ## 0x38c <__text+0x38c>
 movq	0x20(%rdx), %r11
 movl	0x2c(%rdx), %eax
 shlq	$0x2, %rax
