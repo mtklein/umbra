@@ -6,9 +6,6 @@
 // TODO: switch to an animated affine matrix and match scale with SDF Text
 // slides so they can be directly compared
 
-// TODO: the AA along the edge of the lowercase r's ear is inconsistent,
-// jagged and uneven.  What's reason for that?
-
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Weverything"
 #include "../third_party/stb/stb_truetype.h"
@@ -35,9 +32,11 @@ struct slug_cov_ctx {
 // comes from the 0x2E74 sign-bit lookup over (q0s, q1s, q2s) -- bit 0 picks
 // t1, bit 8 picks t2.  Per-ray partial coverage is sum of saturate(e + 0.5)
 // with Slug's sign convention; per-ray weight is max saturate(1 - 2|e|)
-// across contributing roots.  The combine takes the weighted mean (high
-// coverage when either ray is cleanly centered) and falls back to
-// min(|xcov|,|ycov|) so a near-tangent ray can't drag coverage to zero.
+// across contributing roots.  For a straight edge spanning the pixel, the
+// ray more perpendicular to the edge carries the exact interior width, and
+// its weight is highest -- so the combine picks whichever of |xa|, |ya| has
+// the higher weight, falling back to min(|xa|,|ya|) so a near-tangent ray
+// can't drag coverage to zero.
 struct slug_consts {
     umbra_val32 z, o, tw, half, ep;
     umbra_val32 sb31, i_one, i_two, i_8, lut;
@@ -166,13 +165,12 @@ static umbra_val32 coverage_slug_winding(void *vctx, struct umbra_builder *b,
                       xw = umbra_load_var32(b, xwgt),
                       yw = umbra_load_var32(b, ywgt);
 
-    umbra_val32 const num = umbra_abs_f32(b, umbra_add_f32(b,
-                                umbra_mul_f32(b, xa, xw),
-                                umbra_mul_f32(b, ya, yw)));
-    umbra_val32 const den = umbra_max_f32(b, umbra_add_f32(b, xw, yw), c.ep);
-    umbra_val32 const avg = umbra_div_f32(b, num, den);
-    umbra_val32 const fallback = umbra_min_f32(b, umbra_abs_f32(b, xa), umbra_abs_f32(b, ya));
-    umbra_val32 const cov = umbra_min_f32(b, umbra_max_f32(b, avg, fallback), c.o);
+    umbra_val32 const axa = umbra_abs_f32(b, xa),
+                      aya = umbra_abs_f32(b, ya);
+    umbra_val32 const pick_x  = umbra_lt_f32(b, yw, xw);
+    umbra_val32 const primary = umbra_sel_32(b, pick_x, axa, aya);
+    umbra_val32 const fallback = umbra_min_f32(b, axa, aya);
+    umbra_val32 const cov = umbra_min_f32(b, umbra_max_f32(b, primary, fallback), c.o);
 
     return umbra_sel_32(b, in, cov, c.z);
 }
