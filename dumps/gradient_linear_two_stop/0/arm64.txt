@@ -74,13 +74,13 @@ stp	x13, x15, [sp, #-0x10]!
 # loop_top:
 sub	x10, x0, x9
 cmp	x10, #0x8
-b.lt	0x2a8 <ltmp0+0x2a8>
+b.lt	0x2a0 <ltmp0+0x2a0>
 # simd_body:
 dup.4s	v14, w9
 mov.16b	v15, v14
-ldr	q4, 0x570 <ltmp0+0x570>
+ldr	q4, 0x560 <ltmp0+0x560>
 add.4s	v14, v14, v4
-ldr	q4, 0x580 <ltmp0+0x580>
+ldr	q4, 0x570 <ltmp0+0x570>
 add.4s	v15, v15, v4
 movi.4s	v4, #0x0
 mov.16b	v5, v4
@@ -94,18 +94,16 @@ movi.4s	v6, #0x0
 mov.16b	v7, v6
 scvtf.4s	v4, v4
 scvtf.4s	v5, v5
-mov.16b	v6, v18
-fmla.4s	v6, v4, v16
-mov.16b	v4, v6
-mov.16b	v7, v19
-fmla.4s	v7, v5, v17
-mov.16b	v5, v7
+fmul.4s	v4, v4, v16
+fmul.4s	v5, v5, v17
 ldr	q6, [x15]
 ldr	q7, [x15, #0x10]
 fmla.4s	v4, v14, v6
 fmla.4s	v5, v15, v7
 movi.4s	v14, #0x0
 mov.16b	v15, v14
+fadd.4s	v4, v18, v4
+fadd.4s	v5, v19, v5
 fmaxnm.4s	v4, v14, v4
 fmaxnm.4s	v5, v15, v5
 fminnm.4s	v4, v4, v20
@@ -173,7 +171,7 @@ add	x9, x9, #0x8
 b	0x120 <ltmp0+0x120>
 # tail_top:
 cmp	x9, x0
-b.ge	0x458 <ltmp0+0x458>
+b.ge	0x44c <ltmp0+0x44c>
 movi.4s	v4, #0x0
 mov.16b	v5, v4
 ldr	x8, [x2, #0x10]
@@ -235,14 +233,13 @@ str	q7, [x15, #0x70]
 movi.4s	v6, #0x0
 mov.16b	v7, v6
 scvtf.4s	v4, v4
-mov.16b	v6, v18
-fmla.4s	v6, v4, v16
-mov.16b	v4, v6
+fmul.4s	v4, v4, v16
 ldr	q6, [x15, #0x60]
 ldr	q7, [x15, #0x70]
 fmla.4s	v4, v14, v6
 movi.4s	v14, #0x0
 mov.16b	v15, v14
+fadd.4s	v4, v18, v4
 fmaxnm.4s	v4, v14, v4
 fminnm.4s	v4, v4, v20
 str	q6, [x15, #0x60]
@@ -279,13 +276,13 @@ lsl	x10, x9, #3
 add	x10, x8, x10
 str	d24, [x10]
 add	x9, x9, #0x1
-b	0x2a8 <ltmp0+0x2a8>
+b	0x2a0 <ltmp0+0x2a0>
 # row_done:
 add	x14, x14, #0x1
 add	x9, x1, #0x0
 ldr	x10, [sp]
 cmp	x14, x10
-b.ge	0x544 <ltmp0+0x544>
+b.ge	0x538 <ltmp0+0x538>
 # next_row:
 movi.4s	v4, #0x0
 mov.16b	v5, v4
@@ -350,6 +347,5 @@ ldp	q12, q13, [sp, #-0x40]
 ldp	q14, q15, [sp, #-0x20]
 ldp	x29, x30, [sp], #0x10
 ret
-nop
 nop
 nop
