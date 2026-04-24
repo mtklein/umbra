@@ -290,12 +290,8 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (b->inst[y.id].op == op_square_f32) {
         return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
     }
-    // Distribute through min / max / sel when an arm is a mul or square,
-    // so the recursive add above collapses that arm into fma / square_add.
-    // max(a,b)+c == max(a+c, b+c) exactly in IEEE-754 (adding the same c
-    // preserves ordering), and likewise for min and for each branch of
-    // a mask-select (sel_32 dispatches per lane, so adding c inside each
-    // branch preserves the selection).
+
+    // max(a,b)+c == max(a+c,b+c) and similar for min,sel.
     for (int swap = 0; swap < 2; swap++) {
         umbra_val32 const X = swap ? y : x,
                           Y = swap ? x : y;

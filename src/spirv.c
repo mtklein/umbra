@@ -416,31 +416,15 @@ static uint32_t spv_glsl_3(SpvBuilder *b, uint32_t type, uint32_t ext_op,
     return id;
 }
 
-// FP add/sub/mul that refuse to let the backend compiler contract them
-// into an fma.  When `flags & SPIRV_NO_CONTRACT` we lower each op to an
-// explicit GLSLstd450 Fma with a trivial factor, matching SPIRV-Cross's
-// spvFAdd/spvFMul helpers -- needed for backends (notably naga) that
-// don't honor ContractionOff.
-static uint32_t spv_fadd(SpvBuilder *b, int flags, uint32_t xf, uint32_t yf) {
-    if (flags & SPIRV_NO_CONTRACT) {
-        return spv_glsl_3(b, b->t_f32, GLSLstd450Fma,
-                          spv_const_f32(b, 1.0f), xf, yf);
-    }
-    return spv_binop(b, SpvOpFAdd, b->t_f32, xf, yf);
+// Match behavior of #pragma METAL fp contract(off) by hiding unfused ops in our own "fused" ops.
+static uint32_t spv_fadd(SpvBuilder *b, uint32_t xf, uint32_t yf) {
+    return spv_glsl_3(b, b->t_f32, GLSLstd450Fma, spv_const_f32(b, 1.0f), xf, yf);
 }
-static uint32_t spv_fsub(SpvBuilder *b, int flags, uint32_t xf, uint32_t yf) {
-    if (flags & SPIRV_NO_CONTRACT) {
-        return spv_glsl_3(b, b->t_f32, GLSLstd450Fma,
-                          spv_const_f32(b, -1.0f), yf, xf);
-    }
-    return spv_binop(b, SpvOpFSub, b->t_f32, xf, yf);
+static uint32_t spv_fsub(SpvBuilder *b, uint32_t xf, uint32_t yf) {
+    return spv_glsl_3(b, b->t_f32, GLSLstd450Fma, spv_const_f32(b, -1.0f), yf, xf);
 }
-static uint32_t spv_fmul(SpvBuilder *b, int flags, uint32_t xf, uint32_t yf) {
-    if (flags & SPIRV_NO_CONTRACT) {
-        return spv_glsl_3(b, b->t_f32, GLSLstd450Fma,
-                          xf, yf, spv_const_f32(b, 0.0f));
-    }
-    return spv_binop(b, SpvOpFMul, b->t_f32, xf, yf);
+static uint32_t spv_fmul(SpvBuilder *b, uint32_t xf, uint32_t yf) {
+    return spv_glsl_3(b, b->t_f32, GLSLstd450Fma, xf, yf, spv_const_f32(b, 0.0f));
 }
 
 // OpSelect: result = cond ? a : b
@@ -696,9 +680,6 @@ static _Bool produces_float(enum op op) {
 // Build the full SPIR-V binary for a flat IR.
 struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                                int flags) {
-#if defined(UMBRA_NO_BACKEND_FP_CONTRACT)
-    flags |= SPIRV_NO_CONTRACT;
-#endif
     struct spirv_result result = {0};
 
     SpvBuilder B;
@@ -1537,19 +1518,16 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                 } break;
 
                 case op_add_f32:
-                    B.val[i] = spv_fadd(&B, flags,
-                                        as_f32(&B, get_val(&B, inst->x), xid),
-                                        as_f32(&B, get_val(&B, inst->y), yid));
+                    B.val[i] = spv_fadd(&B, as_f32(&B, get_val(&B, inst->x), xid)
+                                          , as_f32(&B, get_val(&B, inst->y), yid));
                     break;
                 case op_sub_f32:
-                    B.val[i] = spv_fsub(&B, flags,
-                                        as_f32(&B, get_val(&B, inst->x), xid),
-                                        as_f32(&B, get_val(&B, inst->y), yid));
+                    B.val[i] = spv_fsub(&B, as_f32(&B, get_val(&B, inst->x), xid)
+                                          , as_f32(&B, get_val(&B, inst->y), yid));
                     break;
                 case op_mul_f32:
-                    B.val[i] = spv_fmul(&B, flags,
-                                        as_f32(&B, get_val(&B, inst->x), xid),
-                                        as_f32(&B, get_val(&B, inst->y), yid));
+                    B.val[i] = spv_fmul(&B, as_f32(&B, get_val(&B, inst->x), xid)
+                                          , as_f32(&B, get_val(&B, inst->y), yid));
                     break;
                 case op_min_f32:
                     B.val[i] = spv_glsl_2(&B, B.t_f32, GLSLstd450FMin,
@@ -1567,7 +1545,7 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     break;
                 case op_square_f32: {
                     uint32_t xf = as_f32(&B, get_val(&B, inst->x), xid);
-                    B.val[i] = spv_fmul(&B, flags, xf, xf);
+                    B.val[i] = spv_fmul(&B, xf, xf);
                 } break;
                 case op_round_f32:
                     B.val[i] = spv_glsl_1(&B, B.t_f32, GLSLstd450RoundEven,
