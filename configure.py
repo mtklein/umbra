@@ -163,8 +163,10 @@ DUMPS = [
     ('sdf_rounded_rect',                2),
     ('sdf_capsule',                     2),
     ('sdf_halfplane',                   2),
-    ('sdf_text',                        2),
     ('sdf_n_gon',                       2),
+    ('sdf_text_outline',                2),
+    ('sdf_text_analytic',               2),
+    ('sdf_text_polyline',               2),
     ('slug',                            1),
 ]
 

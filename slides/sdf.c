@@ -466,21 +466,117 @@ SLIDE(slide_sdf_halfplane) {
     return &st->common.base;
 }
 
+// N-gon.
+
+#define NGON_SIDES 6
+
+struct ngon_sdf_ctx {
+    int              n_sides, :32;
+    struct umbra_buf hp;
+};
+
+static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
+                                  umbra_interval x, umbra_interval y) {
+    struct ngon_sdf_ctx const *self = ctx;
+    umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
+    // hp_data is recomputed every frame by ngon_animate; not host-readonly.
+    umbra_ptr const data = umbra_bind_buf(b, &self->hp);
+    umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_sides));
+
+    umbra_var32 lo_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));
+    umbra_var32 hi_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));
+
+    umbra_val32 const j = umbra_loop(b, n); {
+        umbra_val32 const idx = umbra_mul_i32(b, j, umbra_imm_i32(b, 3));
+        umbra_interval const nx = umbra_interval_exact(umbra_gather_32(b, data, idx)),
+                             ny = umbra_interval_exact(
+                                 umbra_gather_32(b, data,
+                                     umbra_add_i32(b, idx, umbra_imm_i32(b, 1)))),
+                             d  = umbra_interval_exact(
+                                 umbra_gather_32(b, data,
+                                     umbra_add_i32(b, idx, umbra_imm_i32(b, 2))));
+        umbra_interval const hp = umbra_interval_sub_f32(b,
+                                      umbra_interval_add_f32(b,
+                                          umbra_interval_mul_f32(b, nx, x),
+                                          umbra_interval_mul_f32(b, ny, y)),
+                                      d);
+        umbra_store_var32(b, lo_var, umbra_max_f32(b, umbra_load_var32(b, lo_var), hp.lo));
+        umbra_store_var32(b, hi_var, umbra_max_f32(b, umbra_load_var32(b, hi_var), hp.hi));
+    } umbra_end_loop(b);
+
+    return (umbra_interval){umbra_load_var32(b, lo_var), umbra_load_var32(b, hi_var)};
+}
+
+struct ngon_slide {
+    struct sdf_common   common;
+    float               cx, cy, r, angle;
+    float              *hp_data;
+    struct ngon_sdf_ctx sdf;
+};
+
+static void ngon_animate(struct slide *s, double secs) {
+    struct ngon_slide *st = (struct ngon_slide *)s;
+    st->cx    = (float)s->w * 0.5f;
+    st->cy    = (float)s->h * 0.5f;
+    st->r     = (float)(s->w < s->h ? s->w : s->h) * 0.3f;
+    st->angle = (float)secs;
+    for (int i = 0; i < NGON_SIDES; i++) {
+        float const a = st->angle + (float)i * (2.0f * 3.14159265f / NGON_SIDES);
+        float const vx = st->cx + st->r * cosf(a),
+                    vy = st->cy + st->r * sinf(a);
+        float const a2 = st->angle + (float)(i + 1) * (2.0f * 3.14159265f / NGON_SIDES);
+        float const wx = st->cx + st->r * cosf(a2),
+                    wy = st->cy + st->r * sinf(a2);
+        float const ex = wx - vx,
+                    ey = wy - vy;
+        float const mag = sqrtf(ex * ex + ey * ey);
+        float const nx = mag > 0 ?  ey / mag : 0,
+                    ny = mag > 0 ? -ex / mag : 1;
+        st->hp_data[i * 3]     = nx;
+        st->hp_data[i * 3 + 1] = ny;
+        st->hp_data[i * 3 + 2] = nx * vx + ny * vy;
+    }
+    st->sdf.n_sides = NGON_SIDES;
+    st->sdf.hp      = (struct umbra_buf){.ptr = st->hp_data, .count = 3 * NGON_SIDES};
+}
+
+static void ngon_free(struct slide *s) {
+    struct ngon_slide *st = (struct ngon_slide *)s;
+    free(st->hp_data);
+    free(s);
+}
+
+SLIDE(slide_sdf_ngon) {
+    struct ngon_slide *st = calloc(1, sizeof *st);
+    st->common.color   = (umbra_color){0.8f, 0.8f, 0.2f, 1};
+    st->hp_data        = malloc(3 * NGON_SIDES * sizeof(float));
+    st->common.base    = (struct slide){
+        .title   = "SDF N-Gon",
+        .bg      = {0.08f, 0.10f, 0.14f, 1},
+        .free    = ngon_free,
+        .animate = ngon_animate,
+        SDF_COMMON_HOOKS,
+    };
+    st->common.base.sdf_fn  = ngon_build;
+    st->common.base.sdf_ctx = &st->sdf;
+    return &st->common.base;
+}
+
 // SDF Text (outline approximation).
 //
 // Unsigned distance to each curve's P0→P2 chord — the control point P1 is
 // ignored.  Renders as a stroke-like outline; kept alongside the polyline
 // and analytic slides as the simplest baseline in the comparison.
 
-struct sdf_text_sdf {
+struct sdf_text_outline_sdf {
     float            scale_x, scale_y, off_x, off_y;
     int              n_curves, :32;
     struct umbra_buf curves;
 };
 
-static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
-                                      umbra_interval x, umbra_interval y) {
-    struct sdf_text_sdf const *self = ctx;
+static umbra_interval sdf_text_outline_build(void *ctx, struct umbra_builder *b,
+                                             umbra_interval x, umbra_interval y) {
+    struct sdf_text_outline_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves));
@@ -506,7 +602,7 @@ static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
     umbra_imm_i32(b, 6);
 
     // Track squared distance bounds; sqrt them once after the loop.  See
-    // sdf_polyline_text_build for the same trick.
+    // sdf_text_polyline_build for the same trick.
     umbra_var32 lo2_var = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f));
     umbra_var32 hi2_var = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f));
 
@@ -565,14 +661,14 @@ static umbra_interval sdf_text_build(void *ctx, struct umbra_builder *b,
     return umbra_interval_sub_f32(b, min_dist, umbra_interval_exact(umbra_imm_f32(b, 1.5f)));
 }
 
-struct sdf_text_slide {
-    struct sdf_common   common;
-    struct slug_curves  slug;
-    struct sdf_text_sdf sdf;
+struct sdf_text_outline_slide {
+    struct sdf_common           common;
+    struct slug_curves          slug;
+    struct sdf_text_outline_sdf sdf;
 };
 
-static void sdf_text_init(struct slide *s) {
-    struct sdf_text_slide *st = (struct sdf_text_slide *)s;
+static void sdf_text_outline_init(struct slide *s) {
+    struct sdf_text_outline_slide *st = (struct sdf_text_outline_slide *)s;
     st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
 
     float const gw = st->slug.w,
@@ -591,28 +687,28 @@ static void sdf_text_init(struct slide *s) {
                                            .count = st->slug.count * 6};
 }
 
-static void sdf_text_free(struct slide *s) {
-    struct sdf_text_slide *st = (struct sdf_text_slide *)s;
+static void sdf_text_outline_free(struct slide *s) {
+    struct sdf_text_outline_slide *st = (struct sdf_text_outline_slide *)s;
     slug_free(&st->slug);
     free(s);
 }
 
-SLIDE(slide_sdf_text) {
-    struct sdf_text_slide *st = calloc(1, sizeof *st);
+SLIDE(slide_sdf_text_outline) {
+    struct sdf_text_outline_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
     st->common.base    = (struct slide){
-        .title = "SDF Text",
+        .title = "SDF Text Outline",
         .bg    = {0.08f, 0.10f, 0.14f, 1},
-        .init  = sdf_text_init,
-        .free  = sdf_text_free,
+        .init  = sdf_text_outline_init,
+        .free  = sdf_text_outline_free,
         SDF_COMMON_HOOKS,
     };
-    st->common.base.sdf_fn  = sdf_text_build;
+    st->common.base.sdf_fn  = sdf_text_outline_build;
     st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }
 
-// SDF Polyline Text.
+// SDF Text Polyline.
 //
 // Text rendered as a SIGNED distance field.  The curve buffer holds quadratic
 // Beziers in (P0, P1, P2) form -- the same data slug.c emits -- and the
@@ -629,16 +725,16 @@ SLIDE(slide_sdf_text) {
 
 enum { SDF_POLYLINE_SAMPLES = 8 };
 
-struct sdf_polyline_text_sdf {
+struct sdf_text_polyline_sdf {
     float            scale_x, scale_y, off_x, off_y;
     int              n_curves;
     int              lg_n;    // log2(samples_per_curve); mask_n and rcp_n derive from this
     struct umbra_buf curves;
 };
 
-static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b,
+static umbra_interval sdf_text_polyline_build(void *ctx, struct umbra_builder *b,
                                                umbra_interval x, umbra_interval y) {
-    struct sdf_polyline_text_sdf const *self = ctx;
+    struct sdf_text_polyline_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
 
@@ -765,14 +861,14 @@ static umbra_interval sdf_polyline_text_build(void *ctx, struct umbra_builder *b
     };
 }
 
-struct sdf_polyline_text_slide {
+struct sdf_text_polyline_slide {
     struct sdf_common            common;
     struct slug_curves           slug;
-    struct sdf_polyline_text_sdf sdf;
+    struct sdf_text_polyline_sdf sdf;
 };
 
-static void sdf_polyline_text_init(struct slide *s) {
-    struct sdf_polyline_text_slide *st = (struct sdf_polyline_text_slide *)s;
+static void sdf_text_polyline_init(struct slide *s) {
+    struct sdf_text_polyline_slide *st = (struct sdf_text_polyline_slide *)s;
     st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
 
     float const gw = st->slug.w,
@@ -792,13 +888,13 @@ static void sdf_polyline_text_init(struct slide *s) {
                                            .count = st->slug.count * 6};
 }
 
-static void sdf_polyline_text_free(struct slide *s) {
-    struct sdf_polyline_text_slide *st = (struct sdf_polyline_text_slide *)s;
+static void sdf_text_polyline_free(struct slide *s) {
+    struct sdf_text_polyline_slide *st = (struct sdf_text_polyline_slide *)s;
     slug_free(&st->slug);
     free(s);
 }
 
-// SDF Analytic Text.
+// SDF Text Analytic.
 //
 // Signed distance field where per-curve distance is computed analytically
 // via Inigo Quilez's Cardano-form solution of the quadratic-Bezier distance
@@ -824,15 +920,15 @@ static void sdf_polyline_text_free(struct slide *s) {
 // Bounds returned as a Lipschitz-1 ball around the tile center, matching
 // the polyline slide.
 
-struct sdf_analytic_text_sdf {
+struct sdf_text_analytic_sdf {
     float            scale_x, scale_y, off_x, off_y;
     int              n_curves, :32;
     struct umbra_buf curves;
 };
 
-static umbra_interval sdf_analytic_text_build(void *ctx, struct umbra_builder *b,
+static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b,
                                                umbra_interval x, umbra_interval y) {
-    struct sdf_analytic_text_sdf const *self = ctx;
+    struct sdf_text_analytic_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
     umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
     umbra_val32 const n  = umbra_uniform_32(b, u, SLOT(n_curves));
@@ -1090,14 +1186,14 @@ static umbra_interval sdf_analytic_text_build(void *ctx, struct umbra_builder *b
     };
 }
 
-struct sdf_analytic_text_slide {
+struct sdf_text_analytic_slide {
     struct sdf_common            common;
     struct slug_curves           slug;
-    struct sdf_analytic_text_sdf sdf;
+    struct sdf_text_analytic_sdf sdf;
 };
 
-static void sdf_analytic_text_init(struct slide *s) {
-    struct sdf_analytic_text_slide *st = (struct sdf_analytic_text_slide *)s;
+static void sdf_text_analytic_init(struct slide *s) {
+    struct sdf_text_analytic_slide *st = (struct sdf_text_analytic_slide *)s;
     st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
 
     float const gw = st->slug.w,
@@ -1116,134 +1212,38 @@ static void sdf_analytic_text_init(struct slide *s) {
                                            .count = st->slug.count * 6};
 }
 
-static void sdf_analytic_text_free(struct slide *s) {
-    struct sdf_analytic_text_slide *st = (struct sdf_analytic_text_slide *)s;
+static void sdf_text_analytic_free(struct slide *s) {
+    struct sdf_text_analytic_slide *st = (struct sdf_text_analytic_slide *)s;
     slug_free(&st->slug);
     free(s);
 }
 
-SLIDE(slide_sdf_analytic_text) {
-    struct sdf_analytic_text_slide *st = calloc(1, sizeof *st);
+SLIDE(slide_sdf_text_analytic) {
+    struct sdf_text_analytic_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
     st->common.base    = (struct slide){
-        .title = "SDF Analytic Text",
+        .title = "SDF Text Analytic",
         .bg    = {0.08f, 0.10f, 0.14f, 1},
-        .init  = sdf_analytic_text_init,
-        .free  = sdf_analytic_text_free,
+        .init  = sdf_text_analytic_init,
+        .free  = sdf_text_analytic_free,
         SDF_COMMON_HOOKS,
     };
-    st->common.base.sdf_fn  = sdf_analytic_text_build;
+    st->common.base.sdf_fn  = sdf_text_analytic_build;
     st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }
 
-SLIDE(slide_sdf_polyline_text) {
-    struct sdf_polyline_text_slide *st = calloc(1, sizeof *st);
+SLIDE(slide_sdf_text_polyline) {
+    struct sdf_text_polyline_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
     st->common.base    = (struct slide){
-        .title = "SDF Polyline Text",
+        .title = "SDF Text Polyline",
         .bg    = {0.08f, 0.10f, 0.14f, 1},
-        .init  = sdf_polyline_text_init,
-        .free  = sdf_polyline_text_free,
+        .init  = sdf_text_polyline_init,
+        .free  = sdf_text_polyline_free,
         SDF_COMMON_HOOKS,
     };
-    st->common.base.sdf_fn  = sdf_polyline_text_build;
-    st->common.base.sdf_ctx = &st->sdf;
-    return &st->common.base;
-}
-
-// N-gon.
-
-#define NGON_SIDES 6
-
-struct ngon_sdf_ctx {
-    int              n_sides, :32;
-    struct umbra_buf hp;
-};
-
-static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
-                                  umbra_interval x, umbra_interval y) {
-    struct ngon_sdf_ctx const *self = ctx;
-    umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    // hp_data is recomputed every frame by ngon_animate; not host-readonly.
-    umbra_ptr const data = umbra_bind_buf(b, &self->hp);
-    umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_sides));
-
-    umbra_var32 lo_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));
-    umbra_var32 hi_var = umbra_declare_var32(b, umbra_imm_f32(b, -1e9f));
-
-    umbra_val32 const j = umbra_loop(b, n); {
-        umbra_val32 const idx = umbra_mul_i32(b, j, umbra_imm_i32(b, 3));
-        umbra_interval const nx = umbra_interval_exact(umbra_gather_32(b, data, idx)),
-                             ny = umbra_interval_exact(
-                                 umbra_gather_32(b, data,
-                                     umbra_add_i32(b, idx, umbra_imm_i32(b, 1)))),
-                             d  = umbra_interval_exact(
-                                 umbra_gather_32(b, data,
-                                     umbra_add_i32(b, idx, umbra_imm_i32(b, 2))));
-        umbra_interval const hp = umbra_interval_sub_f32(b,
-                                      umbra_interval_add_f32(b,
-                                          umbra_interval_mul_f32(b, nx, x),
-                                          umbra_interval_mul_f32(b, ny, y)),
-                                      d);
-        umbra_store_var32(b, lo_var, umbra_max_f32(b, umbra_load_var32(b, lo_var), hp.lo));
-        umbra_store_var32(b, hi_var, umbra_max_f32(b, umbra_load_var32(b, hi_var), hp.hi));
-    } umbra_end_loop(b);
-
-    return (umbra_interval){umbra_load_var32(b, lo_var), umbra_load_var32(b, hi_var)};
-}
-
-struct ngon_slide {
-    struct sdf_common   common;
-    float               cx, cy, r, angle;
-    float              *hp_data;
-    struct ngon_sdf_ctx sdf;
-};
-
-static void ngon_animate(struct slide *s, double secs) {
-    struct ngon_slide *st = (struct ngon_slide *)s;
-    st->cx    = (float)s->w * 0.5f;
-    st->cy    = (float)s->h * 0.5f;
-    st->r     = (float)(s->w < s->h ? s->w : s->h) * 0.3f;
-    st->angle = (float)secs;
-    for (int i = 0; i < NGON_SIDES; i++) {
-        float const a = st->angle + (float)i * (2.0f * 3.14159265f / NGON_SIDES);
-        float const vx = st->cx + st->r * cosf(a),
-                    vy = st->cy + st->r * sinf(a);
-        float const a2 = st->angle + (float)(i + 1) * (2.0f * 3.14159265f / NGON_SIDES);
-        float const wx = st->cx + st->r * cosf(a2),
-                    wy = st->cy + st->r * sinf(a2);
-        float const ex = wx - vx,
-                    ey = wy - vy;
-        float const mag = sqrtf(ex * ex + ey * ey);
-        float const nx = mag > 0 ?  ey / mag : 0,
-                    ny = mag > 0 ? -ex / mag : 1;
-        st->hp_data[i * 3]     = nx;
-        st->hp_data[i * 3 + 1] = ny;
-        st->hp_data[i * 3 + 2] = nx * vx + ny * vy;
-    }
-    st->sdf.n_sides = NGON_SIDES;
-    st->sdf.hp      = (struct umbra_buf){.ptr = st->hp_data, .count = 3 * NGON_SIDES};
-}
-
-static void ngon_free(struct slide *s) {
-    struct ngon_slide *st = (struct ngon_slide *)s;
-    free(st->hp_data);
-    free(s);
-}
-
-SLIDE(slide_sdf_ngon) {
-    struct ngon_slide *st = calloc(1, sizeof *st);
-    st->common.color   = (umbra_color){0.8f, 0.8f, 0.2f, 1};
-    st->hp_data        = malloc(3 * NGON_SIDES * sizeof(float));
-    st->common.base    = (struct slide){
-        .title   = "SDF N-Gon",
-        .bg      = {0.08f, 0.10f, 0.14f, 1},
-        .free    = ngon_free,
-        .animate = ngon_animate,
-        SDF_COMMON_HOOKS,
-    };
-    st->common.base.sdf_fn  = ngon_build;
+    st->common.base.sdf_fn  = sdf_text_polyline_build;
     st->common.base.sdf_ctx = &st->sdf;
     return &st->common.base;
 }
