@@ -299,44 +299,6 @@ umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
         return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
     }
 
-    // TODO: remove.  max(a,b)+c == max(a+c,b+c) algebraically, but as two
-    // independent rounded adds it can disagree with the single-rounded form by
-    // a ULP, and NaN/±0 tie-breaking in max/min/sel is implementation-defined
-    // and sensitive to which lane we feed through.  Same goes for the sel
-    // variant below.
-    for (int swap = 0; swap < 2; swap++) {
-        umbra_val32 const X = swap ? y : x,
-                          Y = swap ? x : y;
-        enum op const op = b->inst[X.id].op;
-        if (op == op_max_f32 || op == op_min_f32) {
-            umbra_val32 const lhs = b->inst[X.id].x.v32,
-                              rhs = b->inst[X.id].y.v32;
-            enum op const lhs_op = b->inst[lhs.id].op,
-                          rhs_op = b->inst[rhs.id].op;
-            if (lhs_op == op_mul_f32 || lhs_op == op_square_f32
-             || rhs_op == op_mul_f32 || rhs_op == op_square_f32) {
-                umbra_val32 const la = umbra_add_f32(b, lhs, Y),
-                                  lb = umbra_add_f32(b, rhs, Y);
-                return math(b, op, .x = (val){.v32 = la}, .y = (val){.v32 = lb}).v32;
-            }
-        }
-        if (op == op_sel_32) {
-            val         const cond = b->inst[X.id].x;
-            umbra_val32 const t = b->inst[X.id].y.v32,
-                              f = b->inst[X.id].z.v32;
-            enum op const t_op = b->inst[t.id].op,
-                          f_op = b->inst[f.id].op;
-            if (t_op == op_mul_f32 || t_op == op_square_f32
-             || f_op == op_mul_f32 || f_op == op_square_f32) {
-                umbra_val32 const lt = umbra_add_f32(b, t, Y),
-                                  lf = umbra_add_f32(b, f, Y);
-                return math(b, op_sel_32,
-                            .x = cond,
-                            .y = (val){.v32 = lt},
-                            .z = (val){.v32 = lf}).v32;
-            }
-        }
-    }
     return math(b, op_add_f32, VX(x), VY(y)).v32;
 }
 
