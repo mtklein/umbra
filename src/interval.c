@@ -51,6 +51,22 @@ umbra_interval umbra_interval_mul_f32(struct umbra_builder *b,
     };
 }
 
+umbra_interval umbra_interval_fma_f32(struct umbra_builder *b,
+                                      umbra_interval a, umbra_interval c, umbra_interval d) {
+    if (exact(a) && exact(c) && exact(d)) {
+        return umbra_interval_exact(umbra_fma_f32(b, a.lo, c.lo, d.lo));
+    }
+    return umbra_interval_add_f32(b, umbra_interval_mul_f32(b, a, c), d);
+}
+
+umbra_interval umbra_interval_fms_f32(struct umbra_builder *b,
+                                      umbra_interval a, umbra_interval c, umbra_interval d) {
+    if (exact(a) && exact(c) && exact(d)) {
+        return umbra_interval_exact(umbra_fms_f32(b, a.lo, c.lo, d.lo));
+    }
+    return umbra_interval_sub_f32(b, d, umbra_interval_mul_f32(b, a, c));
+}
+
 // If c straddles or touches zero the true set {a/x : x in c} is unbounded,
 // so we collapse to (-inf, +inf) rather than the misleadingly narrow
 // {1/c.hi, 1/c.lo} recip that only holds when c is sign-consistent.

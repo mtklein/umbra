@@ -10,6 +10,10 @@ umbra_interval umbra_interval_exact(umbra_val32);
 umbra_interval umbra_interval_add_f32 (struct umbra_builder*, umbra_interval, umbra_interval);
 umbra_interval umbra_interval_sub_f32 (struct umbra_builder*, umbra_interval, umbra_interval);
 umbra_interval umbra_interval_mul_f32 (struct umbra_builder*, umbra_interval, umbra_interval);
+umbra_interval umbra_interval_fma_f32 (struct umbra_builder*,
+                                       umbra_interval, umbra_interval, umbra_interval);
+umbra_interval umbra_interval_fms_f32 (struct umbra_builder*,
+                                       umbra_interval, umbra_interval, umbra_interval);
 umbra_interval umbra_interval_div_f32 (struct umbra_builder*, umbra_interval, umbra_interval);
 umbra_interval umbra_interval_min_f32 (struct umbra_builder*, umbra_interval, umbra_interval);
 umbra_interval umbra_interval_max_f32 (struct umbra_builder*, umbra_interval, umbra_interval);

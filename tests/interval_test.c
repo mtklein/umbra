@@ -74,6 +74,41 @@ static iv eval_unary(umbra_interval (*op)(struct umbra_builder*, umbra_interval)
     return (iv){lo_out, hi_out};
 }
 
+static iv eval_ternary(umbra_interval (*op)(struct umbra_builder*,
+                                            umbra_interval, umbra_interval, umbra_interval),
+                       iv a, iv b, iv c) {
+    float uniforms[] = {a.lo, a.hi, b.lo, b.hi, c.lo, c.hi};
+    float lo_out = 0, hi_out = 0;
+    struct umbra_buf lo_buf = {.ptr = &lo_out, .count = 1},
+                     hi_buf = {.ptr = &hi_out, .count = 1};
+
+    struct umbra_builder *bld = umbra_builder();
+    umbra_ptr const u    = umbra_bind_uniforms(bld, uniforms, 6);
+    umbra_ptr const lop  = umbra_bind_buf(bld, &lo_buf);
+    umbra_ptr const hip  = umbra_bind_buf(bld, &hi_buf);
+    umbra_interval const ia = {umbra_uniform_32(bld, u, 0),
+                               umbra_uniform_32(bld, u, 1)};
+    umbra_interval const ib = {umbra_uniform_32(bld, u, 2),
+                               umbra_uniform_32(bld, u, 3)};
+    umbra_interval const ic = {umbra_uniform_32(bld, u, 4),
+                               umbra_uniform_32(bld, u, 5)};
+    umbra_interval const r = op(bld, ia, ib, ic);
+    umbra_store_32(bld, lop, r.lo);
+    umbra_store_32(bld, hip, r.hi);
+
+    struct umbra_flat_ir *ir = umbra_flat_ir(bld);
+    umbra_builder_free(bld);
+    struct umbra_backend *be = umbra_backend_interp();
+    struct umbra_program *prog = be->compile(be, ir);
+    umbra_flat_ir_free(ir);
+
+    prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+    be->flush(be);
+    umbra_program_free(prog);
+    umbra_backend_free(be);
+    return (iv){lo_out, hi_out};
+}
+
 TEST(interval_add) {
     iv_equiv(eval_binary(umbra_interval_add_f32, (iv){1,3}, (iv){2,5}), (iv){3,8}) here;
     iv_equiv(eval_binary(umbra_interval_add_f32, (iv){-2,1}, (iv){-3,4}), (iv){-5,5}) here;
@@ -88,6 +123,22 @@ TEST(interval_mul) {
     iv_equiv(eval_binary(umbra_interval_mul_f32, (iv){2,3}, (iv){4,5}), (iv){8,15}) here;
     iv_equiv(eval_binary(umbra_interval_mul_f32, (iv){-2,3}, (iv){-1,4}), (iv){-8,12}) here;
     iv_equiv(eval_binary(umbra_interval_mul_f32, (iv){-3,-1}, (iv){-5,-2}), (iv){2,15}) here;
+}
+
+TEST(interval_fma) {
+    // fma(a, c, d) = a*c + d
+    iv_equiv(eval_ternary(umbra_interval_fma_f32,
+                          (iv){2,3}, (iv){4,5}, (iv){1,2}), (iv){9,17}) here;
+    iv_equiv(eval_ternary(umbra_interval_fma_f32,
+                          (iv){-2,3}, (iv){-1,4}, (iv){0,1}), (iv){-8,13}) here;
+}
+
+TEST(interval_fms) {
+    // fms(a, c, d) = d - a*c
+    iv_equiv(eval_ternary(umbra_interval_fms_f32,
+                          (iv){2,3}, (iv){4,5}, (iv){20,30}), (iv){5,22}) here;
+    iv_equiv(eval_ternary(umbra_interval_fms_f32,
+                          (iv){-2,3}, (iv){-1,4}, (iv){0,1}), (iv){-12,9}) here;
 }
 
 TEST(interval_min) {
@@ -246,6 +297,10 @@ TEST(interval_exact_stays_exact) {
     iv_equiv(eval_exact_unary(umbra_interval_sqrt_f32, 9), (iv){3, 3}) here;
     iv_equiv(eval_exact_unary(umbra_interval_abs_f32, -7), (iv){7, 7}) here;
     iv_equiv(eval_exact_unary(umbra_interval_abs_f32, 4), (iv){4, 4}) here;
+    iv_equiv(eval_ternary(umbra_interval_fma_f32,
+                          (iv){2, 2}, (iv){3, 3}, (iv){5, 5}), (iv){11, 11}) here;
+    iv_equiv(eval_ternary(umbra_interval_fms_f32,
+                          (iv){2, 2}, (iv){3, 3}, (iv){10, 10}), (iv){4, 4}) here;
 }
 
 TEST(interval_loop) {
