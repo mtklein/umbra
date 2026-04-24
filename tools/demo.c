@@ -171,14 +171,18 @@ static int next_backend(int cur) {
     return cur;
 }
 
-static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double fps, int nt) {
+static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double fps, int nt,
+                         _Bool vsync) {
     char title[256];
     int n = SDL_snprintf(title, sizeof title, "%s  [%s/%s]  %.0f fps", s->title,
                          backend_name[bi], fmt_enums[fi]->name, fps);
     if (nt > 1) {
         int tc, tr;
         tile_factor(nt, &tc, &tr);
-        SDL_snprintf(title + n, sizeof title - (size_t)n, "  %dx%d", tc, tr);
+        n += SDL_snprintf(title + n, sizeof title - (size_t)n, "  %dx%d", tc, tr);
+    }
+    if (vsync) {
+        SDL_snprintf(title + n, sizeof title - (size_t)n, "  vsync");
     }
     SDL_SetWindowTitle(w, title);
 }
@@ -272,10 +276,12 @@ int main(void) {
     int      fps_frames = 0;
     double   fps = 0.0;
 
-    _Bool want_dump = 0;
-    _Bool vsync = 0;
+    _Bool    want_dump   = 0;
+    _Bool    vsync       = 0;
+    _Bool    paused      = 0;
+    uint64_t pause_start = 0;
 
-    update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps, n_threads);
+    update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps, n_threads, vsync);
 
     _Bool running = 1;
     while (running) {
@@ -299,8 +305,17 @@ int main(void) {
                 rebuild_extra(cur_backend);
             } else if (ev.type == SDL_EVENT_KEY_DOWN) {
                 int next = cur_slide;
-                if (ev.key.key == SDLK_RIGHT || ev.key.key == SDLK_SPACE) {
+                if (ev.key.key == SDLK_RIGHT) {
                     next = (cur_slide + 1) % slide_count();
+                } else if (ev.key.key == SDLK_SPACE) {
+                    uint64_t const now = SDL_GetPerformanceCounter();
+                    if (paused) {
+                        t0 += now - pause_start;
+                        paused = 0;
+                    } else {
+                        pause_start = now;
+                        paused = 1;
+                    }
                 } else if (ev.key.key == SDLK_LEFT) {
                     next = (cur_slide + slide_count() - 1) % slide_count();
                 } else if (ev.key.key == SDLK_B) {
@@ -339,7 +354,7 @@ int main(void) {
                     rebuild_extra(cur_backend);
                 }
                 update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps,
-                             n_threads);
+                             n_threads, vsync);
             }
         }
         if (!running) { break; }
@@ -365,8 +380,9 @@ int main(void) {
             if (!saved_ir && nt > 1) { nt = 1; }
             int sh = (H + nt - 1) / nt;
 
-            uint64_t const freq = SDL_GetPerformanceFrequency();
-            double const secs = (double)(SDL_GetPerformanceCounter() - t0) / (double)freq;
+            uint64_t const freq = SDL_GetPerformanceFrequency(),
+                           ref  = paused ? pause_start : SDL_GetPerformanceCounter();
+            double const secs = (double)(ref - t0) / (double)freq;
 
             if (is_leaf(s)) { slide_runtime_animate(s, secs); }
 
@@ -453,7 +469,7 @@ int main(void) {
             fps_frames = 0;
             fps_start = now;
             update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps,
-                         n_threads);
+                         n_threads, vsync);
         }
     }
 
