@@ -64,10 +64,10 @@ static struct umbra_builder* build_srcover(void) {
                       db = umbra_f32_from_f16(b, umbra_load_16(b, dbp)),
                       da = umbra_f32_from_f16(b, umbra_load_16(b, dap));
     umbra_val32 const inv_a = umbra_sub_f32(b, one, sa),
-                      rout  = umbra_add_f32(b, sr, umbra_mul_f32(b, dr, inv_a)),
-                      gout  = umbra_add_f32(b, sg, umbra_mul_f32(b, dg, inv_a)),
-                      bout  = umbra_add_f32(b, sb, umbra_mul_f32(b, db, inv_a)),
-                      aout  = umbra_add_f32(b, sa, umbra_mul_f32(b, da, inv_a));
+                      rout  = umbra_fma_f32(b, dr, inv_a, sr),
+                      gout  = umbra_fma_f32(b, dg, inv_a, sg),
+                      bout  = umbra_fma_f32(b, db, inv_a, sb),
+                      aout  = umbra_fma_f32(b, da, inv_a, sa);
     umbra_store_16(b, drp, umbra_f16_from_f32(b, rout));
     umbra_store_16(b, dgp, umbra_f16_from_f32(b, gout));
     umbra_store_16(b, dbp, umbra_f16_from_f32(b, bout));

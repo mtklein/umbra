@@ -770,8 +770,8 @@ static umbra_interval sdf_text_polyline_build(void *ctx, struct umbra_builder *b
                                 umbra_add_f32(b, umbra_mul_f32(b, hw, hw),
                                                  umbra_mul_f32(b, hh, hh)));
 
-    umbra_val32 const gx = umbra_add_f32(b, umbra_mul_f32(b, bcx, sx), ox),
-                      gy = umbra_add_f32(b, umbra_mul_f32(b, bcy, sy), oy);
+    umbra_val32 const gx = umbra_fma_f32(b, bcx, sx, ox),
+                      gy = umbra_fma_f32(b, bcy, sy, oy);
 
     umbra_val32 const n_iter = umbra_shl_i32(b, n, lgN);
 
@@ -808,17 +808,17 @@ static umbra_interval sdf_text_polyline_build(void *ctx, struct umbra_builder *b
                           w1e  = umbra_mul_f32(b, tw,  umbra_mul_f32(b, mte, te)),
                           w2e  = umbra_mul_f32(b, te,  te);
 
-        umbra_val32 const ax = umbra_add_f32(b, umbra_mul_f32(b, w0s, p0x),
-                                 umbra_add_f32(b, umbra_mul_f32(b, w1s, p1x),
+        umbra_val32 const ax = umbra_fma_f32(b, w0s, p0x,
+                                 umbra_fma_f32(b, w1s, p1x,
                                                   umbra_mul_f32(b, w2s, p2x))),
-                          ay = umbra_add_f32(b, umbra_mul_f32(b, w0s, p0y),
-                                 umbra_add_f32(b, umbra_mul_f32(b, w1s, p1y),
+                          ay = umbra_fma_f32(b, w0s, p0y,
+                                 umbra_fma_f32(b, w1s, p1y,
                                                   umbra_mul_f32(b, w2s, p2y))),
-                          cx = umbra_add_f32(b, umbra_mul_f32(b, w0e, p0x),
-                                 umbra_add_f32(b, umbra_mul_f32(b, w1e, p1x),
+                          cx = umbra_fma_f32(b, w0e, p0x,
+                                 umbra_fma_f32(b, w1e, p1x,
                                                   umbra_mul_f32(b, w2e, p2x))),
-                          cy = umbra_add_f32(b, umbra_mul_f32(b, w0e, p0y),
-                                 umbra_add_f32(b, umbra_mul_f32(b, w1e, p1y),
+                          cy = umbra_fma_f32(b, w0e, p0y,
+                                 umbra_fma_f32(b, w1e, p1y,
                                                   umbra_mul_f32(b, w2e, p2y)));
 
         umbra_val32 const dx = umbra_sub_f32(b, cx, ax),
@@ -827,15 +827,12 @@ static umbra_interval sdf_text_polyline_build(void *ctx, struct umbra_builder *b
                           ey = umbra_sub_f32(b, gy, ay);
         umbra_val32 const dd = umbra_add_f32(b, umbra_mul_f32(b, dx, dx),
                                                 umbra_mul_f32(b, dy, dy));
-        umbra_val32 const ed = umbra_add_f32(b, umbra_mul_f32(b, ex, dx),
-                                                umbra_mul_f32(b, ey, dy));
+        umbra_val32 const ed = umbra_fma_f32(b, ex, dx, umbra_mul_f32(b, ey, dy));
         umbra_val32 const t  = umbra_min_f32(b, o,
                                   umbra_max_f32(b, z,
                                       umbra_div_f32(b, ed, dd)));
-        umbra_val32 const qx = umbra_sub_f32(b, gx,
-                                  umbra_add_f32(b, ax, umbra_mul_f32(b, t, dx))),
-                          qy = umbra_sub_f32(b, gy,
-                                  umbra_add_f32(b, ay, umbra_mul_f32(b, t, dy)));
+        umbra_val32 const qx = umbra_sub_f32(b, gx, umbra_fma_f32(b, t, dx, ax)),
+                          qy = umbra_sub_f32(b, gy, umbra_fma_f32(b, t, dy, ay));
         umbra_val32 const seg_d2 = umbra_add_f32(b, umbra_mul_f32(b, qx, qx),
                                                     umbra_mul_f32(b, qy, qy));
         umbra_store_var32(b, dist2, umbra_min_f32(b, umbra_load_var32(b, dist2), seg_d2));
@@ -844,7 +841,7 @@ static umbra_interval sdf_text_polyline_build(void *ctx, struct umbra_builder *b
                           below1 = umbra_lt_f32(b, cy, gy),
                           strad  = umbra_xor_32(b, below0, below1);
         umbra_val32 const ty   = umbra_div_f32(b, umbra_sub_f32(b, gy, ay), dy),
-                          xat  = umbra_add_f32(b, ax, umbra_mul_f32(b, ty, dx)),
+                          xat  = umbra_fma_f32(b, ty, dx, ax),
                           right = umbra_lt_f32(b, gx, xat);
         umbra_val32 const cross = umbra_and_32(b, strad, right);
         umbra_store_var32(b, par, umbra_xor_32(b, umbra_load_var32(b, par), cross));
@@ -956,8 +953,8 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
                                 umbra_add_f32(b, umbra_mul_f32(b, hw, hw),
                                                  umbra_mul_f32(b, hh, hh)));
 
-    umbra_val32 const gx = umbra_add_f32(b, umbra_mul_f32(b, bcx, sx), ox),
-                      gy = umbra_add_f32(b, umbra_mul_f32(b, bcy, sy), oy);
+    umbra_val32 const gx = umbra_fma_f32(b, bcx, sx, ox),
+                      gy = umbra_fma_f32(b, bcy, sy, oy);
 
     umbra_var32 const dist2        = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f)),
                       par          = umbra_declare_var32(b, umbra_imm_i32(b, 0)),
@@ -982,14 +979,10 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
 
         umbra_val32 const ax = umbra_sub_f32(b, p1x, p0x),
                           ay = umbra_sub_f32(b, p1y, p0y);
-        umbra_val32 const bbx = umbra_add_f32(b,
-                                    umbra_sub_f32(b, p0x, umbra_mul_f32(b, two, p1x)), p2x),
-                          bby = umbra_add_f32(b,
-                                    umbra_sub_f32(b, p0y, umbra_mul_f32(b, two, p1y)), p2y);
+        umbra_val32 const bbx = umbra_add_f32(b, umbra_fms_f32(b, two, p1x, p0x), p2x),
+                          bby = umbra_add_f32(b, umbra_fms_f32(b, two, p1y, p0y), p2y);
         umbra_val32 const dx = umbra_sub_f32(b, p0x, gx),
                           dy = umbra_sub_f32(b, p0y, gy);
-        umbra_val32 const ccx = umbra_mul_f32(b, two, ax),
-                          ccy = umbra_mul_f32(b, two, ay);
 
         umbra_val32 const bb_bb = umbra_add_f32(b, umbra_mul_f32(b, bbx, bbx),
                                                    umbra_mul_f32(b, bby, bby));
@@ -1003,15 +996,13 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
                                                       umbra_mul_f32(b, seg_y, seg_y));
         umbra_val32 const g_p0_x = umbra_sub_f32(b, gx, p0x),
                           g_p0_y = umbra_sub_f32(b, gy, p0y);
-        umbra_val32 const dot_gs = umbra_add_f32(b, umbra_mul_f32(b, g_p0_x, seg_x),
+        umbra_val32 const dot_gs = umbra_fma_f32(b, g_p0_x, seg_x,
                                                     umbra_mul_f32(b, g_p0_y, seg_y));
         umbra_val32 const t_lin = umbra_min_f32(b, one,
                                       umbra_max_f32(b, zero,
                                           umbra_div_f32(b, dot_gs, seg_len2)));
-        umbra_val32 const qx_lin = umbra_sub_f32(b, gx,
-                                       umbra_add_f32(b, p0x, umbra_mul_f32(b, t_lin, seg_x))),
-                          qy_lin = umbra_sub_f32(b, gy,
-                                       umbra_add_f32(b, p0y, umbra_mul_f32(b, t_lin, seg_y)));
+        umbra_val32 const qx_lin = umbra_sub_f32(b, gx, umbra_fma_f32(b, t_lin, seg_x, p0x)),
+                          qy_lin = umbra_sub_f32(b, gy, umbra_fma_f32(b, t_lin, seg_y, p0y));
         umbra_val32 const d2_linear = umbra_add_f32(b, umbra_mul_f32(b, qx_lin, qx_lin),
                                                        umbra_mul_f32(b, qy_lin, qy_lin));
 
@@ -1020,8 +1011,7 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
                           strad  = umbra_xor_32(b, below0, below1);
         umbra_val32 const ty_lin = umbra_div_f32(b,
                                        umbra_sub_f32(b, gy, p0y), seg_y),
-                          xat_lin = umbra_add_f32(b, p0x,
-                                        umbra_mul_f32(b, ty_lin, seg_x)),
+                          xat_lin = umbra_fma_f32(b, ty_lin, seg_x, p0x),
                           right_lin = umbra_lt_f32(b, gx, xat_lin);
         umbra_val32 const linear_cross = umbra_and_32(b, strad, right_lin);
 
@@ -1029,30 +1019,24 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
         // is_linear picks which path wins at the end.
         umbra_val32 const bb_bb_safe = umbra_max_f32(b, bb_bb, lin_eps);
         umbra_val32 const kk = umbra_div_f32(b, one, bb_bb_safe);
-        umbra_val32 const a_bb = umbra_add_f32(b, umbra_mul_f32(b, ax, bbx),
-                                                   umbra_mul_f32(b, ay, bby));
+        umbra_val32 const a_bb = umbra_fma_f32(b, ax, bbx, umbra_mul_f32(b, ay, bby));
         umbra_val32 const kx = umbra_mul_f32(b, kk, a_bb);
         umbra_val32 const a_a = umbra_add_f32(b, umbra_mul_f32(b, ax, ax),
                                                   umbra_mul_f32(b, ay, ay));
-        umbra_val32 const d_bb = umbra_add_f32(b, umbra_mul_f32(b, dx, bbx),
-                                                   umbra_mul_f32(b, dy, bby));
+        umbra_val32 const d_bb = umbra_fma_f32(b, dx, bbx, umbra_mul_f32(b, dy, bby));
         umbra_val32 const ky = umbra_mul_f32(b, kk,
                                    umbra_mul_f32(b, third,
-                                       umbra_add_f32(b, umbra_mul_f32(b, two, a_a), d_bb)));
-        umbra_val32 const d_a = umbra_add_f32(b, umbra_mul_f32(b, dx, ax),
-                                                  umbra_mul_f32(b, dy, ay));
-        umbra_val32 const kz = umbra_mul_f32(b, kk, d_a);
+                                       umbra_fma_f32(b, two, a_a, d_bb)));
+        umbra_val32 const d_a = umbra_fma_f32(b, dx, ax, umbra_mul_f32(b, dy, ay));
 
         umbra_val32 const kx2 = umbra_mul_f32(b, kx, kx);
         umbra_val32 const p   = umbra_sub_f32(b, ky, kx2);
-        umbra_val32 const q   = umbra_add_f32(b,
+        umbra_val32 const q   = umbra_fma_f32(b, kk, d_a,
                                     umbra_mul_f32(b, kx,
-                                        umbra_sub_f32(b, umbra_mul_f32(b, two, kx2),
-                                                          umbra_mul_f32(b, three, ky))),
-                                    kz);
+                                        umbra_fms_f32(b, three, ky,
+                                            umbra_mul_f32(b, two, kx2))));
         umbra_val32 const p3 = umbra_mul_f32(b, p, umbra_mul_f32(b, p, p));
-        umbra_val32 const h  = umbra_add_f32(b, umbra_mul_f32(b, q, q),
-                                                umbra_mul_f32(b, four, p3));
+        umbra_val32 const h  = umbra_fma_f32(b, four, p3, umbra_mul_f32(b, q, q));
 
         // h ≥ 0 branch (always computed; max(h,0) keeps sqrt finite when h<0):
         umbra_val32 const hs = umbra_sqrt_f32(b, umbra_max_f32(b, h, zero));
@@ -1064,12 +1048,12 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
         umbra_val32 const t_pos_raw = umbra_sub_f32(b, umbra_add_f32(b, u1, u2), kx);
         umbra_val32 const t_pos = umbra_min_f32(b, one,
                                       umbra_max_f32(b, zero, t_pos_raw));
-        umbra_val32 const dpx = umbra_add_f32(b, dx,
-                                    umbra_mul_f32(b, t_pos,
-                                        umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t_pos)))),
-                          dpy = umbra_add_f32(b, dy,
-                                    umbra_mul_f32(b, t_pos,
-                                        umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t_pos))));
+        umbra_val32 const dpx = umbra_fma_f32(b, t_pos,
+                                    umbra_fma_f32(b, two, ax, umbra_mul_f32(b, bbx, t_pos)),
+                                    dx),
+                          dpy = umbra_fma_f32(b, t_pos,
+                                    umbra_fma_f32(b, two, ay, umbra_mul_f32(b, bby, t_pos)),
+                                    dy);
         umbra_val32 const d2_pos = umbra_add_f32(b, umbra_mul_f32(b, dpx, dpx),
                                                      umbra_mul_f32(b, dpy, dpy));
 
@@ -1100,18 +1084,18 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
                                            kx);
             umbra_val32 const t0 = umbra_min_f32(b, one, umbra_max_f32(b, zero, t0_raw)),
                               t1 = umbra_min_f32(b, one, umbra_max_f32(b, zero, t1_raw));
-            umbra_val32 const d0x = umbra_add_f32(b, dx,
-                                        umbra_mul_f32(b, t0,
-                                            umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t0)))),
-                              d0y = umbra_add_f32(b, dy,
-                                        umbra_mul_f32(b, t0,
-                                            umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t0)))),
-                              d1x = umbra_add_f32(b, dx,
-                                        umbra_mul_f32(b, t1,
-                                            umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t1)))),
-                              d1y = umbra_add_f32(b, dy,
-                                        umbra_mul_f32(b, t1,
-                                            umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t1))));
+            umbra_val32 const d0x = umbra_fma_f32(b, t0,
+                                        umbra_fma_f32(b, two, ax, umbra_mul_f32(b, bbx, t0)),
+                                        dx),
+                              d0y = umbra_fma_f32(b, t0,
+                                        umbra_fma_f32(b, two, ay, umbra_mul_f32(b, bby, t0)),
+                                        dy),
+                              d1x = umbra_fma_f32(b, t1,
+                                        umbra_fma_f32(b, two, ax, umbra_mul_f32(b, bbx, t1)),
+                                        dx),
+                              d1y = umbra_fma_f32(b, t1,
+                                        umbra_fma_f32(b, two, ay, umbra_mul_f32(b, bby, t1)),
+                                        dy);
             umbra_val32 const d2_t0 = umbra_add_f32(b, umbra_mul_f32(b, d0x, d0x),
                                                         umbra_mul_f32(b, d0y, d0y)),
                               d2_t1 = umbra_add_f32(b, umbra_mul_f32(b, d1x, d1x),
@@ -1137,11 +1121,11 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
         umbra_store_var32(b, cross_slot, umbra_imm_i32(b, 0));
         umbra_if(b, is_curved); {
             umbra_val32 const qA = bby,
-                              qB = ccy,
+                              qB = umbra_mul_f32(b, two, ay),
                               qC = umbra_sub_f32(b, p0y, gy);
-            umbra_val32 const disc = umbra_sub_f32(b,
-                                         umbra_mul_f32(b, qB, qB),
-                                         umbra_mul_f32(b, four, umbra_mul_f32(b, qA, qC)));
+            umbra_val32 const disc = umbra_fms_f32(b, four,
+                                         umbra_mul_f32(b, qA, qC),
+                                         umbra_mul_f32(b, qB, qB));
             umbra_if(b, umbra_le_f32(b, zero, disc)); {
                 umbra_val32 const sd     = umbra_sqrt_f32(b, disc);
                 umbra_val32 const inv2A  = umbra_div_f32(b, half, qA);
@@ -1154,14 +1138,14 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
                                   inside1 = umbra_and_32(b,
                                                 umbra_le_f32(b, zero, r1),
                                                 umbra_le_f32(b, r1, one));
-                umbra_val32 const bxr0 = umbra_add_f32(b, p0x,
-                                             umbra_mul_f32(b, r0,
-                                                 umbra_add_f32(b, ccx,
-                                                     umbra_mul_f32(b, bbx, r0)))),
-                                  bxr1 = umbra_add_f32(b, p0x,
-                                             umbra_mul_f32(b, r1,
-                                                 umbra_add_f32(b, ccx,
-                                                     umbra_mul_f32(b, bbx, r1))));
+                umbra_val32 const bxr0 = umbra_fma_f32(b, r0,
+                                             umbra_fma_f32(b, two, ax,
+                                                 umbra_mul_f32(b, bbx, r0)),
+                                             p0x),
+                                  bxr1 = umbra_fma_f32(b, r1,
+                                             umbra_fma_f32(b, two, ax,
+                                                 umbra_mul_f32(b, bbx, r1)),
+                                             p0x);
                 umbra_val32 const right0 = umbra_lt_f32(b, gx, bxr0),
                                   right1 = umbra_lt_f32(b, gx, bxr1);
                 umbra_val32 const cross0 = umbra_and_32(b, inside0, right0),

@@ -14,8 +14,7 @@ static umbra_val32 clamp01(struct umbra_builder *builder, umbra_val32 t) {
 
 static umbra_val32 lerp_f(struct umbra_builder *builder, umbra_val32 p, umbra_val32 q,
                            umbra_val32 t) {
-    return umbra_add_f32(builder, p,
-                         umbra_mul_f32(builder, umbra_sub_f32(builder, q, p), t));
+    return umbra_fma_f32(builder, umbra_sub_f32(builder, q, p), t, p);
 }
 
 umbra_val32 gradient_linear(void *ctx, struct umbra_builder *b, umbra_point_val32 xy) {
@@ -25,9 +24,8 @@ umbra_val32 gradient_linear(void *ctx, struct umbra_builder *b, umbra_point_val3
                       bb = umbra_uniform_32(b, u, SLOT(b)),
                       c = umbra_uniform_32(b, u, SLOT(c));
     umbra_val32 const t = umbra_add_f32(b,
-                                      umbra_add_f32(b, umbra_mul_f32(b, a, xy.x),
-                                                    umbra_mul_f32(b, bb, xy.y)),
-                                      c);
+                              umbra_fma_f32(b, a, xy.x, umbra_mul_f32(b, bb, xy.y)),
+                              c);
     return clamp01(b, t);
 }
 

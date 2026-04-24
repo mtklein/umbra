@@ -60,10 +60,9 @@ static void slug_ray(struct umbra_builder *b, struct slug_consts const *c,
     umbra_val32 t2ok = umbra_eq_i32(b, umbra_and_32(b, umbra_shr_u32(b, code, c->i_8),
                                                       c->i_one), c->i_one);
 
-    umbra_val32 a    = umbra_add_f32(b, umbra_sub_f32(b, q0s, umbra_mul_f32(b, tw, q1s)), q2s);
+    umbra_val32 a    = umbra_add_f32(b, umbra_fms_f32(b, tw, q1s, q0s), q2s);
     umbra_val32 bv   = umbra_sub_f32(b, q0s, q1s);
-    umbra_val32 disc = umbra_sub_f32(b, umbra_mul_f32(b, bv, bv),
-                                        umbra_mul_f32(b, a, q0s));
+    umbra_val32 disc = umbra_fms_f32(b, a, q0s, umbra_mul_f32(b, bv, bv));
     umbra_val32 sd   = umbra_sqrt_f32(b, umbra_max_f32(b, disc, z));
 
     umbra_val32 is_linear = umbra_le_f32(b, umbra_abs_f32(b, a), ep);
@@ -75,13 +74,13 @@ static void slug_ray(struct umbra_builder *b, struct slug_consts const *c,
     umbra_val32 t1 = umbra_sel_32(b, is_linear, lt, qt1);
     umbra_val32 t2 = umbra_sel_32(b, is_linear, lt, qt2);
 
-    umbra_val32 ae = umbra_add_f32(b, umbra_sub_f32(b, q0e, umbra_mul_f32(b, tw, q1e)), q2e);
+    umbra_val32 ae = umbra_add_f32(b, umbra_fms_f32(b, tw, q1e, q0e), q2e);
     umbra_val32 be = umbra_mul_f32(b, tw, umbra_sub_f32(b, q1e, q0e));
-    umbra_val32 e1 = umbra_add_f32(b,
-                         umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ae, t1), be), t1),
+    umbra_val32 e1 = umbra_fma_f32(b, t1,
+                         umbra_add_f32(b, umbra_mul_f32(b, ae, t1), be),
                          q0e);
-    umbra_val32 e2 = umbra_add_f32(b,
-                         umbra_mul_f32(b, umbra_add_f32(b, umbra_mul_f32(b, ae, t2), be), t2),
+    umbra_val32 e2 = umbra_fma_f32(b, t2,
+                         umbra_add_f32(b, umbra_mul_f32(b, ae, t2), be),
                          q0e);
 
     umbra_val32 sat1 = umbra_min_f32(b, umbra_max_f32(b, umbra_add_f32(b, e1, half), z), o);
@@ -91,10 +90,10 @@ static void slug_ray(struct umbra_builder *b, struct slug_consts const *c,
     umbra_val32 dacc = umbra_add_f32(b, c1, c2);
 
     umbra_val32 wk1 = umbra_min_f32(b, umbra_max_f32(b,
-                          umbra_sub_f32(b, o, umbra_mul_f32(b, tw, umbra_abs_f32(b, e1))),
+                          umbra_fms_f32(b, tw, umbra_abs_f32(b, e1), o),
                           z), o);
     umbra_val32 wk2 = umbra_min_f32(b, umbra_max_f32(b,
-                          umbra_sub_f32(b, o, umbra_mul_f32(b, tw, umbra_abs_f32(b, e2))),
+                          umbra_fms_f32(b, tw, umbra_abs_f32(b, e2), o),
                           z), o);
     umbra_val32 dwgt = umbra_max_f32(b, umbra_sel_32(b, t1ok, wk1, z),
                                         umbra_sel_32(b, t2ok, wk2, z));

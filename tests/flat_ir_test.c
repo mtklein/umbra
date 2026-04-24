@@ -30,10 +30,10 @@ static struct umbra_builder* build_srcover(struct umbra_buf *slot) {
               db = umbra_f32_from_f16(b, umbra_load_16(b, umbra_bind_buf(b, &slot[3]))),
               da = umbra_f32_from_f16(b, umbra_load_16(b, umbra_bind_buf(b, &slot[4]))),
               one = umbra_imm_f32(b, 1.0f), inv_a = umbra_sub_f32(b, one, sa),
-              rout = umbra_add_f32(b, sr, umbra_mul_f32(b, dr, inv_a)),
-              gout = umbra_add_f32(b, sg, umbra_mul_f32(b, dg, inv_a)),
-              bout = umbra_add_f32(b, sb, umbra_mul_f32(b, db, inv_a)),
-              aout = umbra_add_f32(b, sa, umbra_mul_f32(b, da, inv_a));
+              rout = umbra_fma_f32(b, dr, inv_a, sr),
+              gout = umbra_fma_f32(b, dg, inv_a, sg),
+              bout = umbra_fma_f32(b, db, inv_a, sb),
+              aout = umbra_fma_f32(b, da, inv_a, sa);
     umbra_store_16(b, umbra_bind_buf(b, &slot[1]), umbra_f16_from_f32(b, rout));
     umbra_store_16(b, umbra_bind_buf(b, &slot[2]), umbra_f16_from_f32(b, gout));
     umbra_store_16(b, umbra_bind_buf(b, &slot[3]), umbra_f16_from_f32(b, bout));
@@ -492,7 +492,7 @@ TEST(test_fma_f32) {
     umbra_val32 x = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
               y = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
               w = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
-              m = umbra_mul_f32(builder, x, y), r = umbra_add_f32(builder, m, w);
+              r = umbra_fma_f32(builder, x, y, w);
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[3]), r);
     struct test_backends B = make(builder);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -607,7 +607,7 @@ TEST(test_fma_f32_single_rounding) {
     umbra_val32 x = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
               y = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
               w = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
-              m = umbra_mul_f32(builder, x, y), r = umbra_add_f32(builder, m, w);
+              r = umbra_fma_f32(builder, x, y, w);
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[3]), r);
     struct test_backends B = make(builder);
 
@@ -644,8 +644,8 @@ TEST(test_fma_f32_d_equals_x) {
                       c = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
                       d = umbra_load_32(builder, umbra_bind_buf(builder, &slot[3])),
                       w = umbra_load_32(builder, umbra_bind_buf(builder, &slot[4])),
-                      r0 = umbra_add_f32(builder, umbra_mul_f32(builder, a, b), w),
-                      r1 = umbra_add_f32(builder, umbra_mul_f32(builder, c, d), w);
+                      r0 = umbra_fma_f32(builder, a, b, w),
+                      r1 = umbra_fma_f32(builder, c, d, w);
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[5]), r0);
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[6]), r1);
     struct test_backends B = make(builder);
@@ -1471,7 +1471,7 @@ TEST(test_preamble_pair_alias) {
 
     umbra_val32 sum = umbra_mul_f32(builder, x, pre[0]);
     for (int i = 1; i < N_PRE; i++) {
-        sum = umbra_add_f32(builder, sum, umbra_mul_f32(builder, x, pre[i]));
+        sum = umbra_fma_f32(builder, x, pre[i], sum);
     }
 
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[1]), sum);
@@ -2033,7 +2033,7 @@ TEST(test_codegen_regalloc) {
         umbra_val32            x = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
         umbra_val32            y = umbra_load_32(b, umbra_bind_buf(b, &slot[1]));
         umbra_val32            z = umbra_load_32(b, umbra_bind_buf(b, &slot[2]));
-        umbra_val32            r = umbra_sub_f32(b, z, umbra_mul_f32(b, x, y));
+        umbra_val32            r = umbra_fms_f32(b, x, y, z);
         umbra_val32            s = umbra_add_f32(b, r, z);
         umbra_val32            u = umbra_add_f32(b, s, y);
         umbra_store_32(b, umbra_bind_buf(b, &slot[3]), u);
@@ -2057,7 +2057,7 @@ TEST(test_codegen_regalloc) {
         umbra_val32            x = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
         umbra_val32            y = umbra_load_32(b, umbra_bind_buf(b, &slot[1]));
         umbra_val32            z = umbra_load_32(b, umbra_bind_buf(b, &slot[2]));
-        umbra_val32            r = umbra_sub_f32(b, z, umbra_mul_f32(b, x, y));
+        umbra_val32            r = umbra_fms_f32(b, x, y, z);
         umbra_val32            s = umbra_add_f32(b, r, x);
         umbra_val32            u = umbra_add_f32(b, s, y);
         umbra_val32            w = umbra_add_f32(b, u, z);
@@ -2109,7 +2109,7 @@ TEST(test_fms) {
     umbra_val32            vx = umbra_load_32(b, umbra_bind_buf(b, &slot[0])),
                           vy = umbra_load_32(b, umbra_bind_buf(b, &slot[1])),
                           vz = umbra_load_32(b, umbra_bind_buf(b, &slot[2]));
-    umbra_val32            r = umbra_sub_f32(b, vz, umbra_mul_f32(b, vx, vy));
+    umbra_val32            r = umbra_fms_f32(b, vx, vy, vz);
     umbra_store_32(b, umbra_bind_buf(b, &slot[3]), r);
     struct test_backends B = make(b);
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
@@ -3201,7 +3201,7 @@ TEST(test_sel_fms_variants) {
     // r_fms_f32_mmr: fms(x, y, acc) → acc → store
     // fms = z - x*y, with z from acc
     umbra_val32 fms_z = umbra_add_f32(b, fc, umbra_imm_f32(b, 10.f));
-    umbra_val32 fms_r = umbra_sub_f32(b, fms_z, umbra_mul_f32(b, fa, fc));
+    umbra_val32 fms_r = umbra_fms_f32(b, fa, fc, fms_z);
     umbra_store_32(b, umbra_bind_buf(b, &slot[3]), umbra_i32_from_f32(b, fms_r));
 
     struct test_backends B = make(b);
@@ -4461,8 +4461,7 @@ TEST(test_loop_sel_gather) {
 
         umbra_val32 frac = umbra_div_f32(b, umbra_sub_f32(b, t, lo),
                                             umbra_sub_f32(b, hi, lo));
-        umbra_val32 lerped = umbra_add_f32(b, c0,
-                                 umbra_mul_f32(b, umbra_sub_f32(b, c1, c0), frac));
+        umbra_val32 lerped = umbra_fma_f32(b, umbra_sub_f32(b, c1, c0), frac, c0);
 
         umbra_store_var32(b, vr, umbra_sel_32(b, in_seg, lerped, umbra_load_var32(b, vr)));
     } umbra_end_loop(b);
