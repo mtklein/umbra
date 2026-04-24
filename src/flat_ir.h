@@ -4,6 +4,12 @@
 #include "op.h"
 #include <stdint.h>
 
+// TODO: explore replacing flat_ir with a graph representation.
+//       now that we have complicated control flow like if/endif and a loop.
+//       It is starting to feel error prone optimizing and code generating with
+//       control flow ops present, and it would also be nice to generalize loop
+//       support to multiple and nested loops, maybe even loops over varyings?
+
 typedef union {
     int         bits;
     umbra_val32 v32;
