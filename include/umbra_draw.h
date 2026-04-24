@@ -121,6 +121,10 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 
+// TODO: allow programs to queue() other programs, using this to evaluate bounds
+//       on the final draw backend rather than always on the CPU
+//       Some (outdated) notes in plans/notes-on-device-dispatch.md.
+
 // Use an SDF bounds program to intelligently dispatch draw->queue() calls for a
 // draw program built by umbra_build_sdf_draw() from the same SDF, skipping
 // uncovered rectangles.  Optional affine coordinate transform.
