@@ -717,7 +717,6 @@ static char* build_source(IR const *ir) {
     SrcBuf b = {0};
 
     emit(&b,
-         "#pragma METAL fp contract(off)\n"
          "#include <metal_stdlib>\n"
          "using namespace metal;\n\n");
 
