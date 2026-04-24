@@ -33,6 +33,7 @@ static void atomic_write_hdr(char const *path, int w, int h, int comp, float con
     }
 }
 
+// TODO: we can remove this (earliest program!) now
 static struct umbra_builder* build_srcover(void) {
     static struct umbra_buf src    = {0},
                             dr_buf = {0}, dg_buf = {0}, db_buf = {0}, da_buf = {0};
@@ -63,7 +64,7 @@ static struct umbra_builder* build_srcover(void) {
                       dg = umbra_f32_from_f16(b, umbra_load_16(b, dgp)),
                       db = umbra_f32_from_f16(b, umbra_load_16(b, dbp)),
                       da = umbra_f32_from_f16(b, umbra_load_16(b, dap));
-    umbra_val32 const inv_a = umbra_sub_f32(b, one, sa),
+    umbra_val32 const inv_a = umbra_fms_f32(b, inv255, umbra_f32_from_i32(b, rgba[3]), one),
                       rout  = umbra_fma_f32(b, dr, inv_a, sr),
                       gout  = umbra_fma_f32(b, dg, inv_a, sg),
                       bout  = umbra_fma_f32(b, db, inv_a, sb),

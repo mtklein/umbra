@@ -37,8 +37,7 @@ umbra_val32 gradient_radial(void *ctx, struct umbra_builder *b, umbra_point_val3
                       inv_r = umbra_uniform_32(b, u, SLOT(inv_r));
     umbra_val32 const dx = umbra_sub_f32(b, xy.x, cx),
                       dy = umbra_sub_f32(b, xy.y, cy);
-    umbra_val32 const d2 = umbra_add_f32(b, umbra_mul_f32(b, dx, dx),
-                                       umbra_mul_f32(b, dy, dy));
+    umbra_val32 const d2 = umbra_fma_f32(b, dx, dx, umbra_mul_f32(b, dy, dy));
     return clamp01(b, umbra_mul_f32(b, umbra_sqrt_f32(b, d2), inv_r));
 }
 

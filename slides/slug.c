@@ -76,12 +76,8 @@ static void slug_ray(struct umbra_builder *b, struct slug_consts const *c,
 
     umbra_val32 ae = umbra_add_f32(b, umbra_fms_f32(b, tw, q1e, q0e), q2e);
     umbra_val32 be = umbra_mul_f32(b, tw, umbra_sub_f32(b, q1e, q0e));
-    umbra_val32 e1 = umbra_fma_f32(b, t1,
-                         umbra_add_f32(b, umbra_mul_f32(b, ae, t1), be),
-                         q0e);
-    umbra_val32 e2 = umbra_fma_f32(b, t2,
-                         umbra_add_f32(b, umbra_mul_f32(b, ae, t2), be),
-                         q0e);
+    umbra_val32 e1 = umbra_fma_f32(b, t1, umbra_fma_f32(b, ae, t1, be), q0e);
+    umbra_val32 e2 = umbra_fma_f32(b, t2, umbra_fma_f32(b, ae, t2, be), q0e);
 
     umbra_val32 sat1 = umbra_min_f32(b, umbra_max_f32(b, umbra_add_f32(b, e1, half), z), o);
     umbra_val32 sat2 = umbra_min_f32(b, umbra_max_f32(b, umbra_add_f32(b, e2, half), z), o);

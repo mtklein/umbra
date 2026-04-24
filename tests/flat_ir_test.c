@@ -540,15 +540,14 @@ TEST(test_square_f32) {
     test_backends_free(&B);
 }
 
-// add(mul(X, X), w) auto-rewrites to op_square_add_f32.  Same single-rounding
+// fma(x, x, w) auto-rewrites to op_square_add_f32.  Same single-rounding
 // pattern as test_fma_f32_single_rounding but exercising the new op.
 TEST(test_square_add_f32_single_rounding) {
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *builder = umbra_builder();
     umbra_val32 x = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
                 w = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
-                m = umbra_mul_f32(builder, x, x),
-                r = umbra_add_f32(builder, m, w);
+                r = umbra_fma_f32(builder, x, x, w);
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[2]), r);
     struct test_backends B = make(builder);
 
@@ -570,14 +569,13 @@ TEST(test_square_add_f32_single_rounding) {
     test_backends_free(&B);
 }
 
-// sub(w, mul(X, X)) auto-rewrites to op_square_sub_f32.
+// fms(x, x, w) auto-rewrites to op_square_sub_f32.
 TEST(test_square_sub_f32_single_rounding) {
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *builder = umbra_builder();
     umbra_val32 x = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
                 w = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
-                m = umbra_mul_f32(builder, x, x),
-                r = umbra_sub_f32(builder, w, m);
+                r = umbra_fms_f32(builder, x, x, w);
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[2]), r);
     struct test_backends B = make(builder);
 
@@ -675,8 +673,8 @@ TEST(test_square_add_f32_d_equals_x) {
     umbra_val32 const a = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
                       c = umbra_load_32(builder, umbra_bind_buf(builder, &slot[1])),
                       w = umbra_load_32(builder, umbra_bind_buf(builder, &slot[2])),
-                      r0 = umbra_add_f32(builder, umbra_mul_f32(builder, a, a), w),
-                      r1 = umbra_add_f32(builder, umbra_mul_f32(builder, c, c), w);
+                      r0 = umbra_fma_f32(builder, a, a, w),
+                      r1 = umbra_fma_f32(builder, c, c, w);
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[3]), r0);
     umbra_store_32(builder, umbra_bind_buf(builder, &slot[4]), r1);
     struct test_backends B = make(builder);

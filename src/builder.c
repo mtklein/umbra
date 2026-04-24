@@ -278,38 +278,11 @@ static void sort(umbra_val32 *a, umbra_val32 *b) {
 umbra_val32 umbra_add_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     sort(&x, &y);
     if (is_imm32(b, x.id, 0)) { return y; }
-    // TODO: decide whether fma/fms/square_add/square_sub fusion should move
-    // to an explicit API (umbra_fma_f32, ...) instead of being inferred here
-    // and in umbra_sub_f32.  Implicit fusion collapses two roundings into one
-    // -- not strictly IEEE -- but it's uniformly applied across backends (we
-    // turned off Metal's fp contract, so nothing fuses below us) and it picks
-    // up fusions that span units of builder code, e.g. one helper returns a
-    // mul and another adds it to an accumulator.  An explicit API would be
-    // honest about the rounding change but would miss those cross-unit cases.
-    if (b->inst[x.id].op == op_mul_f32) {
-        return math(b, op_fma_f32, .x = b->inst[x.id].x, .y = b->inst[x.id].y, VZ(y)).v32;
-    }
-    if (b->inst[y.id].op == op_mul_f32) {
-        return math(b, op_fma_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
-    }
-    if (b->inst[x.id].op == op_square_f32) {
-        return math(b, op_square_add_f32, .x = b->inst[x.id].x, VY(y)).v32;
-    }
-    if (b->inst[y.id].op == op_square_f32) {
-        return math(b, op_square_add_f32, .x = b->inst[y.id].x, VY(x)).v32;
-    }
-
     return math(b, op_add_f32, VX(x), VY(y)).v32;
 }
 
 umbra_val32 umbra_sub_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0)) { return x; }
-    if (b->inst[y.id].op == op_mul_f32) {
-        return math(b, op_fms_f32, .x = b->inst[y.id].x, .y = b->inst[y.id].y, VZ(x)).v32;
-    }
-    if (b->inst[y.id].op == op_square_f32) {
-        return math(b, op_square_sub_f32, .x = b->inst[y.id].x, VY(x)).v32;
-    }
     return math(b, op_sub_f32, VX(x), VY(y)).v32;
 }
 
@@ -325,11 +298,17 @@ umbra_val32 umbra_mul_f32(builder *b, umbra_val32 x, umbra_val32 y) {
 
 umbra_val32 umbra_fma_f32(builder *b, umbra_val32 x, umbra_val32 y, umbra_val32 z) {
     sort(&x, &y);
+    if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) {
+        return math(b, op_square_add_f32, VX(x), VY(z)).v32;
+    }
     return math(b, op_fma_f32, VX(x), VY(y), VZ(z)).v32;
 }
 
 umbra_val32 umbra_fms_f32(builder *b, umbra_val32 x, umbra_val32 y, umbra_val32 z) {
     sort(&x, &y);
+    if ((val){.v32 = x}.bits == (val){.v32 = y}.bits) {
+        return math(b, op_square_sub_f32, VX(x), VY(z)).v32;
+    }
     return math(b, op_fms_f32, VX(x), VY(y), VZ(z)).v32;
 }
 
@@ -414,7 +393,7 @@ umbra_val32 umbra_sqrt_f32(builder *b, umbra_val32 x) {
 
     // Final NR step on sqrt itself: sn = fma(x, y, (x - sn²) * (y/2)).
     umbra_val32 const sn       = umbra_mul_f32(b, x, y);
-    umbra_val32 const residual = umbra_sub_f32(b, x, umbra_mul_f32(b, sn, sn));
+    umbra_val32 const residual = umbra_fms_f32(b, sn, sn, x);
     umbra_val32 const yhalf    = umbra_mul_f32(b, y, c_half);
     umbra_val32 const refined  = umbra_fma_f32(b, x, y, umbra_mul_f32(b, residual, yhalf));
     return umbra_sel_32(b, umbra_eq_f32(b, x, c_zero_f), c_zero_f, refined);
@@ -499,7 +478,7 @@ umbra_val32 umbra_cos_f32(builder *b, umbra_val32 x) {
 
     umbra_val32 const t  = umbra_mul_f32(b, x, inv_2pi);
     umbra_val32 const ft = umbra_sub_f32(b, t,
-                               umbra_floor_f32(b, umbra_add_f32(b, t, half)));
+                               umbra_floor_f32(b, umbra_fma_f32(b, x, inv_2pi, half)));
     return sin5q(b, umbra_sub_f32(b, quarter, umbra_abs_f32(b, ft)));
 }
 
