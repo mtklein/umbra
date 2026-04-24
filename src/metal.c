@@ -412,20 +412,24 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      uv(_ux, vx, xid, is_f));
                 break;
 
+            // Wrap unfused add/sub/mul in fma() so Metal's compiler can't
+            // reassociate them into different roundings.  Matches what
+            // SPIRV-Cross emits via spv_fadd/spv_fsub/spv_fmul, keeping all
+            // backends bit-exact even under fast math.
             case op_add_f32:
-                emit(b, "%sfloat v%d = %s + %s;\n",
+                emit(b, "%sfloat v%d = fma(1.0f, %s, %s);\n",
                      pad, i,
                      fv(_fx, vx, xid, is_f),
                      fv(_fy, vy, yid, is_f));
                 break;
             case op_sub_f32:
-                emit(b, "%sfloat v%d = %s - %s;\n",
+                emit(b, "%sfloat v%d = fma(-1.0f, %s, %s);\n",
                      pad, i,
-                     fv(_fx, vx, xid, is_f),
-                     fv(_fy, vy, yid, is_f));
+                     fv(_fy, vy, yid, is_f),
+                     fv(_fx, vx, xid, is_f));
                 break;
             case op_mul_f32:
-                emit(b, "%sfloat v%d = %s * %s;\n",
+                emit(b, "%sfloat v%d = fma(%s, %s, 0.0f);\n",
                      pad, i,
                      fv(_fx, vx, xid, is_f),
                      fv(_fy, vy, yid, is_f));
@@ -452,8 +456,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                 break;
             case op_square_f32: {
                 char const *s = fv(_fx, vx, xid, is_f);
-                emit(b, "%sfloat v%d ="
-                        " %s * %s;\n",
+                emit(b, "%sfloat v%d = fma(%s, %s, 0.0f);\n",
                      pad, i, s, s);
             } break;
             case op_round_f32:
