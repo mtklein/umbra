@@ -33,49 +33,6 @@ static void atomic_write_hdr(char const *path, int w, int h, int comp, float con
     }
 }
 
-// TODO: we can remove this (earliest program!) now
-static struct umbra_builder* build_srcover(void) {
-    static struct umbra_buf src    = {0},
-                            dr_buf = {0}, dg_buf = {0}, db_buf = {0}, da_buf = {0};
-    struct umbra_builder *b = umbra_builder();
-
-    umbra_ptr const sp  = umbra_bind_host_readonly_buf(b, &src),
-                    drp = umbra_bind_host_readonly_buf(b, &dr_buf),
-                    dgp = umbra_bind_host_readonly_buf(b, &dg_buf),
-                    dbp = umbra_bind_host_readonly_buf(b, &db_buf),
-                    dap = umbra_bind_host_readonly_buf(b, &da_buf);
-
-    umbra_val32 const px   = umbra_load_32(b, sp),
-                      mask = umbra_imm_i32(b, 0xFF);
-    umbra_val32 const rgba[4] = {
-        umbra_and_32(b, px, mask),
-        umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 8)), mask),
-        umbra_and_32(b, umbra_shr_u32(b, px, umbra_imm_i32(b, 16)), mask),
-        umbra_shr_u32(b, px, umbra_imm_i32(b, 24)),
-    };
-
-    umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f),
-                      one    = umbra_imm_f32(b, 1.0f);
-    umbra_val32 const sr = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[0]), inv255),
-                      sg = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[1]), inv255),
-                      sb = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[2]), inv255),
-                      sa = umbra_mul_f32(b, umbra_f32_from_i32(b, rgba[3]), inv255),
-                      dr = umbra_f32_from_f16(b, umbra_load_16(b, drp)),
-                      dg = umbra_f32_from_f16(b, umbra_load_16(b, dgp)),
-                      db = umbra_f32_from_f16(b, umbra_load_16(b, dbp)),
-                      da = umbra_f32_from_f16(b, umbra_load_16(b, dap));
-    umbra_val32 const inv_a = umbra_fms_f32(b, inv255, umbra_f32_from_i32(b, rgba[3]), one),
-                      rout  = umbra_fma_f32(b, dr, inv_a, sr),
-                      gout  = umbra_fma_f32(b, dg, inv_a, sg),
-                      bout  = umbra_fma_f32(b, db, inv_a, sb),
-                      aout  = umbra_fma_f32(b, da, inv_a, sa);
-    umbra_store_16(b, drp, umbra_f16_from_f32(b, rout));
-    umbra_store_16(b, dgp, umbra_f16_from_f32(b, gout));
-    umbra_store_16(b, dbp, umbra_f16_from_f32(b, bout));
-    umbra_store_16(b, dap, umbra_f16_from_f32(b, aout));
-    return b;
-}
-
 #if defined(__aarch64__)
 #define JIT_EXT "arm64"
 #elif defined(__AVX2__)
@@ -316,12 +273,6 @@ int main(int argc, char *argv[]) {
 
     struct dump_backends db = dump_backends_init();
     int unit = 0;
-
-    if (unit++ % shards == shard) {
-        mkdir("dumps/srcover", 0755);
-        mkdir("dumps/srcover/0", 0755);
-        dump_builder(&db, "dumps/srcover/0", build_srcover());
-    }
 
     slides_init(RW, RH);
 

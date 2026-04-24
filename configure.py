@@ -138,7 +138,6 @@ build build.ninja $
 # output lists.
 
 DUMPS = [
-    ('srcover',                         1),
     ('blend_src',                       1),
     ('blend_srcover',                   1),
     ('blend_dstover',                   1),
@@ -173,8 +172,8 @@ DUMPS = [
 
 def dump_units():
     """Yield ('dumps/{name}/{i}', ...) one per dump-unit, in dump.c order.
-    One unit per (slide, subdir) pair, matching dump.c's internal enumeration
-    — srcover counts as one unit, each slide contributes one unit per subdir."""
+    One unit per (slide, subdir) pair, matching dump.c's internal enumeration —
+    each slide contributes one unit per subdir."""
     for name, count in DUMPS:
         for i in range(count):
             yield f'dumps/{name}/{i}'
