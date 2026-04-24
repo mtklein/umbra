@@ -1641,8 +1641,7 @@ static umbra_interval test_circle_fn(void *ctx, struct umbra_builder *b,
                          r  = umbra_interval_exact(umbra_uniform_32(b, u, 2));
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
-                         d2 = umbra_interval_add_f32(b,
-                                  umbra_interval_mul_f32(b, dx, dx),
+                         d2 = umbra_interval_fma_f32(b, dx, dx,
                                   umbra_interval_mul_f32(b, dy, dy)),
                          d  = umbra_interval_sqrt_f32(b, d2);
     return umbra_interval_sub_f32(b, d, r);

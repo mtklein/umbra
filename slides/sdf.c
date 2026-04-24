@@ -24,8 +24,7 @@ static umbra_interval circle_sdf(struct umbra_builder *b,
                                  umbra_interval r) {
     umbra_interval const dx = umbra_interval_sub_f32(b, x, cx),
                          dy = umbra_interval_sub_f32(b, y, cy),
-                         d2 = umbra_interval_add_f32(b,
-                                  umbra_interval_mul_f32(b, dx, dx),
+                         d2 = umbra_interval_fma_f32(b, dx, dx,
                                   umbra_interval_mul_f32(b, dy, dy)),
                          d  = umbra_interval_sqrt_f32(b, d2);
     return umbra_interval_sub_f32(b, d, r);
@@ -302,8 +301,7 @@ static umbra_interval rounded_rect_build(void *ctx, struct umbra_builder *b,
                                       umbra_interval_abs_f32(b,
                                           umbra_interval_sub_f32(b, y, cy)),
                                       umbra_interval_sub_f32(b, hh, r)));
-    umbra_interval const d2 = umbra_interval_add_f32(b,
-                                  umbra_interval_mul_f32(b, dx, dx),
+    umbra_interval const d2 = umbra_interval_fma_f32(b, dx, dx,
                                   umbra_interval_mul_f32(b, dy, dy));
     return umbra_interval_sub_f32(b, umbra_interval_sqrt_f32(b, d2), r);
 }
@@ -361,11 +359,9 @@ static umbra_interval capsule_build(void *ctx, struct umbra_builder *b,
     umbra_interval const px = umbra_interval_sub_f32(b, x, p0x),
                          py = umbra_interval_sub_f32(b, y, p0y);
 
-    umbra_interval const dot_pd = umbra_interval_add_f32(b,
-                                      umbra_interval_mul_f32(b, px, dx),
+    umbra_interval const dot_pd = umbra_interval_fma_f32(b, px, dx,
                                       umbra_interval_mul_f32(b, py, dy));
-    umbra_interval const dot_dd = umbra_interval_add_f32(b,
-                                      umbra_interval_mul_f32(b, dx, dx),
+    umbra_interval const dot_dd = umbra_interval_fma_f32(b, dx, dx,
                                       umbra_interval_mul_f32(b, dy, dy));
     umbra_interval const zero = umbra_interval_exact(umbra_imm_f32(b, 0)),
                          one  = umbra_interval_exact(umbra_imm_f32(b, 1));
@@ -373,12 +369,11 @@ static umbra_interval capsule_build(void *ctx, struct umbra_builder *b,
                                  umbra_interval_max_f32(b, zero,
                                      umbra_interval_div_f32(b, dot_pd, dot_dd)));
 
-    umbra_interval const cx = umbra_interval_add_f32(b, p0x, umbra_interval_mul_f32(b, t, dx)),
-                         cy = umbra_interval_add_f32(b, p0y, umbra_interval_mul_f32(b, t, dy));
+    umbra_interval const cx = umbra_interval_fma_f32(b, t, dx, p0x),
+                         cy = umbra_interval_fma_f32(b, t, dy, p0y);
     umbra_interval const ex = umbra_interval_sub_f32(b, x, cx),
                          ey = umbra_interval_sub_f32(b, y, cy);
-    umbra_interval const d2 = umbra_interval_add_f32(b,
-                                  umbra_interval_mul_f32(b, ex, ex),
+    umbra_interval const d2 = umbra_interval_fma_f32(b, ex, ex,
                                   umbra_interval_mul_f32(b, ey, ey));
     return umbra_interval_sub_f32(b, umbra_interval_sqrt_f32(b, d2), rad);
 }
@@ -428,8 +423,7 @@ static umbra_interval halfplane_build(void *ctx, struct umbra_builder *b,
                          ny = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(ny))),
                          d  = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(d)));
     return umbra_interval_sub_f32(b,
-               umbra_interval_add_f32(b,
-                   umbra_interval_mul_f32(b, nx, x),
+               umbra_interval_fma_f32(b, nx, x,
                    umbra_interval_mul_f32(b, ny, y)),
                d);
 }
@@ -496,8 +490,7 @@ static umbra_interval ngon_build(void *ctx, struct umbra_builder *b,
                                  umbra_gather_32(b, data,
                                      umbra_add_i32(b, idx, umbra_imm_i32(b, 2))));
         umbra_interval const hp = umbra_interval_sub_f32(b,
-                                      umbra_interval_add_f32(b,
-                                          umbra_interval_mul_f32(b, nx, x),
+                                      umbra_interval_fma_f32(b, nx, x,
                                           umbra_interval_mul_f32(b, ny, y)),
                                       d);
         umbra_store_var32(b, lo_var, umbra_max_f32(b, umbra_load_var32(b, lo_var), hp.lo));
@@ -590,8 +583,8 @@ static umbra_interval sdf_text_outline_build(void *ctx, struct umbra_builder *b,
                          oy = umbra_interval_exact(
                                   umbra_uniform_32(b, u, SLOT(off_y)));
 
-    umbra_interval const gx = umbra_interval_add_f32(b, umbra_interval_mul_f32(b, x, sx), ox),
-                         gy = umbra_interval_add_f32(b, umbra_interval_mul_f32(b, y, sy), oy);
+    umbra_interval const gx = umbra_interval_fma_f32(b, x, sx, ox),
+                         gy = umbra_interval_fma_f32(b, y, sy, oy);
 
     umbra_imm_f32(b, 0);
     umbra_imm_f32(b, 1);
@@ -631,8 +624,7 @@ static umbra_interval sdf_text_outline_build(void *ctx, struct umbra_builder *b,
 
         umbra_interval const px = umbra_interval_sub_f32(b, gx, p0x),
                              py = umbra_interval_sub_f32(b, gy, p0y);
-        umbra_interval const dot_pd = umbra_interval_add_f32(b,
-                                          umbra_interval_mul_f32(b, px, dx),
+        umbra_interval const dot_pd = umbra_interval_fma_f32(b, px, dx,
                                           umbra_interval_mul_f32(b, py, dy));
         umbra_interval const zero = umbra_interval_exact(umbra_imm_f32(b, 0)),
                              one  = umbra_interval_exact(umbra_imm_f32(b, 1));
@@ -640,14 +632,11 @@ static umbra_interval sdf_text_outline_build(void *ctx, struct umbra_builder *b,
                                      umbra_interval_max_f32(b, zero,
                                          umbra_interval_div_f32(b, dot_pd, dd)));
 
-        umbra_interval const cx = umbra_interval_add_f32(b, p0x,
-                                      umbra_interval_mul_f32(b, t, dx)),
-                             cy = umbra_interval_add_f32(b, p0y,
-                                      umbra_interval_mul_f32(b, t, dy));
+        umbra_interval const cx = umbra_interval_fma_f32(b, t, dx, p0x),
+                             cy = umbra_interval_fma_f32(b, t, dy, p0y);
         umbra_interval const ex = umbra_interval_sub_f32(b, gx, cx),
                              ey = umbra_interval_sub_f32(b, gy, cy);
-        umbra_interval const d2 = umbra_interval_add_f32(b,
-                                      umbra_interval_mul_f32(b, ex, ex),
+        umbra_interval const d2 = umbra_interval_fma_f32(b, ex, ex,
                                       umbra_interval_mul_f32(b, ey, ey));
 
         umbra_store_var32(b, lo2_var, umbra_min_f32(b, umbra_load_var32(b, lo2_var), d2.lo));

@@ -281,13 +281,11 @@ static void apply_affine_interval(struct umbra_affine const *a,
                          sy = umbra_interval_exact(umbra_uniform_32(b, u, 4)),
                          ty = umbra_interval_exact(umbra_uniform_32(b, u, 5));
     umbra_interval const xp =
-        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, sx, *x),
-                                                            umbra_interval_mul_f32(b, kx, *y)),
-                                  tx);
+        umbra_interval_fma_f32(b, sx, *x,
+            umbra_interval_fma_f32(b, kx, *y, tx));
     umbra_interval const yp =
-        umbra_interval_add_f32(b, umbra_interval_add_f32(b, umbra_interval_mul_f32(b, ky, *x),
-                                                            umbra_interval_mul_f32(b, sy, *y)),
-                                  ty);
+        umbra_interval_fma_f32(b, ky, *x,
+            umbra_interval_fma_f32(b, sy, *y, ty));
     *x = xp;
     *y = yp;
 }
