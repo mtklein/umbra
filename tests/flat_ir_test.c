@@ -962,6 +962,30 @@ TEST(test_sin_cos_f32) {
     test_backends_free(&B);
 }
 
+TEST(test_acos_f32) {
+    struct umbra_buf slot[20] = {0};
+
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const x = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      r = umbra_acos_f32(builder, x);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[1]), r);
+    struct test_backends B = make(builder);
+
+    float a[] = { -1.0f, -0.9f, -0.5f, -0.25f, 0.0f, 0.25f, 0.5f, 0.9f, 1.0f };
+    enum { N = (int)(sizeof a / sizeof *a) };
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float z[N] = {0};
+        if (run(&B, bi, N, 1, slot, 2,
+    (struct umbra_buf[]){{.ptr=a, .count=N},
+                         {.ptr=z, .count=N}})) {
+            for (int i = 0; i < N; i++) {
+                (fabsf(z[i] - acosf(a[i])) <= 1e-3f) here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_abs_f32) {
     struct umbra_buf slot[20] = {0};
     {

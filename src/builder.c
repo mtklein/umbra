@@ -530,6 +530,33 @@ umbra_val32 umbra_sin_f32(builder *b, umbra_val32 x) {
     return umbra_cos_f32(b, umbra_sub_f32(b, x, umbra_imm_f32(b, 1.5707963267948966f)));
 }
 
+umbra_val32 umbra_acos_f32(builder *b, umbra_val32 x) {
+    // Skia's asin cubic on |x| combined with the identity
+    //   asin(|x|) = π/2 − sqrt(1 − |x|) · poly(|x|)
+    // then acos(x) = π/2 − asin(x), so
+    //   acos( ax) = sqrt(1 − ax) · poly(ax)
+    //   acos(-ax) = π − sqrt(1 − ax) · poly(ax).
+    umbra_val32 const zero = umbra_imm_f32(b, 0.0f),
+                      one  = umbra_imm_f32(b, 1.0f),
+                      pi   = umbra_imm_f32(b, 3.14159265358979323846f),
+                      c3   = umbra_imm_f32(b, -0.0187293f),
+                      c2   = umbra_imm_f32(b,  0.0742610f),
+                      c1   = umbra_imm_f32(b, -0.2121144f),
+                      c0   = umbra_imm_f32(b,  1.5707288f);
+
+    umbra_val32 const ax = umbra_abs_f32(b, x);
+    umbra_val32 const poly = umbra_add_f32(b, c0,
+                                 umbra_mul_f32(b, ax,
+                                     umbra_add_f32(b, c1,
+                                         umbra_mul_f32(b, ax,
+                                             umbra_add_f32(b, c2,
+                                                 umbra_mul_f32(b, ax, c3))))));
+    umbra_val32 const root = umbra_sqrt_f32(b, umbra_sub_f32(b, one, ax));
+    umbra_val32 const pos  = umbra_mul_f32(b, root, poly);
+    umbra_val32 const neg  = umbra_sub_f32(b, pi, pos);
+    return umbra_sel_32(b, umbra_lt_f32(b, x, zero), neg, pos);
+}
+
 umbra_val32 umbra_abs_f32(builder *b, umbra_val32 x) { return math(b, op_abs_f32, VX(x)).v32; }
 umbra_val32 umbra_round_f32(builder *b, umbra_val32 x) { return math(b, op_round_f32, VX(x)).v32; }
 umbra_val32 umbra_floor_f32(builder *b, umbra_val32 x) { return math(b, op_floor_f32, VX(x)).v32; }

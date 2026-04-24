@@ -138,6 +138,7 @@ umbra_val32 umbra_cbrt_f32(struct umbra_builder*, umbra_val32);
 umbra_val32 umbra_abs_f32 (struct umbra_builder*, umbra_val32);
 umbra_val32 umbra_sin_f32 (struct umbra_builder*, umbra_val32);
 umbra_val32 umbra_cos_f32 (struct umbra_builder*, umbra_val32);
+umbra_val32 umbra_acos_f32(struct umbra_builder*, umbra_val32);
 
 umbra_val32 umbra_round_f32(struct umbra_builder*, umbra_val32);
 umbra_val32 umbra_floor_f32(struct umbra_builder*, umbra_val32);
