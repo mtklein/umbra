@@ -900,6 +900,35 @@ TEST(test_min_max_sqrt_f32) {
     }
 }
 
+TEST(test_cbrt_f32) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *builder = umbra_builder();
+    umbra_val32 const x = umbra_load_32(builder, umbra_bind_buf(builder, &slot[0])),
+                      r = umbra_cbrt_f32(builder, x);
+    umbra_store_32(builder, umbra_bind_buf(builder, &slot[1]), r);
+    struct test_backends B = make(builder);
+
+    float a[] = { 0.0f, 1.0f, -1.0f,
+                  8.0f, 27.0f, 64.0f, 125.0f,
+                  -8.0f, -1000.0f,
+                  1e-6f, 1e6f, 1e18f };
+    enum { N = (int)(sizeof a / sizeof *a) };
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        float z[N] = {0};
+        if (run(&B, bi, N, 1, slot, 2,
+    (struct umbra_buf[]){{.ptr=a, .count=N},
+                         {.ptr=z, .count=N}})) {
+            for (int i = 0; i < N; i++) {
+                float const want = cbrtf(a[i]),
+                            err  = fabsf(z[i] - want),
+                            tol  = fabsf(want) * 1e-5f + 1e-20f;
+                (err <= tol) here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_abs_f32) {
     struct umbra_buf slot[20] = {0};
     {

@@ -439,6 +439,65 @@ umbra_val32 umbra_sqrt_f32(builder *b, umbra_val32 x) {
                  umbra_mul_f32(b, y, c_half)));
     return umbra_sel_32(b, umbra_eq_f32(b, x, c_zero_f), c_zero_f, sn);
 }
+
+umbra_val32 umbra_cbrt_f32(builder *b, umbra_val32 x) {
+    // Signed cube root, bit-exact across backends.
+    //
+    // Skia-style rational approximation of 2^(log2(|x|)/3) for the seed,
+    // followed by two Newton refinements on y^3 = |x|.  Sign is applied at
+    // the end; x = 0 is masked to 0 to absorb the seed's finite bit noise.
+    umbra_val32 const zero_f  = umbra_imm_f32(b, 0.0f);
+    umbra_val32 const mant_m  = umbra_imm_i32(b, 0x007FFFFF);
+    umbra_val32 const expo_h  = umbra_imm_i32(b, 0x3F000000);
+    umbra_val32 const inv_223 = umbra_imm_f32(b, 1.0f / (float)(1 << 23));
+    umbra_val32 const x223    = umbra_imm_f32(b, (float)(1 << 23));
+
+    umbra_val32 const ax = umbra_abs_f32(b, x);
+
+    // approx_log2(ax):
+    //   e = (int)(bits(ax)) * 2^-23                      -- ~ log2(ax) + 127
+    //   m = reinterp_f32((bits(ax) & 0x7FFFFF) | 0x3F000000)  -- in [0.5, 1)
+    //   log2 = e - 124.225514990 - 1.498030302*m - 1.725879990 / (0.3520887068 + m)
+    umbra_val32 const e   = umbra_mul_f32(b, umbra_f32_from_i32(b, ax), inv_223);
+    umbra_val32 const m   = umbra_or_32 (b, umbra_and_32(b, ax, mant_m), expo_h);
+    umbra_val32 const log2 = umbra_sub_f32(b,
+                                 umbra_sub_f32(b,
+                                     umbra_sub_f32(b, e, umbra_imm_f32(b, 124.225514990f)),
+                                     umbra_mul_f32(b, umbra_imm_f32(b, 1.498030302f), m)),
+                                 umbra_div_f32(b,
+                                     umbra_imm_f32(b, 1.725879990f),
+                                     umbra_add_f32(b, umbra_imm_f32(b, 0.3520887068f), m)));
+
+    // approx_pow2(log2 / 3):
+    //   f = fract(L); approx = L + 121.2740575 - 1.490129070*f + 27.7280233 / (4.84252568 - f)
+    //   seed = reinterp_f32( round_to_int(approx * 2^23) )
+    umbra_val32 const L = umbra_mul_f32(b, log2, umbra_imm_f32(b, 1.0f / 3.0f));
+    umbra_val32 const f = umbra_sub_f32(b, L, umbra_floor_f32(b, L));
+    umbra_val32 const approx = umbra_add_f32(b,
+                                   umbra_sub_f32(b,
+                                       umbra_add_f32(b, L, umbra_imm_f32(b, 121.274057500f)),
+                                       umbra_mul_f32(b, umbra_imm_f32(b, 1.490129070f), f)),
+                                   umbra_div_f32(b,
+                                       umbra_imm_f32(b, 27.728023300f),
+                                       umbra_sub_f32(b, umbra_imm_f32(b, 4.84252568f), f)));
+    umbra_val32 const seed = umbra_round_i32(b, umbra_mul_f32(b, approx, x223));
+
+    // Two Newton iterations on y^3 = ax:  y := y - (y^3 - ax) / (3 y^2).
+    umbra_val32 const three_f = umbra_imm_f32(b, 3.0f);
+    umbra_val32 y = seed;
+    for (int k = 0; k < 2; k++) {
+        umbra_val32 const y2 = umbra_mul_f32(b, y, y);
+        umbra_val32 const y3 = umbra_mul_f32(b, y, y2);
+        y = umbra_sub_f32(b, y,
+                umbra_div_f32(b, umbra_sub_f32(b, y3, ax),
+                                 umbra_mul_f32(b, three_f, y2)));
+    }
+
+    y = umbra_sel_32(b, umbra_eq_f32(b, ax, zero_f), zero_f, y);
+    return umbra_sel_32(b, umbra_lt_f32(b, x, zero_f),
+                        umbra_sub_f32(b, zero_f, y), y);
+}
+
 umbra_val32 umbra_abs_f32(builder *b, umbra_val32 x) { return math(b, op_abs_f32, VX(x)).v32; }
 umbra_val32 umbra_round_f32(builder *b, umbra_val32 x) { return math(b, op_round_f32, VX(x)).v32; }
 umbra_val32 umbra_floor_f32(builder *b, umbra_val32 x) { return math(b, op_floor_f32, VX(x)).v32; }
