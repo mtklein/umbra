@@ -70,6 +70,10 @@ int op_eval(enum op op, int xb, int yb, int zb, int wb) {
     case op_add_f32: r.f = x.f + y.f; return r.i;
     case op_sub_f32: r.f = x.f - y.f; return r.i;
     case op_mul_f32: r.f = x.f * y.f; return r.i;
+    case op_fma_f32:        r.f = fmaf( x.f, y.f, z.f); return r.i;
+    case op_fms_f32:        r.f = fmaf(-x.f, y.f, z.f); return r.i;
+    case op_square_add_f32: r.f = fmaf( x.f, x.f, y.f); return r.i;
+    case op_square_sub_f32: r.f = fmaf(-x.f, x.f, y.f); return r.i;
     case op_min_f32: r.f = x.f < y.f ? x.f : y.f; return r.i;
     case op_max_f32: r.f = x.f > y.f ? x.f : y.f; return r.i;
     case op_abs_f32:    r.f = fabsf(x.f); return r.i;

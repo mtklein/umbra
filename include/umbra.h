@@ -133,6 +133,12 @@ umbra_val32 umbra_div_f32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_min_f32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_max_f32(struct umbra_builder*, umbra_val32, umbra_val32);
 
+// Single-rounded x*y + z and z - x*y.  Not strictly IEEE -- one fused rounding
+// rather than two -- but uniformly applied across backends (FP contraction is
+// disabled below umbra, so nothing else fuses underneath).
+umbra_val32 umbra_fma_f32(struct umbra_builder*, umbra_val32 x, umbra_val32 y, umbra_val32 z);
+umbra_val32 umbra_fms_f32(struct umbra_builder*, umbra_val32 x, umbra_val32 y, umbra_val32 z);
+
 umbra_val32 umbra_sqrt_f32(struct umbra_builder*, umbra_val32);
 umbra_val32 umbra_cbrt_f32(struct umbra_builder*, umbra_val32);
 umbra_val32 umbra_abs_f32 (struct umbra_builder*, umbra_val32);

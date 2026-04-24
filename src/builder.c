@@ -323,6 +323,16 @@ umbra_val32 umbra_mul_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     return math(b, op_mul_f32, VX(x), VY(y)).v32;
 }
 
+umbra_val32 umbra_fma_f32(builder *b, umbra_val32 x, umbra_val32 y, umbra_val32 z) {
+    sort(&x, &y);
+    return math(b, op_fma_f32, VX(x), VY(y), VZ(z)).v32;
+}
+
+umbra_val32 umbra_fms_f32(builder *b, umbra_val32 x, umbra_val32 y, umbra_val32 z) {
+    sort(&x, &y);
+    return math(b, op_fms_f32, VX(x), VY(y), VZ(z)).v32;
+}
+
 umbra_val32 umbra_div_f32(builder *b, umbra_val32 x, umbra_val32 y) {
     if (is_imm32(b, y.id, 0x3f800000)) { return x; }
     // Correctly-rounded division synthesized in terms of add/sub/mul so every
