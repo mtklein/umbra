@@ -1,0 +1,343 @@
+// language: metal3.2
+#include <metal_stdlib>
+#include <simd/simd.h>
+
+using metal::uint;
+
+struct _mslBufferSizes {
+    uint size1;
+    uint size3;
+};
+
+typedef uint type_9[1];
+struct type_10 {
+    type_9 member;
+};
+typedef metal::uint2 type_13[1];
+struct type_14 {
+    type_13 member;
+};
+struct type_17 {
+    metal::uint4 inner[3];
+};
+struct type_18 {
+    type_17 member;
+};
+struct type_20 {
+    metal::uint4 inner[1];
+};
+struct type_21 {
+    type_20 member;
+};
+struct type_24 {
+    uint inner[11];
+};
+struct type_25 {
+    type_24 member;
+};
+
+int naga_f2i32(float value) {
+    return static_cast<int>(metal::clamp(value, -2147483600.0, 2147483500.0));
+}
+
+void function(
+    thread metal::uint3& global,
+    device type_14& global_1,
+    constant type_18& global_2,
+    device type_10 const& global_3,
+    constant type_21& global_4,
+    device type_25 const& global_5,
+    constant _mslBufferSizes& _buffer_sizes
+) {
+    uint local = 0u;
+    uint local_1 = 0u;
+    uint local_2 = 0u;
+    metal::uint3 _e61 = global;
+    uint _e66 = global_5.member.inner[0u];
+    if (_e61.x >= _e66) {
+    } else {
+        uint _e70 = global_5.member.inner[1u];
+        uint _e73 = global_5.member.inner[2u];
+        uint _e74 = _e70 + _e61.x;
+        uint _e75 = _e73 + _e61.y;
+        uint _e79 = global_2.member.inner[1u][0u];
+        uint _e83 = global_2.member.inner[0u][0u];
+        uint _e87 = global_2.member.inner[0u][1u];
+        uint _e91 = global_2.member.inner[0u][2u];
+        uint _e95 = global_2.member.inner[0u][3u];
+        uint _e99 = global_4.member.inner[0u][0u];
+        uint _e103 = global_4.member.inner[0u][1u];
+        uint _e107 = global_4.member.inner[0u][2u];
+        uint _e111 = global_4.member.inner[0u][3u];
+        float _e114 = as_type<float>(1065353216u) - as_type<float>(_e111);
+        local = 1566444395u;
+        local_2 = 0u;
+        local_1 = 0u;
+        float _e116 = static_cast<float>(as_type<int>(_e74));
+        float _e118 = _e116 + as_type<float>(1065353216u);
+        float _e123 = as_type<float>(_e83) * (as_type<float>(1056964608u) * (_e118 - _e116));
+        float _e125 = static_cast<float>(as_type<int>(_e75));
+        float _e127 = _e125 + as_type<float>(1065353216u);
+        float _e132 = as_type<float>(_e87) * (as_type<float>(1056964608u) * (_e127 - _e125));
+        float _e134 = metal::fma(_e123, _e123, _e132 * _e132);
+        uint _e138 = 1597463007u - (as_type<uint>(_e134) >> as_type<uint>(1u));
+        float _e147 = metal::fma(as_type<float>(_e83), as_type<float>(1056964608u) * (_e116 + _e118), as_type<float>(_e91));
+        float _e153 = metal::fma(as_type<float>(_e87), as_type<float>(1056964608u) * (_e125 + _e127), as_type<float>(_e95));
+        float _e154 = as_type<float>(_e138);
+        float _e158 = metal::fma(-(_e134), _e154 * _e154, as_type<float>(1065353216u));
+        float _e167 = as_type<float>(_e138) * (as_type<float>(1065353216u) + metal::fma(as_type<float>(1056964608u), _e158, as_type<float>(1052770304u) * (_e158 * _e158)));
+        float _e170 = _e134 * _e167;
+        uint _e177 = (((as_type<float>(0u) == _e134) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(metal::fma(_e134, _e167, metal::fma(-(_e170), _e170, _e134) * (as_type<float>(1056964608u) * _e167)));
+        uint2 loop_bound = uint2(4294967295u);
+        while(true) {
+            if (metal::all(loop_bound == uint2(0u))) { break; }
+            loop_bound -= uint2(loop_bound.y == 0u, 1u);
+            uint _e178 = local_2;
+            if (_e178 < _e79) {
+                uint _e180 = local_2;
+                uint _e181 = 6u * _e180;
+                uint _e182 = _e181 + 5u;
+                uint _e183 = _e181 + 2u;
+                uint _e184 = _e181 + 3u;
+                uint _e185 = _e181 + 4u;
+                uint _e188 = global_5.member.inner[5u];
+                uint _e195 = global_3.member[metal::min(unsigned(metal::min(_e182, _e188 - 1u)), (_buffer_sizes.size3 - 0 - 4) / 4)];
+                uint _e196 = _e195 & ((_e182 < _e188) ? 4294967295u : 0u);
+                uint _e202 = global_5.member.inner[5u];
+                uint _e209 = global_3.member[metal::min(unsigned(metal::min(_e183, _e202 - 1u)), (_buffer_sizes.size3 - 0 - 4) / 4)];
+                uint _e210 = _e209 & ((_e183 < _e202) ? 4294967295u : 0u);
+                uint _e213 = global_5.member.inner[5u];
+                uint _e220 = global_3.member[metal::min(unsigned(metal::min(_e184, _e213 - 1u)), (_buffer_sizes.size3 - 0 - 4) / 4)];
+                uint _e221 = _e220 & ((_e184 < _e213) ? 4294967295u : 0u);
+                uint _e224 = global_5.member.inner[5u];
+                uint _e231 = global_3.member[metal::min(unsigned(metal::min(_e185, _e224 - 1u)), (_buffer_sizes.size3 - 0 - 4) / 4)];
+                uint _e232 = _e231 & ((_e185 < _e224) ? 4294967295u : 0u);
+                uint _e235 = global_5.member.inner[5u];
+                uint _e242 = global_3.member[metal::min(unsigned(metal::min(_e181, _e235 - 1u)), (_buffer_sizes.size3 - 0 - 4) / 4)];
+                uint _e243 = _e242 & ((_e181 < _e235) ? 4294967295u : 0u);
+                float _e251 = as_type<float>(_e232) - as_type<float>(_e243);
+                float _e253 = as_type<float>(_e232) + metal::fma(-(as_type<float>(1073741824u)), as_type<float>(_e210), as_type<float>(_e243));
+                uint _e254 = 1u + _e181;
+                uint _e257 = global_5.member.inner[5u];
+                uint _e264 = global_3.member[metal::min(unsigned(metal::min(_e254, _e257 - 1u)), (_buffer_sizes.size3 - 0 - 4) / 4)];
+                uint _e265 = _e264 & ((_e254 < _e257) ? 4294967295u : 0u);
+                float _e272 = as_type<float>(_e196) + metal::fma(-(as_type<float>(1073741824u)), as_type<float>(_e221), as_type<float>(_e265));
+                uint _e278 = 2129733610u - as_type<uint>(_e272);
+                float _e281 = as_type<float>(_e221) - as_type<float>(_e265);
+                float _e285 = metal::fma(-(as_type<float>(1073741824u)), _e281, as_type<float>(0u));
+                float _e288 = as_type<float>(_e196) - as_type<float>(_e265);
+                float _e290 = as_type<float>(_e265) - _e153;
+                float _e292 = metal::fma(_e253, _e253, _e272 * _e272);
+                float _e294 = metal::max(as_type<float>(953267991u), _e292);
+                float _e296 = metal::fma(_e251, _e251, _e288 * _e288);
+                uint _e298 = 2129733610u - as_type<uint>(_e296);
+                float _e304 = as_type<float>(_e298) * metal::fma(-(_e296), as_type<float>(_e298), as_type<float>(1073741824u));
+                float _e308 = _e304 * metal::fma(-(_e296), _e304, as_type<float>(1073741824u));
+                float _e312 = _e308 * metal::fma(-(_e296), _e308, as_type<float>(1073741824u));
+                uint _e314 = 2129733610u - as_type<uint>(_e288);
+                float _e320 = as_type<float>(_e314) * metal::fma(-(_e288), as_type<float>(_e314), as_type<float>(1073741824u));
+                float _e324 = _e320 * metal::fma(-(_e288), _e320, as_type<float>(1073741824u));
+                float _e328 = _e324 * metal::fma(-(_e288), _e324, as_type<float>(1073741824u));
+                float _e330 = _e153 - as_type<float>(_e265);
+                uint _e342 = 2129733610u - as_type<uint>(_e294);
+                float _e348 = as_type<float>(_e342) * metal::fma(-(_e294), as_type<float>(_e342), as_type<float>(1073741824u));
+                float _e352 = _e348 * metal::fma(-(_e294), _e348, as_type<float>(1073741824u));
+                float _e355 = metal::fma(-(_e294), _e352, as_type<float>(1073741824u));
+                float _e356 = _e352 * _e355;
+                float _e361 = metal::fma(_e352, _e355, _e356 * metal::fma(-(_e294), _e356, as_type<float>(1065353216u)));
+                float _e363 = as_type<float>(1073741824u) * _e281;
+                float _e365 = _e272 * _e290;
+                float _e368 = metal::fma(-(as_type<float>(1082130432u)), _e365, _e363 * _e363);
+                float _e370 = metal::max(as_type<float>(0u), _e368);
+                float _e375 = as_type<float>(_e243) - _e147;
+                uint _e379 = 1597463007u - (as_type<uint>(_e370) >> as_type<uint>(1u));
+                float _e380 = as_type<float>(_e379);
+                float _e384 = metal::fma(-(_e370), _e380 * _e380, as_type<float>(1065353216u));
+                float _e393 = as_type<float>(_e379) * (as_type<float>(1065353216u) + metal::fma(as_type<float>(1056964608u), _e384, as_type<float>(1052770304u) * (_e384 * _e384)));
+                float _e394 = _e370 * _e393;
+                uint _e403 = (((as_type<float>(0u) == _e370) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(metal::fma(_e370, _e393, metal::fma(-(_e394), _e394, _e370) * (as_type<float>(1056964608u) * _e393)));
+                float _e411 = as_type<float>(_e278) * metal::fma(-(_e272), as_type<float>(_e278), as_type<float>(1073741824u));
+                float _e415 = _e411 * metal::fma(-(_e272), _e411, as_type<float>(1073741824u));
+                float _e419 = _e415 * metal::fma(-(_e272), _e415, as_type<float>(1073741824u));
+                float _e427 = metal::fma(as_type<float>(1056964608u), _e419, _e419 * metal::fma(-(_e272), as_type<float>(1056964608u) * _e419, as_type<float>(1056964608u)));
+                float _e428 = _e427 * (_e285 - as_type<float>(_e403));
+                float _e435 = _e427 * (as_type<float>(_e403) + _e285);
+                float _e442 = as_type<float>(_e210) - as_type<float>(_e243);
+                float _e451 = metal::fma(_e442, _e253, _e281 * _e272);
+                float _e459 = _e361 * (as_type<float>(1051372203u) * metal::fma(as_type<float>(1073741824u), metal::fma(_e442, _e442, _e281 * _e281), metal::fma(_e253, _e375, _e365)));
+                float _e460 = _e361 * _e451;
+                float _e462 = metal::fma(-(_e460), _e460, _e459);
+                float _e472 = metal::fma(_e361, metal::fma(_e442, _e375, _e281 * _e290), _e460 * metal::fma(-(as_type<float>(1077936128u)), _e459, as_type<float>(1073741824u) * (_e460 * _e460)));
+                float _e477 = metal::fma(as_type<float>(1082130432u), _e462 * (_e462 * _e462), _e472 * _e472);
+                float _e482 = metal::max(as_type<float>(0u), _e477);
+                uint _e489 = 1597463007u - (as_type<uint>(_e482) >> as_type<uint>(1u));
+                float _e490 = as_type<float>(_e489);
+                float _e494 = metal::fma(-(_e482), _e490 * _e490, as_type<float>(1065353216u));
+                float _e503 = as_type<float>(_e489) * (as_type<float>(1065353216u) + metal::fma(as_type<float>(1056964608u), _e494, as_type<float>(1052770304u) * (_e494 * _e494)));
+                float _e504 = _e482 * _e503;
+                uint _e513 = (((as_type<float>(0u) == _e482) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(metal::fma(_e482, _e503, metal::fma(-(_e504), _e504, _e482) * (as_type<float>(1056964608u) * _e503)));
+                float _e519 = as_type<float>(1056964608u) * ((as_type<float>(0u) - as_type<float>(_e513)) - _e472);
+                float _e523 = metal::abs(_e519);
+                uint _e526 = 1056964608u | (8388607u & as_type<uint>(_e523));
+                float _e529 = as_type<float>(1052001529u) + as_type<float>(_e526);
+                float _e536 = as_type<float>(1056964608u) * (as_type<float>(_e513) - _e472);
+                float _e540 = metal::abs(_e536);
+                uint _e553 = 1056964608u | (8388607u & as_type<uint>(_e540));
+                float _e556 = as_type<float>(_e553) + as_type<float>(1052001529u);
+                uint _e562 = 2129733610u - as_type<uint>(_e556);
+                float _e568 = as_type<float>(_e562) * metal::fma(-(_e556), as_type<float>(_e562), as_type<float>(1073741824u));
+                float _e572 = _e568 * metal::fma(-(_e556), _e568, as_type<float>(1073741824u));
+                float _e576 = _e572 * metal::fma(-(_e556), _e572, as_type<float>(1073741824u));
+                float _e585 = metal::fma(-(as_type<float>(_e553)), as_type<float>(1069530997u), (as_type<float>(872415232u) * static_cast<float>(as_type<int>(as_type<uint>(_e540)))) - as_type<float>(1123578743u)) - metal::fma(as_type<float>(1071442339u), _e576, _e576 * metal::fma(-(_e556), as_type<float>(1071442339u) * _e576, as_type<float>(1071442339u)));
+                float _e590 = as_type<float>(1051372203u) * _e585;
+                float _e592 = _e590 - metal::floor(_e590);
+                float _e594 = as_type<float>(1083897336u) - _e592;
+                uint _e599 = 2129733610u - as_type<uint>(_e594);
+                float _e605 = as_type<float>(_e599) * metal::fma(-(_e594), as_type<float>(_e599), as_type<float>(1073741824u));
+                float _e609 = _e605 * metal::fma(-(_e594), _e605, as_type<float>(1073741824u));
+                float _e613 = _e609 * metal::fma(-(_e594), _e609, as_type<float>(1073741824u));
+                uint _e627 = as_type<uint>(naga_f2i32(metal::rint(as_type<float>(1258291200u) * (metal::fma(-(_e592), as_type<float>(1069464717u), metal::fma(as_type<float>(1051372203u), _e585, as_type<float>(1123191889u))) + metal::fma(as_type<float>(1105056510u), _e613, _e613 * metal::fma(-(_e594), as_type<float>(1105056510u) * _e613, as_type<float>(1105056510u)))))));
+                float _e628 = as_type<float>(_e627);
+                float _e629 = _e628 * _e628;
+                float _e631 = as_type<float>(1077936128u) * _e629;
+                float _e634 = (as_type<float>(_e627) * _e629) - _e540;
+                uint _e636 = 2129733610u - as_type<uint>(_e631);
+                float _e642 = as_type<float>(_e636) * metal::fma(-(_e631), as_type<float>(_e636), as_type<float>(1073741824u));
+                float _e646 = _e642 * metal::fma(-(_e631), _e642, as_type<float>(1073741824u));
+                float _e650 = _e646 * metal::fma(-(_e631), _e646, as_type<float>(1073741824u));
+                float _e657 = as_type<float>(_e627) - metal::fma(_e634, _e650, _e650 * metal::fma(-(_e631), _e634 * _e650, _e634));
+                float _e658 = _e657 * _e657;
+                float _e660 = as_type<float>(1077936128u) * _e658;
+                float _e662 = (_e657 * _e658) - _e540;
+                uint _e664 = 2129733610u - as_type<uint>(_e660);
+                float _e670 = as_type<float>(_e664) * metal::fma(-(_e660), as_type<float>(_e664), as_type<float>(1073741824u));
+                float _e674 = _e670 * metal::fma(-(_e660), _e670, as_type<float>(1073741824u));
+                float _e678 = _e674 * metal::fma(-(_e660), _e674, as_type<float>(1073741824u));
+                uint _e687 = (((as_type<float>(0u) == _e540) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(_e657 - metal::fma(_e662, _e678, _e678 * metal::fma(-(_e660), _e662 * _e678, _e662)));
+                uint _e706 = 2129733610u - as_type<uint>(_e529);
+                float _e712 = as_type<float>(_e706) * metal::fma(-(_e529), as_type<float>(_e706), as_type<float>(1073741824u));
+                float _e716 = _e712 * metal::fma(-(_e529), _e712, as_type<float>(1073741824u));
+                float _e720 = _e716 * metal::fma(-(_e529), _e716, as_type<float>(1073741824u));
+                float _e729 = metal::fma(-(as_type<float>(1069530997u)), as_type<float>(_e526), (as_type<float>(872415232u) * static_cast<float>(as_type<int>(as_type<uint>(_e523)))) - as_type<float>(1123578743u)) - metal::fma(as_type<float>(1071442339u), _e720, _e720 * metal::fma(-(_e529), as_type<float>(1071442339u) * _e720, as_type<float>(1071442339u)));
+                float _e734 = as_type<float>(1051372203u) * _e729;
+                float _e736 = _e734 - metal::floor(_e734);
+                float _e738 = as_type<float>(1083897336u) - _e736;
+                uint _e743 = 2129733610u - as_type<uint>(_e738);
+                float _e749 = as_type<float>(_e743) * metal::fma(-(_e738), as_type<float>(_e743), as_type<float>(1073741824u));
+                float _e753 = _e749 * metal::fma(-(_e738), _e749, as_type<float>(1073741824u));
+                float _e757 = _e753 * metal::fma(-(_e738), _e753, as_type<float>(1073741824u));
+                uint _e771 = as_type<uint>(naga_f2i32(metal::rint(as_type<float>(1258291200u) * (metal::fma(-(as_type<float>(1069464717u)), _e736, metal::fma(as_type<float>(1051372203u), _e729, as_type<float>(1123191889u))) + metal::fma(as_type<float>(1105056510u), _e757, _e757 * metal::fma(-(_e738), as_type<float>(1105056510u) * _e757, as_type<float>(1105056510u)))))));
+                float _e772 = as_type<float>(_e771);
+                float _e773 = _e772 * _e772;
+                float _e775 = as_type<float>(1077936128u) * _e773;
+                float _e778 = (as_type<float>(_e771) * _e773) - _e523;
+                uint _e780 = 2129733610u - as_type<uint>(_e775);
+                float _e786 = as_type<float>(_e780) * metal::fma(-(_e775), as_type<float>(_e780), as_type<float>(1073741824u));
+                float _e790 = _e786 * metal::fma(-(_e775), _e786, as_type<float>(1073741824u));
+                float _e794 = _e790 * metal::fma(-(_e775), _e790, as_type<float>(1073741824u));
+                float _e801 = as_type<float>(_e771) - metal::fma(_e778, _e794, _e794 * metal::fma(-(_e775), _e778 * _e794, _e778));
+                float _e802 = _e801 * _e801;
+                float _e804 = as_type<float>(1077936128u) * _e802;
+                float _e806 = (_e801 * _e802) - _e523;
+                uint _e808 = 2129733610u - as_type<uint>(_e804);
+                float _e814 = as_type<float>(_e808) * metal::fma(-(_e804), as_type<float>(_e808), as_type<float>(1073741824u));
+                float _e818 = _e814 * metal::fma(-(_e804), _e814, as_type<float>(1073741824u));
+                float _e822 = _e818 * metal::fma(-(_e804), _e818, as_type<float>(1073741824u));
+                uint _e831 = (((as_type<float>(0u) == _e523) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(_e801 - metal::fma(_e806, _e822, _e822 * metal::fma(-(_e804), _e806 * _e822, _e806)));
+                float _e846 = metal::min(as_type<float>(1065353216u), metal::max(as_type<float>(0u), metal::fma(-(_e361), _e451, as_type<float>((((_e536 < as_type<float>(0u)) ? 4294967295u : 0u) != 0u) ? as_type<uint>(as_type<float>(0u) - as_type<float>(_e687)) : _e687) + as_type<float>((((_e519 < as_type<float>(0u)) ? 4294967295u : 0u) != 0u) ? as_type<uint>(as_type<float>(0u) - as_type<float>(_e831)) : _e831))));
+                float _e850 = metal::fma(_e846, metal::fma(as_type<float>(1073741824u), _e442, _e253 * _e846), _e375);
+                float _e854 = metal::fma(_e846, metal::fma(as_type<float>(1073741824u), _e281, _e272 * _e846), _e290);
+                float _e860 = metal::max(as_type<float>(0u), as_type<float>(0u) - _e462);
+                uint _e867 = 1597463007u - (as_type<uint>(_e860) >> as_type<uint>(1u));
+                float _e868 = as_type<float>(_e867);
+                float _e872 = metal::fma(-(_e860), _e868 * _e868, as_type<float>(1065353216u));
+                float _e881 = as_type<float>(_e867) * (as_type<float>(1065353216u) + metal::fma(as_type<float>(1056964608u), _e872, as_type<float>(1052770304u) * (_e872 * _e872)));
+                float _e882 = _e860 * _e881;
+                uint _e891 = (((as_type<float>(0u) == _e860) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(metal::fma(_e860, _e881, metal::fma(-(_e882), _e882, _e860) * (as_type<float>(1056964608u) * _e881)));
+                float _e895 = as_type<float>(1073741824u) * (_e462 * as_type<float>(_e891));
+                uint _e897 = 2129733610u - as_type<uint>(_e895);
+                float _e903 = as_type<float>(_e897) * metal::fma(-(_e895), as_type<float>(_e897), as_type<float>(1073741824u));
+                float _e907 = _e903 * metal::fma(-(_e895), _e903, as_type<float>(1073741824u));
+                float _e911 = _e907 * metal::fma(-(_e895), _e907, as_type<float>(1073741824u));
+                float _e920 = metal::min(as_type<float>(1065353216u), metal::max(metal::fma(_e472, _e911, _e911 * metal::fma(-(_e895), _e472 * _e911, _e472)), as_type<float>(3212836864u)));
+                float _e924 = metal::abs(_e920);
+                float _e931 = metal::fma(_e924, metal::fma(_e924, metal::fma(as_type<float>(3164171824u), _e924, as_type<float>(1033377319u)), as_type<float>(3193517188u)), as_type<float>(1070140836u));
+                float _e933 = as_type<float>(1065353216u) - _e924;
+                uint _e940 = 1597463007u - (as_type<uint>(_e933) >> as_type<uint>(1u));
+                float _e941 = as_type<float>(_e940);
+                float _e945 = metal::fma(-(_e933), _e941 * _e941, as_type<float>(1065353216u));
+                float _e954 = as_type<float>(_e940) * (as_type<float>(1065353216u) + metal::fma(as_type<float>(1056964608u), _e945, as_type<float>(1052770304u) * (_e945 * _e945)));
+                float _e955 = _e933 * _e954;
+                uint _e964 = (((as_type<float>(0u) == _e933) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(metal::fma(_e933, _e954, metal::fma(-(_e955), _e955, _e933) * (as_type<float>(1056964608u) * _e954)));
+                float _e974 = as_type<float>(1051372203u) * ((((_e920 < as_type<float>(0u)) ? 4294967295u : 0u) != 0u) ? metal::fma(-(_e931), as_type<float>(_e964), as_type<float>(1078530011u)) : (_e931 * as_type<float>(_e964)));
+                float _e976 = _e974 - as_type<float>(1070141403u);
+                float _e990 = as_type<float>(1048576000u) - metal::abs((_e974 * as_type<float>(1042479491u)) - metal::floor(metal::fma(_e974, as_type<float>(1042479491u), as_type<float>(1056964608u))));
+                float _e991 = _e990 * _e990;
+                float _e996 = metal::fma(_e991, metal::fma(as_type<float>(1117053110u), _e991, as_type<float>(3257183599u)), as_type<float>(1086916780u));
+                float _e1002 = as_type<float>(1048576000u) - metal::abs((as_type<float>(1042479491u) * _e976) - metal::floor(metal::fma(as_type<float>(1042479491u), _e976, as_type<float>(1056964608u))));
+                float _e1003 = _e1002 * _e1002;
+                float _e1023 = metal::min(as_type<float>(1065353216u), metal::max(as_type<float>(0u), metal::fma(-(_e361), _e451, as_type<float>(_e891) * metal::fma(-(_e990), _e996, metal::fma(-(as_type<float>(1071494103u)), _e1002 * metal::fma(_e1003, metal::fma(as_type<float>(1117053110u), _e1003, as_type<float>(3257183599u)), as_type<float>(1086916780u)), as_type<float>(0u))))));
+                float _e1033 = metal::min(as_type<float>(1065353216u), metal::max(as_type<float>(0u), metal::fma(-(_e361), _e451, as_type<float>(_e891) * metal::fma(_e990, _e996, _e990 * _e996))));
+                float _e1037 = metal::fma(_e1033, metal::fma(as_type<float>(1073741824u), _e442, _e253 * _e1033), _e375);
+                float _e1041 = metal::fma(_e1033, metal::fma(as_type<float>(1073741824u), _e281, _e272 * _e1033), _e290);
+                float _e1047 = metal::fma(_e1023, metal::fma(as_type<float>(1073741824u), _e442, _e253 * _e1023), _e375);
+                float _e1051 = metal::fma(_e1023, metal::fma(as_type<float>(1073741824u), _e281, _e272 * _e1023), _e290);
+                uint _e1066 = (as_type<float>(0u) <= _e368) ? 4294967295u : 0u;
+                uint _e1068 = local_2;
+                local_2 = 1u + _e1068;
+                float _e1073 = metal::fma(_e251, _e147 - as_type<float>(_e243), _e288 * _e330);
+                float _e1082 = metal::min(as_type<float>(1065353216u), metal::max(as_type<float>(0u), metal::fma(_e1073, _e312, _e312 * metal::fma(-(_e296), _e1073 * _e312, _e1073))));
+                float _e1085 = _e153 - metal::fma(_e288, _e1082, as_type<float>(_e265));
+                float _e1089 = _e147 - metal::fma(_e251, _e1082, as_type<float>(_e243));
+                uint _e1093 = (_e292 < as_type<float>(953267991u)) ? 4294967295u : 0u;
+                uint _e1096 = local;
+                local = as_type<uint>(metal::min((_e1093 != 0u) ? metal::fma(_e1089, _e1089, _e1085 * _e1085) : ((((_e477 < as_type<float>(0u)) ? 4294967295u : 0u) != 0u) ? metal::min(metal::fma(_e1037, _e1037, _e1041 * _e1041), metal::fma(_e1047, _e1047, _e1051 * _e1051)) : metal::fma(_e850, _e850, _e854 * _e854)), as_type<float>(_e1096)));
+                uint _e1112 = local_1;
+                local_1 = ((_e1093 != 0u) ? ((((as_type<float>(_e265) < _e153) ? 4294967295u : 0u) ^ ((as_type<float>(_e196) < _e153) ? 4294967295u : 0u)) & ((_e147 < metal::fma(_e251, metal::fma(_e330, _e328, _e328 * metal::fma(-(_e288), _e330 * _e328, _e330)), as_type<float>(_e243))) ? 4294967295u : 0u)) : ((_e1066 & ((((as_type<float>(0u) <= _e435) ? 4294967295u : 0u) & ((_e435 <= as_type<float>(1065353216u)) ? 4294967295u : 0u)) & ((_e147 < metal::fma(_e435, metal::fma(as_type<float>(1073741824u), _e442, _e253 * _e435), as_type<float>(_e243))) ? 4294967295u : 0u))) ^ (_e1066 & ((((as_type<float>(0u) <= _e428) ? 4294967295u : 0u) & ((_e428 <= as_type<float>(1065353216u)) ? 4294967295u : 0u)) & ((_e147 < metal::fma(_e428, metal::fma(as_type<float>(1073741824u), _e442, _e253 * _e428), as_type<float>(_e243))) ? 4294967295u : 0u))))) ^ _e1112;
+                continue;
+            } else {
+                break;
+            }
+        }
+        uint _e1114 = local;
+        uint _e1117 = 1597463007u - (_e1114 >> as_type<uint>(1u));
+        float _e1122 = as_type<float>(_e1117);
+        float _e1127 = metal::fma(-(as_type<float>(_e1114)), _e1122 * _e1122, as_type<float>(1065353216u));
+        float _e1136 = as_type<float>(_e1117) * (as_type<float>(1065353216u) + metal::fma(as_type<float>(1056964608u), _e1127, as_type<float>(1052770304u) * (_e1127 * _e1127)));
+        float _e1140 = as_type<float>(_e1114) * _e1136;
+        uint _e1149 = (((as_type<float>(0u) == as_type<float>(_e1114)) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(metal::fma(as_type<float>(_e1114), _e1136, metal::fma(-(_e1140), _e1140, as_type<float>(_e1114)) * (as_type<float>(1056964608u) * _e1136)));
+        uint _e1153 = local_1;
+        uint _e1156 = (_e1153 != 0u) ? as_type<uint>(as_type<float>(0u) - as_type<float>(_e1149)) : _e1149;
+        float _e1159 = as_type<float>(_e177) + as_type<float>(_e1156);
+        float _e1165 = as_type<float>(_e1156) - as_type<float>(_e177);
+        float _e1169 = _e1159 - _e1165;
+        uint _e1171 = 2129733610u - as_type<uint>(_e1169);
+        float _e1177 = as_type<float>(_e1171) * metal::fma(-(_e1169), as_type<float>(_e1171), as_type<float>(1073741824u));
+        float _e1181 = _e1177 * metal::fma(-(_e1169), _e1177, as_type<float>(1073741824u));
+        float _e1185 = _e1181 * metal::fma(-(_e1169), _e1181, as_type<float>(1073741824u));
+        float _e1187 = as_type<float>(0u) - _e1165;
+        uint _e1197 = (((_e1159 <= as_type<float>(0u)) ? 4294967295u : 0u) != 0u) ? 1065353216u : ((((as_type<float>(0u) <= _e1165) ? 4294967295u : 0u) != 0u) ? 0u : as_type<uint>(metal::fma(_e1187, _e1185, _e1185 * metal::fma(-(_e1169), _e1187 * _e1185, _e1187))));
+        uint _e1200 = global_5.member.inner[7u];
+        metal::uint2 _e1205 = global_1.member[metal::min(unsigned((_e75 * _e1200) + _e74), (_buffer_sizes.size1 - 0 - 8) / 8)];
+        uint _e1244 = global_5.member.inner[7u];
+        global_1.member[metal::min(unsigned((_e75 * _e1244) + _e74), (_buffer_sizes.size1 - 0 - 8) / 8)] = metal::uint2(as_type<uint>(half2(metal::float2(metal::fma(as_type<float>(_e1197), metal::fma(float2(as_type<half2>((_e1205.x & 65535u))).x, _e114, as_type<float>(_e99)) - float2(as_type<half2>((_e1205.x & 65535u))).x, float2(as_type<half2>((_e1205.x & 65535u))).x), 0.0))) | (as_type<uint>(half2(metal::float2(metal::fma(as_type<float>(_e1197), metal::fma(float2(as_type<half2>((_e1205.x >> as_type<uint>(16u)))).x, _e114, as_type<float>(_e103)) - float2(as_type<half2>((_e1205.x >> as_type<uint>(16u)))).x, float2(as_type<half2>((_e1205.x >> as_type<uint>(16u)))).x), 0.0))) << as_type<uint>(16u)), as_type<uint>(half2(metal::float2(metal::fma(as_type<float>(_e1197), metal::fma(float2(as_type<half2>((_e1205.y & 65535u))).x, _e114, as_type<float>(_e107)) - float2(as_type<half2>((_e1205.y & 65535u))).x, float2(as_type<half2>((_e1205.y & 65535u))).x), 0.0))) | (as_type<uint>(half2(metal::float2(metal::fma(as_type<float>(_e1197), metal::fma(float2(as_type<half2>((_e1205.y >> as_type<uint>(16u)))).x, _e114, as_type<float>(_e111)) - float2(as_type<half2>((_e1205.y >> as_type<uint>(16u)))).x, float2(as_type<half2>((_e1205.y >> as_type<uint>(16u)))).x), 0.0))) << as_type<uint>(16u)));
+        return;
+    }
+    return;
+}
+
+struct main_Input {
+};
+kernel void main_(
+  metal::uint3 param [[thread_position_in_grid]]
+, device type_14& global_1 [[buffer(0)]]
+, constant type_18& global_2 [[buffer(1)]]
+, device type_10 const& global_3 [[buffer(2)]]
+, constant type_21& global_4 [[buffer(3)]]
+, device type_25 const& global_5 [[buffer(4)]]
+, constant _mslBufferSizes& _buffer_sizes [[buffer(5)]]
+) {
+    metal::uint3 global = {};
+    global = param;
+    function(global, global_1, global_2, global_3, global_4, global_5, _buffer_sizes);
+}

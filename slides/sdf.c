@@ -810,6 +810,338 @@ static void sdf_polyline_text_free(struct slide *s) {
     free(s);
 }
 
+// SDF Analytic Text.
+//
+// Signed distance field where per-curve distance is computed analytically
+// via Inigo Quilez's Cardano-form solution of the quadratic-Bezier distance
+// cubic.  See https://iquilezles.org/articles/distfunctions2d/.  All three
+// branches (linear fallback, Cardano h ≥ 0 one root via cbrt, Cardano h < 0
+// three roots via acos/cos/sin) are computed unconditionally and combined
+// with sel() — no umbra_if.  That's both more work on GPU than ideal and
+// a deliberate sidestep of a bit-exactness issue the umbra_if-based draft
+// had between CPU backends; see the TODO below.
+//
+// Straight-line segments arrive from slug.c as degenerate quadratics with
+// P1 = midpoint(P0, P2), i.e. bb = P0 − 2·P1 + P2 = 0.  We clamp bb_bb with
+// lin_eps so the Cardano path stays finite even on those, and sel out its
+// (wrong) contribution via is_linear.  sqrt and acos arguments are clamped
+// into their valid range for the same reason — the unused branch must be
+// finite so sel() doesn't see backend-divergent NaN handling.
+//
+// Sign via horizontal-ray winding parity, computed per-curve with the same
+// sel pattern: a linear crossing test and a curved two-root test are both
+// evaluated and selected by is_linear.
+//
+// Bounds returned as a Lipschitz-1 ball around the tile center, matching
+// the polyline slide.
+//
+// TODO: revisit with umbra_if once the CPU-backend if-block handling is
+// robust enough to keep interp and jit bit-exact on a body this size.  The
+// first draft (kept in git history) tried that and failed golden_test by
+// ~4200 bytes interp-vs-jit, all backends drawing differently — the kind
+// of pattern that says something in the if-end-if plumbing isn't preserving
+// state the way the sel-based version does.  Using Cardano under umbra_if
+// would let GPU backends skip the trig path on tiles with no h<0 lanes.
+
+struct sdf_analytic_text_sdf {
+    float            scale_x, scale_y, off_x, off_y;
+    int              n_curves, :32;
+    struct umbra_buf curves;
+};
+
+static umbra_interval sdf_analytic_text_build(void *ctx, struct umbra_builder *b,
+                                               umbra_interval x, umbra_interval y) {
+    struct sdf_analytic_text_sdf const *self = ctx;
+    umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
+    umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
+    umbra_val32 const n  = umbra_uniform_32(b, u, SLOT(n_curves));
+
+    umbra_val32 const sx = umbra_uniform_32(b, u, SLOT(scale_x)),
+                      sy = umbra_uniform_32(b, u, SLOT(scale_y)),
+                      ox = umbra_uniform_32(b, u, SLOT(off_x)),
+                      oy = umbra_uniform_32(b, u, SLOT(off_y));
+
+    umbra_val32 const zero  = umbra_imm_f32(b, 0.0f),
+                      one   = umbra_imm_f32(b, 1.0f),
+                      two   = umbra_imm_f32(b, 2.0f),
+                      three = umbra_imm_f32(b, 3.0f),
+                      four  = umbra_imm_f32(b, 4.0f),
+                      half  = umbra_imm_f32(b, 0.5f),
+                      third = umbra_imm_f32(b, 1.0f/3.0f),
+                      sqrt3 = umbra_imm_f32(b, 1.732050808f),
+                      lin_eps = umbra_imm_f32(b, 1e-4f);
+
+    umbra_val32 const bcx = umbra_mul_f32(b, umbra_add_f32(b, x.lo, x.hi), half),
+                      bcy = umbra_mul_f32(b, umbra_add_f32(b, y.lo, y.hi), half);
+    umbra_val32 const hw  = umbra_mul_f32(b, umbra_mul_f32(b, umbra_sub_f32(b, x.hi, x.lo), half), sx),
+                      hh  = umbra_mul_f32(b, umbra_mul_f32(b, umbra_sub_f32(b, y.hi, y.lo), half), sy);
+    umbra_val32 const r   = umbra_sqrt_f32(b,
+                                umbra_add_f32(b, umbra_mul_f32(b, hw, hw),
+                                                 umbra_mul_f32(b, hh, hh)));
+
+    umbra_val32 const gx = umbra_add_f32(b, umbra_mul_f32(b, bcx, sx), ox),
+                      gy = umbra_add_f32(b, umbra_mul_f32(b, bcy, sy), oy);
+
+    umbra_var32 const dist2 = umbra_declare_var32(b, umbra_imm_f32(b, 1e18f)),
+                      par   = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_val32 const six = umbra_imm_i32(b, 6);
+
+    umbra_val32 const j = umbra_loop(b, n); {
+        umbra_val32 const base = umbra_mul_i32(b, j, six);
+        umbra_val32 const p0x = umbra_gather_32(b, data, base),
+                          p0y = umbra_gather_32(b, data,
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 1))),
+                          p1x = umbra_gather_32(b, data,
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 2))),
+                          p1y = umbra_gather_32(b, data,
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 3))),
+                          p2x = umbra_gather_32(b, data,
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 4))),
+                          p2y = umbra_gather_32(b, data,
+                                    umbra_add_i32(b, base, umbra_imm_i32(b, 5)));
+
+        umbra_val32 const ax = umbra_sub_f32(b, p1x, p0x),
+                          ay = umbra_sub_f32(b, p1y, p0y);
+        umbra_val32 const bbx = umbra_add_f32(b,
+                                    umbra_sub_f32(b, p0x, umbra_mul_f32(b, two, p1x)), p2x),
+                          bby = umbra_add_f32(b,
+                                    umbra_sub_f32(b, p0y, umbra_mul_f32(b, two, p1y)), p2y);
+        umbra_val32 const dx = umbra_sub_f32(b, p0x, gx),
+                          dy = umbra_sub_f32(b, p0y, gy);
+        umbra_val32 const ccx = umbra_mul_f32(b, two, ax),
+                          ccy = umbra_mul_f32(b, two, ay);
+
+        umbra_val32 const bb_bb = umbra_add_f32(b, umbra_mul_f32(b, bbx, bbx),
+                                                   umbra_mul_f32(b, bby, bby));
+        umbra_val32 const is_linear = umbra_lt_f32(b, bb_bb, lin_eps);
+
+        // Linear path: closest-point-on-segment formula and straight-line
+        // winding.  Produces finite results as long as seg_len2 > 0.
+        umbra_val32 const seg_x = umbra_sub_f32(b, p2x, p0x),
+                          seg_y = umbra_sub_f32(b, p2y, p0y);
+        umbra_val32 const seg_len2 = umbra_add_f32(b, umbra_mul_f32(b, seg_x, seg_x),
+                                                      umbra_mul_f32(b, seg_y, seg_y));
+        umbra_val32 const g_p0_x = umbra_sub_f32(b, gx, p0x),
+                          g_p0_y = umbra_sub_f32(b, gy, p0y);
+        umbra_val32 const dot_gs = umbra_add_f32(b, umbra_mul_f32(b, g_p0_x, seg_x),
+                                                    umbra_mul_f32(b, g_p0_y, seg_y));
+        umbra_val32 const t_lin = umbra_min_f32(b, one,
+                                      umbra_max_f32(b, zero,
+                                          umbra_div_f32(b, dot_gs, seg_len2)));
+        umbra_val32 const qx_lin = umbra_sub_f32(b, gx,
+                                       umbra_add_f32(b, p0x, umbra_mul_f32(b, t_lin, seg_x))),
+                          qy_lin = umbra_sub_f32(b, gy,
+                                       umbra_add_f32(b, p0y, umbra_mul_f32(b, t_lin, seg_y)));
+        umbra_val32 const d2_linear = umbra_add_f32(b, umbra_mul_f32(b, qx_lin, qx_lin),
+                                                       umbra_mul_f32(b, qy_lin, qy_lin));
+
+        umbra_val32 const below0 = umbra_lt_f32(b, p0y, gy),
+                          below1 = umbra_lt_f32(b, p2y, gy),
+                          strad  = umbra_xor_32(b, below0, below1);
+        umbra_val32 const ty_lin = umbra_div_f32(b,
+                                       umbra_sub_f32(b, gy, p0y), seg_y),
+                          xat_lin = umbra_add_f32(b, p0x,
+                                        umbra_mul_f32(b, ty_lin, seg_x)),
+                          right_lin = umbra_lt_f32(b, gx, xat_lin);
+        umbra_val32 const linear_cross = umbra_and_32(b, strad, right_lin);
+
+        // Cardano path, using bb_bb_safe so linear inputs don't produce NaN.
+        // is_linear picks which path wins at the end.
+        umbra_val32 const bb_bb_safe = umbra_max_f32(b, bb_bb, lin_eps);
+        umbra_val32 const kk = umbra_div_f32(b, one, bb_bb_safe);
+        umbra_val32 const a_bb = umbra_add_f32(b, umbra_mul_f32(b, ax, bbx),
+                                                   umbra_mul_f32(b, ay, bby));
+        umbra_val32 const kx = umbra_mul_f32(b, kk, a_bb);
+        umbra_val32 const a_a = umbra_add_f32(b, umbra_mul_f32(b, ax, ax),
+                                                  umbra_mul_f32(b, ay, ay));
+        umbra_val32 const d_bb = umbra_add_f32(b, umbra_mul_f32(b, dx, bbx),
+                                                   umbra_mul_f32(b, dy, bby));
+        umbra_val32 const ky = umbra_mul_f32(b, kk,
+                                   umbra_mul_f32(b, third,
+                                       umbra_add_f32(b, umbra_mul_f32(b, two, a_a), d_bb)));
+        umbra_val32 const d_a = umbra_add_f32(b, umbra_mul_f32(b, dx, ax),
+                                                  umbra_mul_f32(b, dy, ay));
+        umbra_val32 const kz = umbra_mul_f32(b, kk, d_a);
+
+        umbra_val32 const kx2 = umbra_mul_f32(b, kx, kx);
+        umbra_val32 const p   = umbra_sub_f32(b, ky, kx2);
+        umbra_val32 const q   = umbra_add_f32(b,
+                                    umbra_mul_f32(b, kx,
+                                        umbra_sub_f32(b, umbra_mul_f32(b, two, kx2),
+                                                          umbra_mul_f32(b, three, ky))),
+                                    kz);
+        umbra_val32 const p3 = umbra_mul_f32(b, p, umbra_mul_f32(b, p, p));
+        umbra_val32 const h  = umbra_add_f32(b, umbra_mul_f32(b, q, q),
+                                                umbra_mul_f32(b, four, p3));
+
+        // h ≥ 0 branch (always computed; max(h,0) keeps sqrt finite when h<0):
+        umbra_val32 const hs = umbra_sqrt_f32(b, umbra_max_f32(b, h, zero));
+        umbra_val32 const x1 = umbra_mul_f32(b, half, umbra_sub_f32(b, hs, q)),
+                          x2 = umbra_mul_f32(b, half,
+                                   umbra_sub_f32(b, umbra_sub_f32(b, zero, hs), q));
+        umbra_val32 const u1 = umbra_cbrt_f32(b, x1),
+                          u2 = umbra_cbrt_f32(b, x2);
+        umbra_val32 const t_pos_raw = umbra_sub_f32(b, umbra_add_f32(b, u1, u2), kx);
+        umbra_val32 const t_pos = umbra_min_f32(b, one,
+                                      umbra_max_f32(b, zero, t_pos_raw));
+        umbra_val32 const dpx = umbra_add_f32(b, dx,
+                                    umbra_mul_f32(b, t_pos,
+                                        umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t_pos)))),
+                          dpy = umbra_add_f32(b, dy,
+                                    umbra_mul_f32(b, t_pos,
+                                        umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t_pos))));
+        umbra_val32 const d2_pos = umbra_add_f32(b, umbra_mul_f32(b, dpx, dpx),
+                                                     umbra_mul_f32(b, dpy, dpy));
+
+        // h < 0 branch.  All inputs to sqrt/acos are clamped so the unused
+        // branch is finite and sel() gets a clean bit-for-bit pick.
+        umbra_val32 const neg_p_safe = umbra_max_f32(b,
+                                           umbra_sub_f32(b, zero, p), zero);
+        umbra_val32 const z_v = umbra_sqrt_f32(b, neg_p_safe);
+        umbra_val32 const denom = umbra_mul_f32(b, two, umbra_mul_f32(b, p, z_v));
+        umbra_val32 const arg_raw = umbra_div_f32(b, q, denom);
+        umbra_val32 const neg_one = umbra_sub_f32(b, zero, one);
+        umbra_val32 const arg_safe = umbra_min_f32(b, one,
+                                         umbra_max_f32(b, neg_one, arg_raw));
+        umbra_val32 const v  = umbra_mul_f32(b, third, umbra_acos_f32(b, arg_safe));
+        umbra_val32 const mv = umbra_cos_f32(b, v),
+                          nv = umbra_mul_f32(b, sqrt3, umbra_sin_f32(b, v));
+        umbra_val32 const t0_raw = umbra_sub_f32(b,
+                                       umbra_mul_f32(b, umbra_add_f32(b, mv, mv), z_v),
+                                       kx),
+                          t1_raw = umbra_sub_f32(b,
+                                       umbra_mul_f32(b,
+                                           umbra_sub_f32(b, umbra_sub_f32(b, zero, nv), mv),
+                                           z_v),
+                                       kx);
+        umbra_val32 const t0 = umbra_min_f32(b, one, umbra_max_f32(b, zero, t0_raw)),
+                          t1 = umbra_min_f32(b, one, umbra_max_f32(b, zero, t1_raw));
+        umbra_val32 const d0x = umbra_add_f32(b, dx,
+                                    umbra_mul_f32(b, t0,
+                                        umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t0)))),
+                          d0y = umbra_add_f32(b, dy,
+                                    umbra_mul_f32(b, t0,
+                                        umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t0)))),
+                          d1x = umbra_add_f32(b, dx,
+                                    umbra_mul_f32(b, t1,
+                                        umbra_add_f32(b, ccx, umbra_mul_f32(b, bbx, t1)))),
+                          d1y = umbra_add_f32(b, dy,
+                                    umbra_mul_f32(b, t1,
+                                        umbra_add_f32(b, ccy, umbra_mul_f32(b, bby, t1))));
+        umbra_val32 const d2_t0 = umbra_add_f32(b, umbra_mul_f32(b, d0x, d0x),
+                                                    umbra_mul_f32(b, d0y, d0y)),
+                          d2_t1 = umbra_add_f32(b, umbra_mul_f32(b, d1x, d1x),
+                                                    umbra_mul_f32(b, d1y, d1y));
+        umbra_val32 const d2_neg = umbra_min_f32(b, d2_t0, d2_t1);
+
+        umbra_val32 const h_neg    = umbra_lt_f32(b, h, zero);
+        umbra_val32 const d2_card  = umbra_sel_32(b, h_neg, d2_neg, d2_pos);
+        umbra_val32 const d2_curve = umbra_sel_32(b, is_linear, d2_linear, d2_card);
+        umbra_store_var32(b, dist2,
+            umbra_min_f32(b, umbra_load_var32(b, dist2), d2_curve));
+
+        // Curved winding: B(t).y − gy = bb.y·t² + 2·a.y·t + (P0.y − gy) = 0.
+        // Both roots are evaluated; out-of-range or complex roots produce
+        // cross=0 naturally via the inside/disc_ok AND-mask chain.
+        umbra_val32 const qA = bby,
+                          qB = ccy,
+                          qC = umbra_sub_f32(b, p0y, gy);
+        umbra_val32 const disc = umbra_sub_f32(b,
+                                     umbra_mul_f32(b, qB, qB),
+                                     umbra_mul_f32(b, four, umbra_mul_f32(b, qA, qC)));
+        umbra_val32 const disc_ok   = umbra_le_f32(b, zero, disc);
+        umbra_val32 const disc_safe = umbra_max_f32(b, disc, zero);
+        umbra_val32 const sd     = umbra_sqrt_f32(b, disc_safe);
+        umbra_val32 const inv2A  = umbra_div_f32(b, half, qA);
+        umbra_val32 const neg_qB = umbra_sub_f32(b, zero, qB);
+        umbra_val32 const r0 = umbra_mul_f32(b, inv2A, umbra_add_f32(b, neg_qB, sd)),
+                          r1 = umbra_mul_f32(b, inv2A, umbra_sub_f32(b, neg_qB, sd));
+
+        umbra_val32 const inside0 = umbra_and_32(b,
+                                        umbra_le_f32(b, zero, r0),
+                                        umbra_le_f32(b, r0, one)),
+                          inside1 = umbra_and_32(b,
+                                        umbra_le_f32(b, zero, r1),
+                                        umbra_le_f32(b, r1, one));
+        umbra_val32 const bxr0 = umbra_add_f32(b, p0x,
+                                     umbra_mul_f32(b, r0,
+                                         umbra_add_f32(b, ccx,
+                                             umbra_mul_f32(b, bbx, r0)))),
+                          bxr1 = umbra_add_f32(b, p0x,
+                                     umbra_mul_f32(b, r1,
+                                         umbra_add_f32(b, ccx,
+                                             umbra_mul_f32(b, bbx, r1))));
+        umbra_val32 const right0 = umbra_lt_f32(b, gx, bxr0),
+                          right1 = umbra_lt_f32(b, gx, bxr1);
+        umbra_val32 const cross0 = umbra_and_32(b, disc_ok,
+                                       umbra_and_32(b, inside0, right0)),
+                          cross1 = umbra_and_32(b, disc_ok,
+                                       umbra_and_32(b, inside1, right1));
+        umbra_val32 const curved_cross = umbra_xor_32(b, cross0, cross1);
+
+        umbra_val32 const cross = umbra_sel_32(b, is_linear, linear_cross, curved_cross);
+        umbra_store_var32(b, par, umbra_xor_32(b, umbra_load_var32(b, par), cross));
+    } umbra_end_loop(b);
+
+    umbra_val32 const d        = umbra_sqrt_f32(b, umbra_load_var32(b, dist2)),
+                      parity   = umbra_load_var32(b, par);
+    umbra_val32 const signed_d = umbra_sel_32(b, parity,
+                                     umbra_sub_f32(b, zero, d), d);
+
+    return (umbra_interval){
+        umbra_sub_f32(b, signed_d, r),
+        umbra_add_f32(b, signed_d, r),
+    };
+}
+
+struct sdf_analytic_text_slide {
+    struct sdf_common            common;
+    struct slug_curves           slug;
+    struct sdf_analytic_text_sdf sdf;
+};
+
+static void sdf_analytic_text_init(struct slide *s) {
+    struct sdf_analytic_text_slide *st = (struct sdf_analytic_text_slide *)s;
+    st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
+
+    float const gw = st->slug.w,
+                gh = st->slug.h;
+    float const sx = gw / (float)s->w,
+                sy = gh / (float)s->h;
+    float const scale = sx > sy ? sx : sy;
+    float const pad_x = ((float)s->w * scale - gw) * 0.5f,
+                pad_y = ((float)s->h * scale - gh) * 0.5f;
+    st->sdf.scale_x  = scale;
+    st->sdf.scale_y  = scale;
+    st->sdf.off_x    = -pad_x;
+    st->sdf.off_y    = -pad_y;
+    st->sdf.n_curves = st->slug.count;
+    st->sdf.curves   = (struct umbra_buf){.ptr = st->slug.data,
+                                           .count = st->slug.count * 6};
+}
+
+static void sdf_analytic_text_free(struct slide *s) {
+    struct sdf_analytic_text_slide *st = (struct sdf_analytic_text_slide *)s;
+    slug_free(&st->slug);
+    free(s);
+}
+
+SLIDE(slide_sdf_analytic_text) {
+    struct sdf_analytic_text_slide *st = calloc(1, sizeof *st);
+    st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
+    st->common.base    = (struct slide){
+        .title = "SDF Analytic Text",
+        .bg    = {0.08f, 0.10f, 0.14f, 1},
+        .init  = sdf_analytic_text_init,
+        .free  = sdf_analytic_text_free,
+        SDF_COMMON_HOOKS,
+    };
+    st->common.base.sdf_fn  = sdf_analytic_text_build;
+    st->common.base.sdf_ctx = &st->sdf;
+    return &st->common.base;
+}
+
 SLIDE(slide_sdf_polyline_text) {
     struct sdf_polyline_text_slide *st = calloc(1, sizeof *st);
     st->common.color   = (umbra_color){0.95f, 0.9f, 0.8f, 1};
