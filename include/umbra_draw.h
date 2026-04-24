@@ -100,6 +100,16 @@ void umbra_build_draw(struct umbra_builder*,
 typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
                                  umbra_interval x, umbra_interval y);
 
+// Wrap an SDF with |sdf| - width, stroking the zero crossing of the inner
+// SDF with total thickness 2*width.  Apply twice to stroke a stroke.
+struct umbra_sdf_stroke {
+    umbra_sdf *inner_fn;
+    void      *inner_ctx;
+    float      width;
+    int       :32;
+};
+umbra_sdf umbra_sdf_stroke;
+
 // Like umbra_build_draw() but using an SDF for coverage.  Coverage is the
 // fraction of the pixel-box interval [x,x+1]x[y,y+1] that the SDF reports
 // as inside: cov = -lo / (hi - lo), with the fully-inside (hi <= 0) and

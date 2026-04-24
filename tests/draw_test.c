@@ -1720,6 +1720,43 @@ TEST(test_sdf_dispatch_tiling) {
     umbra_backend_free(be);
 }
 
+TEST(test_sdf_stroke_ring) {
+    // Stroke a filled disk: the result is a ring, so pixels deep inside the
+    // disk and pixels well outside it are both empty, while pixels on the
+    // original circle boundary are fully covered.
+    enum { W = 64, H = 64 };
+    struct test_circle_state inner = {.cx = 32, .cy = 32, .r = 24};
+    struct umbra_sdf_stroke  sdf   = {.inner_fn = test_circle_fn,
+                                       .inner_ctx = &inner,
+                                       .width = 6};
+    umbra_color color = {1, 0, 0, 1};
+
+    struct umbra_buf dst_slot = {0};
+
+    struct umbra_builder *builder = umbra_builder();
+    umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
+    umbra_val32 const dx = umbra_f32_from_i32(builder, umbra_x(builder)),
+                      dy = umbra_f32_from_i32(builder, umbra_y(builder));
+    umbra_build_sdf_draw(builder, dst_ptr, umbra_fmt_8888, dx, dy,
+                         umbra_sdf_stroke,    &sdf,
+                         umbra_shader_color,  &color,
+                         umbra_blend_srcover, NULL);
+    struct test_backends B = make(builder);
+
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t *dst = calloc(W * H, sizeof *dst);
+        dst_slot = (struct umbra_buf){.ptr = dst, .count = W * H, .stride = W};
+        if (test_backends_run(&B, bi, W, H)) {
+            dst[32 * W + 32] == 0        here;  // disk center: outside the ring
+            dst[32 * W +  8] == 0xFF0000FFu here;  // on boundary at left (R=24)
+            dst[32 * W + 56] == 0xFF0000FFu here;  // on boundary at right (R=24)
+            dst[ 4 * W +  4] == 0        here;  // far outside
+        }
+        free(dst);
+    }
+    test_backends_free(&B);
+}
+
 // Concurrent-draw regression tests.  The driving concern is that CPU-backend
 // programs (interp, jit) advertise queue_is_threadsafe=1; TSAN should see a
 // clean run even with N threads dispatching against shared programs.  We pair

@@ -218,6 +218,16 @@ static umbra_val32 coverage_from_sdf(void *ctx, struct umbra_builder *b,
            umbra_sel_32(b, outside, zero, edge));
 }
 
+umbra_interval umbra_sdf_stroke(void *ctx, struct umbra_builder *b,
+                                 umbra_interval x, umbra_interval y) {
+    struct umbra_sdf_stroke const *self = ctx;
+    umbra_interval const d     = self->inner_fn(self->inner_ctx, b, x, y),
+                         abs_d = umbra_interval_abs_f32(b, d);
+    umbra_ptr      const u     = umbra_bind_uniforms(b, &self->width, 1);
+    umbra_interval const w     = umbra_interval_exact(umbra_uniform_32(b, u, 0));
+    return umbra_interval_sub_f32(b, abs_d, w);
+}
+
 void umbra_build_sdf_draw(struct umbra_builder *b,
                           umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                           umbra_val32 x, umbra_val32 y,
