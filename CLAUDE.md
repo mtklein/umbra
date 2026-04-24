@@ -26,6 +26,16 @@ Write cleanly-revertable commits that each contain one kind of code change and
 its related tests: a bug fix and regression test; a single feature's work and
 new tests for that functionality; or no-op refactoring.
 
+When stuck, show and ask — don't revert.  If a feature or correctness change
+runs into a problem you can't crack in a couple of tries, show the user what
+you've got: commit it to a WIP branch, or leave it uncommitted and describe
+where you're stuck.  The user can look at screenshots, read the diff, and
+often has domain knowledge or implementation ideas you don't.  Silently
+deleting in-progress work denies both of you that collaboration.  Reverting
+is for speculative perf experiments whose measurement didn't move, or for
+work the user explicitly asks to roll back — not for a feature whose code
+runs but fails a test you haven't figured out yet.
+
 Use // TODO in the code to track bugs or anything that may need a follow up.
 
 Code Style

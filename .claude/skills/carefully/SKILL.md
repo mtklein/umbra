@@ -37,14 +37,22 @@ does not produce the expected improvement, revert it.
 
 Hypothesis-driven changes that produce no measurable improvement are a signal
 you have the wrong model of the hot path — stop and gather data before trying
-the next fix.  Revert speculative changes that did not produce the expected
-effect before moving on, so the tree stays clean and the next measurement is
-not confounded.
+the next fix.  For **performance** work, revert speculative changes that did
+not produce the expected effect before moving on, so the tree stays clean
+and the next measurement is not confounded.
+
+For **feature or correctness** work, the opposite rule: don't revert.  Code
+that runs but fails a test you haven't figured out is load-bearing progress,
+not noise.  Keep it in the tree (WIP branch or just uncommitted), describe
+the symptom, list the hypotheses you've tried, and hand it to the user.  They
+can look at screenshots, read the diff, and frequently have ideas you don't
+— denying them that by silently reverting is worse than a messy tree.
 
 **Running out of ideas is not proof.**  If you have tried several hypotheses
 and none worked, gather more data, or say "I'm stuck" and ask for help.  Do not
 claim the problem is unfixable, inherent, or impossible without a measurement
-that proves it.
+that proves it.  Do not revert feature work to make the tree look clean while
+saying you're stuck — the user cannot help with code they cannot see.
 
 **Read the dependency's source.**  When a dependency's behavior is load-bearing
 to what you are doing, read its source.  Clone MoltenVK, wgpu-native, or
@@ -107,4 +115,5 @@ the prediction to match the outcome.
 - Checking inputs to functions rather than outputs.
 - Papering over a failure downstream with a NULL guard or fallback.
 - Claiming a problem is inherent because you ran out of ideas.
-- Leaving speculative changes in the tree after they did not pan out.
+- Leaving speculative **perf** changes in the tree when their measurement didn't move.
+- Reverting in-progress **feature or correctness** work instead of showing the user and asking for help.
