@@ -293,7 +293,7 @@ struct slug_slide {
 
 static void slug_init(struct slide *s) {
     struct slug_slide *st = (struct slug_slide *)s;
-    st->slug = slug_extract("Slug", (float)s->h * 0.3125f);
+    st->slug = slug_extract("Hamburgefons", (float)s->h * 0.4f);
     st->curves_buf = (struct umbra_buf){
         .ptr = st->slug.data, .count = st->slug.count * 6,
     };
