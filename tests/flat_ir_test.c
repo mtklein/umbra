@@ -5161,6 +5161,87 @@ TEST(test_if_load_8x4) {
     test_backends_free(&B);
 }
 
+TEST(test_if_load_16x4) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+
+    umbra_if(b, cond); {
+        umbra_val16 r, g, bl, a;
+        umbra_load_16x4 (b, umbra_bind_buf(b, &slot[0]), &r, &g, &bl, &a);
+        umbra_store_16x4(b, umbra_bind_buf(b, &slot[1]),  r,  g,  bl,  a);
+    } umbra_end_if(b);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // Source: 8 pixels of RGBA fp16.  1.0=0x3C00, 2.0=0x4000, 3.0=0x4200, 4.0=0x4400.
+        uint16_t src[8 * 4];
+        for (int lane = 0; lane < 8; lane++) {
+            src[lane*4 + 0] = (uint16_t)(0x3C00 + lane);
+            src[lane*4 + 1] = (uint16_t)(0x4000 + lane);
+            src[lane*4 + 2] = (uint16_t)(0x4200 + lane);
+            src[lane*4 + 3] = (uint16_t)(0x4400 + lane);
+        }
+        uint16_t dst[8 * 4];
+        for (int j = 0; j < 32; j++) { dst[j] = 0xBEEF; }
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = src, .count = 8},
+                             {.ptr = dst, .count = 8}})) {
+            dst[ 0] == src[ 0] here;
+            dst[ 3] == src[ 3] here;
+            dst[12] == src[12] here;  // lane 3 R
+            dst[15] == src[15] here;  // lane 3 A
+            dst[16] == 0xBEEF  here;  // lane 4 R (false)
+            dst[31] == 0xBEEF  here;  // lane 7 A (false)
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_if_load_16x4_planar) {
+    // Use fp16 values to sidestep the spirv integer-val16 bug in
+    // load_16x4_planar / store_16x4_planar (TODO at src/spirv.c).
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+
+    umbra_if(b, cond); {
+        umbra_val16 r, g, bl, a;
+        umbra_load_16x4_planar (b, umbra_bind_buf(b, &slot[0]), &r, &g, &bl, &a);
+        umbra_store_16x4_planar(b, umbra_bind_buf(b, &slot[1]),  r,  g,  bl,  a);
+    } umbra_end_if(b);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // Planar: src = [R0..R7][G0..G7][B0..B7][A0..A7].
+        uint16_t src[8 * 4];
+        for (int lane = 0; lane < 8; lane++) {
+            src[ 0 + lane] = (uint16_t)(0x3C00 + lane);
+            src[ 8 + lane] = (uint16_t)(0x4000 + lane);
+            src[16 + lane] = (uint16_t)(0x4200 + lane);
+            src[24 + lane] = (uint16_t)(0x4400 + lane);
+        }
+        uint16_t dst[8 * 4];
+        for (int j = 0; j < 32; j++) { dst[j] = 0xBEEF; }
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = src, .count = 8 * 4},
+                             {.ptr = dst, .count = 8 * 4}})) {
+            dst[ 0] == src[ 0] here;
+            dst[ 3] == src[ 3] here;
+            dst[ 8] == src[ 8] here;  // lane 0 G
+            dst[24] == src[24] here;  // lane 0 A
+            dst[ 4] == 0xBEEF  here;  // lane 4 R (false)
+            dst[12] == 0xBEEF  here;  // lane 4 G
+            dst[28] == 0xBEEF  here;  // lane 4 A
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
