@@ -130,6 +130,22 @@ void umbra_build_sdf_draw(struct umbra_builder*,
 //       wall on heavy-bounds workloads.  Profiling SDF Text Analytic on metal
 //       shows ~all main-thread CPU is the JIT bounds eval today.
 //
+//   The plan: shader-side cull, no readback, one submit per frame.
+//
+//   Bounds shader writes cov[] as it does today.  draw_partial / draw_full
+//   each gain a per-tile early-exit at the top: read cov[tile_idx], skip the
+//   body if not my tile kind.  Host queues bounds + both draws over the full
+//   (l, t, r, b) into one cmdbuf and submits once -- zero mid-frame sync,
+//   zero cov readback.  Backends already insert a barrier between bounds
+//   (writes cov) and draws (read cov) via dispatch_overlap_check.
+//
+//   On GPU backends the per-tile early-exit is essentially free: idle threads
+//   that hit a return on the first instruction cost almost nothing.  We give
+//   up the geometric "don't even encode dispatches for NONE rectangles"
+//   optimization, but on a GPU that cost is one branch per thread, not a CPU
+//   encode.  This is what Vello does: it dispatches over every tile and
+//   early-exits empty ones rather than compacting a worklist.
+//
 //   Tried (commit 8f1910cf, reverted in 507742b6): compile bounds on the
 //   caller-supplied backend, queue+flush mid-dispatch, then read cov[] back
 //   to drive the per-tile draws on the host.  Big win for heavy bounds (SDF
@@ -138,34 +154,20 @@ void umbra_build_sdf_draw(struct umbra_builder*,
 //   72% CPU; wgpu went .22 -> 2.82 ns/px @ 99% CPU because it has no zero-
 //   copy buffer transfer and pays a full staging-buffer round-trip per frame
 //   for the cov download).  The mid-dispatch flush is the cost; readback is
-//   the second cost on backends without zero-copy.
+//   the second cost on backends without zero-copy.  Both costs vanish under
+//   the shader-side-cull plan.
 //
-//   Two designs that avoid both costs by keeping dispatch on the device:
-//
-//   Rung 1 -- shader-side cull, no readback, one submit/frame:
-//     Bounds shader writes cov[].  draw_partial / draw_full each gain a
-//     per-tile early-exit at the top: read cov[tile_idx], return if not my
-//     tile kind.  Backends already barrier between bounds (writes cov) and
-//     draws (read cov).  Host queues bounds + both draws over (l,t,r,b) into
-//     one cmdbuf and submits once -- zero mid-frame sync, zero readback.
-//     GPU launches a thread per pixel for every tile (NONE tiles too) and
-//     those threads early-exit on the first instruction; idle threads on a
-//     GPU are essentially free.  Needs a builder helper to wrap a draw body
-//     in the cov-check (uses the if/endif we already have).  Best ROI for a
-//     first cut.
-//
-//   Rung 2 -- GPU-built worklist + indirect dispatch:
-//     Bounds shader atomic-adds to a per-program counter and writes the
-//     active tile's coords into a worklist.  Host issues one indirect
-//     compute dispatch per program (vkCmdDispatchIndirect /
-//     dispatchThreadgroupsIndirect / dispatchWorkgroupsIndirect) reading
-//     dimensions from GPU memory.  Each draw thread maps its global ID into
-//     a worklist entry to find its (x,y).  No wasted thread launches; NONE
-//     tiles get no work at all.  Needs op_atomic_add (or equivalent) in the
-//     IR, indirect-dispatch wrappers in metal/vulkan/wgpu, and a way for a
-//     program to source (x,y) from a worklist instead of gl_GlobalInvocation.
-//     Bigger lift than Rung 1; only worth it if Rung 1's idle-thread cost
-//     measures as real on some workload.
+//   What's needed to land it:
+//     - A builder helper to wrap a draw body in the cov-check (uses if/endif).
+//     - Make if/endif actually skip its body on CPU backends (interp + JIT)
+//       when the condition is uniform across the lane batch.  Today CPU
+//       backends lower if/endif as a per-lane mask that only gates store_var
+//       (not memory stores), so a draw body with stores inside an "if cov ==
+//       me" would write garbage on CPU.  GPU backends already lower if as
+//       real control flow.  The IR already tracks per-instruction uniform-
+//       ness; CPU backends can branch on that to pick masking vs real branch.
+//     - Wire dispatch to enqueue bounds + both draws over (l, t, r, b) into
+//       the same cmdbuf instead of cov-readback + per-tile draws.
 
 // Use an SDF bounds program to intelligently dispatch draw->queue() calls for a
 // draw program built by umbra_build_sdf_draw() from the same SDF, skipping
