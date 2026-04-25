@@ -301,16 +301,16 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     }
 
     int *cf = malloc((size_t)n * sizeof *cf);
-    int n_cf = 0;
+    int cfs = 0;
     for (int i = 0; i < n; i++) {
         if (b->inst[i].live && b->inst[i].varying && is_cf(b->inst[i].op)) {
-            cf[n_cf++] = i;
+            cf[cfs++] = i;
         }
     }
 
     int j = preamble;
     int region_lo = 0;
-    for (int ci = 0; ci < n_cf; ci++) {
+    for (int ci = 0; ci < cfs; ci++) {
         schedule(b->inst, n, out, j, live, region_lo, cf[ci]);
         for (int i = region_lo; i < cf[ci]; i++) {
             if (is_body(b->inst + i)) { j++; }
