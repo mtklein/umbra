@@ -5058,6 +5058,40 @@ TEST(test_if_store_16x4_planar) {
     test_backends_free(&B);
 }
 
+TEST(test_if_load_32) {
+    // load_32 is sequential per lane (no varying address), so on false lanes
+    // the load reads in-bounds bytes and the garbage value just sits in a
+    // register; subsequent masked store_var preserves the var on false lanes.
+    // Lock the behavior in: src has distinct values, true lanes carry through,
+    // false lanes show the var's init value.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0xCAFE));
+
+    umbra_if(b, cond); {
+        umbra_store_var32(b, v, umbra_load_32(b, umbra_bind_buf(b, &slot[0])));
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t src[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = src, .count = 8, .stride = 8},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 10     here;
+            dst[3] == 40     here;
+            dst[4] == 0xCAFE here;
+            dst[7] == 0xCAFE here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
