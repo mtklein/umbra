@@ -335,6 +335,7 @@ void vpunpcklwd (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x61, d, v, 
 void vpunpckhwd (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x69, d, v, s); }
 void vpunpckhdq (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x6a, d, v, s); }
 void vpackusdw  (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 2, 0, 0x2b, d, v, s); }
+void vpackssdw  (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x6b, d, v, s); }
 
 int vbroadcastss_rip(Buf *b, int d)        { return vex_rip(b, 1, 2, 0, 1, d, 0, 0x18); }
 int vpshufb_rip     (Buf *b, int d, int v) { return vex_rip(b, 1, 2, 0, 1, d, v, 0x00); }

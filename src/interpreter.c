@@ -589,13 +589,33 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     uint16_t *dst = (uint16_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
-                    if (rem >= K) {
-                        __builtin_memcpy(dst + i, &v[ip->x], 2 * K);
+                    if (if_depth == 0) {
+                        if (rem >= K) {
+                            __builtin_memcpy(dst + i, &v[ip->x], 2 * K);
+                        } else {
+                            for (int ll = 0; ll < rem; ll++) {
+                                uint16_t s;
+                                __builtin_memcpy(&s, (char*)&v[ip->x] + 2 * ll, 2);
+                                __builtin_memcpy(dst + i + ll, &s, 2);
+                            }
+                        }
                     } else {
-                        for (int ll = 0; ll < rem; ll++) {
-                            uint16_t s;
-                            __builtin_memcpy(&s, (char*)&v[ip->x] + 2 * ll, 2);
-                            __builtin_memcpy(dst + i + ll, &s, 2);
+                        I32 const mask32 = if_mask_stack[if_depth - 1];
+                        if (rem >= K) {
+                            S16 const mask = cast(S16, mask32);
+                            S16 old, neu;
+                            __builtin_memcpy(&old, dst + i, 2 * K);
+                            __builtin_memcpy(&neu, &v[ip->x], 2 * K);
+                            S16 const blend = (S16)((neu & mask) | (old & ~mask));
+                            __builtin_memcpy(dst + i, &blend, 2 * K);
+                        } else {
+                            for (int ll = 0; ll < rem; ll++) {
+                                if (mask32[ll]) {
+                                    uint16_t s;
+                                    __builtin_memcpy(&s, (char*)&v[ip->x] + 2 * ll, 2);
+                                    __builtin_memcpy(dst + i + ll, &s, 2);
+                                }
+                            }
                         }
                     }
                 } NEXT;

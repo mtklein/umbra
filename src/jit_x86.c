@@ -788,11 +788,33 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, 1);
-            if (scalar) {
-                vmovd_to_gpr(c, RAX, ry);
-                mov_word_store(c, RAX, base, XCOL_X86, 2, 0);
+            if (jc->if_depth > 0) {
+                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    movzx_word_load(c, RAX, base, XCOL_X86, 2, 0);
+                    vmovd_from_gpr(c, tmp, RAX);
+                    vpblendvb(c, 0, tmp, tmp, ry, rm);
+                    vmovd_to_gpr(c, RAX, tmp);
+                    mov_word_store(c, RAX, base, XCOL_X86, 2, 0);
+                    ra_return_reg(ra, tmp);
+                } else {
+                    int8_t mn = ra_alloc(ra, sl, ns);
+                    vmov_load   (c, 0, tmp, base, XCOL_X86, 2, 0);
+                    vextracti128(c, mn, rm, 1);
+                    vpackssdw   (c, mn, rm, mn);
+                    vpblendvb   (c, 0, tmp, tmp, ry, mn);
+                    vmov_store  (c, 0, tmp, base, XCOL_X86, 2, 0);
+                    ra_return_reg(ra, mn);
+                    ra_return_reg(ra, tmp);
+                }
             } else {
-                vmov_store(c, 0, ry, base, XCOL_X86, 2, 0);
+                if (scalar) {
+                    vmovd_to_gpr(c, RAX, ry);
+                    mov_word_store(c, RAX, base, XCOL_X86, 2, 0);
+                } else {
+                    vmov_store(c, 0, ry, base, XCOL_X86, 2, 0);
+                }
             }
             ra_free_chan(ra, inst->y, i);
         } break;

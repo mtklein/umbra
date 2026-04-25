@@ -104,6 +104,7 @@ void vpunpcklwd (struct asm_x86 *b, int d, int v, int s);
 void vpunpckhwd (struct asm_x86 *b, int d, int v, int s);
 void vpunpckhdq (struct asm_x86 *b, int d, int v, int s);
 void vpackusdw  (struct asm_x86 *b, int d, int v, int s);
+void vpackssdw  (struct asm_x86 *b, int d, int v, int s);
 
 int vbroadcastss_rip(struct asm_x86 *b, int d);
 int vpshufb_rip     (struct asm_x86 *b, int d, int v);

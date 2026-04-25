@@ -473,6 +473,11 @@ TEST(test_avx_unpack_pack) {
     bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x61, 0x2B, 0xD4}) here;
     reset(&b);
 
+    // vpackssdw xmm2, xmm3, xmm4 => c5 e1 6b d4
+    vpackssdw(&b, 2, 3, 4);
+    bytes_eq(&b, 4, (uint8_t[]){0xC5, 0xE1, 0x6B, 0xD4}) here;
+    reset(&b);
+
     // vpunpckldq xmm10, xmm9, xmm8 => c4 41 31 62 d0 (high regs force 3-byte VEX)
     vpunpckldq(&b, 10, 9, 8);
     bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x41, 0x31, 0x62, 0xD0}) here;

@@ -903,13 +903,38 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 1);
-            if (scalar) {
-                put(c, STR_hx(lo(ry), XP, XCOL));
+            if (jc->if_depth > 0) {
+                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                int8_t mn  = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    put(c, LDR_hx(lo(tmp), XP, XCOL));
+                    put(c, XTN_4h(lo(mn), lo(rm)));
+                    put(c, BIT_16b(lo(tmp), lo(ry), lo(mn)));
+                    put(c, STR_hx(lo(tmp), XP, XCOL));
+                } else {
+                    put(c, LSL_xi(XT, XCOL, 1));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LDR_di(lo(tmp), XT, 0));
+                    put(c, LDR_di(hi(tmp), XT, 1));
+                    put(c, XTN_4h(lo(mn), lo(rm)));
+                    put(c, XTN_4h(hi(mn), hi(rm)));
+                    put(c, BIT_16b(lo(tmp), lo(ry), lo(mn)));
+                    put(c, BIT_16b(hi(tmp), hi(ry), hi(mn)));
+                    put(c, STR_di(lo(tmp), XT, 0));
+                    put(c, STR_di(hi(tmp), XT, 1));
+                }
+                ra_return_reg(ra, mn);
+                ra_return_reg(ra, tmp);
             } else {
-                put(c, LSL_xi(XT, XCOL, 1));
-                put(c, ADD_xr(XT, XP, XT));
-                put(c, STR_di(lo(ry), XT, 0));
-                put(c, STR_di(hi(ry), XT, 1));
+                if (scalar) {
+                    put(c, STR_hx(lo(ry), XP, XCOL));
+                } else {
+                    put(c, LSL_xi(XT, XCOL, 1));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, STR_di(lo(ry), XT, 0));
+                    put(c, STR_di(hi(ry), XT, 1));
+                }
             }
             ra_free_chan(ra, inst->y, i);
         } break;

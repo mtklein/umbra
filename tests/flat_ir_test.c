@@ -4920,6 +4920,35 @@ TEST(test_if_store_32) {
     test_backends_free(&B);
 }
 
+TEST(test_if_store_16) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_val16 const val  = umbra_i16_from_i32(b, umbra_imm_i32(b, 99));
+
+    umbra_if(b, cond); {
+        umbra_store_16(b, umbra_bind_buf(b, &slot[0]), val);
+    } umbra_end_if(b);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint16_t dst[8] = {
+            0xBEEF, 0xBEEF, 0xBEEF, 0xBEEF,
+            0xBEEF, 0xBEEF, 0xBEEF, 0xBEEF,
+        };
+        if (run(&B, bi, 8, 1, slot, 1,
+        (struct umbra_buf[]){{.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 99     here;
+            dst[3] == 99     here;
+            dst[4] == 0xBEEF here;
+            dst[7] == 0xBEEF here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
