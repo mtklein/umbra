@@ -416,7 +416,9 @@ static uint32_t spv_glsl_3(SpvBuilder *b, uint32_t type, uint32_t ext_op,
     return id;
 }
 
-// Match behavior of #pragma METAL fp contract(off) by hiding unfused ops in our own "fused" ops.
+// Wrap unfused add/sub/mul in fma() so the shader compiler can't reassociate
+// them into different roundings.  Mirrors src/metal.c's hand-written emission,
+// keeping all backends bit-exact even under fast math.
 static uint32_t spv_fadd(SpvBuilder *b, uint32_t xf, uint32_t yf) {
     return spv_glsl_3(b, b->t_f32, GLSLstd450Fma, spv_const_f32(b, 1.0f), xf, yf);
 }
