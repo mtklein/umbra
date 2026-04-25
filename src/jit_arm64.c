@@ -627,6 +627,14 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         } break;
 
         case op_store_32: {
+            // TODO: ra_ensure ignores inst->y.chan, so store_32 of a non-zero
+            //       channel (e.g. the A output of load_8x4) reads channel 0's
+            //       register instead.  Should be ra_ensure_chan(...,
+            //       inst->y.chan).  Same bug appears in store_16 (line ~902),
+            //       store_var (line ~991), and the x86 mirrors of all three.
+            //       Existing tests round-trip via store_8x4 which uses
+            //       ra_ensure_chan correctly, so the bug is unobserved in
+            //       production.
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 2);

@@ -5122,6 +5122,45 @@ TEST(test_if_load_16) {
     test_backends_free(&B);
 }
 
+TEST(test_if_load_8x4) {
+    // Round-trip load_8x4 → store_8x4 inside the if.  Reading individual
+    // channels directly via store_32 hits a pre-existing JIT bug (store_32
+    // ignores its input's channel field — TODO at the call site), so we
+    // exercise the if-mask interaction through store_8x4 which routes
+    // channels correctly via ra_ensure_chan.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+
+    umbra_if(b, cond); {
+        umbra_val32 r, g, bl, a;
+        umbra_load_8x4 (b, umbra_bind_buf(b, &slot[0]), &r, &g, &bl, &a);
+        umbra_store_8x4(b, umbra_bind_buf(b, &slot[1]),  r,  g,  bl,  a);
+    } umbra_end_if(b);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t src[8];
+        for (int lane = 0; lane < 8; lane++) {
+            uint32_t const ul = (uint32_t)lane;
+            src[lane] = (ul*16u+1u) | ((ul*16u+2u) << 8) | ((ul*16u+3u) << 16) | ((ul*16u+4u) << 24);
+        }
+        uint32_t dst[8];
+        for (int j = 0; j < 8; j++) { dst[j] = 0xDEADBEEF; }
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = src, .count = 8, .stride = 8},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == src[0]     here;
+            dst[3] == src[3]     here;
+            dst[4] == 0xDEADBEEF here;
+            dst[7] == 0xDEADBEEF here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
