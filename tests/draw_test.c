@@ -769,7 +769,7 @@ TEST(test_coverage_rect_white_dst) {
 TEST(test_coverage_bitmap) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 1, 1, 1};
-    uint8_t  cov_data[8] = {0, 128, 255, 0, 0, 0, 0, 0};
+    uint16_t cov_data[8] = {0, 128, 255, 0, 0, 0, 0, 0};
     struct umbra_buf buf = {.ptr=cov_data, .count=8};
     struct umbra_builder *builder = umbra_builder();
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
@@ -798,7 +798,7 @@ TEST(test_coverage_bitmap) {
 TEST(test_coverage_bitmap_565) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 1};
-    uint8_t  cov_data[16];
+    uint16_t cov_data[16];
     for (int i = 0; i < 16; i++) { cov_data[i] = 255; }
     struct umbra_buf buf = {.ptr=cov_data, .count=16};
     struct umbra_builder *builder = umbra_builder();
@@ -827,7 +827,7 @@ TEST(test_coverage_bitmap_565) {
 TEST(test_coverage_sdf) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 1, 1, 1};
-    uint8_t  cov_data[8] = {0, 100, 128, 200, 255, 0, 0, 0};
+    uint16_t cov_data[8] = {0, 100, 128, 200, 255, 0, 0, 0};
     struct umbra_buf buf = {.ptr=cov_data, .count=8};
     struct umbra_builder *builder = umbra_builder();
     umbra_ptr const dst_ptr = umbra_bind_buf(builder, &dst_slot);
@@ -854,7 +854,7 @@ TEST(test_coverage_sdf) {
 TEST(test_coverage_bitmap_matrix) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 1, 1, 1};
-    uint8_t  bmp[8] = {0, 0, 255, 0, 0, 0, 0, 0};
+    uint16_t bmp[8] = {0, 0, 255, 0, 0, 0, 0, 0};
     struct coverage_bitmap2d sampler = {
         .buf = {.ptr=bmp, .count=8}, .w=8, .h=1,
     };
@@ -886,7 +886,7 @@ TEST(test_coverage_bitmap_matrix) {
 TEST(test_coverage_bitmap_matrix_565) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 0, 0, 1};
-    uint8_t  bmp[16];
+    uint16_t bmp[16];
     for (int i = 0; i < 16; i++) { bmp[i] = 255; }
     struct coverage_bitmap2d sampler = {
         .buf = {.ptr=bmp, .count=16}, .w=16, .h=1,
@@ -919,7 +919,7 @@ TEST(test_coverage_bitmap_matrix_565) {
 TEST(test_coverage_bitmap_matrix_oob) {
     struct umbra_buf dst_slot = {0};
     umbra_color color = {1, 1, 1, 1};
-    uint8_t  bmp[4] = {255, 0, 0, 0};
+    uint16_t bmp[4] = {255, 0, 0, 0};
     struct coverage_bitmap2d sampler = {
         .buf = {.ptr=bmp, .count=4}, .w=2, .h=2,
     };

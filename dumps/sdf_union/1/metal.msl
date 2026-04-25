@@ -5,7 +5,7 @@ struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2;
 
 kernel void main0(
     constant meta &m [[buffer(0)]],
-    device uchar * __restrict p0 [[buffer(1)]],
+    device ushort * __restrict p0 [[buffer(1)]],
     device const uint * __restrict p1 [[buffer(2)]],
     device const uint * __restrict p2 [[buffer(3)]],
     uint2 pos [[thread_position_in_grid]]
@@ -158,5 +158,6 @@ kernel void main0(
     float v142 = min(v92, v141);
     uint v143 = v142 <  as_type<float>(v0) ? 0xffffffffu : 0u;
     uint v144 = (v143 != 0u) ? v7 : v125;
-    p0[y * m.stride0 + x] = (uchar)v144;
+    uint v145 = (uint)(ushort)v144;
+    p0[y * m.stride0 + x] = (ushort)v145;
 }

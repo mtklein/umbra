@@ -5,7 +5,7 @@ struct meta { uint w, x0, y0, count0, count1, count2, count3, stride0, stride1, 
 
 kernel void main0(
     constant meta &m [[buffer(0)]],
-    device uchar * __restrict p0 [[buffer(1)]],
+    device ushort * __restrict p0 [[buffer(1)]],
     device const uint * __restrict p1 [[buffer(2)]],
     device const uint * __restrict p2 [[buffer(3)]],
     device const uint * __restrict p3 [[buffer(4)]],
@@ -223,5 +223,6 @@ kernel void main0(
     float v197 = fma(-1.0f, as_type<float>(v15), as_type<float>(v196));
     uint v198 = v197 <  as_type<float>(v0) ? 0xffffffffu : 0u;
     uint v199 = (v198 != 0u) ? v7 : v181;
-    p0[y * m.stride0 + x] = (uchar)v199;
+    uint v200 = (uint)(ushort)v199;
+    p0[y * m.stride0 + x] = (ushort)v200;
 }

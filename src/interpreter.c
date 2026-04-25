@@ -218,19 +218,15 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 
             case op_load_16: emit(.tag = op_load_16, .ptr = RESOLVE_PTR(inst)); break;
             case op_load_32: emit(.tag = op_load_32, .ptr = RESOLVE_PTR(inst)); break;
-            case op_load_8:  emit(.tag = op_load_8,  .ptr = RESOLVE_PTR(inst)); break;
             case op_gather_16:         emit(.tag = op_gather_16,
                                             .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_uniform_32: emit(.tag = op_gather_uniform_32,
                                             .ptr = RESOLVE_PTR(inst), .x = X); break;
             case op_gather_32:         emit(.tag = op_gather_32,
                                             .ptr = RESOLVE_PTR(inst), .x = X); break;
-            case op_gather_8:          emit(.tag = op_gather_8,
-                                            .ptr = RESOLVE_PTR(inst), .x = X); break;
 
             case op_store_16: emit(.tag = op_store_16, .ptr = RESOLVE_PTR(inst), .x = Y); break;
             case op_store_32: emit(.tag = op_store_32, .ptr = RESOLVE_PTR(inst), .x = Y); break;
-            case op_store_8:  emit(.tag = op_store_8,  .ptr = RESOLVE_PTR(inst), .x = Y); break;
 
             case op_loop_begin:
                 emit(.tag = op_loop_begin, .x = X, .y = 0);
@@ -473,10 +469,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_store_16x4] = &&L_op_store_16x4,
                 [op_store_16x4_planar] = &&L_op_store_16x4_planar,
                 [op_load_8x4] = &&L_op_load_8x4, [op_store_8x4] = &&L_op_store_8x4,
-                [op_load_8]   = &&L_op_load_8,   [op_store_8]   = &&L_op_store_8,
                 [op_gather_uniform_32] = &&L_op_gather_uniform_32,
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
-                [op_gather_8]  = &&L_op_gather_8,
                 [op_loop_begin] = &&L_op_loop_begin, [op_loop_end] = &&L_op_loop_end,
                 [op_if_begin] = &&L_op_if_begin, [op_if_end] = &&L_op_if_end,
                 [op_load_var] = &&L_op_load_var, [op_store_var] = &&L_op_store_var,
@@ -800,26 +794,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                         }
                     }
                 } NEXT;
-                CASE(op_load_8) {
-                    uint8_t const *src =
-                        (uint8_t const*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
-                    int const i = end - K;
-                    int const rem = n - i;
-                    uint32_t tmp[K];
-                    __builtin_memset(tmp, 0, sizeof tmp);
-                    int const lim = rem < K ? rem : K;
-                    for (int ll = 0; ll < lim; ll++) { tmp[ll] = src[i + ll]; }
-                    __builtin_memcpy(&v->u32, tmp, sizeof tmp);
-                } NEXT;
-                CASE(op_store_8) {
-                    uint8_t *dst = (uint8_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
-                    int const i = end - K;
-                    int const rem = n - i;
-                    uint32_t tmp[K];
-                    __builtin_memcpy(tmp, &v[ip->x].u32, sizeof tmp);
-                    int const lim = rem < K ? rem : K;
-                    for (int ll = 0; ll < lim; ll++) { dst[i + ll] = (uint8_t)tmp[ll]; }
-                } NEXT;
 
                 CASE(op_gather_uniform_32) {
                     int const ix = v[ip->x].i32[0];
@@ -846,22 +820,6 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     }
                     v->u32 = (U32){0};
                     __builtin_memcpy(v, tmp, sizeof tmp);
-                } NEXT;
-                CASE(op_gather_8) {
-                    int const count = buf[ip->ptr].count;
-                    int const rem = n - (end - K);
-                    uint8_t const *ptr = (uint8_t const*)buf[ip->ptr].ptr;
-                    int32_t ix[K];
-                    __builtin_memcpy(ix, &v[ip->x].i32, sizeof ix);
-                    uint32_t tmp[K];
-                    __builtin_memset(tmp, 0, sizeof tmp);
-                    int const lim = rem < K ? rem : K;
-                    for (int ll = 0; ll < lim; ll++) {
-                        if (ix[ll] >= 0 && ix[ll] < count) {
-                            tmp[ll] = ptr[ix[ll]];
-                        }
-                    }
-                    __builtin_memcpy(&v->u32, tmp, sizeof tmp);
                 } NEXT;
                 CASE(op_gather_32) {
                     int const count = buf[ip->ptr].count;

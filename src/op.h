@@ -35,9 +35,6 @@ enum {
     X(load_16,                              OP_PTR|OP_VARYING)                             \
     X(store_16,                             OP_STORE|OP_PTR|OP_VARYING)                    \
     X(gather_16,                            OP_PTR)                                        \
-    X(load_8,                               OP_PTR|OP_VARYING)                             \
-    X(store_8,                              OP_STORE|OP_PTR|OP_VARYING)                    \
-    X(gather_8,                             OP_PTR)                                        \
     X(loop_begin,                           0)                                             \
     X(loop_end,                             0)                                             \
     X(if_begin,                             0)                                             \

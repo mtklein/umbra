@@ -334,7 +334,7 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *
                       full    = umbra_lt_f32(b, f.hi, zero_f);
     umbra_val32 const base = umbra_sel_32(b, partial, partial_i, none_i);
     umbra_val32 const tri  = umbra_sel_32(b, full,    full_i,    base);
-    umbra_store_8(b, bounds->cov_ptr, tri);
+    umbra_store_16(b, bounds->cov_ptr, umbra_i16_from_i32(b, tri));
 
     // Snapshot + compile internally.  Leave `b` alive; caller owns its
     // lifetime and may inspect/dump/recompile after this returns.
@@ -371,7 +371,7 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
               y_tiles = (b - t + T - 1) / T,
               tiles = x_tiles * y_tiles;
 
-    uint8_t *cov = malloc((size_t)tiles * sizeof *cov);
+    uint16_t *cov = malloc((size_t)tiles * sizeof *cov);
     float const uniforms[] = {(float)l, (float)t, (float)T, (float)T};
 
     struct umbra_late_binding const bounds_late[] = {

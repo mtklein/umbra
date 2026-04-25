@@ -516,21 +516,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             }
         } break;
 
-        case op_load_8: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, 0);
-            if (scalar) {
-                movzx_byte_load(c, RAX, base, XCOL_X86, 1, 0);
-                vmovd_from_gpr(c, s.rd, RAX);
-            } else {
-                int8_t tmp = ra_alloc(ra, sl, ns);
-                vmovq_load(c, tmp, base, XCOL_X86, 1, 0);
-                vpmovzxbd(c, s.rd, tmp);
-                ra_return_reg(ra, tmp);
-            }
-        } break;
-
         case op_store_32: {
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
@@ -793,26 +778,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ra_free_chan(ra, inst->y, i);
         } break;
 
-        case op_store_8: {
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
-            ptr    p = inst->ptr;
-            int    base = resolve_ptr_x86(c, p, &last_ptr, 0);
-            if (scalar) {
-                vmovd_to_gpr(c, RAX, ry);
-                mov_byte_store(c, RAX, base, XCOL_X86, 1, 0);
-            } else {
-                int8_t t   = ra_alloc(ra, sl, ns);
-                int8_t thi = ra_alloc(ra, sl, ns);
-                vextracti128(c, thi, ry, 1);
-                vpackusdw(c, t, ry, thi);
-                vpackuswb(c, t, t, t);
-                vmovq_store(c, t, base, XCOL_X86, 1, 0);
-                ra_return_reg(ra, thi);
-                ra_return_reg(ra, t);
-            }
-            ra_free_chan(ra, inst->y, i);
-        } break;
-
         case op_uniform_32: {
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             ptr            p = inst->ptr;
@@ -906,47 +871,6 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                     vpinsrw(c, s.rd, s.rd, RAX, (uint8_t)k);
                     patch_jcc(c, skip);
                 }
-                ra_return_reg(ra, hi_idx);
-                ra_free_chan(ra, inst->x, i);
-            }
-        } break;
-
-        case op_gather_8: {
-            struct ra_step s = ra_step_alloc(ra, sl, ns, i);
-            int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
-            ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, 0);
-            load_count_x86(c, p);
-            if (scalar) {
-                vmovd_to_gpr(c, RAX, rx);
-                ra_free_chan(ra, inst->x, i);
-                vpxor(c, 0, s.rd, s.rd, s.rd);
-                cmp_rr(c, RAX, XM);
-                int skip = jcc(c, 0x03);
-                movzx_byte_load(c, RAX, base, RAX, 1, 0);
-                vmovd_from_gpr(c, s.rd, RAX);
-                patch_jcc(c, skip);
-            } else {
-                int8_t hi_idx = ra_alloc(ra, sl, ns);
-                int8_t tmp    = ra_alloc(ra, sl, ns);
-                vextracti128(c, hi_idx, rx, 1);
-                vpxor(c, 0, tmp, tmp, tmp);
-                for (int k = 0; k < 8; k++) {
-                    int src = (k < 4) ? rx : hi_idx;
-                    int lane = k & 3;
-                    if (lane == 0) {
-                        vmovd_to_gpr(c, RAX, src);
-                    } else {
-                        vpextrd(c, RAX, src, (uint8_t)lane);
-                    }
-                    cmp_rr(c, RAX, XM);
-                    int skip = jcc(c, 0x03);
-                    movzx_byte_load(c, RAX, base, RAX, 1, 0);
-                    vpinsrw(c, tmp, tmp, RAX, (uint8_t)k);
-                    patch_jcc(c, skip);
-                }
-                vpmovzxwd(c, s.rd, tmp);
-                ra_return_reg(ra, tmp);
                 ra_return_reg(ra, hi_idx);
                 ra_free_chan(ra, inst->x, i);
             }

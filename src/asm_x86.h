@@ -114,8 +114,6 @@ void vpcmpeqd(struct asm_x86 *b, int d, int v, int s);
 void vpcmpgtd(struct asm_x86 *b, int d, int v, int s);
 void vpmovsxwd(struct asm_x86 *b, int d, int s);
 void vpmovzxwd(struct asm_x86 *b, int d, int s);
-void vpmovzxbd(struct asm_x86 *b, int d, int s);
-void vpackuswb(struct asm_x86 *b, int d, int v, int s);
 
 void vpgatherdd(struct asm_x86 *b, int dst, int base, int idx, int scale, int mask);
 void vpextrd(struct asm_x86 *b, int gpr, int xmm, uint8_t imm);

@@ -14,7 +14,7 @@ umbra_val32 coverage_bitmap(void *ctx, struct umbra_builder *b,
     struct umbra_buf const *self = ctx;
     (void)x; (void)y;
     umbra_ptr const bmp = umbra_bind_host_readonly_buf(b, self);
-    umbra_val32 const val = umbra_load_8(b, bmp);
+    umbra_val32 const val = umbra_i32_from_u16(b, umbra_load_16(b, bmp));
     umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
     return umbra_mul_f32(b, umbra_f32_from_i32(b, val), inv255);
 }
@@ -24,7 +24,7 @@ umbra_val32 coverage_sdf(void *ctx, struct umbra_builder *b,
     struct umbra_buf const *self = ctx;
     (void)x; (void)y;
     umbra_ptr const bmp = umbra_bind_host_readonly_buf(b, self);
-    umbra_val32 const raw = umbra_load_8(b, bmp);
+    umbra_val32 const raw = umbra_i32_from_u16(b, umbra_load_16(b, bmp));
     umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
     umbra_val32 const dist = umbra_mul_f32(b, umbra_f32_from_i32(b, raw), inv255);
     umbra_val32 const lo = umbra_imm_f32(b, 0.4375f);
@@ -64,7 +64,7 @@ umbra_val32 coverage_bitmap2d(void *ctx, struct umbra_builder *b,
     umbra_val32 const wi = umbra_imm_i32(b, self->w);
     umbra_val32 const idx = umbra_add_i32(b, umbra_mul_i32(b, yi, wi), xi);
 
-    umbra_val32 const val    = umbra_gather_8(b, pixels, idx);
+    umbra_val32 const val    = umbra_i32_from_u16(b, umbra_gather_16(b, pixels, idx));
     umbra_val32 const inv255 = umbra_imm_f32(b, 1.0f / 255.0f);
     umbra_val32 const cov    = umbra_mul_f32(b, umbra_f32_from_i32(b, val), inv255);
 
@@ -101,7 +101,7 @@ static unsigned char* text_load_font(char const *path) {
 }
 
 struct text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) {
-    struct text_cov tc = { .data = calloc((size_t)(W * H), sizeof(uint8_t)), .w = W, .h = H };
+    struct text_cov tc = { .data = calloc((size_t)(W * H), sizeof(uint16_t)), .w = W, .h = H };
 
     unsigned char *font_data = text_load_font("/System/Library/Fonts/Supplemental/Arial.ttf");
     if (font_data) {
@@ -151,8 +151,8 @@ struct text_cov text_rasterize(int W, int H, float font_size, _Bool sdf) {
                         for (int col = 0; col < gw; col++) {
                             int px = dx + col;
                             if (px >= 0 && px < W) {
-                                uint8_t val = bmp[row * gw + col];
-                                uint8_t cur = tc.data[py * W + px];
+                                uint16_t const val = bmp[row * gw + col];
+                                uint16_t const cur = tc.data[py * W + px];
                                 if (val > cur) { tc.data[py * W + px] = val; }
                             }
                         }

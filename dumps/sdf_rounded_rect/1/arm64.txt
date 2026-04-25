@@ -59,7 +59,7 @@ fsub.4s	v8, v8, v12
 fsub.4s	v9, v9, v13
 fsub.4s	v10, v10, v12
 fsub.4s	v11, v11, v13
-ldr	q14, 0xb30 <ltmp0+0xb30>
+ldr	q14, 0xb40 <ltmp0+0xb40>
 mov.16b	v15, v14
 movi.4s	v4, #0x3f, lsl #24
 mov.16b	v5, v4
@@ -74,15 +74,15 @@ stp	x13, x15, [sp, #-0x10]!
 # loop_top:
 sub	x10, x0, x9
 cmp	x10, #0x8
-b.lt	0x64c <ltmp0+0x64c>
+b.lt	0x654 <ltmp0+0x654>
 # simd_body:
 dup.4s	v4, w9
 mov.16b	v5, v4
 str	q6, [x15]
 str	q7, [x15, #0x10]
-ldr	q6, 0xb40 <ltmp0+0xb40>
-add.4s	v4, v4, v6
 ldr	q6, 0xb50 <ltmp0+0xb50>
+add.4s	v4, v4, v6
+ldr	q6, 0xb60 <ltmp0+0xb60>
 add.4s	v5, v5, v6
 movi.4s	v6, #0x0
 mov.16b	v7, v6
@@ -376,14 +376,16 @@ movi.4s	v16, #0x2
 mov.16b	v17, v16
 bsl.16b	v6, v16, v4
 bsl.16b	v7, v17, v5
+xtn.4h	v6, v6
+xtn.4h	v7, v7
 ldr	x8, [x2]
 ldr	w10, [x2, #0xc]
+lsl	x10, x10, #1
 madd	x8, x14, x10, x8
-xtn.4h	v0, v6
-xtn2.8h	v0, v7
-xtn.8b	v0, v0
-add	x10, x8, x9
-str	d0, [x10]
+lsl	x10, x9, #1
+add	x10, x8, x10
+str	d6, [x10]
+str	d7, [x10, #0x8]
 ldr	q6, [x15]
 ldr	q7, [x15, #0x10]
 ldr	q16, [x15, #0x20]
@@ -406,7 +408,7 @@ add	x9, x9, #0x8
 b	0x120 <ltmp0+0x120>
 # tail_top:
 cmp	x9, x0
-b.ge	0xa20 <ltmp0+0xa20>
+b.ge	0xa30 <ltmp0+0xa30>
 movi.4s	v4, #0x0
 mov.16b	v5, v4
 ldr	x8, [x2, #0x10]
@@ -454,7 +456,7 @@ fsub.4s	v8, v8, v12
 fsub.4s	v9, v9, v13
 fsub.4s	v10, v10, v12
 fsub.4s	v11, v11, v13
-ldr	q14, 0xb30 <ltmp0+0xb30>
+ldr	q14, 0xb40 <ltmp0+0xb40>
 mov.16b	v15, v14
 movi.4s	v4, #0x3f, lsl #24
 mov.16b	v5, v4
@@ -644,18 +646,20 @@ fcmgt.4s	v6, v28, v6
 movi.4s	v16, #0x2
 mov.16b	v17, v16
 bsl.16b	v6, v16, v4
+xtn.4h	v6, v6
 ldr	x8, [x2]
 ldr	w10, [x2, #0xc]
+lsl	x10, x10, #1
 madd	x8, x14, x10, x8
-str	b6, [x8, x9, lsl #0]
+str	h6, [x8, x9, lsl #1]
 add	x9, x9, #0x1
-b	0x64c <ltmp0+0x64c>
+b	0x654 <ltmp0+0x654>
 # row_done:
 add	x14, x14, #0x1
 add	x9, x1, #0x0
 ldr	x10, [sp]
 cmp	x14, x10
-b.ge	0xb0c <ltmp0+0xb0c>
+b.ge	0xb1c <ltmp0+0xb1c>
 # next_row:
 movi.4s	v4, #0x0
 mov.16b	v5, v4
@@ -704,7 +708,7 @@ fsub.4s	v8, v8, v12
 fsub.4s	v9, v9, v13
 fsub.4s	v10, v10, v12
 fsub.4s	v11, v11, v13
-ldr	q14, 0xb30 <ltmp0+0xb30>
+ldr	q14, 0xb40 <ltmp0+0xb40>
 mov.16b	v15, v14
 movi.4s	v4, #0x3f, lsl #24
 mov.16b	v5, v4

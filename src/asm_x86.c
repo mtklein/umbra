@@ -335,7 +335,6 @@ void vpunpcklwd (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x61, d, v, 
 void vpunpckhwd (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x69, d, v, s); }
 void vpunpckhdq (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x6a, d, v, s); }
 void vpackusdw  (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 2, 0, 0x2b, d, v, s); }
-void vpackuswb  (Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 0, 0x67, d, v, s); }
 
 int vbroadcastss_rip(Buf *b, int d)        { return vex_rip(b, 1, 2, 0, 1, d, 0, 0x18); }
 int vpshufb_rip     (Buf *b, int d, int v) { return vex_rip(b, 1, 2, 0, 1, d, v, 0x00); }
@@ -347,7 +346,6 @@ void vpcmpgtd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0x66, d, v, s);
 
 void vpmovsxwd(Buf *b, int d, int s) { vex_rr(b, 1, 2, 1, 0x23, d, s); }
 void vpmovzxwd(Buf *b, int d, int s) { vex_rr(b, 1, 2, 1, 0x33, d, s); }
-void vpmovzxbd(Buf *b, int d, int s) { vex_rr(b, 1, 2, 1, 0x31, d, s); }
 
 void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask) {
     vex_mem(b, 1, 2, 0, 1, dst, mask, 0x90, base, idx, scale, 0);

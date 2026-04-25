@@ -6,7 +6,7 @@ struct meta { uint w, x0, y0, count0, count1, count2, stride0, stride1, stride2;
 kernel void main0(
     constant meta &m [[buffer(0)]],
     device half4 * __restrict p0 [[buffer(1)]],
-    device const uchar * __restrict p1 [[buffer(2)]],
+    device const ushort * __restrict p1 [[buffer(2)]],
     device const uint * __restrict p2 [[buffer(3)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
@@ -40,39 +40,40 @@ kernel void main0(
     uint v24 = v23 << v6;
     uint v25 = v18 + v24;
     uint v26 = (uint)p1[min(v25, m.count1 - 1u)] & ((v25 < m.count1) ? ~0u : 0u);
-    float v27 = (float)(int)v26;
-    float v28 = fma(as_type<float>(v7), v27, 0.0f);
-    uint v29 = v20 <  as_type<float>(v2) ? 0xffffffffu : 0u;
-    uint v30 = as_type<float>(v0) <= v14 ? 0xffffffffu : 0u;
-    uint v31 = v30 & v17;
-    uint v32 = as_type<float>(v0) <= v20 ? 0xffffffffu : 0u;
-    uint v33 = v32 & v29;
-    uint v34 = v31 & v33;
-    uint v35 = (v34 != 0u) ? as_type<uint>(v28) : v0;
-    half4 _px36 = p0[y * m.stride0 + x];
-    uint v36 = (uint)as_type<ushort>(_px36.x);
-    uint v36_1 = (uint)as_type<ushort>(_px36.y);
-    uint v36_2 = (uint)as_type<ushort>(_px36.z);
-    uint v36_3 = (uint)as_type<ushort>(_px36.w);
-    float v37 = (float)as_type<half>((ushort)v36);
-    float v38 = fma(v37, v12, as_type<float>(v8));
-    float v39 = fma(-1.0f, v37, v38);
-    float v40 = fma(as_type<float>(v35), v39, v37);
-    float v41 = (float)as_type<half>((ushort)v36_1);
-    float v42 = fma(v41, v12, as_type<float>(v9));
-    float v43 = fma(-1.0f, v41, v42);
-    float v44 = fma(as_type<float>(v35), v43, v41);
-    float v45 = (float)as_type<half>((ushort)v36_2);
-    float v46 = fma(v45, v12, as_type<float>(v10));
-    float v47 = fma(-1.0f, v45, v46);
-    float v48 = fma(as_type<float>(v35), v47, v45);
-    float v49 = (float)as_type<half>((ushort)v36_3);
-    float v50 = fma(v49, v12, as_type<float>(v11));
-    float v51 = fma(-1.0f, v49, v50);
-    float v52 = fma(as_type<float>(v35), v51, v49);
-    uint v53 = (uint)as_type<ushort>((half)v52);
-    uint v54 = (uint)as_type<ushort>((half)v48);
-    uint v55 = (uint)as_type<ushort>((half)v44);
-    uint v56 = (uint)as_type<ushort>((half)v40);
-    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v56), as_type<half>((ushort)v55), as_type<half>((ushort)v54), as_type<half>((ushort)v53));
+    uint v27 = (uint)(ushort)v26;
+    float v28 = (float)(int)v27;
+    float v29 = fma(as_type<float>(v7), v28, 0.0f);
+    uint v30 = v20 <  as_type<float>(v2) ? 0xffffffffu : 0u;
+    uint v31 = as_type<float>(v0) <= v14 ? 0xffffffffu : 0u;
+    uint v32 = v31 & v17;
+    uint v33 = as_type<float>(v0) <= v20 ? 0xffffffffu : 0u;
+    uint v34 = v33 & v30;
+    uint v35 = v32 & v34;
+    uint v36 = (v35 != 0u) ? as_type<uint>(v29) : v0;
+    half4 _px37 = p0[y * m.stride0 + x];
+    uint v37 = (uint)as_type<ushort>(_px37.x);
+    uint v37_1 = (uint)as_type<ushort>(_px37.y);
+    uint v37_2 = (uint)as_type<ushort>(_px37.z);
+    uint v37_3 = (uint)as_type<ushort>(_px37.w);
+    float v38 = (float)as_type<half>((ushort)v37);
+    float v39 = fma(v38, v12, as_type<float>(v8));
+    float v40 = fma(-1.0f, v38, v39);
+    float v41 = fma(as_type<float>(v36), v40, v38);
+    float v42 = (float)as_type<half>((ushort)v37_1);
+    float v43 = fma(v42, v12, as_type<float>(v9));
+    float v44 = fma(-1.0f, v42, v43);
+    float v45 = fma(as_type<float>(v36), v44, v42);
+    float v46 = (float)as_type<half>((ushort)v37_2);
+    float v47 = fma(v46, v12, as_type<float>(v10));
+    float v48 = fma(-1.0f, v46, v47);
+    float v49 = fma(as_type<float>(v36), v48, v46);
+    float v50 = (float)as_type<half>((ushort)v37_3);
+    float v51 = fma(v50, v12, as_type<float>(v11));
+    float v52 = fma(-1.0f, v50, v51);
+    float v53 = fma(as_type<float>(v36), v52, v50);
+    uint v54 = (uint)as_type<ushort>((half)v53);
+    uint v55 = (uint)as_type<ushort>((half)v49);
+    uint v56 = (uint)as_type<ushort>((half)v45);
+    uint v57 = (uint)as_type<ushort>((half)v41);
+    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v57), as_type<half>((ushort)v56), as_type<half>((ushort)v55), as_type<half>((ushort)v54));
 }

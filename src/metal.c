@@ -347,32 +347,6 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      uv(_uy, vy, yid, is_f));
             } break;
 
-            case op_load_8: {
-                int p = inst->ptr.bits;
-                emit(b,
-                     "%suint v%d = (uint)"
-                     "p%d[y * m.stride%d + x];\n",
-                     pad, i, p, p);
-            } break;
-            case op_gather_8: {
-                int p = inst->ptr.bits;
-                emit(b,
-                     "%suint v%d = (uint)p%d"
-                     "[min(%s, m.count%d - 1u)]"
-                     " & ((%s < m.count%d)"
-                     " ? ~0u : 0u);\n",
-                     pad, i, p,
-                     vx, p, vx, p);
-            } break;
-            case op_store_8: {
-                int p = inst->ptr.bits;
-                emit(b,
-                     "%sp%d[y * m.stride%d + x]"
-                     " = (uchar)%s;\n",
-                     pad, p, p,
-                     uv(_uy, vy, yid, is_f));
-            } break;
-
             case op_f32_from_f16:
                 emit(b,
                     "%sfloat v%d ="
@@ -735,8 +709,7 @@ static char* build_source(IR const *ir) {
     for (int p = 0; p < total_bufs; p++) {
         char const *type = buf[p].shift == 3 ? "half4"
                          : buf[p].shift == 2 ? "uint"
-                         : buf[p].shift == 1 ? "ushort"
-                                             : "uchar";
+                                             : "ushort";
         char const *qual = (buf[p].rw & BUF_WRITTEN) ? "device" : "device const";
         emit(&b,
              ",\n    %s %s * __restrict p%d"

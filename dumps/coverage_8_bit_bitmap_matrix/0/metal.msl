@@ -7,7 +7,7 @@ kernel void main0(
     constant meta &m [[buffer(0)]],
     device half4 * __restrict p0 [[buffer(1)]],
     device const uint * __restrict p1 [[buffer(2)]],
-    device const uchar * __restrict p2 [[buffer(3)]],
+    device const ushort * __restrict p2 [[buffer(3)]],
     device const uint * __restrict p3 [[buffer(4)]],
     uint2 pos [[thread_position_in_grid]]
 ) {
@@ -76,39 +76,40 @@ kernel void main0(
     uint v59 = v58 << v17;
     uint v60 = v51 + v59;
     uint v61 = (uint)p2[min(v60, m.count2 - 1u)] & ((v60 < m.count2) ? ~0u : 0u);
-    float v62 = (float)(int)v61;
-    float v63 = fma(as_type<float>(v18), v62, 0.0f);
-    uint v64 = v55 <  as_type<float>(v13) ? 0xffffffffu : 0u;
-    uint v65 = as_type<float>(v0) <= v47 ? 0xffffffffu : 0u;
-    uint v66 = v65 & v50;
-    uint v67 = as_type<float>(v0) <= v55 ? 0xffffffffu : 0u;
-    uint v68 = v67 & v64;
-    uint v69 = v66 & v68;
-    uint v70 = (v69 != 0u) ? as_type<uint>(v63) : v0;
-    half4 _px71 = p0[y * m.stride0 + x];
-    uint v71 = (uint)as_type<ushort>(_px71.x);
-    uint v71_1 = (uint)as_type<ushort>(_px71.y);
-    uint v71_2 = (uint)as_type<ushort>(_px71.z);
-    uint v71_3 = (uint)as_type<ushort>(_px71.w);
-    float v72 = (float)as_type<half>((ushort)v71);
-    float v73 = fma(v72, v23, as_type<float>(v19));
-    float v74 = fma(-1.0f, v72, v73);
-    float v75 = fma(as_type<float>(v70), v74, v72);
-    float v76 = (float)as_type<half>((ushort)v71_1);
-    float v77 = fma(v76, v23, as_type<float>(v20));
-    float v78 = fma(-1.0f, v76, v77);
-    float v79 = fma(as_type<float>(v70), v78, v76);
-    float v80 = (float)as_type<half>((ushort)v71_2);
-    float v81 = fma(v80, v23, as_type<float>(v21));
-    float v82 = fma(-1.0f, v80, v81);
-    float v83 = fma(as_type<float>(v70), v82, v80);
-    float v84 = (float)as_type<half>((ushort)v71_3);
-    float v85 = fma(v84, v23, as_type<float>(v22));
-    float v86 = fma(-1.0f, v84, v85);
-    float v87 = fma(as_type<float>(v70), v86, v84);
-    uint v88 = (uint)as_type<ushort>((half)v87);
-    uint v89 = (uint)as_type<ushort>((half)v83);
-    uint v90 = (uint)as_type<ushort>((half)v79);
-    uint v91 = (uint)as_type<ushort>((half)v75);
-    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v91), as_type<half>((ushort)v90), as_type<half>((ushort)v89), as_type<half>((ushort)v88));
+    uint v62 = (uint)(ushort)v61;
+    float v63 = (float)(int)v62;
+    float v64 = fma(as_type<float>(v18), v63, 0.0f);
+    uint v65 = v55 <  as_type<float>(v13) ? 0xffffffffu : 0u;
+    uint v66 = as_type<float>(v0) <= v47 ? 0xffffffffu : 0u;
+    uint v67 = v66 & v50;
+    uint v68 = as_type<float>(v0) <= v55 ? 0xffffffffu : 0u;
+    uint v69 = v68 & v65;
+    uint v70 = v67 & v69;
+    uint v71 = (v70 != 0u) ? as_type<uint>(v64) : v0;
+    half4 _px72 = p0[y * m.stride0 + x];
+    uint v72 = (uint)as_type<ushort>(_px72.x);
+    uint v72_1 = (uint)as_type<ushort>(_px72.y);
+    uint v72_2 = (uint)as_type<ushort>(_px72.z);
+    uint v72_3 = (uint)as_type<ushort>(_px72.w);
+    float v73 = (float)as_type<half>((ushort)v72);
+    float v74 = fma(v73, v23, as_type<float>(v19));
+    float v75 = fma(-1.0f, v73, v74);
+    float v76 = fma(as_type<float>(v71), v75, v73);
+    float v77 = (float)as_type<half>((ushort)v72_1);
+    float v78 = fma(v77, v23, as_type<float>(v20));
+    float v79 = fma(-1.0f, v77, v78);
+    float v80 = fma(as_type<float>(v71), v79, v77);
+    float v81 = (float)as_type<half>((ushort)v72_2);
+    float v82 = fma(v81, v23, as_type<float>(v21));
+    float v83 = fma(-1.0f, v81, v82);
+    float v84 = fma(as_type<float>(v71), v83, v81);
+    float v85 = (float)as_type<half>((ushort)v72_3);
+    float v86 = fma(v85, v23, as_type<float>(v22));
+    float v87 = fma(-1.0f, v85, v86);
+    float v88 = fma(as_type<float>(v71), v87, v85);
+    uint v89 = (uint)as_type<ushort>((half)v88);
+    uint v90 = (uint)as_type<ushort>((half)v84);
+    uint v91 = (uint)as_type<ushort>((half)v80);
+    uint v92 = (uint)as_type<ushort>((half)v76);
+    p0[y * m.stride0 + x] = half4(as_type<half>((ushort)v92), as_type<half>((ushort)v91), as_type<half>((ushort)v90), as_type<half>((ushort)v89));
 }
