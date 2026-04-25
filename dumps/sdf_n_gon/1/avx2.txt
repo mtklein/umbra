@@ -41,9 +41,9 @@ subq	%r10, %r11
 cmpq	$0x8, %r11
 jl	0x34e <__text+0x34e>
 # simd_body:
+vmovdqu	%ymm9, (%rsp)
 vmovdqu	%ymm9, 0x20(%rsp)
 vmovdqu	%ymm0, 0x40(%rsp)
-vmovdqu	%ymm9, (%rsp)
 vmovd	%r10d, %xmm11
 vbroadcastss	%xmm11, %ymm11
 vpaddd	0x5cc(%rip), %ymm11, %ymm11 ## 0x698 <__text+0x698>
@@ -119,10 +119,8 @@ vaddps	%ymm4, %ymm9, %ymm9
 vsubps	%ymm5, %ymm9, %ymm9
 vmovdqu	0x20(%rsp), %ymm4
 vmaxps	%ymm4, %ymm9, %ymm9
-vmovdqu	%ymm9, 0x20(%rsp)
 vmovdqu	0x40(%rsp), %ymm4
 vpaddd	%ymm4, %ymm8, %ymm4
-vmovdqu	%ymm4, 0x40(%rsp)
 vminps	%ymm6, %ymm7, %ymm7
 vminps	%ymm0, %ymm10, %ymm10
 vaddps	%ymm7, %ymm10, %ymm10
@@ -130,6 +128,8 @@ vsubps	%ymm5, %ymm10, %ymm10
 vmovdqu	(%rsp), %ymm0
 vmaxps	%ymm0, %ymm10, %ymm10
 vmovdqu	%ymm10, (%rsp)
+vmovdqu	%ymm9, 0x20(%rsp)
+vmovdqu	%ymm4, 0x40(%rsp)
 vmovdqu	0xe0(%rsp), %ymm0
 vmovd	%xmm0, %r11d
 vmovdqu	0x40(%rsp), %ymm4
@@ -191,9 +191,9 @@ vbroadcastss	(%r11), %ymm8
 vbroadcastss	0x2d5(%rip), %ymm9 ## 0x694 <__text+0x694>
 vpcmpeqd	%ymm10, %ymm10, %ymm10
 vpsrld	$0x1e, %ymm10, %ymm10
+vmovdqu	%ymm9, (%rsp)
 vmovdqu	%ymm9, 0x20(%rsp)
 vmovdqu	%ymm0, 0x40(%rsp)
-vmovdqu	%ymm9, (%rsp)
 vmovd	%r10d, %xmm11
 vcvtdq2ps	%ymm11, %ymm11
 vaddps	%ymm5, %ymm11, %ymm12
@@ -263,10 +263,8 @@ vaddps	%ymm4, %ymm9, %ymm9
 vsubps	%ymm5, %ymm9, %ymm9
 vmovdqu	0x20(%rsp), %ymm4
 vmaxps	%ymm4, %ymm9, %ymm9
-vmovdqu	%ymm9, 0x20(%rsp)
 vmovdqu	0x40(%rsp), %ymm4
 vpaddd	%ymm4, %ymm8, %ymm4
-vmovdqu	%ymm4, 0x40(%rsp)
 vminps	%ymm6, %ymm7, %ymm7
 vminps	%ymm0, %ymm10, %ymm10
 vaddps	%ymm7, %ymm10, %ymm10
@@ -274,6 +272,8 @@ vsubps	%ymm5, %ymm10, %ymm10
 vmovdqu	(%rsp), %ymm0
 vmaxps	%ymm0, %ymm10, %ymm10
 vmovdqu	%ymm10, (%rsp)
+vmovdqu	%ymm9, 0x20(%rsp)
+vmovdqu	%ymm4, 0x40(%rsp)
 vmovdqu	0x200(%rsp), %ymm0
 vmovd	%xmm0, %r11d
 vmovdqu	0x40(%rsp), %ymm4

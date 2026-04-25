@@ -158,14 +158,29 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
                         meta[j].last_use[0] = i;
                     }
                 }
-                // TODO: also order against prior store_vars of the same var.
-                //       Two consecutive store_vars without a load_var between
-                //       them have no recorded dependency, so the score-based
-                //       scheduler can put the second one before the first and
-                //       lose the user's last write.  Reproduces with two
-                //       store_var32(v, ...) calls back-to-back in program
-                //       order; wrapping in umbra_if forces the scheduler to
-                //       respect region boundaries and works around it.
+            }
+            // load_var must read after any prior store_var of the same var so
+            // the user observes writes in program order.
+            if (in[i].op == op_load_var) {
+                for (int j = region_lo; j < i; j++) {
+                    if (in[j].op == op_store_var && in[j].imm == in[i].imm
+                            && is_body(in + j)) {
+                        meta[i].deps++;
+                        meta[j].users++;
+                    }
+                }
+            }
+            // Stores serialize globally in program order, regardless of which
+            // var or buffer they write.  Anything weaker can let the scheduler
+            // drop a "second write wins" semantically — including two
+            // store_vars of the same var, or two store_32s into the same buf.
+            if (op_is_store(in[i].op)) {
+                for (int j = region_lo; j < i; j++) {
+                    if (op_is_store(in[j].op) && is_body(in + j)) {
+                        meta[i].deps++;
+                        meta[j].users++;
+                    }
+                }
             }
         }
     }
@@ -191,6 +206,21 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
                 for (int j = region_lo; j < i; j++) {
                     if (in[j].op == op_load_var && in[j].imm == in[i].imm
                             && is_body(in + j)) {
+                        users[meta[j].user_off + meta[j].users++] = i;
+                    }
+                }
+            }
+            if (in[i].op == op_load_var) {
+                for (int j = region_lo; j < i; j++) {
+                    if (in[j].op == op_store_var && in[j].imm == in[i].imm
+                            && is_body(in + j)) {
+                        users[meta[j].user_off + meta[j].users++] = i;
+                    }
+                }
+            }
+            if (op_is_store(in[i].op)) {
+                for (int j = region_lo; j < i; j++) {
+                    if (op_is_store(in[j].op) && is_body(in + j)) {
                         users[meta[j].user_off + meta[j].users++] = i;
                     }
                 }

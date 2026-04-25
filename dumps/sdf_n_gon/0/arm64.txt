@@ -64,12 +64,12 @@ sub	x10, x0, x9
 cmp	x10, #0x8
 b.lt	0x678 <ltmp0+0x678>
 # simd_body:
+str	q18, [x15]
+str	q19, [x15, #0x10]
 str	q18, [x15, #0x20]
 str	q19, [x15, #0x30]
 str	q4, [x15, #0x40]
 str	q5, [x15, #0x50]
-str	q18, [x15]
-str	q19, [x15, #0x10]
 dup.4s	v4, w9
 mov.16b	v5, v4
 ldr	q6, 0xb90 <ltmp0+0xb90>
@@ -198,14 +198,10 @@ ldr	q20, [x15, #0x20]
 ldr	q21, [x15, #0x30]
 fmaxnm.4s	v30, v30, v20
 fmaxnm.4s	v31, v31, v21
-str	q30, [x15, #0x20]
-str	q31, [x15, #0x30]
 ldr	q20, [x15, #0x40]
 ldr	q21, [x15, #0x50]
 add.4s	v20, v28, v20
 add.4s	v21, v29, v21
-str	q20, [x15, #0x40]
-str	q21, [x15, #0x50]
 fminnm.4s	v26, v26, v24
 fminnm.4s	v27, v27, v25
 fminnm.4s	v8, v8, v4
@@ -220,6 +216,10 @@ fmaxnm.4s	v8, v8, v4
 fmaxnm.4s	v9, v9, v5
 str	q8, [x15]
 str	q9, [x15, #0x10]
+str	q30, [x15, #0x20]
+str	q31, [x15, #0x30]
+str	q20, [x15, #0x40]
+str	q21, [x15, #0x50]
 ldr	q4, [x15, #0x60]
 ldr	q5, [x15, #0x70]
 mov.s	w10, v4[0]
@@ -459,9 +459,9 @@ dup.4s	v12, v12[0]
 mov.16b	v13, v12
 fsub.4s	v14, v6, v12
 fsub.4s	v15, v7, v13
+str	q18, [x15]
 str	q18, [x15, #0x20]
 str	q4, [x15, #0x40]
-str	q18, [x15]
 dup.4s	v4, w9
 movi.4s	v6, #0x0
 mov.16b	v7, v6
@@ -560,10 +560,8 @@ fadd.4s	v30, v30, v20
 fsub.4s	v30, v30, v22
 ldr	q20, [x15, #0x20]
 fmaxnm.4s	v30, v30, v20
-str	q30, [x15, #0x20]
 ldr	q20, [x15, #0x40]
 add.4s	v20, v28, v20
-str	q20, [x15, #0x40]
 fminnm.4s	v26, v26, v24
 fminnm.4s	v8, v8, v4
 fadd.4s	v8, v8, v26
@@ -571,6 +569,8 @@ fsub.4s	v8, v8, v22
 ldr	q4, [x15]
 fmaxnm.4s	v8, v8, v4
 str	q8, [x15]
+str	q30, [x15, #0x20]
+str	q20, [x15, #0x40]
 ldr	q4, [x15, #0x1a0]
 ldr	q5, [x15, #0x1b0]
 mov.s	w10, v4[0]

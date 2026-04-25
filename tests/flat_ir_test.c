@@ -5438,10 +5438,7 @@ TEST(test_store_16_per_channel) {
 TEST(test_store_var_per_channel) {
     // Regression: store_var in the JITs called ra_ensure(inst->y.id) and
     // ignored inst->y.chan, so storing the G/B/A channel of load_8x4 into
-    // a var read R's register instead.  Wrap the channel stores in an
-    // always-true umbra_if so the schedule keeps them strictly after the
-    // declare's init store_var (the scheduler doesn't track store-after-
-    // store ordering for the same var, but if/end_if regions do force it).
+    // a var read R's register instead.
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
 
@@ -5452,13 +5449,10 @@ TEST(test_store_var_per_channel) {
 
     umbra_val32 r, g, bl, a;
     umbra_load_8x4(b, umbra_bind_buf(b, &slot[0]), &r, &g, &bl, &a);
-    umbra_val32 const always = umbra_lt_s32(b, umbra_imm_i32(b, 0), umbra_imm_i32(b, 1));
-    umbra_if(b, always); {
-        umbra_store_var32(b, vR, r);
-        umbra_store_var32(b, vG, g);
-        umbra_store_var32(b, vB, bl);
-        umbra_store_var32(b, vA, a);
-    } umbra_end_if(b);
+    umbra_store_var32(b, vR, r);
+    umbra_store_var32(b, vG, g);
+    umbra_store_var32(b, vB, bl);
+    umbra_store_var32(b, vA, a);
     umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, vR));
     umbra_store_32(b, umbra_bind_buf(b, &slot[2]), umbra_load_var32(b, vG));
     umbra_store_32(b, umbra_bind_buf(b, &slot[3]), umbra_load_var32(b, vB));
@@ -5550,6 +5544,47 @@ TEST(test_load_store_16x4_planar_int) {
         }
         test_backends_free(&B);
     }
+}
+
+TEST(test_store_var_back_to_back) {
+    // Two store_var calls of the same var, no umbra_if region between them.
+    // The second write must win — reads after must see 0x5678, not 0x1234
+    // or the declare's init.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+    umbra_var32 const v = umbra_declare_var32(b, umbra_imm_i32(b, 0xCAFE));
+    umbra_store_var32(b, v, umbra_imm_i32(b, 0x1234));
+    umbra_store_var32(b, v, umbra_imm_i32(b, 0x5678));
+    umbra_store_32(b, umbra_bind_buf(b, &slot[0]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 1,
+        (struct umbra_buf[]){{.ptr = dst, .count = 8, .stride = 8}})) {
+            for (int lane = 0; lane < 8; lane++) { dst[lane] == 0x5678u here; }
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_store_32_back_to_back) {
+    // Two store_32 calls writing the same buffer; the second store must win.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const ptr = umbra_bind_buf(b, &slot[0]);
+    umbra_store_32(b, ptr, umbra_imm_i32(b, 0x1111));
+    umbra_store_32(b, ptr, umbra_imm_i32(b, 0x2222));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 1,
+        (struct umbra_buf[]){{.ptr = dst, .count = 8, .stride = 8}})) {
+            for (int lane = 0; lane < 8; lane++) { dst[lane] == 0x2222u here; }
+        }
+    }
+    test_backends_free(&B);
 }
 
 TEST(test_many_constants) {
