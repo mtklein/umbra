@@ -165,11 +165,10 @@ TEST(test_gpu_buf_cache_sealed_skips_hash_and_reupload) {
     char data[64];
     memset(data, 0x42, sizeof data);
 
-    // First access: one seed upload, no hashing stored.
+    // First access: one seed upload.
     gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
     m.uploads == 1 here;
     c.entry[0].sealed here;
-    c.entry[0].hashed_size == 0 here;
 
     // Subsequent accesses within batch: skip.
     gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
@@ -243,6 +242,42 @@ TEST(test_gpu_buf_cache_import_nocopy) {
 
     gpu_buf_cache_free(&c);
     m.releases == 1 here;
+}
+
+// Backends like wgpu round their GPU alloc up to a 4-byte boundary.  Make sure
+// copyback caps the host download at the requested size, not the rounded-up
+// alloc size, so a sealed+writable buffer with a non-multiple-of-4 byte count
+// doesn't have copyback overrun the host buffer.  ASan catches the overrun.
+static gpu_buf mock_alloc_round4(size_t size, void *ctx) {
+    ((struct mock_ctx *)ctx)->allocs++;
+    size_t aligned = (size + 3) & ~(size_t)3;
+    return (gpu_buf){.ptr = malloc(aligned), .size = aligned};
+}
+
+TEST(test_gpu_buf_cache_copyback_respects_requested_size) {
+    struct mock_ctx m = {0};
+    struct gpu_buf_cache c = {
+        .ops = {mock_alloc_round4, mock_upload, mock_download, NULL, mock_release},
+        .ctx = &m,
+    };
+
+    char data[6];   // not a multiple of 4
+    memset(data, 0x42, sizeof data);
+
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN | BUF_SEALED);
+    c.entry[0].buf.size == 8 here;
+
+    // Pretend the GPU wrote across the rounded buffer.
+    memset(c.entry[0].buf.ptr, 0xAB, c.entry[0].buf.size);
+
+    // Copyback must download only sizeof data bytes to the host buffer; if it
+    // downloaded the rounded 8, ASan would catch the 2-byte stack overrun.
+    gpu_buf_cache_copyback(&c);
+    m.downloads == 1 here;
+    data[0] == (char)0xAB here;
+    data[5] == (char)0xAB here;
+
+    gpu_buf_cache_free(&c);
 }
 
 TEST(test_gpu_buf_cache_import_nocopy_writable) {

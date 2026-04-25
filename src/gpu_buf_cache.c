@@ -60,8 +60,12 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
         c->ops.upload(ce->buf, host, bytes, c->ctx);
         c->upload_bytes += bytes;
         ce->fp          = sealed ? (fingerprint){0} : fingerprint_hash(host, bytes);
-        ce->hashed_size = sealed ? 0 : bytes;
-        ce->uploaded = 1;
+        // Always record the requested bytes -- the skip-re-upload check is
+        // gated on !ce->sealed independently, but copyback needs the original
+        // size so it doesn't download the alloc-rounded buf.size into a
+        // smaller host buffer.
+        ce->hashed_size = bytes;
+        ce->uploaded    = 1;
     }
     if (writable && host && bytes) {
         ce->copy_tracked = 1;
@@ -73,22 +77,12 @@ void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
     for (int i = 0; i < c->n; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->copy_tracked && !ce->nocopy && ce->host) {
-            // TODO: for sealed entries, hashed_size is 0 (we skip
-            // hashing) so we fall back to ce->buf.size, which the backend's
-            // alloc may have rounded up (wgpu rounds to 4 bytes).  Downloading
-            // the rounded size into a smaller host buffer overflows -- ASAN
-            // catches it in wgpu_cache_download's final memcpy.  Currently
-            // unreached because no shipping caller pairs sealed with
-            // writable + non-4-byte-aligned size on wgpu, but it's a real
-            // latent bug.  Fix: track the original requested bytes alongside
-            // ce->buf.size and use that for the download cap.
-            size_t const bytes = ce->hashed_size ? ce->hashed_size : ce->buf.size;
+            size_t const bytes = ce->hashed_size;
             c->ops.download(ce->buf, ce->host, bytes, c->ctx);
             if (!ce->sealed) {
                 // Host now matches GPU.  Refresh fingerprint so next batch can
                 // skip the upload if the user doesn't modify the buffer.
-                ce->fp          = fingerprint_hash(ce->host, bytes);
-                ce->hashed_size = bytes;
+                ce->fp = fingerprint_hash(ce->host, bytes);
             }
         }
     }
