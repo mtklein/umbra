@@ -10,7 +10,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
         if (ce->host == host && ce->buf.size >= bytes) {
             if (host && bytes
                     && !ce->nocopy                        // Zero-copy: GPU reads host directly.
-                    && !ce->sealed                 // Host promised not to mutate.
+                    && !ce->sealed                        // Host promised not to mutate.
                     && !(ce->uploaded && ce->writable)) { // Umbra owns writable bufs within a batch.
                 fingerprint const fp = fingerprint_hash(host, bytes);
                 if (!ce->host_bytes || !fingerprint_eq(ce->fp, fp)) {
