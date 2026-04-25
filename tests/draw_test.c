@@ -1590,7 +1590,7 @@ TEST(test_sdf_dispatch_rect) {
 
             struct umbra_builder *bb = umbra_builder();
             struct umbra_sdf_bounds_program *bounds =
-                umbra_sdf_bounds_program(bb, NULL, test_rect_fn, &rect);
+                umbra_sdf_bounds_program(bb, bes[bi], NULL, test_rect_fn, &rect);
             umbra_builder_free(bb);
 
             uint32_t dst[W * H];
@@ -1676,7 +1676,7 @@ TEST(test_sdf_dispatch_tiling) {
 
     struct umbra_builder *bb = umbra_builder();
     struct umbra_sdf_bounds_program *bounds =
-        umbra_sdf_bounds_program(bb, NULL, test_circle_fn, &sdf);
+        umbra_sdf_bounds_program(bb, be, NULL, test_circle_fn, &sdf);
     umbra_builder_free(bb);
 
     // Flat reference: same shader+coverage, no tiling.
@@ -1803,7 +1803,7 @@ static void sdf_thread_safety_for(struct umbra_backend *be) {
 
     struct umbra_builder *bb = umbra_builder();
     struct umbra_sdf_bounds_program *bounds =
-        umbra_sdf_bounds_program(bb, NULL, test_circle_fn, &sdf);
+        umbra_sdf_bounds_program(bb, be, NULL, test_circle_fn, &sdf);
     umbra_builder_free(bb);
 
     // Per-thread draw program + dst slot so the draw side isn't also racing.

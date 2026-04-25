@@ -256,10 +256,12 @@ enum umbra_sdf_tile {
 };
 
 struct umbra_sdf_bounds_program {
-    struct umbra_backend *be;   // owned; freed in umbra_sdf_bounds_program_free()
     struct umbra_program *prog;
     umbra_ptr             cov_ptr;      // late-bound cov buffer
     umbra_ptr             uniform_ptr;  // late-bound {base_x, base_y, tile_w, tile_h}
+    uint16_t             *cov;          // owned, sized to cov_tiles
+    int                   cov_tiles;
+    int                   :32;
 };
 
 // Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()), sourced from
@@ -306,6 +308,7 @@ static void apply_affine_interval(struct umbra_affine const *a,
 }
 
 struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *b,
+                                                          struct umbra_backend *be,
                                                           struct umbra_affine const *transform,
                                                           umbra_sdf sdf_fn, void *sdf_ctx) {
     struct umbra_sdf_bounds_program *bounds = calloc(1, sizeof *bounds);
@@ -339,9 +342,7 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *
     // Snapshot + compile internally.  Leave `b` alive; caller owns its
     // lifetime and may inspect/dump/recompile after this returns.
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
-    bounds->be = umbra_backend_jit();
-    if (!bounds->be) { bounds->be = umbra_backend_interp(); }
-    bounds->prog = bounds->be->compile(bounds->be, ir);
+    bounds->prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
     return bounds;
 }
@@ -349,7 +350,7 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder *
 void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
     if (b) {
         umbra_program_free(b->prog);
-        umbra_backend_free(b->be);
+        free(b->cov);
         free(b);
     }
 }
@@ -371,7 +372,12 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
               y_tiles = (b - t + T - 1) / T,
               tiles = x_tiles * y_tiles;
 
-    uint16_t *cov = malloc((size_t)tiles * sizeof *cov);
+    if (tiles > bounds->cov_tiles) {
+        free(bounds->cov);
+        bounds->cov = malloc((size_t)tiles * sizeof *bounds->cov);
+        bounds->cov_tiles = tiles;
+    }
+    uint16_t *cov = bounds->cov;
     float const uniforms[] = {(float)l, (float)t, (float)T, (float)T};
 
     struct umbra_late_binding const bounds_late[] = {
@@ -379,6 +385,8 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
         {.ptr = bounds->uniform_ptr, .uniforms = uniforms},
     };
     bounds->prog->queue(bounds->prog, 0, 0, x_tiles, y_tiles, bounds_late, count(bounds_late));
+    // Bounds must be done writing cov[] before we read it to drive draws.
+    bounds->prog->backend->flush(bounds->prog->backend);
 
     // Coalesce horizontally adjacent tiles with the same program to amortize dispatch overhead.
     for (int ty = 0; ty < y_tiles; ty++) {
@@ -400,7 +408,6 @@ void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
             run_prog->queue(run_prog, l + run_start*T, tt, r, tb, late, lates);
         }
     }
-    free(cov);
 }
 
 umbra_color_val32 umbra_shader_color(void *ctx, struct umbra_builder *b,

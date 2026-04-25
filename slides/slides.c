@@ -207,7 +207,7 @@ struct slide_runtime* slide_runtime(struct slide *s,
         void      *bctx;
         slide_effective_sdf(s, &bfn, &bctx);
         struct umbra_builder *bb = umbra_builder();
-        rt->bounds = umbra_sdf_bounds_program(bb, pre ? &pre->affine : NULL,
+        rt->bounds = umbra_sdf_bounds_program(bb, be, pre ? &pre->affine : NULL,
                                               bfn, bctx);
         umbra_builder_free(bb);
     }
