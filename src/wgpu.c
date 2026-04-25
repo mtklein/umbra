@@ -554,7 +554,6 @@ static void wgpu_program_queue(struct umbra_program *prog,
                                (size_t)n * sizeof bind_offset[0]));
     if (!bg_hit) {
         if (p->cached[ring_ix].bg) { wgpuBindGroupRelease(p->cached[ring_ix].bg); }
-        int n_bg = n + 1;
         WGPUBindGroupEntry bg_entries[33];
         for (int i = 0; i < n; i++) {
             _Bool const is_ring = p->dynamic_offset_bindings && !(p->buf[i].rw & BUF_WRITTEN);
@@ -575,7 +574,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
         p->cached[ring_ix].bg = wgpuDeviceCreateBindGroup(be->device,
             &(WGPUBindGroupDescriptor){
                 .layout     = p->bg_layout,
-                .entryCount = (size_t)n_bg,
+                .entryCount = (size_t)(n + 1),
                 .entries    = bg_entries,
             });
         p->cached[ring_ix].n = n;
