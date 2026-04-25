@@ -5350,6 +5350,46 @@ TEST(test_if_uniform_32) {
     test_backends_free(&B);
 }
 
+TEST(test_store_32_per_channel) {
+    // Regression: store_32 in the JITs called ra_ensure(inst->y.id) and
+    // ignored inst->y.chan, so storing the G/B/A channel of load_8x4 read
+    // the R register's bytes instead.  Exercise all four channels.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 r, g, bl, a;
+    umbra_load_8x4(b, umbra_bind_buf(b, &slot[0]), &r, &g, &bl, &a);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), r);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[2]), g);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[3]), bl);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[4]), a);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t src[8];
+        for (int lane = 0; lane < 8; lane++) {
+            uint32_t const ul = (uint32_t)lane;
+            src[lane] = (ul*16u+1u) | ((ul*16u+2u) << 8) | ((ul*16u+3u) << 16) | ((ul*16u+4u) << 24);
+        }
+        uint32_t dstR[8] = {0}, dstG[8] = {0}, dstB[8] = {0}, dstA[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 5,
+        (struct umbra_buf[]){{.ptr = src,  .count = 8, .stride = 8},
+                             {.ptr = dstR, .count = 8, .stride = 8},
+                             {.ptr = dstG, .count = 8, .stride = 8},
+                             {.ptr = dstB, .count = 8, .stride = 8},
+                             {.ptr = dstA, .count = 8, .stride = 8}})) {
+            for (int lane = 0; lane < 8; lane++) {
+                uint32_t const ul = (uint32_t)lane;
+                dstR[lane] == ul*16u + 1u here;
+                dstG[lane] == ul*16u + 2u here;
+                dstB[lane] == ul*16u + 3u here;
+                dstA[lane] == ul*16u + 4u here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
