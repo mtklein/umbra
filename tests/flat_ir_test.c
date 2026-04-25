@@ -5242,6 +5242,45 @@ TEST(test_if_load_16x4_planar) {
     test_backends_free(&B);
 }
 
+TEST(test_if_gather_32) {
+    // gather_32 already does per-lane bounds checking (interp returns 0,
+    // arm64 JIT branches over OOB lanes, x86 JIT uses vpgatherdd with an
+    // in-bounds mask), so a varying index inside umbra_if is fault-safe
+    // even when false-lane indices are deliberately OOB.  Lock that in.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    // True lanes: ix = x (in-bounds 0..3).  False lanes: ix = x + 100000 (OOB).
+    umbra_val32 const oob_offset = umbra_sel_32(b, cond,
+                                                umbra_imm_i32(b, 0),
+                                                umbra_imm_i32(b, 100000));
+    umbra_val32 const ix         = umbra_add_i32(b, x, oob_offset);
+    umbra_var32 const v          = umbra_declare_var32(b, umbra_imm_i32(b, 0xCAFE));
+
+    umbra_if(b, cond); {
+        umbra_val32 const got = umbra_gather_32(b, umbra_bind_buf(b, &slot[0]), ix);
+        umbra_store_var32(b, v, got);
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t src[8] = {100, 200, 300, 400, 500, 600, 700, 800};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = src, .count = 8, .stride = 8},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 100    here;
+            dst[3] == 400    here;
+            dst[4] == 0xCAFE here;
+            dst[7] == 0xCAFE here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
