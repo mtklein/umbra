@@ -303,7 +303,7 @@ int main(int argc, char *argv[]) {
             if (unit % shards == shard) {
                 struct umbra_builder *bb = umbra_builder();
                 struct umbra_sdf_bounds_program *bounds =
-                    umbra_sdf_bounds_program(bb, be, NULL, s->sdf_fn, s->sdf_ctx);
+                    umbra_sdf_bounds_program(bb, NULL, s->sdf_fn, s->sdf_ctx);
                 char sub[256];
                 snprintf(sub, sizeof sub, "%s/1", dir);
                 mkdir(sub, 0755);

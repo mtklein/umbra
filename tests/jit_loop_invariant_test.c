@@ -57,7 +57,7 @@ TEST(test_jit_compiles_sdf_bounds_with_affine_transform) {
 
     struct umbra_builder *b = umbra_builder();
     struct umbra_sdf_bounds_program *prog =
-        umbra_sdf_bounds_program(b, be, &cell_mat, two_circle_union, &sdf);
+        umbra_sdf_bounds_program(b, &cell_mat, two_circle_union, &sdf);
     umbra_builder_free(b);
 
     prog != NULL here;

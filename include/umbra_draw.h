@@ -126,17 +126,15 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 
+// TODO: run the bounds program on the draw program's backend (GPU when the
+//       draw is on a GPU), instead of always JITing it on the CPU.  Profiling
+//       SDF Text Analytic on metal shows ~all main-thread CPU is the JIT
+//       bounds eval; pushing it to the GPU should remove that wall.
+
 // Use an SDF bounds program to intelligently dispatch draw->queue() calls for a
 // draw program built by umbra_build_sdf_draw() from the same SDF, skipping
-// uncovered rectangles.  Optional affine coordinate transform.  The caller-
-// supplied backend compiles + executes the bounds eval; passing the same
-// backend the draws run on lets bounds eval happen on the GPU rather than the
-// host JIT.  Caller retains ownership of the backend.
-//
-// TODO: add an API to sync just one queue() call; today running bounds on a
-//       GPU backend forces a full flush() between bounds and draws.
+// uncovered rectangles.  Optional affine coordinate transform.
 struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder*,
-                                                          struct umbra_backend*,
                                                           struct umbra_affine const *transform,
                                                           umbra_sdf, void *sdf_ctx);
 void   umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program*);
