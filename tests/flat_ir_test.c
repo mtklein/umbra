@@ -5092,6 +5092,36 @@ TEST(test_if_load_32) {
     test_backends_free(&B);
 }
 
+TEST(test_if_load_16) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0xCAFE));
+
+    umbra_if(b, cond); {
+        umbra_val16 const loaded = umbra_load_16(b, umbra_bind_buf(b, &slot[0]));
+        umbra_store_var32(b, v, umbra_i32_from_u16(b, loaded));
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint16_t src[8] = {0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = src, .count = 8, .stride = 8},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0x10   here;
+            dst[3] == 0x40   here;
+            dst[4] == 0xCAFE here;
+            dst[7] == 0xCAFE here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
