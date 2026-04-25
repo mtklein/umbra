@@ -13,11 +13,11 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
                     && !ce->sealed                 // Host promised not to mutate.
                     && !(ce->uploaded && ce->writable)) { // Umbra owns writable bufs within a batch.
                 fingerprint const fp = fingerprint_hash(host, bytes);
-                if (!ce->hashed_size || !fingerprint_eq(ce->fp, fp)) {
+                if (!ce->host_bytes || !fingerprint_eq(ce->fp, fp)) {
                     c->ops.upload(ce->buf, host, bytes, c->ctx);
                     c->upload_bytes += bytes;
-                    ce->fp          = fp;
-                    ce->hashed_size = bytes;
+                    ce->fp         = fp;
+                    ce->host_bytes = bytes;
                 }
                 ce->uploaded = 1;
             }
@@ -59,13 +59,13 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     if (host && bytes) {
         c->ops.upload(ce->buf, host, bytes, c->ctx);
         c->upload_bytes += bytes;
-        ce->fp          = sealed ? (fingerprint){0} : fingerprint_hash(host, bytes);
+        ce->fp         = sealed ? (fingerprint){0} : fingerprint_hash(host, bytes);
         // Always record the requested bytes -- the skip-re-upload check is
         // gated on !ce->sealed independently, but copyback needs the original
         // size so it doesn't download the alloc-rounded buf.size into a
         // smaller host buffer.
-        ce->hashed_size = bytes;
-        ce->uploaded    = 1;
+        ce->host_bytes = bytes;
+        ce->uploaded   = 1;
     }
     if (writable && host && bytes) {
         ce->copy_tracked = 1;
@@ -77,7 +77,7 @@ void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
     for (int i = 0; i < c->n; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->copy_tracked && !ce->nocopy && ce->host) {
-            size_t const bytes = ce->hashed_size;
+            size_t const bytes = ce->host_bytes;
             c->ops.download(ce->buf, ce->host, bytes, c->ctx);
             if (!ce->sealed) {
                 // Host now matches GPU.  Refresh fingerprint so next batch can
