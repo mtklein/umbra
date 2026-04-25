@@ -777,22 +777,52 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     __builtin_memcpy(&hg, &v[ip->y], sizeof hg);
                     __builtin_memcpy(&hb, &v[ip->z], sizeof hb);
                     __builtin_memcpy(&ha, &v[ip->w], sizeof ha);
-                    if (rem >= K) {
-                        __builtin_memcpy(dst           + i, &hr, sizeof hr);
-                        __builtin_memcpy(dst + ps      + i, &hg, sizeof hg);
-                        __builtin_memcpy(dst + ps * 2  + i, &hb, sizeof hb);
-                        __builtin_memcpy(dst + ps * 3  + i, &ha, sizeof ha);
+                    if (if_depth == 0) {
+                        if (rem >= K) {
+                            __builtin_memcpy(dst           + i, &hr, sizeof hr);
+                            __builtin_memcpy(dst + ps      + i, &hg, sizeof hg);
+                            __builtin_memcpy(dst + ps * 2  + i, &hb, sizeof hb);
+                            __builtin_memcpy(dst + ps * 3  + i, &ha, sizeof ha);
+                        } else {
+                            uint16_t tr[K], tg[K], tb[K], ta[K];
+                            __builtin_memcpy(tr, &hr, sizeof tr);
+                            __builtin_memcpy(tg, &hg, sizeof tg);
+                            __builtin_memcpy(tb, &hb, sizeof tb);
+                            __builtin_memcpy(ta, &ha, sizeof ta);
+                            for (int ll = 0; ll < rem; ll++) {
+                                __builtin_memcpy(dst           + i + ll, &tr[ll], 2);
+                                __builtin_memcpy(dst + ps      + i + ll, &tg[ll], 2);
+                                __builtin_memcpy(dst + ps * 2  + i + ll, &tb[ll], 2);
+                                __builtin_memcpy(dst + ps * 3  + i + ll, &ta[ll], 2);
+                            }
+                        }
                     } else {
-                        uint16_t tr[K], tg[K], tb[K], ta[K];
-                        __builtin_memcpy(tr, &hr, sizeof tr);
-                        __builtin_memcpy(tg, &hg, sizeof tg);
-                        __builtin_memcpy(tb, &hb, sizeof tb);
-                        __builtin_memcpy(ta, &ha, sizeof ta);
-                        for (int ll = 0; ll < rem; ll++) {
-                            __builtin_memcpy(dst           + i + ll, &tr[ll], 2);
-                            __builtin_memcpy(dst + ps      + i + ll, &tg[ll], 2);
-                            __builtin_memcpy(dst + ps * 2  + i + ll, &tb[ll], 2);
-                            __builtin_memcpy(dst + ps * 3  + i + ll, &ta[ll], 2);
+                        I32 const mask32 = if_mask_stack[if_depth - 1];
+                        if (rem >= K) {
+                            S16 const mask = cast(S16, mask32);
+                            uint16_t * const planes[4] = {dst, dst + ps, dst + ps * 2, dst + ps * 3};
+                            U16 const channels[4] = {hr, hg, hb, ha};
+                            for (int ch = 0; ch < 4; ch++) {
+                                S16 old;
+                                __builtin_memcpy(&old, planes[ch] + i, sizeof old);
+                                S16 const blend =
+                                    (S16)(((S16)channels[ch] & mask) | (old & ~mask));
+                                __builtin_memcpy(planes[ch] + i, &blend, sizeof blend);
+                            }
+                        } else {
+                            uint16_t tr[K], tg[K], tb[K], ta[K];
+                            __builtin_memcpy(tr, &hr, sizeof tr);
+                            __builtin_memcpy(tg, &hg, sizeof tg);
+                            __builtin_memcpy(tb, &hb, sizeof tb);
+                            __builtin_memcpy(ta, &ha, sizeof ta);
+                            for (int ll = 0; ll < rem; ll++) {
+                                if (mask32[ll]) {
+                                    __builtin_memcpy(dst           + i + ll, &tr[ll], 2);
+                                    __builtin_memcpy(dst + ps      + i + ll, &tg[ll], 2);
+                                    __builtin_memcpy(dst + ps * 2  + i + ll, &tb[ll], 2);
+                                    __builtin_memcpy(dst + ps * 3  + i + ll, &ta[ll], 2);
+                                }
+                            }
                         }
                     }
                 } NEXT;

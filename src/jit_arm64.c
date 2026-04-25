@@ -834,7 +834,37 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 put(c, LDR_wi(XT, XBUF, count_off / 4));
                 put(c, LSR_xi(XT, XT, 1));
             }
-            if (scalar) {
+            if (jc->if_depth > 0) {
+                int8_t const channels[4] = {rr, rg, rb, ra_v};
+                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t mn  = ra_alloc(ra, sl, ns);
+                int8_t old = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    put(c, XTN_4h(lo(mn), lo(rm)));
+                    for (int chi = 0; chi < 4; chi++) {
+                        put(c, LDR_hx(lo(old), XP, XCOL));
+                        put(c, BIT_16b(lo(old), lo(channels[chi]), lo(mn)));
+                        put(c, STR_hx(lo(old), XP, XCOL));
+                        if (chi < 3) { put(c, ADD_xr(XP, XP, XT)); }
+                    }
+                } else {
+                    put(c, XTN_4h(lo(mn), lo(rm)));
+                    put(c, XTN_4h(hi(mn), hi(rm)));
+                    put(c, LSL_xi(XM, XCOL, 1));
+                    put(c, ADD_xr(XM, XP, XM));
+                    for (int chi = 0; chi < 4; chi++) {
+                        put(c, LDR_di(lo(old), XM, 0));
+                        put(c, LDR_di(hi(old), XM, 1));
+                        put(c, BIT_16b(lo(old), lo(channels[chi]), lo(mn)));
+                        put(c, BIT_16b(hi(old), hi(channels[chi]), hi(mn)));
+                        put(c, STR_di(lo(old), XM, 0));
+                        put(c, STR_di(hi(old), XM, 1));
+                        if (chi < 3) { put(c, ADD_xr(XM, XM, XT)); }
+                    }
+                }
+                ra_return_reg(ra, old);
+                ra_return_reg(ra, mn);
+            } else if (scalar) {
                 put(c, STR_hx(lo(rr), XP, XCOL));
                 put(c, ADD_xr(XP, XP, XT));
                 put(c, STR_hx(lo(rg), XP, XCOL));

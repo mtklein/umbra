@@ -739,7 +739,32 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
                 mov_load32(c, stride, XBUF, count_off);
                 shr_ri(c, stride, 1);
                 int8_t const plane[4] = {rr, rg, rb_, ra_v};
-                if (scalar) {
+                if (jc->if_depth > 0) {
+                    int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                    int8_t mn  = ra_alloc(ra, sl, ns);
+                    int8_t old = ra_alloc(ra, sl, ns);
+                    if (scalar) {
+                        for (int k = 0; k < 4; k++) {
+                            if (k > 0) { add_rr(c, R11, stride); }
+                            movzx_word_load(c, RAX, R11, XCOL_X86, 2, 0);
+                            vmovd_from_gpr(c, old, RAX);
+                            vpblendvb     (c, 0, old, old, plane[k], rm);
+                            vmovd_to_gpr  (c, RAX, old);
+                            mov_word_store(c, RAX, R11, XCOL_X86, 2, 0);
+                        }
+                    } else {
+                        vextracti128(c, mn, rm, 1);
+                        vpackssdw   (c, mn, rm, mn);
+                        for (int k = 0; k < 4; k++) {
+                            if (k > 0) { add_rr(c, R11, stride); }
+                            vmov_load (c, 0, old, R11, XCOL_X86, 2, 0);
+                            vpblendvb (c, 0, old, old, plane[k], mn);
+                            vmov_store(c, 0, old, R11, XCOL_X86, 2, 0);
+                        }
+                    }
+                    ra_return_reg(ra, old);
+                    ra_return_reg(ra, mn);
+                } else if (scalar) {
                     for (int k = 0; k < 4; k++) {
                         if (k > 0) { add_rr(c, R11, stride); }
                         vmovd_to_gpr(c, RAX, plane[k]);

@@ -5015,6 +5015,49 @@ TEST(test_if_store_16x4) {
     test_backends_free(&B);
 }
 
+TEST(test_if_store_16x4_planar) {
+    // Use fp16 channel values — store_16x4_planar's spirv lowering treats
+    // its inputs as f16 (the integer-val16 path is broken there independently
+    // of umbra_if; that's TODO).  fp16 values exercise the if_mask path on
+    // every backend without tripping that pre-existing bug.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_val16 const cr = umbra_f16_from_f32(b, umbra_imm_f32(b, 1.0f));
+    umbra_val16 const cg = umbra_f16_from_f32(b, umbra_imm_f32(b, 2.0f));
+    umbra_val16 const cb = umbra_f16_from_f32(b, umbra_imm_f32(b, 3.0f));
+    umbra_val16 const ca = umbra_f16_from_f32(b, umbra_imm_f32(b, 4.0f));
+
+    umbra_if(b, cond); {
+        umbra_store_16x4_planar(b, umbra_bind_buf(b, &slot[0]), cr, cg, cb, ca);
+    } umbra_end_if(b);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // Planar: dst = [R0..R7][G0..G7][B0..B7][A0..A7], 32 i16 total.
+        uint16_t dst[8 * 4];
+        for (int j = 0; j < 32; j++) { dst[j] = 0xBEEF; }
+        if (run(&B, bi, 8, 1, slot, 1,
+        (struct umbra_buf[]){{.ptr = dst, .count = 8 * 4}})) {
+            // 1.0=0x3C00, 2.0=0x4000, 3.0=0x4200, 4.0=0x4400 in fp16.
+            dst[ 0] == 0x3C00 here;  // R lane 0
+            dst[ 3] == 0x3C00 here;  // R lane 3
+            dst[ 8] == 0x4000 here;  // G lane 0
+            dst[16] == 0x4200 here;  // B lane 0
+            dst[24] == 0x4400 here;  // A lane 0
+            // False lanes (4..7) keep the sentinel in every plane.
+            dst[ 4] == 0xBEEF here;
+            dst[ 7] == 0xBEEF here;
+            dst[12] == 0xBEEF here;
+            dst[20] == 0xBEEF here;
+            dst[28] == 0xBEEF here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
