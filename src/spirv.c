@@ -442,7 +442,6 @@ static uint32_t spv_select(SpvBuilder *b, uint32_t type,
     return id;
 }
 
-// Helper: ensure a value is uint. If it's float, bitcast it.
 static uint32_t as_u32(SpvBuilder *b, uint32_t val, int inst_id) {
     if (b->is_f[inst_id]) {
         return spv_bitcast(b, b->t_u32, val);
@@ -450,7 +449,6 @@ static uint32_t as_u32(SpvBuilder *b, uint32_t val, int inst_id) {
     return val;
 }
 
-// Helper: ensure a value is float. If it's uint, bitcast it.
 static uint32_t as_f32(SpvBuilder *b, uint32_t val, int inst_id) {
     if (!b->is_f[inst_id]) {
         return spv_bitcast(b, b->t_f32, val);
