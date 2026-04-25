@@ -871,7 +871,36 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 2);
-            if (scalar) {
+            if (jc->if_depth > 0) {
+                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t px  = ra_alloc(ra, sl, ns);
+                int8_t t   = ra_alloc(ra, sl, ns);
+                int8_t old = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    put(c, SHL_4s_imm(lo(t), lo(rg),    8)); put(c, ORR_16b(lo(px), lo(rr), lo(t)));
+                    put(c, SHL_4s_imm(lo(t), lo(rb),   16)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                    put(c, SHL_4s_imm(lo(t), lo(ra_v), 24)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                    put(c, LDR_sx(lo(old), XP, XCOL));
+                    put(c, BIT_16b(lo(old), lo(px), lo(rm)));
+                    put(c, STR_sx(lo(old), XP, XCOL));
+                } else {
+                    put(c, SHL_4s_imm(lo(t), lo(rg),    8)); put(c, ORR_16b(lo(px), lo(rr), lo(t)));
+                    put(c, SHL_4s_imm(hi(t), hi(rg),    8)); put(c, ORR_16b(hi(px), hi(rr), hi(t)));
+                    put(c, SHL_4s_imm(lo(t), lo(rb),   16)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                    put(c, SHL_4s_imm(hi(t), hi(rb),   16)); put(c, ORR_16b(hi(px), hi(px), hi(t)));
+                    put(c, SHL_4s_imm(lo(t), lo(ra_v), 24)); put(c, ORR_16b(lo(px), lo(px), lo(t)));
+                    put(c, SHL_4s_imm(hi(t), hi(ra_v), 24)); put(c, ORR_16b(hi(px), hi(px), hi(t)));
+                    put(c, LSL_xi(XT, XCOL, 2));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LDP_qi(lo(old), hi(old), XT, 0));
+                    put(c, BIT_16b(lo(old), lo(px), lo(rm)));
+                    put(c, BIT_16b(hi(old), hi(px), hi(rm)));
+                    put(c, STP_qi(lo(old), hi(old), XT, 0));
+                }
+                ra_return_reg(ra, old);
+                ra_return_reg(ra, t);
+                ra_return_reg(ra, px);
+            } else if (scalar) {
                 int8_t px = ra_alloc(ra, sl, ns);
                 int8_t t  = ra_alloc(ra, sl, ns);
                 put(c, SHL_4s_imm(lo(t), lo(rg), 8));    put(c, ORR_16b(lo(px), lo(rr), lo(t)));

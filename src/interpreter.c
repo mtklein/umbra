@@ -823,13 +823,31 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                                  | ((v[ip->y].u32 & mask8) <<  8)
                                  | ((v[ip->z].u32 & mask8) << 16)
                                  | ((v[ip->w].u32 & mask8) << 24);
-                    if (rem >= K) {
-                        __builtin_memcpy(dst + i, &px, sizeof px);
+                    if (if_depth == 0) {
+                        if (rem >= K) {
+                            __builtin_memcpy(dst + i, &px, sizeof px);
+                        } else {
+                            uint32_t tmp[K];
+                            __builtin_memcpy(tmp, &px, sizeof tmp);
+                            for (int ll = 0; ll < rem; ll++) {
+                                __builtin_memcpy(dst + i + ll, &tmp[ll], 4);
+                            }
+                        }
                     } else {
-                        uint32_t tmp[K];
-                        __builtin_memcpy(tmp, &px, sizeof tmp);
-                        for (int ll = 0; ll < rem; ll++) {
-                            __builtin_memcpy(dst + i + ll, &tmp[ll], 4);
+                        U32 const mask = (U32)if_mask_stack[if_depth - 1];
+                        if (rem >= K) {
+                            U32 old;
+                            __builtin_memcpy(&old, dst + i, sizeof old);
+                            U32 const blend = (px & mask) | (old & ~mask);
+                            __builtin_memcpy(dst + i, &blend, sizeof blend);
+                        } else {
+                            for (int ll = 0; ll < rem; ll++) {
+                                if (mask[ll]) {
+                                    uint32_t tmp;
+                                    __builtin_memcpy(&tmp, (char const*)&px + 4 * ll, 4);
+                                    __builtin_memcpy(dst + i + ll, &tmp, 4);
+                                }
+                            }
                         }
                     }
                 } NEXT;

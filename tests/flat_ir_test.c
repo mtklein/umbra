@@ -4949,6 +4949,38 @@ TEST(test_if_store_16) {
     test_backends_free(&B);
 }
 
+TEST(test_if_store_8x4) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_val32 const cr   = umbra_imm_i32(b, 0x11);
+    umbra_val32 const cg   = umbra_imm_i32(b, 0x22);
+    umbra_val32 const cb   = umbra_imm_i32(b, 0x33);
+    umbra_val32 const ca   = umbra_imm_i32(b, 0x44);
+
+    umbra_if(b, cond); {
+        umbra_store_8x4(b, umbra_bind_buf(b, &slot[0]), cr, cg, cb, ca);
+    } umbra_end_if(b);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t dst[8] = {
+            0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF,
+            0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF,
+        };
+        if (run(&B, bi, 8, 1, slot, 1,
+        (struct umbra_buf[]){{.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0x44332211u here;
+            dst[3] == 0x44332211u here;
+            dst[4] == 0xDEADBEEFu here;
+            dst[7] == 0xDEADBEEFu here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {

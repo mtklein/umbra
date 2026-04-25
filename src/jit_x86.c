@@ -771,7 +771,20 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             vpslld_i(c, t, rg, 8);    vpor(c, L, px, rr, t);
             vpslld_i(c, t, rb_, 16);  vpor(c, L, px, px, t);
             vpslld_i(c, t, ra_v, 24); vpor(c, L, px, px, t);
-            if (scalar) {
+            if (jc->if_depth > 0) {
+                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t old = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    vmovd_load (c, old, base, XCOL_X86, 4, 0);
+                    vpblendvb  (c, 0, px, old, px, rm);
+                    vmovd_store(c, px,  base, XCOL_X86, 4, 0);
+                } else {
+                    vmov_load (c, 1, old, base, XCOL_X86, 4, 0);
+                    vpblendvb (c, 1, px, old, px, rm);
+                    vmov_store(c, 1, px,  base, XCOL_X86, 4, 0);
+                }
+                ra_return_reg(ra, old);
+            } else if (scalar) {
                 vmovd_store(c, px, base, XCOL_X86, 4, 0);
             } else {
                 vmov_store(c, 1, px, base, XCOL_X86, 4, 0);
