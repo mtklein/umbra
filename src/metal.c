@@ -60,28 +60,29 @@ static id nsstr(char const *s) {
     return msg_s((id)objc_getClass("NSString"), sel("stringWithUTF8String:"), s);
 }
 
-// Selectors hit every dispatch / batch / submit.  Populated once in
-// metal_backend_create(); sel_registerName is idempotent across backend
-// instances so the cache is process-global.
-// TODO: per-backend so multiple metal_backend_create() don't even technically race.
-static SEL SEL_setComputePipelineState,
-           SEL_setBytes_length_atIndex,
-           SEL_setBuffer_offset_atIndex,
-           SEL_dispatchThreads_threadsPerThreadgroup,
-           SEL_commandBuffer,
-           SEL_computeCommandEncoderWithDispatchType,
-           SEL_endEncoding,
-           SEL_commit;
+// Selectors hit every dispatch / batch / submit; cache them on the backend.
+struct metal_sel {
+    SEL set_pipeline,
+        set_bytes,
+        set_buffer,
+        dispatch,
+        command_buffer,
+        compute_encoder,
+        end_encoding,
+        commit;
+};
 
-static void init_sel_cache(void) {
-    SEL_setComputePipelineState               = sel("setComputePipelineState:");
-    SEL_setBytes_length_atIndex               = sel("setBytes:length:atIndex:");
-    SEL_setBuffer_offset_atIndex              = sel("setBuffer:offset:atIndex:");
-    SEL_dispatchThreads_threadsPerThreadgroup = sel("dispatchThreads:threadsPerThreadgroup:");
-    SEL_commandBuffer                         = sel("commandBuffer");
-    SEL_computeCommandEncoderWithDispatchType = sel("computeCommandEncoderWithDispatchType:");
-    SEL_endEncoding                           = sel("endEncoding");
-    SEL_commit                                = sel("commit");
+static struct metal_sel metal_sel_init(void) {
+    return (struct metal_sel){
+        .set_pipeline    = sel("setComputePipelineState:"),
+        .set_bytes       = sel("setBytes:length:atIndex:"),
+        .set_buffer      = sel("setBuffer:offset:atIndex:"),
+        .dispatch        = sel("dispatchThreads:threadsPerThreadgroup:"),
+        .command_buffer  = sel("commandBuffer"),
+        .compute_encoder = sel("computeCommandEncoderWithDispatchType:"),
+        .end_encoding    = sel("endEncoding"),
+        .commit          = sel("commit"),
+    };
 }
 
 typedef struct umbra_flat_ir IR;
@@ -98,6 +99,7 @@ struct metal_backend {
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
     struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
+    struct metal_sel sel;
     double gpu_time_accum;
     int    total_dispatches;
     int    total_submits;
@@ -780,7 +782,6 @@ static void metal_wait_frame(int frame, void *ctx) {
 }
 
 static struct metal_backend* metal_backend_create(void) {
-    init_sel_cache();
     void *pool = objc_autoreleasePoolPush();
     id device = (id)MTLCreateSystemDefaultDevice();
     id queue = device
@@ -791,6 +792,7 @@ static struct metal_backend* metal_backend_create(void) {
         be = calloc(1, sizeof *be);
         be->device = (void*)retain(device);
         be->queue  = (void*)queue;
+        be->sel    = metal_sel_init();
         be->uni_pool = (struct uniform_ring_pool){
             .n=METAL_N_FRAMES,
             .high_water=METAL_RING_HIGH_WATER,
@@ -971,7 +973,7 @@ static void encode_dispatch(struct metal_program *p,
               h = b - t;
 
     if (be->batch_pipeline != p->pipeline) {
-        (void)msg_v_p(enc, SEL_setComputePipelineState, (id)p->pipeline);
+        (void)msg_v_p(enc, be->sel.set_pipeline, (id)p->pipeline);
         be->batch_pipeline = p->pipeline;
     }
 
@@ -1011,19 +1013,19 @@ static void encode_dispatch(struct metal_program *p,
         (meta)[3+i+tb] = (uint32_t)buf[i].stride;
     }
     size_t const meta_bytes = (size_t)(3 + 2*tb) * sizeof(uint32_t);
-    (void)msg_v_vuu(enc, SEL_setBytes_length_atIndex,
+    (void)msg_v_vuu(enc, be->sel.set_bytes,
                     meta, (NSUInteger)meta_bytes, (NSUInteger)0);
 
     for (int i = 0; i < tb; i++) {
         if (bind_handle[i]) {
-            (void)msg_v_puu(enc, SEL_setBuffer_offset_atIndex,
+            (void)msg_v_puu(enc, be->sel.set_buffer,
                             (id)bind_handle[i], (NSUInteger)bind_offset[i], (NSUInteger)(i + 1));
         }
     }
 
     MTLSize grid  = {(NSUInteger)w, (NSUInteger)h, 1};
     MTLSize group = {(NSUInteger)64, 1, 1};
-    msg_v_ss(enc, SEL_dispatchThreads_threadsPerThreadgroup, grid, group);
+    msg_v_ss(enc, be->sel.dispatch, grid, group);
     be->total_dispatches++;
 }
 
@@ -1043,11 +1045,11 @@ static void metal_program_queue(struct metal_program *p, int l, int t, int r, in
     void *pool = objc_autoreleasePoolPush();
     {
         if (!be->batch_cmdbuf) {
-            be->batch_cmdbuf = (void*)retain(msg(be->queue, SEL_commandBuffer));
+            be->batch_cmdbuf = (void*)retain(msg(be->queue, be->sel.command_buffer));
         }
         if (!be->batch_enc) {
             be->batch_enc = (void*)retain(msg_u(
-                (id)be->batch_cmdbuf, SEL_computeCommandEncoderWithDispatchType,
+                (id)be->batch_cmdbuf, be->sel.compute_encoder,
                 (NSUInteger)MTLDispatchTypeSerial));
         }
         encode_dispatch(p, l, t, r, b, buf, (id)be->batch_enc);
@@ -1060,12 +1062,12 @@ static void metal_submit_cmdbuf(struct metal_backend *be) {
         void *pool = objc_autoreleasePoolPush();
         {
             if (be->batch_enc) {
-                (void)msg((id)be->batch_enc, SEL_endEncoding);
+                (void)msg((id)be->batch_enc, be->sel.end_encoding);
                 release(be->batch_enc);
                 be->batch_enc      = NULL;
                 be->batch_pipeline = NULL;
             }
-            (void)msg((id)be->batch_cmdbuf, SEL_commit);
+            (void)msg((id)be->batch_cmdbuf, be->sel.commit);
         }
         objc_autoreleasePoolPop(pool);
         be->total_submits++;
