@@ -5317,6 +5317,39 @@ TEST(test_if_gather_16) {
     test_backends_free(&B);
 }
 
+TEST(test_if_uniform_32) {
+    // uniform_32 broadcasts a build-time-indexed uniform value across lanes;
+    // there's no per-lane address variability, so it's trivially fault-safe.
+    // Lock the if-mask interaction in.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0xCAFE));
+
+    umbra_if(b, cond); {
+        umbra_val32 const u = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+        umbra_store_var32(b, v, u);
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t uni[1] = {0xABCD};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1, .stride = 0},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0xABCD here;
+            dst[3] == 0xABCD here;
+            dst[4] == 0xCAFE here;
+            dst[7] == 0xCAFE here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
