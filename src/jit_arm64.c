@@ -1000,7 +1000,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         } break;
 
         case op_store_16: {
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
+            int8_t ry = ra_ensure_chan(ra, sl, ns, inst->y.id, (int)inst->y.chan);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 1);
             if (jc->if_depth > 0) {

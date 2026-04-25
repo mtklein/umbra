@@ -5390,6 +5390,51 @@ TEST(test_store_32_per_channel) {
     test_backends_free(&B);
 }
 
+TEST(test_store_16_per_channel) {
+    // Regression: store_16 in the JITs called ra_ensure(inst->y.id) and
+    // ignored inst->y.chan, so storing the G/B/A channel of load_16x4 read
+    // the R register's bytes instead.  Use fp16 channel data (interleaved
+    // store_16x4 is integer-safe on spirv but the round-trip from f16
+    // values stays unambiguous).  Distinct value per (channel, lane).
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val16 r, g, bl, a;
+    umbra_load_16x4(b, umbra_bind_buf(b, &slot[0]), &r, &g, &bl, &a);
+    umbra_store_16(b, umbra_bind_buf(b, &slot[1]), r);
+    umbra_store_16(b, umbra_bind_buf(b, &slot[2]), g);
+    umbra_store_16(b, umbra_bind_buf(b, &slot[3]), bl);
+    umbra_store_16(b, umbra_bind_buf(b, &slot[4]), a);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // Source: 8 RGBA pixels.  Each i16 lane gets a unique tag derived
+        // from channel+lane so a wrong-channel store is visible byte-for-byte.
+        uint16_t src[8 * 4];
+        for (int lane = 0; lane < 8; lane++) {
+            src[lane*4 + 0] = (uint16_t)(0x3C00 + lane);
+            src[lane*4 + 1] = (uint16_t)(0x4000 + lane);
+            src[lane*4 + 2] = (uint16_t)(0x4200 + lane);
+            src[lane*4 + 3] = (uint16_t)(0x4400 + lane);
+        }
+        uint16_t dstR[8] = {0}, dstG[8] = {0}, dstB[8] = {0}, dstA[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 5,
+        (struct umbra_buf[]){{.ptr = src,  .count = 8},
+                             {.ptr = dstR, .count = 8, .stride = 8},
+                             {.ptr = dstG, .count = 8, .stride = 8},
+                             {.ptr = dstB, .count = 8, .stride = 8},
+                             {.ptr = dstA, .count = 8, .stride = 8}})) {
+            for (int lane = 0; lane < 8; lane++) {
+                dstR[lane] == src[lane*4 + 0] here;
+                dstG[lane] == src[lane*4 + 1] here;
+                dstB[lane] == src[lane*4 + 2] here;
+                dstA[lane] == src[lane*4 + 3] here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
