@@ -347,6 +347,7 @@ void vpcmpgtd(Buf *b, int d, int v, int s) { vex_rrr(b, 1, 1, 1, 0x66, d, v, s);
 
 void vpmovsxwd(Buf *b, int d, int s) { vex_rr(b, 1, 2, 1, 0x23, d, s); }
 void vpmovzxwd(Buf *b, int d, int s) { vex_rr(b, 1, 2, 1, 0x33, d, s); }
+void vpmovsxdq(Buf *b, int d, int s) { vex_rr(b, 1, 2, 1, 0x25, d, s); }
 
 void vpgatherdd(Buf *b, int dst, int base, int idx, int scale, int mask) {
     vex_mem(b, 1, 2, 0, 1, dst, mask, 0x90, base, idx, scale, 0);

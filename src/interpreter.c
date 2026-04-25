@@ -734,21 +734,36 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     __builtin_memcpy(&hg, &v[ip->y], sizeof hg);
                     __builtin_memcpy(&hb, &v[ip->z], sizeof hb);
                     __builtin_memcpy(&ha, &v[ip->w], sizeof ha);
-                    if (rem >= K) {
-                        U64 const px = cast(U64, hr)
-                                     | cast(U64, hg) << 16
-                                     | cast(U64, hb) << 32
-                                     | cast(U64, ha) << 48;
-                        __builtin_memcpy(dst + i, &px, sizeof px);
+                    U64 const px = cast(U64, hr)
+                                 | cast(U64, hg) << 16
+                                 | cast(U64, hb) << 32
+                                 | cast(U64, ha) << 48;
+                    if (if_depth == 0) {
+                        if (rem >= K) {
+                            __builtin_memcpy(dst + i, &px, sizeof px);
+                        } else {
+                            uint64_t tmp[K];
+                            __builtin_memcpy(tmp, &px, sizeof tmp);
+                            for (int ll = 0; ll < rem; ll++) {
+                                __builtin_memcpy(dst + i + ll, &tmp[ll], 8);
+                            }
+                        }
                     } else {
-                        uint16_t tr[K], tg[K], tb[K], ta[K];
-                        __builtin_memcpy(tr, &hr, sizeof tr);
-                        __builtin_memcpy(tg, &hg, sizeof tg);
-                        __builtin_memcpy(tb, &hb, sizeof tb);
-                        __builtin_memcpy(ta, &ha, sizeof ta);
-                        for (int ll = 0; ll < rem; ll++) {
-                            uint16_t h[4] = {tr[ll], tg[ll], tb[ll], ta[ll]};
-                            __builtin_memcpy(dst + i + ll, h, 8);
+                        I32 const mask32 = if_mask_stack[if_depth - 1];
+                        if (rem >= K) {
+                            U64 const mask = cast(U64, mask32);
+                            U64 old;
+                            __builtin_memcpy(&old, dst + i, sizeof old);
+                            U64 const blend = (px & mask) | (old & ~mask);
+                            __builtin_memcpy(dst + i, &blend, sizeof blend);
+                        } else {
+                            uint64_t tmp[K];
+                            __builtin_memcpy(tmp, &px, sizeof tmp);
+                            for (int ll = 0; ll < rem; ll++) {
+                                if (mask32[ll]) {
+                                    __builtin_memcpy(dst + i + ll, &tmp[ll], 8);
+                                }
+                            }
                         }
                     }
                 } NEXT;

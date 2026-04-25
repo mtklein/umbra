@@ -747,7 +747,52 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t ra_v = ra_ensure_chan(ra, sl, ns, inst->w.id, (int)inst->w.chan);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 3);
-            if (scalar) {
+            if (jc->if_depth > 0) {
+                int8_t rm = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t t  = ra_alloc(ra, sl, ns);
+                int8_t z  = ra_alloc(ra, sl, ns);
+                int8_t mw = ra_alloc(ra, sl, ns);
+                int8_t o  = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    put(c, ZIP1_8h(lo(t),  lo(rr), lo(rg)));
+                    put(c, ZIP1_8h(hi(t),  lo(rb), lo(ra_v)));
+                    put(c, ZIP1_4s(lo(z),  lo(t),  hi(t)));
+                    put(c, ZIP1_4s(lo(mw), lo(rm), lo(rm)));
+                    put(c, LSL_xi(XT, XCOL, 3));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LDR_di(lo(o), XT, 0));
+                    put(c, BIT_16b(lo(o), lo(z), lo(mw)));
+                    put(c, STR_di(lo(o), XT, 0));
+                } else {
+                    put(c, LSL_xi(XT, XCOL, 3));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, ZIP1_8h(lo(t),  lo(rr), lo(rg)));
+                    put(c, ZIP1_8h(hi(t),  lo(rb), lo(ra_v)));
+                    put(c, ZIP1_4s(lo(z),  lo(t),  hi(t)));
+                    put(c, ZIP2_4s(hi(z),  lo(t),  hi(t)));
+                    put(c, ZIP1_4s(lo(mw), lo(rm), lo(rm)));
+                    put(c, ZIP2_4s(hi(mw), lo(rm), lo(rm)));
+                    put(c, LDP_qi(lo(o), hi(o), XT, 0));
+                    put(c, BIT_16b(lo(o), lo(z), lo(mw)));
+                    put(c, BIT_16b(hi(o), hi(z), hi(mw)));
+                    put(c, STP_qi(lo(o), hi(o), XT, 0));
+                    put(c, ZIP1_8h(lo(t),  hi(rr), hi(rg)));
+                    put(c, ZIP1_8h(hi(t),  hi(rb), hi(ra_v)));
+                    put(c, ZIP1_4s(lo(z),  lo(t),  hi(t)));
+                    put(c, ZIP2_4s(hi(z),  lo(t),  hi(t)));
+                    put(c, ZIP1_4s(lo(mw), hi(rm), hi(rm)));
+                    put(c, ZIP2_4s(hi(mw), hi(rm), hi(rm)));
+                    put(c, ADD_xi(XT, XT, 32));
+                    put(c, LDP_qi(lo(o), hi(o), XT, 0));
+                    put(c, BIT_16b(lo(o), lo(z), lo(mw)));
+                    put(c, BIT_16b(hi(o), hi(z), hi(mw)));
+                    put(c, STP_qi(lo(o), hi(o), XT, 0));
+                }
+                ra_return_reg(ra, o);
+                ra_return_reg(ra, mw);
+                ra_return_reg(ra, z);
+                ra_return_reg(ra, t);
+            } else if (scalar) {
                 int8_t px = ra_alloc(ra, sl, ns);
                 int8_t t  = ra_alloc(ra, sl, ns);
                 int8_t z  = ra_alloc(ra, sl, ns);

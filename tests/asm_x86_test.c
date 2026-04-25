@@ -307,6 +307,11 @@ TEST(test_avx_convert) {
     // vpmovsxwd %xmm8, %ymm9 => c4 42 7d 23 c8
     vpmovsxwd(&b, 9, 8);
     bytes_eq(&b, 5, (uint8_t[]){0xC4, 0x42, 0x7D, 0x23, 0xC8}) here;
+    reset(&b);
+
+    // vpmovsxdq %xmm3, %ymm2 => c4 e2 7d 25 d3
+    vpmovsxdq(&b, 2, 3);
+    bytes_eq(&b, 5, (uint8_t[]){0xC4, 0xE2, 0x7D, 0x25, 0xD3}) here;
     free(b.byte);
 }
 

@@ -665,22 +665,53 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t px    = ra_alloc(ra, sl, ns);
             int8_t t     = ra_alloc(ra, sl, ns);
             int8_t z     = ra_alloc(ra, sl, ns);
-            if (scalar) {
-                // Pack 4 u16 channels into 64 bits via word interleave.
+            if (jc->if_depth > 0) {
+                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t mw  = ra_alloc(ra, sl, ns);
+                int8_t old = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    vpunpcklwd(c, px, rr, rg);
+                    vpunpcklwd(c, t, rb_, ra_v);
+                    vpunpckldq(c, z, px, t);
+                    vpmovsxdq (c, mw, rm);
+                    vmovq_load (c, old, base, XCOL_X86, 8, 0);
+                    vpblendvb  (c, 0, z, old, z, mw);
+                    vmovq_store(c, z, base, XCOL_X86, 8, 0);
+                } else {
+                    vpunpcklwd(c, scale, rr, rg);
+                    vpunpcklwd(c, px, rb_, ra_v);
+                    vpunpckldq(c, t, scale, px);
+                    vpunpckhdq(c, z, scale, px);
+                    vinserti128(c, t, t, z, 1);
+                    vpmovsxdq  (c, mw, rm);
+                    vmov_load  (c, 1, old, base, XCOL_X86, 8, 0);
+                    vpblendvb  (c, 1, t, old, t, mw);
+                    vmov_store (c, 1, t, base, XCOL_X86, 8, 0);
+                    vpunpckhwd(c, scale, rr, rg);
+                    vpunpckhwd(c, px, rb_, ra_v);
+                    vpunpckldq(c, t, scale, px);
+                    vpunpckhdq(c, z, scale, px);
+                    vinserti128(c, t, t, z, 1);
+                    vextracti128(c, mw, rm, 1);
+                    vpmovsxdq   (c, mw, mw);
+                    vmov_load   (c, 1, old, base, XCOL_X86, 8, 32);
+                    vpblendvb   (c, 1, t, old, t, mw);
+                    vmov_store  (c, 1, t, base, XCOL_X86, 8, 32);
+                }
+                ra_return_reg(ra, old);
+                ra_return_reg(ra, mw);
+            } else if (scalar) {
                 vpunpcklwd(c, px, rr, rg);     // [R,G,?,?...]
                 vpunpcklwd(c, t, rb_, ra_v);   // [B,A,?,?...]
                 vpunpckldq(c, z, px, t);       // [R,G,B,A,?,?...]
                 vmovq_store(c, z, base, XCOL_X86, 8, 0);
             } else {
-                // Inputs are 8 x u16 in XMM.
-                // Interleave to pixel order. Process low 4 then high 4 pixels.
                 vpunpcklwd(c, scale, rr, rg);
                 vpunpcklwd(c, px, rb_, ra_v);
                 vpunpckldq(c, t, scale, px);
                 vpunpckhdq(c, z, scale, px);
                 vinserti128(c, t, t, z, 1);
                 vmov_store(c, 1, t, base, XCOL_X86, 8, 0);
-                // High 4:
                 vpunpckhwd(c, scale, rr, rg);
                 vpunpckhwd(c, px, rb_, ra_v);
                 vpunpckldq(c, t, scale, px);

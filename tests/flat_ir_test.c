@@ -4981,6 +4981,40 @@ TEST(test_if_store_8x4) {
     test_backends_free(&B);
 }
 
+TEST(test_if_store_16x4) {
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_val16 const cr = umbra_i16_from_i32(b, umbra_imm_i32(b, 0x1111));
+    umbra_val16 const cg = umbra_i16_from_i32(b, umbra_imm_i32(b, 0x2222));
+    umbra_val16 const cb = umbra_i16_from_i32(b, umbra_imm_i32(b, 0x3333));
+    umbra_val16 const ca = umbra_i16_from_i32(b, umbra_imm_i32(b, 0x4444));
+
+    umbra_if(b, cond); {
+        umbra_store_16x4(b, umbra_bind_buf(b, &slot[0]), cr, cg, cb, ca);
+    } umbra_end_if(b);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint16_t dst[8 * 4];
+        for (int j = 0; j < 32; j++) { dst[j] = 0xBEEF; }
+        if (run(&B, bi, 8, 1, slot, 1,
+        (struct umbra_buf[]){{.ptr = dst, .count = 8}})) {
+            dst[ 0] == 0x1111 here;  // lane 0 R
+            dst[ 1] == 0x2222 here;  // lane 0 G
+            dst[ 2] == 0x3333 here;  // lane 0 B
+            dst[ 3] == 0x4444 here;  // lane 0 A
+            dst[12] == 0x1111 here;  // lane 3 R
+            dst[15] == 0x4444 here;  // lane 3 A
+            dst[16] == 0xBEEF here;  // lane 4 R (false)
+            dst[31] == 0xBEEF here;  // lane 7 A (false)
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {
