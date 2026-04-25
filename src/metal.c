@@ -720,8 +720,6 @@ static char* build_source(IR const *ir) {
          "#include <metal_stdlib>\n"
          "using namespace metal;\n\n");
 
-    emit(&b, "\n");
-
     emit(&b, "struct meta { uint w, x0, y0");
     for (int i = 0; i < total_bufs; i++) {
         emit(&b, ", count%d", i);
