@@ -5435,6 +5435,61 @@ TEST(test_store_16_per_channel) {
     test_backends_free(&B);
 }
 
+TEST(test_store_var_per_channel) {
+    // Regression: store_var in the JITs called ra_ensure(inst->y.id) and
+    // ignored inst->y.chan, so storing the G/B/A channel of load_8x4 into
+    // a var read R's register instead.  Wrap the channel stores in an
+    // always-true umbra_if so the schedule keeps them strictly after the
+    // declare's init store_var (the scheduler doesn't track store-after-
+    // store ordering for the same var, but if/end_if regions do force it).
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_var32 vR = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+    umbra_var32 vG = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+    umbra_var32 vB = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+    umbra_var32 vA = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_val32 r, g, bl, a;
+    umbra_load_8x4(b, umbra_bind_buf(b, &slot[0]), &r, &g, &bl, &a);
+    umbra_val32 const always = umbra_lt_s32(b, umbra_imm_i32(b, 0), umbra_imm_i32(b, 1));
+    umbra_if(b, always); {
+        umbra_store_var32(b, vR, r);
+        umbra_store_var32(b, vG, g);
+        umbra_store_var32(b, vB, bl);
+        umbra_store_var32(b, vA, a);
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, vR));
+    umbra_store_32(b, umbra_bind_buf(b, &slot[2]), umbra_load_var32(b, vG));
+    umbra_store_32(b, umbra_bind_buf(b, &slot[3]), umbra_load_var32(b, vB));
+    umbra_store_32(b, umbra_bind_buf(b, &slot[4]), umbra_load_var32(b, vA));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t src[8];
+        for (int lane = 0; lane < 8; lane++) {
+            uint32_t const ul = (uint32_t)lane;
+            src[lane] = (ul*16u+1u) | ((ul*16u+2u) << 8) | ((ul*16u+3u) << 16) | ((ul*16u+4u) << 24);
+        }
+        uint32_t dstR[8] = {0}, dstG[8] = {0}, dstB[8] = {0}, dstA[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 5,
+        (struct umbra_buf[]){{.ptr = src,  .count = 8, .stride = 8},
+                             {.ptr = dstR, .count = 8, .stride = 8},
+                             {.ptr = dstG, .count = 8, .stride = 8},
+                             {.ptr = dstB, .count = 8, .stride = 8},
+                             {.ptr = dstA, .count = 8, .stride = 8}})) {
+            for (int lane = 0; lane < 8; lane++) {
+                uint32_t const ul = (uint32_t)lane;
+                dstR[lane] == ul*16u + 1u here;
+                dstG[lane] == ul*16u + 2u here;
+                dstB[lane] == ul*16u + 3u here;
+                dstA[lane] == ul*16u + 4u here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {

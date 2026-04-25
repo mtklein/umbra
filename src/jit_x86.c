@@ -1077,7 +1077,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         } break;
 
         case op_store_var: {
-            int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
+            int8_t ry = ra_ensure_chan(ra, sl, ns, inst->y.id, (int)inst->y.chan);
             if (jc->if_depth > 0) {
                 // Resolve the mask register through ra_ensure every time so a
                 // spill/fill between if_begin and this store refills the
