@@ -73,6 +73,15 @@ void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
     for (int i = 0; i < c->n; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->copy_tracked && !ce->nocopy && ce->host) {
+            // TODO: for host_readonly entries, hashed_size is 0 (we skip
+            // hashing) so we fall back to ce->buf.size, which the backend's
+            // alloc may have rounded up (wgpu rounds to 4 bytes).  Downloading
+            // the rounded size into a smaller host buffer overflows -- ASAN
+            // catches it in wgpu_cache_download's final memcpy.  Currently
+            // unreached because no shipping caller pairs host_readonly with
+            // writable + non-4-byte-aligned size on wgpu, but it's a real
+            // latent bug.  Fix: track the original requested bytes alongside
+            // ce->buf.size and use that for the download cap.
             size_t const bytes = ce->hashed_size ? ce->hashed_size : ce->buf.size;
             c->ops.download(ce->buf, ce->host, bytes, c->ctx);
             if (!ce->host_readonly) {
