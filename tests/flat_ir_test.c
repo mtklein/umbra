@@ -5016,10 +5016,6 @@ TEST(test_if_store_16x4) {
 }
 
 TEST(test_if_store_16x4_planar) {
-    // Use fp16 channel values — store_16x4_planar's spirv lowering treats
-    // its inputs as f16 (the integer-val16 path is broken there independently
-    // of umbra_if; that's TODO).  fp16 values exercise the if_mask path on
-    // every backend without tripping that pre-existing bug.
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
 
@@ -5123,11 +5119,7 @@ TEST(test_if_load_16) {
 }
 
 TEST(test_if_load_8x4) {
-    // Round-trip load_8x4 → store_8x4 inside the if.  Reading individual
-    // channels directly via store_32 hits a pre-existing JIT bug (store_32
-    // ignores its input's channel field — TODO at the call site), so we
-    // exercise the if-mask interaction through store_8x4 which routes
-    // channels correctly via ra_ensure_chan.
+    // Round-trip load_8x4 → store_8x4 inside the if.
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
 
@@ -5201,8 +5193,6 @@ TEST(test_if_load_16x4) {
 }
 
 TEST(test_if_load_16x4_planar) {
-    // Use fp16 values to sidestep the spirv integer-val16 bug in
-    // load_16x4_planar / store_16x4_planar (TODO at src/spirv.c).
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
 
