@@ -158,6 +158,14 @@ static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int
                         meta[j].last_use[0] = i;
                     }
                 }
+                // TODO: also order against prior store_vars of the same var.
+                //       Two consecutive store_vars without a load_var between
+                //       them have no recorded dependency, so the score-based
+                //       scheduler can put the second one before the first and
+                //       lose the user's last write.  Reproduces with two
+                //       store_var32(v, ...) calls back-to-back in program
+                //       order; wrapping in umbra_if forces the scheduler to
+                //       respect region boundaries and works around it.
             }
         }
     }
