@@ -351,6 +351,10 @@ struct jit_program* jit_program(struct jit_backend *be,
     int const br_row_done = c.words;
     put(&c, Bcond(0xa, 0));  // B.GE row_done
 
+    // TODO: once every memory op consults the if_mask (umbra.h umbra_if TODO),
+    //       the scalar tail can go: enter the SIMD body once with an if_mask
+    //       seeded so the first remaining-count lanes are true, stamp out one
+    //       K-lane iteration, done.  Removes a whole second copy of the body.
     ra_reset_pool(ra);
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
 
