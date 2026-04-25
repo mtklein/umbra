@@ -1321,6 +1321,11 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                 } break;
 
                 case op_load_16x4_planar: {
+                    // TODO: this lowering always loads as f16 and converts to
+                    //       f32, marking the result is_f.  Integer-typed planar
+                    //       data is unsupported through this path.  op_load_16
+                    //       handles both via load_ssbo_u16 + is_f preservation;
+                    //       mirror that here.
                     int p = resolve_ptr(&B, inst);
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t total  = load_meta_u32(&B, lim_off);
@@ -1378,6 +1383,12 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                 } break;
 
                 case op_store_16x4_planar: {
+                    // TODO: this lowering treats every val16 input as f16
+                    //       (bitcast-to-f32 then SpvOpFConvert to f16).  Integer
+                    //       val16 (e.g. umbra_i16_from_i32) gets reinterpreted as
+                    //       a denormal float and rounded to 0.  store_16x4 above
+                    //       already does the right thing per channel via is_f;
+                    //       fan that out across the 4 planes here.
                     int p = resolve_ptr(&B, inst);
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t total  = load_meta_u32(&B, lim_off);
