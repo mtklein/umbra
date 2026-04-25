@@ -180,17 +180,6 @@ void        umbra_end_loop(struct umbra_builder*);
 
 void        umbra_if    (struct umbra_builder*, umbra_val32 cond);
 void        umbra_end_if(struct umbra_builder*);
-// TODO: CPU backends (interp, JIT) lower umbra_if as a per-lane mask that
-//       only gates store_var.  Loads, gathers, and memory stores inside the
-//       body run unconditionally on every lane -- so a load can fault on a
-//       false-lane address, and a store writes garbage to dst on false
-//       lanes.  GPU backends (metal, spirv) already lower umbra_if as real
-//       control flow (skipped entirely on false), so the bug is CPU-side
-//       only and trivial to reproduce: put umbra_store_* inside an
-//       umbra_if and observe interp/jit output differs from metal.  Fix:
-//       have every memory-touching op consult the if_mask -- mask stores
-//       lane-wise like store_var already does, and skip / safely fall back
-//       on false-lane loads + gathers.
 // TODO: when the condition is uniform across the lane batch, CPU backends
 //       could lower umbra_if as a real branch over the whole body instead
 //       of executing it under a mask.  The IR already tracks per-instruction
@@ -199,6 +188,12 @@ void        umbra_end_if(struct umbra_builder*);
 //       lowering.  Performance feature, not a correctness fix; matters most
 //       for the SDF tile-cov gate where the condition is uniform per batch
 //       (tile size T >> lane batch K).
+// TODO: masked stores inside umbra_if are lowered as load-blend-store;
+//       on x86 vpmaskmovd-store could skip the load and write only the
+//       true lanes.  Pure perf, no OOB-read implications since the SIMD
+//       body always operates on a K-aligned in-bounds chunk.  NEON has
+//       no equivalent masked-store instruction, so arm64 keeps the
+//       blend.
 
 typedef struct { int id; } umbra_var32;
 umbra_var32 umbra_declare_var32(struct umbra_builder*, umbra_val32 init);
