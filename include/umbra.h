@@ -47,13 +47,15 @@ struct umbra_buf {
 // be overridden per-queue() call via umbra_late_binding.
 umbra_ptr umbra_bind_buf(struct umbra_builder*, struct umbra_buf const *buf);
 
-// Like umbra_bind_buf, but the caller promises that the host side of any
-// buffer flowing through this ptr is read-only from binding onward: umbra/GPU
-// owns the bytes, and the host won't mutate them.  The cache skips all
-// fingerprint hashing and re-upload for these entries -- a one-time seed,
-// then the GPU buffer is authoritative forever.  Useful for stable inputs
-// like rasterized glyph masks.
-umbra_ptr umbra_bind_host_readonly_buf(struct umbra_builder*, struct umbra_buf const *buf);
+// Like umbra_bind_buf, but the caller has sealed the buffer: from binding
+// onward the host won't mutate the bytes, so umbra owns write authority for
+// what flows through this ptr (the GPU may still write through it -- the
+// "seal" is on host writes, not GPU writes).  Memory ownership is unchanged;
+// umbra never frees a sealed buffer.  The cache skips all fingerprint hashing
+// and re-upload for these entries -- a one-time seed, then the GPU buffer is
+// authoritative forever.  Useful for stable inputs like rasterized glyph
+// masks, and for write-once destinations like the SDF tile cov[].
+umbra_ptr umbra_bind_sealed_buf(struct umbra_builder*, struct umbra_buf const *buf);
 
 // Bind a uniform block of `slots` 32-bit words.  Pass a non-NULL `slot_32bit`
 // to provide an early default pointer, or NULL for purely-late uniforms.

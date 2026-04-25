@@ -171,7 +171,7 @@ umbra_color_val32 shader_gradient_evenly_spaced_stops(void *ctx, struct umbra_bu
     umbra_val32 const t = self->coords_fn(self->coords_ctx, b,
                                           (umbra_point_val32){x, y});
     umbra_ptr const u      = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const colors = umbra_bind_host_readonly_buf(b, &self->colors);
+    umbra_ptr const colors = umbra_bind_sealed_buf(b, &self->colors);
     return gather_even_stops(b, t, u, SLOT(N), colors);
 }
 
@@ -181,8 +181,8 @@ umbra_color_val32 shader_gradient(void *ctx, struct umbra_builder *b,
     umbra_val32 const t = self->coords_fn(self->coords_ctx, b,
                                           (umbra_point_val32){x, y});
     umbra_ptr const u      = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const colors = umbra_bind_host_readonly_buf(b, &self->colors);
-    umbra_ptr const pos    = umbra_bind_host_readonly_buf(b, &self->pos);
+    umbra_ptr const colors = umbra_bind_sealed_buf(b, &self->colors);
+    umbra_ptr const pos    = umbra_bind_sealed_buf(b, &self->pos);
     return walk_stops(b, t, u, SLOT(N), colors, pos);
 }
 

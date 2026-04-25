@@ -11,7 +11,7 @@ _Bool binding_is_uniform(enum binding_kind k) {
 }
 
 static _Bool kind_is_buf(enum binding_kind k) {
-    return k == BIND_BUF || k == BIND_HOST_READONLY_BUF;
+    return k == BIND_BUF || k == BIND_SEALED_BUF;
 }
 
 _Bool flat_ir_has_early_writes(struct umbra_flat_ir const *ir) {
@@ -386,8 +386,8 @@ static void compute_buf_meta(struct umbra_flat_ir *ir) {
                 ir->buf[p].is_uniform    = 1;
                 ir->buf[p].uniform_slots = ir->binding[i].uniforms.count;
             }
-            if (ir->binding[i].kind == BIND_HOST_READONLY_BUF) {
-                ir->buf[p].host_readonly = 1;
+            if (ir->binding[i].kind == BIND_SEALED_BUF) {
+                ir->buf[p].sealed = 1;
             }
         }
     }

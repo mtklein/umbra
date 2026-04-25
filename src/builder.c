@@ -129,10 +129,10 @@ umbra_ptr umbra_bind_buf(builder *b, struct umbra_buf const *buf) {
     return (umbra_ptr){.ix = ix};
 }
 
-umbra_ptr umbra_bind_host_readonly_buf(builder *b, struct umbra_buf const *buf) {
+umbra_ptr umbra_bind_sealed_buf(builder *b, struct umbra_buf const *buf) {
     int const ix = reserve_binding(b);
     b->binding[ix] = (struct buffer_binding){
-        .kind = BIND_HOST_READONLY_BUF,
+        .kind = BIND_SEALED_BUF,
         .buf  = buf,
         .ix   = ix,
     };

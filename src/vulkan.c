@@ -288,7 +288,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << vp->buf[i].shift;
             uint8_t const rw = (uint8_t)(vp->buf[i].rw
-                             | (vp->buf[i].host_readonly ? BUF_HOST_READONLY : 0));
+                             | (vp->buf[i].sealed ? BUF_SEALED : 0));
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);

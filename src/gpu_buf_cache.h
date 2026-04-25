@@ -24,7 +24,7 @@ struct gpu_cache_entry {
     size_t       hashed_size;
     fingerprint  fp;
     _Bool        writable, copy_tracked, uploaded, nocopy;
-    _Bool        host_readonly; int :24;
+    _Bool        sealed; int :24;
 };
 
 struct gpu_buf_cache {

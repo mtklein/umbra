@@ -571,7 +571,7 @@ static umbra_interval sdf_text_outline_build(void *ctx, struct umbra_builder *b,
                                              umbra_interval x, umbra_interval y) {
     struct sdf_text_outline_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
+    umbra_ptr const data = umbra_bind_sealed_buf(b, &self->curves);
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves));
 
     umbra_interval const sx = umbra_interval_exact(umbra_uniform_32(b, u, SLOT(mat.sx))),
@@ -720,7 +720,7 @@ static umbra_interval sdf_text_polyline_build(void *ctx, struct umbra_builder *b
                                                umbra_interval x, umbra_interval y) {
     struct sdf_text_polyline_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
+    umbra_ptr const data = umbra_bind_sealed_buf(b, &self->curves);
 
     umbra_val32 const n    = umbra_uniform_32(b, u, SLOT(n_curves)),
                       lgN  = umbra_uniform_32(b, u, SLOT(lg_n));
@@ -907,7 +907,7 @@ static umbra_interval sdf_text_analytic_build(void *ctx, struct umbra_builder *b
                                                umbra_interval x, umbra_interval y) {
     struct sdf_text_analytic_sdf const *self = ctx;
     umbra_ptr const u    = umbra_bind_uniforms(b, self, sizeof *self / 4);
-    umbra_ptr const data = umbra_bind_host_readonly_buf(b, &self->curves);
+    umbra_ptr const data = umbra_bind_sealed_buf(b, &self->curves);
     umbra_val32 const n  = umbra_uniform_32(b, u, SLOT(n_curves));
 
     umbra_val32 const msx = umbra_uniform_32(b, u, SLOT(mat.sx)),

@@ -488,7 +488,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << p->buf[i].shift;
             uint8_t const rw = (uint8_t)(p->buf[i].rw
-                             | (p->buf[i].host_readonly ? BUF_HOST_READONLY : 0));
+                             | (p->buf[i].sealed ? BUF_SEALED : 0));
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 // Ring alloc copies data into chunk buffer; bulk-uploaded at submit.
                 // Uniform-class bindings come from a dedicated pool whose chunks

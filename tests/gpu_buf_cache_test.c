@@ -158,7 +158,7 @@ TEST(test_gpu_buf_cache_multiple_buffers) {
     gpu_buf_cache_free(&c);
 }
 
-TEST(test_gpu_buf_cache_host_readonly_skips_hash_and_reupload) {
+TEST(test_gpu_buf_cache_sealed_skips_hash_and_reupload) {
     struct mock_ctx m = {0};
     struct gpu_buf_cache c = make_cache(&m);
 
@@ -166,19 +166,19 @@ TEST(test_gpu_buf_cache_host_readonly_skips_hash_and_reupload) {
     memset(data, 0x42, sizeof data);
 
     // First access: one seed upload, no hashing stored.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_HOST_READONLY);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
     m.uploads == 1 here;
-    c.entry[0].host_readonly here;
+    c.entry[0].sealed here;
     c.entry[0].hashed_size == 0 here;
 
     // Subsequent accesses within batch: skip.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_HOST_READONLY);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
     m.uploads == 1 here;
 
-    // Even if data changes, host_readonly entries don't re-upload.
+    // Even if data changes, sealed entries don't re-upload.
     data[0] = 0x7F;
     gpu_buf_cache_end_batch(&c);
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_HOST_READONLY);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
     m.uploads == 1 here;
 
     gpu_buf_cache_free(&c);

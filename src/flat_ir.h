@@ -38,22 +38,22 @@ struct ir_inst {
 // populates buf[.ix] at dispatch time by (optionally) reading the early
 // default stored here, then letting any matching umbra_late_binding win.
 //
-//   BIND_BUF                `.buf` is a caller-owned umbra_buf* (or NULL)
-//                           dereferenced on every dispatch.
-//   BIND_HOST_READONLY_BUF  Same storage as BIND_BUF, but the caller promises
-//                           the host bytes don't change after binding -- the
-//                           cache may skip fingerprinting and re-uploads.
-//   BIND_UNIFORMS           `.uniforms` carries the slot count; `.uniforms.ptr`
-//                           is the optional early-default pointer (or NULL).
+//   BIND_BUF        `.buf` is a caller-owned umbra_buf* (or NULL) dereferenced
+//                   on every dispatch.
+//   BIND_SEALED_BUF Same storage as BIND_BUF, but the caller has sealed it:
+//                   the host bytes don't change after binding, so the cache
+//                   may skip fingerprinting and re-uploads.
+//   BIND_UNIFORMS   `.uniforms` carries the slot count; `.uniforms.ptr` is the
+//                   optional early-default pointer (or NULL).
 enum binding_kind {
     BIND_BUF,
-    BIND_HOST_READONLY_BUF,
+    BIND_SEALED_BUF,
     BIND_UNIFORMS,
 };
 
-// The cache reads BUF_HOST_READONLY alongside BUF_READ/BUF_WRITTEN to decide
+// The cache reads BUF_SEALED alongside BUF_READ/BUF_WRITTEN to decide
 // whether to skip fingerprinting and re-uploads for an entry.
-enum { BUF_READ = 1, BUF_WRITTEN = 2, BUF_HOST_READONLY = 4 };
+enum { BUF_READ = 1, BUF_WRITTEN = 2, BUF_SEALED = 4 };
 
 struct buffer_binding {
     enum binding_kind kind;
@@ -69,7 +69,7 @@ struct buffer_metadata {
     uint8_t shift;            // op_elem_shift of any op on this ptr
     uint8_t rw;               // BUF_READ | BUF_WRITTEN flags
     uint8_t is_uniform;       // 1 if the binding's kind is a uniform kind
-    uint8_t host_readonly;    // 1 if the binding is BIND_HOST_READONLY_BUF
+    uint8_t sealed;           // 1 if the binding is BIND_SEALED_BUF
     int     uniform_slots;    // u32 slot count for uniform bindings, else 0
 };
 
