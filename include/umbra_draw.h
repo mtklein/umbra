@@ -126,10 +126,46 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 
-// TODO: run the bounds program on the draw program's backend (GPU when the
-//       draw is on a GPU), instead of always JITing it on the CPU.  Profiling
-//       SDF Text Analytic on metal shows ~all main-thread CPU is the JIT
-//       bounds eval; pushing it to the GPU should remove that wall.
+// TODO: move SDF bounds-eval onto the draw backend so the host CPU isn't the
+//       wall on heavy-bounds workloads.  Profiling SDF Text Analytic on metal
+//       shows ~all main-thread CPU is the JIT bounds eval today.
+//
+//   Tried (commit 8f1910cf, reverted in 507742b6): compile bounds on the
+//   caller-supplied backend, queue+flush mid-dispatch, then read cov[] back
+//   to drive the per-tile draws on the host.  Big win for heavy bounds (SDF
+//   Text Analytic on metal: 2.53 -> 1.81 ns/px @ 40% -> 5% CPU), but the
+//   added per-frame GPU sync tanked simple SDFs (Union: .22 -> .11 ns/px but
+//   72% CPU; wgpu went .22 -> 2.82 ns/px @ 99% CPU because it has no zero-
+//   copy buffer transfer and pays a full staging-buffer round-trip per frame
+//   for the cov download).  The mid-dispatch flush is the cost; readback is
+//   the second cost on backends without zero-copy.
+//
+//   Two designs that avoid both costs by keeping dispatch on the device:
+//
+//   Rung 1 -- shader-side cull, no readback, one submit/frame:
+//     Bounds shader writes cov[].  draw_partial / draw_full each gain a
+//     per-tile early-exit at the top: read cov[tile_idx], return if not my
+//     tile kind.  Backends already barrier between bounds (writes cov) and
+//     draws (read cov).  Host queues bounds + both draws over (l,t,r,b) into
+//     one cmdbuf and submits once -- zero mid-frame sync, zero readback.
+//     GPU launches a thread per pixel for every tile (NONE tiles too) and
+//     those threads early-exit on the first instruction; idle threads on a
+//     GPU are essentially free.  Needs a builder helper to wrap a draw body
+//     in the cov-check (uses the if/endif we already have).  Best ROI for a
+//     first cut.
+//
+//   Rung 2 -- GPU-built worklist + indirect dispatch:
+//     Bounds shader atomic-adds to a per-program counter and writes the
+//     active tile's coords into a worklist.  Host issues one indirect
+//     compute dispatch per program (vkCmdDispatchIndirect /
+//     dispatchThreadgroupsIndirect / dispatchWorkgroupsIndirect) reading
+//     dimensions from GPU memory.  Each draw thread maps its global ID into
+//     a worklist entry to find its (x,y).  No wasted thread launches; NONE
+//     tiles get no work at all.  Needs op_atomic_add (or equivalent) in the
+//     IR, indirect-dispatch wrappers in metal/vulkan/wgpu, and a way for a
+//     program to source (x,y) from a worklist instead of gl_GlobalInvocation.
+//     Bigger lift than Rung 1; only worth it if Rung 1's idle-thread cost
+//     measures as real on some workload.
 
 // Use an SDF bounds program to intelligently dispatch draw->queue() calls for a
 // draw program built by umbra_build_sdf_draw() from the same SDF, skipping
