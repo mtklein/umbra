@@ -524,10 +524,25 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, 2);
-            if (scalar) {
-                vmovd_store(c, ry, base, XCOL_X86, 4, 0);
+            if (jc->if_depth > 0) {
+                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    vmovd_load(c, tmp, base, XCOL_X86, 4, 0);
+                    vpblendvb(c, 0, tmp, tmp, ry, rm);
+                    vmovd_store(c, tmp, base, XCOL_X86, 4, 0);
+                } else {
+                    vmov_load(c, 1, tmp, base, XCOL_X86, 4, 0);
+                    vpblendvb(c, 1, tmp, tmp, ry, rm);
+                    vmov_store(c, 1, tmp, base, XCOL_X86, 4, 0);
+                }
+                ra_return_reg(ra, tmp);
             } else {
-                vmov_store(c, 1, ry, base, XCOL_X86, 4, 0);
+                if (scalar) {
+                    vmovd_store(c, ry, base, XCOL_X86, 4, 0);
+                } else {
+                    vmov_store(c, 1, ry, base, XCOL_X86, 4, 0);
+                }
             }
             ra_free_chan(ra, inst->y, i);
         } break;

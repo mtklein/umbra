@@ -603,13 +603,32 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                     int32_t *dst = (int32_t*)buf[ip->ptr].ptr + row * buf[ip->ptr].stride;
                     int const i = end - K;
                     int const rem = n - i;
-                    if (rem >= K) {
-                        __builtin_memcpy(dst + i, v + ip->x, 4 * K);
+                    if (if_depth == 0) {
+                        if (rem >= K) {
+                            __builtin_memcpy(dst + i, v + ip->x, 4 * K);
+                        } else {
+                            for (int ll = 0; ll < rem; ll++) {
+                                int32_t tmp;
+                                __builtin_memcpy(&tmp, (char*)&v[ip->x].i32 + 4 * ll, 4);
+                                __builtin_memcpy(dst + i + ll, &tmp, 4);
+                            }
+                        }
                     } else {
-                        for (int ll = 0; ll < rem; ll++) {
-                            int32_t tmp;
-                            __builtin_memcpy(&tmp, (char*)&v[ip->x].i32 + 4 * ll, 4);
-                            __builtin_memcpy(dst + i + ll, &tmp, 4);
+                        I32 const mask = if_mask_stack[if_depth - 1];
+                        if (rem >= K) {
+                            I32 old, neu;
+                            __builtin_memcpy(&old, dst + i, 4 * K);
+                            __builtin_memcpy(&neu, &v[ip->x].i32, 4 * K);
+                            I32 const blend = (neu & mask) | (old & ~mask);
+                            __builtin_memcpy(dst + i, &blend, 4 * K);
+                        } else {
+                            for (int ll = 0; ll < rem; ll++) {
+                                if (mask[ll]) {
+                                    int32_t s;
+                                    __builtin_memcpy(&s, (char*)&v[ip->x].i32 + 4 * ll, 4);
+                                    __builtin_memcpy(dst + i + ll, &s, 4);
+                                }
+                            }
                         }
                     }
                 } NEXT;

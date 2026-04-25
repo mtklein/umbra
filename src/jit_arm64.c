@@ -634,12 +634,30 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t ry = ra_ensure(ra, sl, ns, inst->y.id);
             ptr    p = inst->ptr;
             resolve_ptr(c, p, &last_ptr, 2);
-            if (scalar) {
-                put(c, STR_sx(lo(ry), XP, XCOL));
+            if (jc->if_depth > 0) {
+                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                if (scalar) {
+                    put(c, LDR_sx(lo(tmp), XP, XCOL));
+                    put(c, BIT_16b(lo(tmp), lo(ry), lo(rm)));
+                    put(c, STR_sx(lo(tmp), XP, XCOL));
+                } else {
+                    put(c, LSL_xi(XT, XCOL, 2));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, LDP_qi(lo(tmp), hi(tmp), XT, 0));
+                    put(c, BIT_16b(lo(tmp), lo(ry), lo(rm)));
+                    put(c, BIT_16b(hi(tmp), hi(ry), hi(rm)));
+                    put(c, STP_qi(lo(tmp), hi(tmp), XT, 0));
+                }
+                ra_return_reg(ra, tmp);
             } else {
-                put(c, LSL_xi(XT, XCOL, 2));
-                put(c, ADD_xr(XT, XP, XT));
-                put(c, STP_qi(lo(ry), hi(ry), XT, 0));
+                if (scalar) {
+                    put(c, STR_sx(lo(ry), XP, XCOL));
+                } else {
+                    put(c, LSL_xi(XT, XCOL, 2));
+                    put(c, ADD_xr(XT, XP, XT));
+                    put(c, STP_qi(lo(ry), hi(ry), XT, 0));
+                }
             }
             ra_free_chan(ra, inst->y, i);
         } break;
