@@ -42,7 +42,6 @@ static _Bool render_and_compare_at(struct slide *s, int slide_idx,
                                    size_t pixbuf_sz) {
     for (int bi = 0; bi < NUM_BACKENDS; bi++) {
         if (bes[bi]) {
-            __builtin_memset(pbuf[bi], 0, pixbuf_sz);
             struct umbra_buf const dst = {
                 .ptr=pbuf[bi], .count=W * H * fmt.planes, .stride=W,
             };
