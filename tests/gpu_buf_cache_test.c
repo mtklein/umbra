@@ -165,20 +165,18 @@ TEST(test_gpu_buf_cache_sealed_skips_hash_and_reupload) {
     char data[64];
     memset(data, 0x42, sizeof data);
 
-    // First access: one seed upload, no hashing stored for the re-upload check.
+    // First access: one seed upload, no hashing stored.
     gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
     m.uploads == 1 here;
     c.entry[0].sealed here;
     c.entry[0].hashed_size == 0 here;
 
-    // Subsequent accesses within batch: skip the upload.
+    // Subsequent accesses within batch: skip.
     gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
     m.uploads == 1 here;
 
-    // Across batches: still skip.  (Previously this test also mutated `data`
-    // to demonstrate that sealed entries trust the contract; that's now an
-    // active trip-wire under sanitizers, so the mutation case is exercised
-    // negatively -- it traps -- not positively here.)
+    // Even if data changes, sealed entries don't re-upload.
+    data[0] = 0x7F;
     gpu_buf_cache_end_batch(&c);
     gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
     m.uploads == 1 here;

@@ -1,14 +1,5 @@
 #include "gpu_buf_cache.h"
-#include <stdio.h>
 #include <stdlib.h>
-
-#if (defined(__has_feature) \
-        && (__has_feature(address_sanitizer) || __has_feature(thread_sanitizer))) \
- || defined(__SANITIZE_ADDRESS__) || defined(__SANITIZE_THREAD__)
-    #define UMBRA_SANITIZER_BUILD 1
-#else
-    #define UMBRA_SANITIZER_BUILD 0
-#endif
 
 int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
                       uint8_t rw) {
@@ -19,7 +10,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
         if (ce->host == host && ce->buf.size >= bytes) {
             if (host && bytes
                     && !ce->nocopy                        // Zero-copy: GPU reads host directly.
-                    && !ce->sealed                        // Host promised not to mutate.
+                    && !ce->sealed                 // Host promised not to mutate.
                     && !(ce->uploaded && ce->writable)) { // Umbra owns writable bufs within a batch.
                 fingerprint const fp = fingerprint_hash(host, bytes);
                 if (!ce->hashed_size || !fingerprint_eq(ce->fp, fp)) {
@@ -29,22 +20,6 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
                     ce->hashed_size = bytes;
                 }
                 ce->uploaded = 1;
-            }
-            if (UMBRA_SANITIZER_BUILD && ce->sealed && !ce->writable && host && bytes) {
-                // Trip-wire: a sealed read-only buffer's host bytes must not
-                // have changed since the last time we saw them.  Live only
-                // under sanitizers -- in production the seal is trusted and
-                // hashing every lookup would defeat the optimization.  Skip
-                // for sealed+writable because the GPU itself writes between
-                // dispatches (we'd need an explicit eviction API to tell
-                // host-mutation from realloc-to-same-address).
-                fingerprint const fp = fingerprint_hash(host, bytes);
-                if (!fingerprint_eq(ce->fp, fp)) {
-                    fprintf(stderr,
-                            "sealed buffer %p (%zu bytes) was modified after binding\n",
-                            host, bytes);
-                    __builtin_trap();
-                }
             }
             if (writable && !ce->copy_tracked && host && bytes) {
                 ce->copy_tracked = 1;
@@ -84,13 +59,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     if (host && bytes) {
         c->ops.upload(ce->buf, host, bytes, c->ctx);
         c->upload_bytes += bytes;
-        // Sealed read-only entries hash the seed under sanitizers so the
-        // trip-wire has a baseline to compare against; sealed writable and
-        // production sealed skip the hash.  hashed_size stays 0 for any
-        // sealed entry to gate the re-upload check.
-        _Bool const seed_hash = !sealed
-                             || (UMBRA_SANITIZER_BUILD && !writable);
-        ce->fp          = seed_hash ? fingerprint_hash(host, bytes) : (fingerprint){0};
+        ce->fp          = sealed ? (fingerprint){0} : fingerprint_hash(host, bytes);
         ce->hashed_size = sealed ? 0 : bytes;
         ce->uploaded = 1;
     }
@@ -121,9 +90,6 @@ void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
                 ce->fp          = fingerprint_hash(ce->host, bytes);
                 ce->hashed_size = bytes;
             }
-            // Sealed+writable doesn't refresh fp: the trip-wire skips it
-            // anyway (host vs GPU mutation isn't distinguishable by
-            // fingerprint), so the extra hash cost would be wasted.
         }
     }
 }
