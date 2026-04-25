@@ -63,6 +63,7 @@ static id nsstr(char const *s) {
 // Selectors hit every dispatch / batch / submit.  Populated once in
 // metal_backend_create(); sel_registerName is idempotent across backend
 // instances so the cache is process-global.
+// TODO: per-backend so multiple metal_backend_create() don't even technically race.
 static SEL SEL_setComputePipelineState,
            SEL_setBytes_length_atIndex,
            SEL_setBuffer_offset_atIndex,
