@@ -5490,6 +5490,68 @@ TEST(test_store_var_per_channel) {
     test_backends_free(&B);
 }
 
+TEST(test_load_store_16x4_planar_int) {
+    // Regression: spirv lowering of load_16x4_planar / store_16x4_planar
+    // unconditionally treated each val16 channel as f16 (load via FConvert
+    // up to f32, store via FConvert back down to f16).  Integer val16
+    // (e.g. from umbra_i16_from_i32) flushed through that path lost the
+    // value when it landed on a denormal f16.  Mirror op_store_16x4 by
+    // dispatching per channel on is_f.
+    //
+    // Two checks: (a) write integer val16 directly via store_16x4_planar,
+    // and (b) round-trip through load_16x4_planar.  Both should preserve
+    // the 16-bit integer bytes verbatim across all backends.
+    {
+        struct umbra_buf slot[20] = {0};
+        struct umbra_builder *b = umbra_builder();
+        umbra_val16 const cr = umbra_i16_from_i32(b, umbra_imm_i32(b, 0x1234));
+        umbra_val16 const cg = umbra_i16_from_i32(b, umbra_imm_i32(b, 0x5678));
+        umbra_val16 const cb = umbra_i16_from_i32(b, umbra_imm_i32(b, 0x0BCD));
+        umbra_val16 const ca = umbra_i16_from_i32(b, umbra_imm_i32(b, 0x0F01));
+        umbra_store_16x4_planar(b, umbra_bind_buf(b, &slot[0]), cr, cg, cb, ca);
+
+        struct test_backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            uint16_t dst[8 * 4] = {0};
+            if (run(&B, bi, 8, 1, slot, 1,
+            (struct umbra_buf[]){{.ptr = dst, .count = 8 * 4}})) {
+                for (int lane = 0; lane < 8; lane++) {
+                    dst[ 0 + lane] == 0x1234 here;
+                    dst[ 8 + lane] == 0x5678 here;
+                    dst[16 + lane] == 0x0BCD here;
+                    dst[24 + lane] == 0x0F01 here;
+                }
+            }
+        }
+        test_backends_free(&B);
+    }
+    {
+        struct umbra_buf slot[20] = {0};
+        struct umbra_builder *b = umbra_builder();
+        umbra_val16 r, g, bl, a;
+        umbra_load_16x4_planar(b, umbra_bind_buf(b, &slot[0]), &r, &g, &bl, &a);
+        // Treat each channel as integer-typed and round-trip back out.
+        umbra_store_16x4_planar(b, umbra_bind_buf(b, &slot[1]),
+                                umbra_i16_from_i32(b, umbra_i32_from_u16(b, r)),
+                                umbra_i16_from_i32(b, umbra_i32_from_u16(b, g)),
+                                umbra_i16_from_i32(b, umbra_i32_from_u16(b, bl)),
+                                umbra_i16_from_i32(b, umbra_i32_from_u16(b, a)));
+
+        struct test_backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            uint16_t src[8 * 4];
+            for (int j = 0; j < 32; j++) { src[j] = (uint16_t)(0x1000 + j); }
+            uint16_t dst[8 * 4] = {0};
+            if (run(&B, bi, 8, 1, slot, 2,
+            (struct umbra_buf[]){{.ptr = src, .count = 8 * 4},
+                                 {.ptr = dst, .count = 8 * 4}})) {
+                for (int j = 0; j < 32; j++) { dst[j] == src[j] here; }
+            }
+        }
+        test_backends_free(&B);
+    }
+}
+
 TEST(test_many_constants) {
     struct umbra_buf slot[20] = {0};
     float const constants[] = {

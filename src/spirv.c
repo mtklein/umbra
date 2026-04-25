@@ -1321,11 +1321,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                 } break;
 
                 case op_load_16x4_planar: {
-                    // TODO: this lowering always loads as f16 and converts to
-                    //       f32, marking the result is_f.  Integer-typed planar
-                    //       data is unsupported through this path.  op_load_16
-                    //       handles both via load_ssbo_u16 + is_f preservation;
-                    //       mirror that here.
                     int p = resolve_ptr(&B, inst);
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t total  = load_meta_u32(&B, lim_off);
@@ -1344,18 +1339,17 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                                        :           B.c_3;
                         uint32_t plane_off = spv_binop(&B, SpvOpIMul, B.t_u32, ch_id, ps_f16);
                         uint32_t final_addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr, plane_off);
-                        uint32_t ptr = spv_access_chain_2(&B, B.t_ptr_ssbo_f16,
-                                                          B.v_ssbo[p], B.c_0, final_addr);
-                        uint32_t h = spv_load(&B, B.t_f16, ptr);
-                        uint32_t f32_val = spv_unop(&B, SpvOpFConvert, B.t_f32, h);
+                        uint32_t u16 = load_ssbo_u16(&B, p, final_addr);
                         switch (ch) {
-                            case 0: B.val[i]   = f32_val; break;
-                            case 1: B.val_1[i] = f32_val; break;
-                            case 2: B.val_2[i] = f32_val; break;
-                            case 3: B.val_3[i] = f32_val; break;
+                            case 0: B.val[i]   = u16; break;
+                            case 1: B.val_1[i] = u16; break;
+                            case 2: B.val_2[i] = u16; break;
+                            case 3: B.val_3[i] = u16; break;
                         }
                     }
-                    B.is_f[i] = 1;
+                    // Caller decides float-vs-integer interpretation via the
+                    // explicit *_from_f16/u16/s16 conversion ops, matching
+                    // op_load_16 and op_load_16x4.
                 } break;
 
                 case op_store_16x4: {
@@ -1383,12 +1377,6 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                 } break;
 
                 case op_store_16x4_planar: {
-                    // TODO: this lowering treats every val16 input as f16
-                    //       (bitcast-to-f32 then SpvOpFConvert to f16).  Integer
-                    //       val16 (e.g. umbra_i16_from_i32) gets reinterpreted as
-                    //       a denormal float and rounded to 0.  store_16x4 above
-                    //       already does the right thing per channel via is_f;
-                    //       fan that out across the 4 planes here.
                     int p = resolve_ptr(&B, inst);
                     uint32_t lim_off = spv_const_u32(&B, (uint32_t)(3 + p));
                     uint32_t total  = load_meta_u32(&B, lim_off);
@@ -1411,12 +1399,18 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                         uint32_t plane_off = spv_binop(&B, SpvOpIMul, B.t_u32, ch_id, ps_f16);
                         uint32_t final_addr = spv_binop(&B, SpvOpIAdd, B.t_u32, addr, plane_off);
 
-                        uint32_t f32_val = as_f32(&B, get_val(&B, channels[ch]),
-                                                       channel_ids[ch]);
-                        uint32_t h = spv_unop(&B, SpvOpFConvert, B.t_f16, f32_val);
-                        uint32_t ptr = spv_access_chain_2(&B, B.t_ptr_ssbo_f16,
-                                                          B.v_ssbo[p], B.c_0, final_addr);
-                        spv_store(&B, ptr, h);
+                        // Match op_store_16x4: dispatch on the channel's is_f.
+                        // Float channels go through f32_to_f16; integer channels
+                        // go through store_ssbo_u16 directly so denormal-flushing
+                        // can't eat the value.
+                        uint32_t const v = get_val(&B, channels[ch]);
+                        if (B.is_f[channel_ids[ch]]) {
+                            uint32_t h = spv_f32_to_f16(&B, v);
+                            store_ssbo_u16(&B, p, final_addr, h);
+                        } else {
+                            uint32_t u = as_u32(&B, v, channel_ids[ch]);
+                            store_ssbo_u16(&B, p, final_addr, u);
+                        }
                     }
                 } break;
 
