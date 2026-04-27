@@ -4,21 +4,21 @@
 
 enum { TEST_CAP = 4096 };
 
-static test_fn    registry[TEST_CAP];
-static char const *names[TEST_CAP];
-static int         test_count;
+static test_fn     registry[TEST_CAP];
+static char const *name    [TEST_CAP];
+static int         tests;
 
-void test_register(test_fn fn, char const *name) {
-    assume(test_count < TEST_CAP);
-    registry[test_count] = fn;
-    names[test_count] = name;
-    test_count++;
+void test_register(test_fn fn, char const *n) {
+    assume(tests < TEST_CAP);
+    registry[tests] = fn;
+    name    [tests] = n;
+    tests++;
 }
 
 void test_run(char const *match, int shards, int shard) {
-    for (int i = 0; i < test_count; i++) {
+    for (int i = 0; i < tests; i++) {
         if ((shards <= 1 || i % shards == shard)
-                && (!match || strstr(names[i], match))) {
+                && (!match || strstr(name[i], match))) {
             registry[i]();
         }
     }
