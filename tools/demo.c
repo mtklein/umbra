@@ -88,7 +88,7 @@ static void free_pipes(void) {
 }
 
 static int                    max_threads;
-static int                    n_threads = 1;
+static int                    threads = 1;
 static struct umbra_program **extra_progs;
 static struct umbra_flat_ir *saved_ir;
 
@@ -101,8 +101,8 @@ static void free_extra(void) {
 
 static void rebuild_extra(int backend) {
     free_extra();
-    if (saved_ir && n_threads > 1 && bes[backend]) {
-        for (int t = 1; t < n_threads; t++) {
+    if (saved_ir && threads > 1 && bes[backend]) {
+        for (int t = 1; t < threads; t++) {
             extra_progs[t] = bes[backend]->compile(bes[backend], saved_ir);
         }
     }
@@ -281,7 +281,7 @@ int main(void) {
     _Bool    paused      = 0;
     uint64_t pause_start = 0;
 
-    update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps, n_threads, vsync);
+    update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps, threads, vsync);
 
     _Bool running = 1;
     while (running) {
@@ -332,9 +332,9 @@ int main(void) {
                     cur_backend = pick_backend(cur_backend);
                     rebuild_extra(cur_backend);
                 } else if (ev.key.key == SDLK_COMMA) {
-                    if (n_threads > 1) { n_threads--; rebuild_extra(cur_backend); }
+                    if (threads > 1) { threads--; rebuild_extra(cur_backend); }
                 } else if (ev.key.key == SDLK_PERIOD) {
-                    if (n_threads < max_threads) { n_threads++; rebuild_extra(cur_backend); }
+                    if (threads < max_threads) { threads++; rebuild_extra(cur_backend); }
                 } else if (ev.key.key == SDLK_V) {
                     vsync = !vsync;
                     SDL_SetRenderVSync(renderer, vsync ? 1 : 0);
@@ -354,7 +354,7 @@ int main(void) {
                     rebuild_extra(cur_backend);
                 }
                 update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps,
-                             n_threads, vsync);
+                             threads, vsync);
             }
         }
         if (!running) { break; }
@@ -376,7 +376,7 @@ int main(void) {
         }
 
         {
-            int nt = n_threads;
+            int nt = threads;
             if (!saved_ir && nt > 1) { nt = 1; }
             int sh = (H + nt - 1) / nt;
 
@@ -469,7 +469,7 @@ int main(void) {
             fps_frames = 0;
             fps_start = now;
             update_title(window, slide_get(cur_slide), cur_backend, cur_fmt, fps,
-                         n_threads, vsync);
+                         threads, vsync);
         }
     }
 
