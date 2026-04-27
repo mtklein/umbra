@@ -772,7 +772,7 @@ TEST(test_cbrt_f32) {
                 float const want = cbrtf(a[i]),
                             err  = fabsf(z[i] - want),
                             tol  = fabsf(want) * 1e-5f + 1e-20f;
-                (err <= tol) here;
+                err <= tol here;
             }
         }
     }
@@ -804,8 +804,8 @@ TEST(test_sin_cos_f32) {
                          {.ptr=zs, .count=N},
                          {.ptr=zc, .count=N}})) {
             for (int i = 0; i < N; i++) {
-                (fabsf(zs[i] - sinf(a[i])) <= 1e-4f) here;
-                (fabsf(zc[i] - cosf(a[i])) <= 1e-4f) here;
+                fabsf(zs[i] - sinf(a[i])) <= 1e-4f here;
+                fabsf(zc[i] - cosf(a[i])) <= 1e-4f here;
             }
         }
     }
@@ -829,7 +829,7 @@ TEST(test_acos_f32) {
     (struct umbra_buf[]){{.ptr=a, .count=N},
                          {.ptr=z, .count=N}})) {
             for (int i = 0; i < N; i++) {
-                (fabsf(z[i] - acosf(a[i])) <= 1e-3f) here;
+                fabsf(z[i] - acosf(a[i])) <= 1e-3f here;
             }
         }
     }
@@ -6075,18 +6075,18 @@ TEST(test_scope_tier_partition) {
             umbra_add_f32(b, yf, umbra_add_f32(b, c0, c1))));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
 
-    (ir->dispatch_end > 0)           here;
-    (ir->dispatch_end <  ir->row_end) here;
-    (ir->row_end      <  ir->insts)   here;
+    ir->dispatch_end >  0            here;
+    ir->dispatch_end <  ir->row_end  here;
+    ir->row_end      <  ir->insts    here;
 
     for (int i = 0; i < ir->dispatch_end; i++) {
-        (ir->inst[i].scope <= SCOPE_DISPATCH) here;
+        ir->inst[i].scope <= SCOPE_DISPATCH here;
     }
     for (int i = ir->dispatch_end; i < ir->row_end; i++) {
         ir->inst[i].scope == SCOPE_ROW here;
     }
     for (int i = ir->row_end; i < ir->insts; i++) {
-        (ir->inst[i].scope >= SCOPE_BATCH) here;
+        ir->inst[i].scope >= SCOPE_BATCH here;
     }
 
     umbra_flat_ir_free(ir);
