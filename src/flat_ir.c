@@ -282,15 +282,26 @@ static _Bool is_cf(enum op op) {
 
 // Per-op intrinsic scope.  Source ops introduce scope; everything else is
 // SCOPE_COMPILE intrinsically and inherits from operands via narrow().
-// Control-flow ops (loop/if begin/end) have an intrinsic floor of
-// SCOPE_BATCH so they always live in the body — their structural placement
-// delineates regions that must execute per-batch regardless of operand
-// scope.  Finer-grained intrinsics (SCOPE_ROW for op_y, SCOPE_DISPATCH for
-// op_uniform_32) come later when an optimization wants to split the
-// preamble tier.
+// Control-flow ops have an intrinsic floor of SCOPE_BATCH — their structural
+// placement delineates regions that must execute per-batch regardless of
+// operand scope.
+//
+// Note on op_y: semantically it's SCOPE_ROW (constant within a row, varies
+// per row) but the JIT preamble emit happens before the dispatch loop sets
+// up the row-state register XY, so hoisting op_y into the preamble would
+// broadcast the wrong value on the first row.  Tagging it SCOPE_BATCH keeps
+// it in the body (today's behavior) and is still truthful, just looser.
+// Tightening to SCOPE_ROW is a follow-up that needs the JIT to split its
+// per-row preamble emit out from the dispatch-entry preamble emit.
 static enum scope intrinsic_scope(enum op op) {
-    if (is_cf(op))         { return SCOPE_BATCH; }
-    if (op_is_varying(op)) { return SCOPE_LANE;  }
+    if (is_cf(op))                  { return SCOPE_BATCH; }
+    if (op == op_imm_32)            { return SCOPE_COMPILE; }
+    if (op == op_uniform_32
+            || op == op_gather_uniform_32
+            || op == op_gather_32
+            || op == op_gather_16)  { return SCOPE_DISPATCH; }
+    if (op == op_y)                 { return SCOPE_BATCH; }
+    if (op_is_varying(op))          { return SCOPE_LANE; }
     return SCOPE_COMPILE;
 }
 static enum scope narrow(enum scope a, enum scope b) {
@@ -445,32 +456,45 @@ void umbra_flat_ir_free(struct umbra_flat_ir *ir) {
     }
 }
 
+static char scope_letter(int8_t scope) {
+    switch (scope) {
+        case SCOPE_COMPILE:  return 'C';
+        case SCOPE_DISPATCH: return 'D';
+        case SCOPE_ROW:      return 'R';
+        case SCOPE_BATCH:    return 'B';
+        case SCOPE_ITER:     return 'I';
+        case SCOPE_LANE:     return 'L';
+    }
+    return '?';
+}
+
 static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
     for (int i = 0; i < insts; i++) {
         struct ir_inst const *ip = &inst[i];
         enum op const         op = ip->op;
+        char           const  s  = scope_letter(ip->scope);
 
         if (op == op_loop_end) {
-            fprintf(f, "      loop_end\n");
+            fprintf(f, "    %c loop_end\n", s);
             continue;
         }
         if (op == op_if_end) {
-            fprintf(f, "      if_end\n");
+            fprintf(f, "    %c if_end\n", s);
             continue;
         }
         if (op_is_store(op)) {
             if (op == op_store_8x4 || op == op_store_16x4 || op == op_store_16x4_planar) {
-                fprintf(f, "      %-15s p%d v%d v%d v%d v%d\n", op_name(op), ip->ptr.bits,
+                fprintf(f, "    %c %-15s p%d v%d v%d v%d v%d\n", s, op_name(op), ip->ptr.bits,
                         ip->x.id, ip->y.id, ip->z.id, ip->w.id);
             } else if (op == op_store_var) {
-                fprintf(f, "      %-15s var%d v%d\n", op_name(op), ip->imm, ip->y.id);
+                fprintf(f, "    %c %-15s var%d v%d\n", s, op_name(op), ip->imm, ip->y.id);
             } else {
-                fprintf(f, "      %-15s p%d v%d\n", op_name(op), ip->ptr.bits, ip->y.id);
+                fprintf(f, "    %c %-15s p%d v%d\n", s, op_name(op), ip->ptr.bits, ip->y.id);
             }
             continue;
         }
 
-        fprintf(f, "  v%-3d = %-15s", i, op_name(op));
+        fprintf(f, "  v%-3d %c = %-15s", i, s, op_name(op));
 
         switch (op) {
         case op_imm_32: fprintf(f, " 0x%x", (uint32_t)ip->imm); break;
