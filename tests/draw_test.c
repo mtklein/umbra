@@ -1469,8 +1469,8 @@ RECT_TAIL_MATRIX_CASE(17, 2) RECT_TAIL_MATRIX_CASE(17, 3)
 TEST(test_coverage_rect_tail_srcover_fp16_planar) {
     struct umbra_buf dst_slot = {0};
     // Regression: after a tail iteration runs (dispatch width not a multiple
-    // of K=8), the JIT was leaving preamble registers (uniforms and the 0.0
-    // imm constant) clobbered.  The next row's first SIMD iter then compared
+    // of K=8), the JIT was leaving dispatch-tier registers (uniforms and the
+    // 0.0 imm constant) clobbered.  The next row's first SIMD iter then compared
     // x against garbage, producing wrong coverage on every row past the
     // first.  Rect x in [8,18), y in [1,3), dispatched 18x3 so each row has
     // both SIMD iters and a 2-col tail.

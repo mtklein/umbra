@@ -8,9 +8,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// Minimal CSG-style SDF with 6 uniforms, exactly the preamble shape that
-// trips the ARM64 RA loop-invariant check once a cell_mat affine transform
-// gets composed into the bounds program.
+// Minimal CSG-style SDF with 6 uniforms, exactly the dispatch-tier shape
+// that trips the ARM64 RA loop-invariant check once a cell_mat affine
+// transform gets composed into the bounds program.
 struct two_circle {
     float cx1, cy1, r1, cx2, cy2, r2;
 };

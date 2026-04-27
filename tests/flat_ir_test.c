@@ -1450,7 +1450,7 @@ TEST(test_n9) {
     }
 }
 
-TEST(test_preamble_pair_alias) {
+TEST(test_dispatch_pair_alias) {
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *builder = umbra_builder();
 
@@ -2438,7 +2438,7 @@ TEST(test_jit_xs_init) {
     struct umbra_buf slot[20] = {0};
     // Regression: ARM64 JIT only initialized XS (spill stack pointer) when
     // ns > 0.  For tiny programs with no spills, XS was caller garbage.
-    // Use enough preamble values to force eviction+fill at the back-edge.
+    // Use enough dispatch-tier values to force eviction+fill at the back-edge.
     struct umbra_builder *b = umbra_builder();
     enum { N = 25 };
     umbra_val32 pre[N];
@@ -2604,14 +2604,14 @@ TEST(test_program_null_guards) {
     umbra_backend_free(be);
 }
 
-// Regression test: register variant chains must not cross the preamble/body boundary.
-// The preamble runs only on the first tile; subsequent tiles start at the body.
-// If a preamble output is kept in the register and the body reads from it,
+// Regression test: register variant chains must not cross the dispatch/body boundary.
+// The dispatch tier runs only on the first tile; subsequent tiles start at the body.
+// If a dispatch-tier output is kept in the register and the body reads from it,
 // tile 2+ would read the previous tile's last value instead.
-TEST(test_preamble_register_boundary) {
+TEST(test_dispatch_register_boundary) {
     struct umbra_buf slot[20] = {0};
     struct umbra_builder *b = umbra_builder();
-    // uniform is preamble (loop-invariant), add is body (uses x which varies).
+    // uniform is dispatch tier (loop-invariant), add is body (uses x which varies).
     // The uniform feeds directly into the add at offset -1 if scheduled adjacently.
     umbra_val32 u = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
     umbra_val32 x = umbra_add_i32(b, umbra_x(b), u);

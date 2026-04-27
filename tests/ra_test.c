@@ -231,8 +231,8 @@ TEST(test_claim) {
     free_ir(ir);
 }
 
-TEST(test_last_use_preamble) {
-    // preamble used in varying: last_use = n
+TEST(test_last_use_dispatch) {
+    // dispatch-tier value used in varying: last_use = n
     static int8_t const pool[] = {5, 6, 7};
     struct records rec = {0};
     struct ra_config    cfg = {
