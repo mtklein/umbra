@@ -23,7 +23,7 @@ struct jit_program {
     struct jit_label label[16];
 };
 struct jit_program* jit_program(struct jit_backend*, struct umbra_flat_ir const*);
-void   jit_program_run (struct jit_program*, int,int,int,int, struct umbra_buf[]);
+void   jit_program_run (struct jit_program*, int, int, int, int, struct umbra_buf[]);
 void   jit_program_dump(struct jit_program const*, FILE*);
 
 // Stream llvm-objdump -d output for `obj_path` to `out`, prepending

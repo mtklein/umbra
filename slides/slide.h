@@ -10,7 +10,7 @@ union transform {
 struct slide {
     char const     *title;
     umbra_color     bg;
-    int             w,h;
+    int             w, h;
 
     void (*init)   (struct slide*);
     void (*prepare)(struct slide*, struct umbra_backend*, struct umbra_fmt);
