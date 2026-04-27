@@ -34,9 +34,10 @@ typedef union {
 //   SCOPE_LANE     — varies per SIMD lane (umbra_x, all loads/stores).
 //
 // Scope is computed from each op's intrinsic scope and the scopes of its
-// operands.  Today we still partition codegen by the binary `varying` flag;
-// scope is populated alongside as a richer, forward-compatible name for the
-// same partition: `(scope >= SCOPE_BATCH) == varying` for every live op.
+// operands.  Codegen partitions on `scope >= SCOPE_BATCH` (preamble vs body);
+// finer-grained intrinsics (SCOPE_ROW for op_y, SCOPE_DISPATCH for
+// op_uniform_32) come in a later step once any optimization wants to split
+// the preamble tier.
 enum scope {
     SCOPE_COMPILE  = 0,
     SCOPE_DISPATCH = 1,
@@ -53,7 +54,7 @@ struct ir_inst {
     int     imm;
 
     // Bookkeeping metadata, doesn't need to be hashed.
-    _Bool  live, uniform, varying;
+    _Bool  live, uniform; int8_t :8;
     int8_t scope;
     int    final_id;
 };

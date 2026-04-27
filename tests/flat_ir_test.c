@@ -5618,68 +5618,65 @@ TEST(test_add_f32_imm_smoke) {
     test_backends_free(&B);
 }
 
-// Migration check: scope and varying must agree on the BATCH split for every
-// live op.  Step 2 of the lattice rollout flips backends from reading varying
-// to reading scope, and that flip needs zero codegen diff — which holds iff
-// this invariant holds across the test corpus.
-static void check_scope_varying_equiv(struct umbra_builder *b) {
-    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+// Sanity-check the scope lattice on a few representative IR shapes: that
+// preamble/body partition lands as expected, and that immediates/uniforms
+// inside a region escape the cap.
+static void all_live_below_batch(struct umbra_flat_ir const *ir) {
     for (int i = 0; i < ir->insts; i++) {
-        _Bool const want = ir->inst[i].scope >= SCOPE_BATCH;
-        want == ir->inst[i].varying here;
+        if (ir->inst[i].live && !op_is_store(ir->inst[i].op)) {
+            (ir->inst[i].scope < SCOPE_BATCH) here;
+        }
     }
-    umbra_flat_ir_free(ir);
+}
+static void any_live_at_batch_or_narrower(struct umbra_flat_ir const *ir) {
+    int found = 0;
+    for (int i = 0; i < ir->insts; i++) {
+        if (ir->inst[i].live && ir->inst[i].scope >= SCOPE_BATCH) { found = 1; }
+    }
+    found here;
 }
 
-TEST(test_scope_matches_varying) {
+TEST(test_scope_partition) {
     struct umbra_buf slot[20] = {0};
 
-    {   // Pure-uniform: imm + uniform.
+    {   // Pure-uniform: imm + uniform.  Everything but the store is preamble.
         struct umbra_builder *b = umbra_builder();
         umbra_ptr const u = umbra_bind_uniforms(b, NULL, 1);
         umbra_store_32(b, umbra_bind_buf(b, &slot[0]),
             umbra_add_f32(b, umbra_uniform_32(b, u, 0), umbra_imm_f32(b, 1.0f)));
-        check_scope_varying_equiv(b);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        all_live_below_batch(ir);
+        umbra_flat_ir_free(ir);
         umbra_builder_free(b);
     }
-    {   // Lane-varying source (umbra_x) feeding arithmetic.
+    {   // Lane-varying source narrows arithmetic to LANE.
         struct umbra_builder *b = umbra_builder();
         umbra_store_32(b, umbra_bind_buf(b, &slot[0]),
             umbra_add_f32(b, umbra_x(b), umbra_imm_f32(b, 1.0f)));
-        check_scope_varying_equiv(b);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        any_live_at_batch_or_narrower(ir);
+        umbra_flat_ir_free(ir);
         umbra_builder_free(b);
     }
-    {   // Loads/stores of various widths.
-        struct umbra_builder *b = umbra_builder();
-        umbra_val32 const v = umbra_load_32(b, umbra_bind_buf(b, &slot[0]));
-        umbra_store_32(b, umbra_bind_buf(b, &slot[1]), v);
-        umbra_val16 const h = umbra_load_16(b, umbra_bind_buf(b, &slot[2]));
-        umbra_store_16(b, umbra_bind_buf(b, &slot[3]), h);
-        check_scope_varying_equiv(b);
-        umbra_builder_free(b);
-    }
-    {   // umbra_if with imm-only body (cap rule).
+    {   // umbra_if with imm-only body: imm escapes the cap, store does not.
         struct umbra_builder *b = umbra_builder();
         umbra_val32 const cond = umbra_lt_s32(b, umbra_x(b), umbra_imm_i32(b, 4));
         umbra_if(b, cond); {
             umbra_store_32(b, umbra_bind_buf(b, &slot[0]), umbra_imm_i32(b, 99));
         } umbra_end_if(b);
-        check_scope_varying_equiv(b);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        int saw_compile_imm_in_region = 0;
+        for (int i = 0; i < ir->insts; i++) {
+            if (ir->inst[i].op == op_imm_32 && ir->inst[i].imm == 99) {
+                ir->inst[i].scope == SCOPE_COMPILE here;
+                saw_compile_imm_in_region = 1;
+            }
+        }
+        saw_compile_imm_in_region here;
+        umbra_flat_ir_free(ir);
         umbra_builder_free(b);
     }
-    {   // umbra_loop with body referencing loop counter and uniform-only ops.
-        struct umbra_builder *b = umbra_builder();
-        umbra_ptr const   u    = umbra_bind_uniforms(b, NULL, 1);
-        umbra_val32 const trip = umbra_uniform_32(b, u, 0);
-        umbra_var32 const acc  = umbra_declare_var32(b, umbra_imm_i32(b, 0));
-        umbra_val32 const i    = umbra_loop(b, trip);
-        umbra_store_var32(b, acc, umbra_add_i32(b, umbra_load_var32(b, acc), i));
-        umbra_end_loop(b);
-        umbra_store_32(b, umbra_bind_buf(b, &slot[0]), umbra_load_var32(b, acc));
-        check_scope_varying_equiv(b);
-        umbra_builder_free(b);
-    }
-    {   // Nested if inside a loop: maxes out region depth, exercises cap.
+    {   // Nested if inside a loop: cap forces non-imm/uniform ops to BATCH.
         struct umbra_builder *b = umbra_builder();
         umbra_ptr const   u    = umbra_bind_uniforms(b, NULL, 1);
         umbra_val32 const trip = umbra_uniform_32(b, u, 0);
@@ -5690,7 +5687,9 @@ TEST(test_scope_matches_varying) {
         } umbra_end_if(b);
         umbra_end_loop(b);
         umbra_store_32(b, umbra_bind_buf(b, &slot[0]), umbra_load_var32(b, acc));
-        check_scope_varying_equiv(b);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        any_live_at_batch_or_narrower(ir);
+        umbra_flat_ir_free(ir);
         umbra_builder_free(b);
     }
 }

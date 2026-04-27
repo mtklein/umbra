@@ -128,7 +128,7 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
 }
 
 static _Bool is_body(struct ir_inst const *inst) {
-    return inst->live && inst->varying;
+    return inst->live && inst->scope >= SCOPE_BATCH;
 }
 
 static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int live,
@@ -281,13 +281,11 @@ static _Bool is_cf(enum op op) {
 }
 
 // Per-op intrinsic scope.  Source ops introduce scope; everything else is
-// SCOPE_COMPILE intrinsically and inherits from operands via narrow().  For
-// step 1 of the migration we mirror op_is_varying exactly: varying-source ops
-// get SCOPE_LANE, non-varying ops get SCOPE_COMPILE.  That keeps the
-// (scope >= SCOPE_BATCH) == varying invariant true by construction so the
-// later switch-flip lands with zero codegen diff.  Finer-grained intrinsics
-// (SCOPE_ROW for op_y, SCOPE_DISPATCH for op_uniform_32) come in a later
-// step once the partition becomes scope-driven.
+// SCOPE_COMPILE intrinsically and inherits from operands via narrow().  Today
+// we mirror op_is_varying exactly: varying-source ops get SCOPE_LANE,
+// everything else gets SCOPE_COMPILE.  Finer-grained intrinsics (SCOPE_ROW
+// for op_y, SCOPE_DISPATCH for op_uniform_32) come later when an
+// optimization wants to split the preamble tier.
 static enum scope intrinsic_scope(enum op op) {
     return op_is_varying(op) ? SCOPE_LANE : SCOPE_COMPILE;
 }
@@ -318,11 +316,6 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     }
 
     for (int i = 0; i < n; i++) {
-        b->inst[i].varying = op_is_varying(b->inst[i].op)
-                          || b->inst[b->inst[i].x.id].varying
-                          || b->inst[b->inst[i].y.id].varying
-                          || b->inst[b->inst[i].z.id].varying
-                          || b->inst[b->inst[i].w.id].varying;
         enum scope s = intrinsic_scope(b->inst[i].op);
         s = narrow(s, (enum scope)b->inst[b->inst[i].x.id].scope);
         s = narrow(s, (enum scope)b->inst[b->inst[i].y.id].scope);
@@ -343,27 +336,18 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
             if (b->inst[i].op == op_loop_begin || b->inst[i].op == op_if_begin) { depth++; }
             if (depth > 0
                     && b->inst[i].op != op_imm_32
-                    && b->inst[i].op != op_uniform_32) {
-                b->inst[i].varying = 1;
-                if (b->inst[i].scope < SCOPE_BATCH) {
-                    b->inst[i].scope = SCOPE_BATCH;
-                }
+                    && b->inst[i].op != op_uniform_32
+                    && b->inst[i].scope < SCOPE_BATCH) {
+                b->inst[i].scope = SCOPE_BATCH;
             }
             if (b->inst[i].op == op_loop_end || b->inst[i].op == op_if_end) { depth--; }
-        }
-    }
-    // Migration invariant: scope and varying must agree on the BATCH split so
-    // we can flip authority from varying → scope with zero codegen diff.
-    for (int i = 0; i < n; i++) {
-        if (b->inst[i].live) {
-            assume((b->inst[i].scope >= SCOPE_BATCH) == b->inst[i].varying);
         }
     }
 
     struct ir_inst *out = malloc((size_t)live * sizeof *out);
     int preamble = 0;
     for (int i = 0; i < n; i++) {
-        if (b->inst[i].live && !b->inst[i].varying && !op_is_store(b->inst[i].op)) {
+        if (b->inst[i].live && b->inst[i].scope < SCOPE_BATCH && !op_is_store(b->inst[i].op)) {
             b->inst[i].final_id = preamble;
             out[preamble++] = b->inst[i];
         }
@@ -372,7 +356,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     int *cf = malloc((size_t)n * sizeof *cf);
     int cfs = 0;
     for (int i = 0; i < n; i++) {
-        if (b->inst[i].live && b->inst[i].varying && is_cf(b->inst[i].op)) {
+        if (b->inst[i].live && b->inst[i].scope >= SCOPE_BATCH && is_cf(b->inst[i].op)) {
             cf[cfs++] = i;
         }
     }
