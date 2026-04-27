@@ -1220,7 +1220,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 } NEXT;
 
                 // sel_32 register variants.
-#define SEL(xv,yv,zv) (((xv).i32 & (yv).i32) | (~(xv).i32 & (zv).i32))
+#define SEL(xv, yv, zv) (((xv).i32 & (yv).i32) | (~(xv).i32 & (zv).i32))
                 CASE(op_r_sel_32_mm) acc.i32 = SEL(v[ip->x], v[ip->y], v[ip->z]); NEXT;
                 CASE(op_r_sel_32_rm) acc.i32 = SEL(acc,       v[ip->y], v[ip->z]); NEXT;
                 CASE(op_m_sel_32_rm) v->i32  = SEL(acc,       v[ip->y], v[ip->z]); NEXT;
@@ -1228,13 +1228,13 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
 
                 // fma/fms register variants.
 #if defined(__ARM_FEATURE_FMA) || defined(__FMA__)
-#define FMA_OP(xv,yv,zv) vec_fma((xv), (yv), (zv))
-#define FMS_OP(xv,yv,zv) vec_fma(-(xv), (yv), (zv))
+#define FMA_OP(xv, yv, zv) vec_fma((xv), (yv), (zv))
+#define FMS_OP(xv, yv, zv) vec_fma(-(xv), (yv), (zv))
 #else
                 // F64 intermediate for precision on non-FMA platforms.
                 // (uses the existing F64 typedef from the non-variant fma cases)
-#define FMA_OP(xv,yv,zv) cast(F32, cast(F64,(xv)) * cast(F64,(yv)) + cast(F64,(zv)))
-#define FMS_OP(xv,yv,zv) cast(F32, cast(F64,(zv)) - cast(F64,(xv)) * cast(F64,(yv)))
+#define FMA_OP(xv, yv, zv) cast(F32, cast(F64, (xv)) * cast(F64, (yv)) + cast(F64, (zv)))
+#define FMS_OP(xv, yv, zv) cast(F32, cast(F64, (zv)) - cast(F64, (xv)) * cast(F64, (yv)))
 #endif
                 CASE(op_r_fma_f32_mmm) {
                     acc.f32 = FMA_OP(v[ip->x].f32, v[ip->y].f32, v[ip->z].f32);
