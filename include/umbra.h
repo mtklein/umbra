@@ -188,12 +188,6 @@ void        umbra_end_if(struct umbra_builder*);
 //       lowering.  Performance feature, not a correctness fix; matters most
 //       for the SDF tile-cov gate where the condition is uniform per batch
 //       (tile size T >> lane batch K).
-// TODO: masked stores inside umbra_if are lowered as load-blend-store;
-//       on x86 vpmaskmovd-store could skip the load and write only the
-//       true lanes.  Pure perf, no OOB-read implications since the SIMD
-//       body always operates on a K-aligned in-bounds chunk.  NEON has
-//       no equivalent masked-store instruction, so arm64 keeps the
-//       blend.
 
 typedef struct { int id; } umbra_var32;
 umbra_var32 umbra_declare_var32(struct umbra_builder*, umbra_val32 init);

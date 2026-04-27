@@ -521,18 +521,16 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             ptr    p = inst->ptr;
             int    base = resolve_ptr_x86(c, p, &last_ptr, 2);
             if (jc->if_depth > 0) {
-                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
-                int8_t tmp = ra_alloc(ra, sl, ns);
+                int8_t rm = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
                 if (scalar) {
-                    vmovd_load(c, tmp, base, XCOL_X86, 4, 0);
-                    vpblendvb(c, 0, tmp, tmp, ry, rm);
+                    int8_t tmp = ra_alloc(ra, sl, ns);
+                    vmovd_load (c, tmp, base, XCOL_X86, 4, 0);
+                    vpblendvb  (c, 0, tmp, tmp, ry, rm);
                     vmovd_store(c, tmp, base, XCOL_X86, 4, 0);
+                    ra_return_reg(ra, tmp);
                 } else {
-                    vmov_load(c, 1, tmp, base, XCOL_X86, 4, 0);
-                    vpblendvb(c, 1, tmp, tmp, ry, rm);
-                    vmov_store(c, 1, tmp, base, XCOL_X86, 4, 0);
+                    vpmaskmovd_store(c, 1, ry, rm, base, XCOL_X86, 4, 0);
                 }
-                ra_return_reg(ra, tmp);
             } else {
                 if (scalar) {
                     vmovd_store(c, ry, base, XCOL_X86, 4, 0);
@@ -824,18 +822,16 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             vpslld_i(c, t, rb_, 16);  vpor(c, L, px, px, t);
             vpslld_i(c, t, ra_v, 24); vpor(c, L, px, px, t);
             if (jc->if_depth > 0) {
-                int8_t rm  = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
-                int8_t old = ra_alloc(ra, sl, ns);
+                int8_t rm = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
                 if (scalar) {
+                    int8_t old = ra_alloc(ra, sl, ns);
                     vmovd_load (c, old, base, XCOL_X86, 4, 0);
                     vpblendvb  (c, 0, px, old, px, rm);
                     vmovd_store(c, px,  base, XCOL_X86, 4, 0);
+                    ra_return_reg(ra, old);
                 } else {
-                    vmov_load (c, 1, old, base, XCOL_X86, 4, 0);
-                    vpblendvb (c, 1, px, old, px, rm);
-                    vmov_store(c, 1, px,  base, XCOL_X86, 4, 0);
+                    vpmaskmovd_store(c, 1, px, rm, base, XCOL_X86, 4, 0);
                 }
-                ra_return_reg(ra, old);
             } else if (scalar) {
                 vmovd_store(c, px, base, XCOL_X86, 4, 0);
             } else {

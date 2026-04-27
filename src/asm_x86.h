@@ -118,6 +118,8 @@ void vpmovzxwd(struct asm_x86 *b, int d, int s);
 void vpmovsxdq(struct asm_x86 *b, int d, int s);
 
 void vpgatherdd(struct asm_x86 *b, int dst, int base, int idx, int scale, int mask);
+void vpmaskmovd_store(struct asm_x86 *b, int L, int reg, int mask,
+                      int base, int index, int scale, int disp);
 void vpextrd(struct asm_x86 *b, int gpr, int xmm, uint8_t imm);
 void vextracti128(struct asm_x86 *b, int d, int s, uint8_t imm);
 

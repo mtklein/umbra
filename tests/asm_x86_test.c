@@ -416,6 +416,20 @@ TEST(test_gather) {
     free(b.byte);
 }
 
+TEST(test_vpmaskmovd_store) {
+    struct asm_x86 b = {0};
+
+    // vpmaskmovd [rdi+rcx*4+0], ymm5, ymm3 => c4 e2 55 8e 1c 8f
+    vpmaskmovd_store(&b, 1, 3, 5, RDI, RCX, 4, 0);
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE2, 0x55, 0x8E, 0x1C, 0x8F}) here;
+    reset(&b);
+
+    // 128-bit form: vpmaskmovd [rdi+rcx*4+0], xmm5, xmm3 => c4 e2 51 8e 1c 8f
+    vpmaskmovd_store(&b, 0, 3, 5, RDI, RCX, 4, 0);
+    bytes_eq(&b, 6, (uint8_t[]){0xC4, 0xE2, 0x51, 0x8E, 0x1C, 0x8F}) here;
+    free(b.byte);
+}
+
 TEST(test_large_disp) {
     struct asm_x86 b = {0};
 
