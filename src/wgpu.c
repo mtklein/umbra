@@ -64,7 +64,7 @@ struct wgpu_backend {
     _Bool                     frame_has_work [WGPU_N_FRAMES];
     _Bool                     had_error; int :8, :32;
 
-    struct gpu_buf_cache          cache;
+    struct gpu_buf_cache      cache;
 
     struct uniform_ring_pool  uni_pool;
     struct uniform_ring_pool  uni_pool_uniform;
