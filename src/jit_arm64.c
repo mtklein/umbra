@@ -304,25 +304,37 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, NOP());
 
     // Entry: x0=l, x1=t, x2=r, x3=b, x4=buf.
-    // Save before preamble clobbers args (and XM via load_count).
+    // Set XY to the current row before the preamble so op_y (SCOPE_ROW)
+    // broadcasts the right value when it lands in the per-row preamble.
+    // XM can't hold b across the preamble because load_count (used by
+    // gather ops in the preamble) clobbers it; stash b in XCOL instead
+    // (op_x is SCOPE_LANE so the preamble never reads XCOL).
     put(&c, ADD_xi(XH, 0, 0));        // XH = l
-    put(&c, ADD_xi(XCOL, 1, 0));      // XCOL = t (temp)
+    put(&c, ADD_xi(XY, 1, 0));        // XY = t (current row)
     put(&c, ADD_xi(XW, 2, 0));        // XW = r = col_end
-    put(&c, ADD_xi(XY, 3, 0));        // XY = b (temp)
+    put(&c, ADD_xi(XCOL, 3, 0));      // XCOL = b (temp; will be l after preamble)
     put(&c, ADD_xi(XBUF, 4, 0));      // XBUF = buf
 
     int const preamble_off = c.words * 4;
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0,
              &jc);
 
+    // Snapshot sl[] after the first preamble emit.  The row-transition
+    // re-emit (after each row's tail clears sl[]) needs to land its spills
+    // in the *same* slots the SIMD body's already-emitted fills read from,
+    // since with row-scope preamble values (op_y) the slot contents change
+    // per row.  Without this, body fills would read stale data spilled by
+    // a prior row's preamble.
+    int *sl_preamble = malloc((size_t)ir->preamble * sizeof(int));
+    for (int i = 0; i < ir->preamble; i++) { sl_preamble[i] = sl[i]; }
+
     ra_begin_loop(ra);
 
-    // 2D loop: XCOL = column, XY = row, X0 = col_end.
-    put(&c, ADD_xi(XM, XY, 0));       // XM = b = end_row (XY saved pre-preamble)
+    // 2D loop: XCOL = column, XY = row, x0 = col_end.
+    put(&c, ADD_xi(XM, XCOL, 0));     // XM = b = end_row (XCOL stashed b)
     put(&c, ADD_xi(0, XW, 0));        // x0 = col_end = r
-    put(&c, ADD_xi(XWIDTH, XH, 0));   // XWIDTH = l
-    put(&c, ADD_xi(XY, XCOL, 0));     // XY = t
-    put(&c, ADD_xi(XCOL, XH, 0));     // XCOL = l
+    put(&c, ADD_xi(XWIDTH, XH, 0));   // XWIDTH = l (start col)
+    put(&c, ADD_xi(XCOL, XH, 0));     // XCOL = l (current col)
     put(&c, STP_pre(XM, 15, 31, -2)); // push end_row
 
     int const loop_top = c.words;
@@ -376,9 +388,15 @@ struct jit_program* jit_program(struct jit_backend *be,
     // Re-emit preamble so the next row's SIMD iter starts with uniforms in
     // the registers it expects: the tail body clobbers them, and the SIMD
     // body's end-of-loop fills are skipped when we enter the tail.
+    //
+    // Restore sl[] from the snapshot taken after the first preamble emit so
+    // that any preamble value that was spilled originally lands back in the
+    // *same* slot.  The SIMD body's already-emitted fills reference those
+    // original slot numbers, and with row-scope preamble values the slot
+    // contents change per row.
     int const next_row_off = c.words * 4;
     ra_reset_pool(ra);
-    for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
+    for (int i = 0; i < ir->preamble; i++) { sl[i] = sl_preamble[i]; }
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
     ra_assert_loop_invariant(ra);
     put(&c, B(loop_top - c.words));
@@ -431,6 +449,7 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     ra_destroy(ra);
     free(sl);
+    free(sl_preamble);
 
     size_t const code_sz = (size_t)c.words * 4,
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);

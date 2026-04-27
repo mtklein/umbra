@@ -299,20 +299,30 @@ struct jit_program* jit_program(struct jit_backend *be,
     }
 
     // Entry: RDI=l, RSI=t, RDX=r, RCX=b, R8=buf.
-    mov_rr(&c, XCOL_X86, RDX);             // XCOL_X86 = r (save before XBUF overwrite)
+    mov_rr(&c, XCOL_X86, RDX);       // XCOL_X86 = r (save before XBUF overwrite)
     mov_rr(&c, XH_X86, RCX);         // XH_X86 = b
     mov_rr(&c, XBUF, R8);            // XBUF(RDX) = buf
+    mov_rr(&c, XY, RSI);             // XY = t (set before preamble so op_y in
+                                     // the per-row preamble broadcasts row t).
 
     int const preamble_off = (int)c.size;
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
 
+    // Snapshot sl[] after the first preamble emit.  The row-transition
+    // re-emit (after each row's tail clears sl[]) needs to land its spills
+    // in the *same* slots the SIMD body's already-emitted fills read from,
+    // since with row-scope preamble values (op_y) the slot contents change
+    // per row.  Without this, body fills would read stale data spilled by
+    // a prior row's preamble.
+    int *sl_preamble = malloc((size_t)ir->preamble * sizeof(int));
+    for (int i = 0; i < ir->preamble; i++) { sl_preamble[i] = sl[i]; }
+
     ra_begin_loop(ra);
 
-    // RDI=l, RSI=t survive preamble; XCOL_X86=r, XH_X86=b saved above.
-    mov_rr(&c, XY, RSI);             // XY = t
-    mov_rr(&c, RSI, RDI);            // XWIDTH = l
-    mov_rr(&c, RDI, XCOL_X86);             // RDI = r = col_end
-    mov_rr(&c, XCOL_X86, RSI);             // XCOL_X86 = l
+    // XY=t already; XCOL_X86=r still; finish row-state setup.
+    mov_rr(&c, RSI, RDI);            // XWIDTH = l (RSI was t, becomes l)
+    mov_rr(&c, RDI, XCOL_X86);       // RDI = r = col_end
+    mov_rr(&c, XCOL_X86, RSI);       // XCOL_X86 = l
 
     int const loop_top = (int)c.size;
     ra_assert_loop_invariant(ra);
@@ -368,9 +378,15 @@ struct jit_program* jit_program(struct jit_backend *be,
     // Re-emit preamble so the next row's SIMD iter starts with uniforms in
     // the registers it expects: the tail body clobbers them, and the SIMD
     // body's end-of-loop fills are skipped when we enter the tail.
+    //
+    // Restore sl[] from the snapshot taken after the first preamble emit so
+    // that any preamble value that was spilled originally lands back in the
+    // *same* slot.  The SIMD body's already-emitted fills reference those
+    // original slot numbers, and with row-scope preamble values the slot
+    // contents change per row.
     int const next_row_off = (int)c.size;
     ra_reset_pool(ra);
-    for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
+    for (int i = 0; i < ir->preamble; i++) { sl[i] = sl_preamble[i]; }
     emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
     ra_assert_loop_invariant(ra);
     {
@@ -429,6 +445,7 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     ra_destroy(ra);
     free(sl);
+    free(sl_preamble);
 
     size_t const code_sz = c.size,
                  pg      = (size_t)sysconf(_SC_PAGESIZE),

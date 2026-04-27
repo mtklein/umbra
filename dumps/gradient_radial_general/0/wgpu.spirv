@@ -78,13 +78,13 @@
     %uint_16 = OpConstant %uint 16
     %float_0 = OpConstant %float 0
 %uint_4294967295 = OpConstant %uint 4294967295
+   %float_n1 = OpConstant %float -1
 %uint_1597463007 = OpConstant %uint 1597463007
 %uint_1065353216 = OpConstant %uint 1065353216
 %uint_1056964608 = OpConstant %uint 1056964608
 %uint_1052770304 = OpConstant %uint 1052770304
 %uint_2129733610 = OpConstant %uint 2129733610
 %uint_1073741824 = OpConstant %uint 1073741824
-   %float_n1 = OpConstant %float -1
     %float_1 = OpConstant %float 1
      %uint_7 = OpConstant %uint 7
      %uint_6 = OpConstant %uint 6
@@ -117,35 +117,35 @@
          %68 = OpLoad %uint %67
          %69 = OpIAdd %uint %66 %58
          %70 = OpIAdd %uint %68 %59
-         %71 = OpAccessChain %_ptr_Uniform_uint %45 %uint_0 %uint_0 %uint_0
-         %72 = OpLoad %uint %71
-         %73 = OpAccessChain %_ptr_Uniform_uint %45 %uint_0 %uint_0 %uint_1
+         %71 = OpBitcast %int %70
+         %72 = OpConvertSToF %float %71
+         %73 = OpAccessChain %_ptr_Uniform_uint %45 %uint_0 %uint_0 %uint_0
          %74 = OpLoad %uint %73
-         %75 = OpAccessChain %_ptr_Uniform_uint %45 %uint_0 %uint_0 %uint_2
+         %75 = OpAccessChain %_ptr_Uniform_uint %45 %uint_0 %uint_0 %uint_1
          %76 = OpLoad %uint %75
-         %81 = OpAccessChain %_ptr_Uniform_uint %46 %uint_0 %uint_1 %uint_0
-         %82 = OpLoad %uint %81
-         %83 = OpBitcast %float %82
-         %84 = OpConvertFToS %int %83
-         %85 = OpBitcast %uint %84
-         %86 = OpISub %uint %85 %uint_1
-         %87 = OpIAdd %uint %85 %85
-         %88 = OpIAdd %uint %85 %87
+         %77 = OpAccessChain %_ptr_Uniform_uint %45 %uint_0 %uint_0 %uint_2
+         %78 = OpLoad %uint %77
+         %79 = OpBitcast %float %76
+         %81 = OpExtInst %float %1 Fma %float_n1 %79 %72
+         %82 = OpExtInst %float %1 Fma %81 %81 %float_0
+         %87 = OpAccessChain %_ptr_Uniform_uint %46 %uint_0 %uint_1 %uint_0
+         %88 = OpLoad %uint %87
+         %89 = OpBitcast %float %88
+         %90 = OpConvertFToS %int %89
+         %91 = OpBitcast %uint %90
+         %92 = OpISub %uint %91 %uint_1
+         %93 = OpIAdd %uint %91 %91
+         %94 = OpIAdd %uint %91 %93
                OpStore %52 %uint_0
                OpStore %53 %uint_0
                OpStore %54 %uint_0
                OpStore %55 %uint_0
                OpStore %56 %uint_0
-         %91 = OpBitcast %int %69
-         %92 = OpConvertSToF %float %91
-         %93 = OpBitcast %float %72
-         %95 = OpExtInst %float %1 Fma %float_n1 %93 %92
-         %96 = OpBitcast %int %70
-         %97 = OpConvertSToF %float %96
-         %98 = OpBitcast %float %74
-         %99 = OpExtInst %float %1 Fma %float_n1 %98 %97
-        %100 = OpExtInst %float %1 Fma %99 %99 %float_0
-        %101 = OpExtInst %float %1 Fma %95 %95 %100
+         %97 = OpBitcast %int %69
+         %98 = OpConvertSToF %float %97
+         %99 = OpBitcast %float %74
+        %100 = OpExtInst %float %1 Fma %float_n1 %99 %98
+        %101 = OpExtInst %float %1 Fma %100 %100 %82
         %102 = OpBitcast %uint %101
         %103 = OpShiftRightLogical %uint %102 %uint_1
         %104 = OpISub %uint %uint_1597463007 %103
@@ -176,7 +176,7 @@
         %130 = OpINotEqual %bool %107 %uint_0
         %131 = OpBitcast %uint %129
         %132 = OpSelect %uint %130 %uint_0 %131
-        %133 = OpBitcast %float %76
+        %133 = OpBitcast %float %78
         %134 = OpBitcast %float %132
         %135 = OpExtInst %float %1 Fma %133 %134 %float_0
         %136 = OpBitcast %float %uint_0
@@ -187,7 +187,7 @@
         %140 = OpLabel
                OpLoopMerge %143 %142 None
         %144 = OpLoad %uint %56
-        %145 = OpULessThan %bool %144 %86
+        %145 = OpULessThan %bool %144 %92
                OpBranchConditional %145 %141 %143
         %141 = OpLabel
         %146 = OpLoad %uint %56
@@ -224,12 +224,12 @@
         %177 = OpBitcast %float %166
         %178 = OpBitcast %float %157
         %179 = OpExtInst %float %1 Fma %float_n1 %178 %177
-        %180 = OpIAdd %uint %88 %147
+        %180 = OpIAdd %uint %94 %147
         %181 = OpBitcast %uint %179
         %182 = OpISub %uint %uint_2129733610 %181
-        %183 = OpIAdd %uint %85 %147
-        %184 = OpIAdd %uint %87 %147
-        %185 = OpIAdd %uint %88 %146
+        %183 = OpIAdd %uint %91 %147
+        %184 = OpIAdd %uint %93 %147
+        %185 = OpIAdd %uint %94 %146
         %186 = OpBitcast %float %157
         %187 = OpExtInst %float %1 Fma %float_n1 %186 %139
         %189 = OpAccessChain %_ptr_StorageBuffer_uint_0 %49 %uint_0 %uint_6
@@ -292,7 +292,7 @@
         %246 = OpExtInst %float %1 Fma %187 %241 %245
         %247 = OpBitcast %float %224
         %248 = OpExtInst %float %1 Fma %246 %227 %247
-        %249 = OpIAdd %uint %85 %146
+        %249 = OpIAdd %uint %91 %146
         %250 = OpAccessChain %_ptr_StorageBuffer_uint_0 %49 %uint_0 %uint_6
         %251 = OpLoad %uint %250
         %252 = OpISub %uint %251 %uint_1
@@ -307,7 +307,7 @@
         %261 = OpExtInst %float %1 Fma %float_n1 %260 %259
         %262 = OpBitcast %float %258
         %263 = OpExtInst %float %1 Fma %246 %261 %262
-        %264 = OpIAdd %uint %87 %146
+        %264 = OpIAdd %uint %93 %146
         %265 = OpAccessChain %_ptr_StorageBuffer_uint_0 %49 %uint_0 %uint_6
         %266 = OpLoad %uint %265
         %267 = OpISub %uint %266 %uint_1

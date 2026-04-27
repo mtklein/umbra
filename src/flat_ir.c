@@ -286,13 +286,12 @@ static _Bool is_cf(enum op op) {
 // placement delineates regions that must execute per-batch regardless of
 // operand scope.
 //
-// Note on op_y: semantically it's SCOPE_ROW (constant within a row, varies
-// per row) but the JIT preamble emit happens before the dispatch loop sets
-// up the row-state register XY, so hoisting op_y into the preamble would
-// broadcast the wrong value on the first row.  Tagging it SCOPE_BATCH keeps
-// it in the body (today's behavior) and is still truthful, just looser.
-// Tightening to SCOPE_ROW is a follow-up that needs the JIT to split its
-// per-row preamble emit out from the dispatch-entry preamble emit.
+// op_y is SCOPE_ROW: constant within a row, varies per row.  The JITs set
+// up XY (the row-state register) before emitting the preamble so op_y
+// broadcasts the right row, and the per-row preamble re-emit at row
+// transitions refreshes the broadcast for each subsequent row.  Anything
+// purely derived from op_y + uniforms therefore hoists out of the per-batch
+// body into the per-row preamble.
 static enum scope intrinsic_scope(enum op op) {
     if (is_cf(op))                  { return SCOPE_BATCH; }
     if (op == op_imm_32)            { return SCOPE_COMPILE; }
@@ -300,7 +299,7 @@ static enum scope intrinsic_scope(enum op op) {
             || op == op_gather_uniform_32
             || op == op_gather_32
             || op == op_gather_16)  { return SCOPE_DISPATCH; }
-    if (op == op_y)                 { return SCOPE_BATCH; }
+    if (op == op_y)                 { return SCOPE_ROW; }
     if (op_is_varying(op))          { return SCOPE_LANE; }
     return SCOPE_COMPILE;
 }
