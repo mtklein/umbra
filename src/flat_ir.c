@@ -354,10 +354,25 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         b->inst[i].scope = (int8_t)s;
     }
 
+    // Two-pass preamble extraction so the result is a clean tier partition:
+    // out[0..dispatch_end) holds scope ≤ SCOPE_DISPATCH ops (the dispatch
+    // tier — emit once per queue() call), out[dispatch_end..preamble) holds
+    // scope == SCOPE_ROW ops (the row tier — emit at each row's entry),
+    // and out[preamble..insts) is the per-batch body.  Within each tier we
+    // preserve textual order, so dependency ordering is intact.
     struct ir_inst *out = malloc((size_t)live * sizeof *out);
-    int preamble = 0;
+    int dispatch_end = 0;
     for (int i = 0; i < n; i++) {
-        if (b->inst[i].live && b->inst[i].scope < SCOPE_BATCH && !op_is_store(b->inst[i].op)) {
+        if (b->inst[i].live && b->inst[i].scope <= SCOPE_DISPATCH
+                && !op_is_store(b->inst[i].op)) {
+            b->inst[i].final_id = dispatch_end;
+            out[dispatch_end++] = b->inst[i];
+        }
+    }
+    int preamble = dispatch_end;
+    for (int i = 0; i < n; i++) {
+        if (b->inst[i].live && b->inst[i].scope == SCOPE_ROW
+                && !op_is_store(b->inst[i].op)) {
             b->inst[i].final_id = preamble;
             out[preamble++] = b->inst[i];
         }
@@ -394,9 +409,10 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     }
 
     struct umbra_flat_ir *result = calloc(1, sizeof *result);
-    result->inst     = out;
-    result->insts    = live;
-    result->preamble = preamble;
+    result->inst         = out;
+    result->insts        = live;
+    result->dispatch_end = dispatch_end;
+    result->preamble     = preamble;
     result->vars   = b->vars;
     result->loop_begin = -1;
     result->loop_end   = -1;

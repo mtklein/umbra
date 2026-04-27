@@ -5682,6 +5682,43 @@ TEST(test_scope_intrinsics) {
     }
 }
 
+// The finalized IR is a clean tier partition: [0..dispatch_end) holds ops
+// with scope ≤ SCOPE_DISPATCH, [dispatch_end..preamble) holds scope == ROW
+// ops, and [preamble..insts) is the per-batch body (scope ≥ BATCH).  This
+// is the contract the JIT relies on to emit the dispatch tier once at
+// function entry and only re-emit the row tier per row.
+TEST(test_scope_tier_partition) {
+    struct umbra_buf slot[4] = {0};
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const u  = umbra_bind_uniforms(b, NULL, 4);
+    umbra_ptr const dst = umbra_bind_buf(b, &slot[0]);
+    umbra_val32 const c0 = umbra_imm_f32(b, 1.0f);
+    umbra_val32 const c1 = umbra_uniform_32(b, u, 0);
+    umbra_val32 const yf = umbra_f32_from_i32(b, umbra_y(b));
+    umbra_val32 const xf = umbra_f32_from_i32(b, umbra_x(b));
+    umbra_store_32(b, dst,
+        umbra_add_f32(b, xf,
+            umbra_add_f32(b, yf, umbra_add_f32(b, c0, c1))));
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+
+    (ir->dispatch_end > 0)            here;
+    (ir->dispatch_end <  ir->preamble) here;
+    (ir->preamble     <  ir->insts)    here;
+
+    for (int i = 0; i < ir->dispatch_end; i++) {
+        (ir->inst[i].scope <= SCOPE_DISPATCH) here;
+    }
+    for (int i = ir->dispatch_end; i < ir->preamble; i++) {
+        ir->inst[i].scope == SCOPE_ROW here;
+    }
+    for (int i = ir->preamble; i < ir->insts; i++) {
+        (ir->inst[i].scope >= SCOPE_BATCH) here;
+    }
+
+    umbra_flat_ir_free(ir);
+    umbra_builder_free(b);
+}
+
 // LICM: a pure expression with all-uniform inputs textually inside a loop
 // should land in the preamble (scope < SCOPE_BATCH), not the body.  Before
 // scope-driven scheduling the depth-counter cap forced everything inside a

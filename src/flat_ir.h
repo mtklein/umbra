@@ -132,10 +132,12 @@ struct umbra_flat_ir {
     // ptr-bearing op is live.
     struct buffer_metadata   *buf;
 
-    int insts,      // Total instruction count.
-        preamble;   // inst[0..preamble) are uniform, [preamble..) varying.
-    int loop_begin, // Instruction index of op_loop_begin, or -1.
-        loop_end;   // Instruction index of op_loop_end,   or -1.
+    int insts,         // Total instruction count.
+        dispatch_end,  // inst[0..dispatch_end) have scope ≤ SCOPE_DISPATCH.
+        preamble;      // inst[dispatch_end..preamble) have scope == SCOPE_ROW.
+                       // inst[preamble..insts) is the per-batch body.
+    int loop_begin,    // Instruction index of op_loop_begin, or -1.
+        loop_end;      // Instruction index of op_loop_end,   or -1.
     int vars, bindings;
-    int total_bufs, :32;
+    int total_bufs;
 };
