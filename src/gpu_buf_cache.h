@@ -29,7 +29,7 @@ struct gpu_cache_entry {
 
 struct gpu_buf_cache {
     struct gpu_cache_entry *entry;
-    int                     n, cap;
+    int                     entries, cap;
     struct gpu_buf_ops      ops;
     void                   *ctx;
     size_t                  upload_bytes;

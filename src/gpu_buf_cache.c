@@ -5,7 +5,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
                       uint8_t rw) {
     _Bool const writable = rw & BUF_WRITTEN,
                 sealed   = rw & BUF_SEALED;
-    for (int i = 0; i < c->n; i++) {
+    for (int i = 0; i < c->entries; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->host == host && ce->buf.size >= bytes) {
             if (host && bytes
@@ -29,11 +29,11 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
     }
 
     // Miss — grow if needed.
-    if (c->n >= c->cap) {
+    if (c->entries >= c->cap) {
         c->cap = c->cap ? 2 * c->cap : 16;
         c->entry = realloc(c->entry, (size_t)c->cap * sizeof *c->entry);
     }
-    int const idx = c->n++;
+    int const idx = c->entries++;
     struct gpu_cache_entry *ce = &c->entry[idx];
     *ce = (struct gpu_cache_entry){0};
 
@@ -74,7 +74,7 @@ int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
 }
 
 void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
-    for (int i = 0; i < c->n; i++) {
+    for (int i = 0; i < c->entries; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->copy_tracked && !ce->nocopy && ce->host) {
             size_t const bytes = ce->host_bytes;
@@ -89,17 +89,17 @@ void gpu_buf_cache_copyback(struct gpu_buf_cache *c) {
 }
 
 void gpu_buf_cache_end_batch(struct gpu_buf_cache *c) {
-    for (int i = 0; i < c->n; i++) {
+    for (int i = 0; i < c->entries; i++) {
         c->entry[i].copy_tracked = 0;
         c->entry[i].uploaded     = 0;
     }
 }
 
 void gpu_buf_cache_free(struct gpu_buf_cache *c) {
-    for (int i = 0; i < c->n; i++) {
+    for (int i = 0; i < c->entries; i++) {
         c->ops.release(c->entry[i].buf, c->ctx);
     }
     free(c->entry);
     c->entry = NULL;
-    c->n = c->cap = 0;
+    c->entries = c->cap = 0;
 }

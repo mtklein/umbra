@@ -148,7 +148,7 @@ TEST(test_gpu_buf_cache_multiple_buffers) {
     int ib = gpu_buf_cache_get(&c, b, sizeof b, BUF_WRITTEN);
     ia == 0 here;
     ib == 1 here;
-    c.n == 2 here;
+    c.entries == 2 here;
 
     // Hits on both.
     gpu_buf_cache_get(&c, a, sizeof a, BUF_READ) == 0 here;
