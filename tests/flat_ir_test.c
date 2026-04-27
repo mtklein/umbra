@@ -62,9 +62,9 @@ static struct test_backends binop(struct umbra_buf *slot,
 }
 
 static _Bool run(struct test_backends *B, int bi, int w, int h,
-                 struct umbra_buf *slot, int n_buf,
-                 struct umbra_buf const *bufs) {
-    for (int i = 0; i < n_buf; i++) { slot[i] = bufs[i]; }
+                 struct umbra_buf *slot, int bufs,
+                 struct umbra_buf const *buf) {
+    for (int i = 0; i < bufs; i++) { slot[i] = buf[i]; }
     return test_backends_run(B, bi, w, h);
 }
 
