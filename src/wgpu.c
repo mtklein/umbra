@@ -368,16 +368,16 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     // cache survives across dispatches whose offsets change.  Otherwise fall
     // back to only-push-is-dynamic; bg cache thrashes but we stay within
     // limits.
-    int n_ro_storage = 0, n_ro_uniform = 0;
+    int ro_storages = 0, ro_uniforms = 0;
     for (int i = 0; i < descs - 1; i++) {
         if (!(sr.buf[i].rw & BUF_WRITTEN)) {
-            if (sr.buf[i].is_uniform) { n_ro_uniform++; }
-            else                      { n_ro_storage++; }
+            if (sr.buf[i].is_uniform) { ro_uniforms++; }
+            else                      { ro_storages++; }
         }
     }
     _Bool const dynamic_offset_bindings =
-        (uint32_t)(n_ro_storage + 1) <= be->max_dyn_storage
-     && (uint32_t) n_ro_uniform      <= be->max_dyn_uniform;
+        (uint32_t)(ro_storages + 1) <= be->max_dyn_storage
+     && (uint32_t) ro_uniforms      <= be->max_dyn_uniform;
 
     for (int i = 0; i < descs - 1; i++) {
         _Bool const is_ring = dynamic_offset_bindings && !(sr.buf[i].rw & BUF_WRITTEN);
@@ -537,7 +537,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
 
     // Reuse bind group if buffer handles haven't changed.  When
     // dynamic_offset_bindings is set, every ring-backed binding has
-    // hasDynamicOffset=true, so its offset is passed in dyn_offsets[] at
+    // hasDynamicOffset=true, so its offset is passed in dyn_offset[] at
     // SetBindGroup rather than baked into the bg -- the cache then survives
     // offset changes.  When dynamic_offset_bindings is false (budget too
     // tight), offsets are baked and the cache falls back to comparing them too.
@@ -589,20 +589,20 @@ static void wgpu_program_queue(struct umbra_program *prog,
     // semantics.  The runtime inserts any necessary barriers automatically.
     // https://github.com/gpuweb/gpuweb/discussions/4434
 
-    uint32_t dyn_offsets[33];
-    int n_dyn = 0;
+    uint32_t dyn_offset[33];
+    int dyn_offsets = 0;
     if (p->dynamic_offset_bindings) {
         for (int i = 0; i < n; i++) {
             if (!(p->buf[i].rw & BUF_WRITTEN)) {
-                dyn_offsets[n_dyn++] = (uint32_t)bind_offset[i];
+                dyn_offset[dyn_offsets++] = (uint32_t)bind_offset[i];
             }
         }
     }
-    dyn_offsets[n_dyn++] = (uint32_t)push_loc.offset;
+    dyn_offset[dyn_offsets++] = (uint32_t)push_loc.offset;
 
     wgpuComputePassEncoderSetPipeline(be->batch_pass, p->pipeline);
     wgpuComputePassEncoderSetBindGroup(be->batch_pass, 0, p->cached[ring_ix].bg,
-                                       (size_t)n_dyn, dyn_offsets);
+                                       (size_t)dyn_offsets, dyn_offset);
 
     uint32_t gx = ((uint32_t)w + SPIRV_WG_SIZE - 1) / SPIRV_WG_SIZE;
     wgpuComputePassEncoderDispatchWorkgroups(be->batch_pass, gx, (uint32_t)h, 1);
@@ -720,11 +720,11 @@ struct umbra_backend* umbra_backend_wgpu(void) {
     wgpuAdapterGetLimits(adapter, &adapter_limits);
     adapter_limits.nextInChain = NULL;
 
-    WGPUFeatureName features[] = {
+    WGPUFeatureName feature[] = {
         WGPUFeatureName_ShaderF16,
         WGPUFeatureName_TimestampQuery,
     };
-    int n_features = count(features);
+    int features = count(feature);
 
     struct wgpu_backend *be = calloc(1, sizeof *be);
     be->instance = instance;
@@ -732,8 +732,8 @@ struct umbra_backend* umbra_backend_wgpu(void) {
 
     WGPUDevice dev = NULL;
     WGPUDeviceDescriptor dev_desc    = WGPU_DEVICE_DESCRIPTOR_INIT;
-    dev_desc.requiredFeatureCount     = (size_t)n_features;
-    dev_desc.requiredFeatures         = features;
+    dev_desc.requiredFeatureCount     = (size_t)features;
+    dev_desc.requiredFeatures         = feature;
     dev_desc.requiredLimits           = &adapter_limits;
     dev_desc.uncapturedErrorCallbackInfo.callback  = (WGPUUncapturedErrorCallback)error_cb;
     dev_desc.uncapturedErrorCallbackInfo.userdata1 = be;
