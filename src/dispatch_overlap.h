@@ -8,8 +8,8 @@ struct dispatch_write {
 enum { DISPATCH_OVERLAP_CAP = 64 };
 
 struct dispatch_overlap {
-    struct dispatch_write writes[DISPATCH_OVERLAP_CAP];
-    int n, :32;
+    struct dispatch_write write[DISPATCH_OVERLAP_CAP];
+    int writes, :32;
 };
 
 // Check whether `buf` at rect (l,t,r,b) overlaps any previously recorded write.

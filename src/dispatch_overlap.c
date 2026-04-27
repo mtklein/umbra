@@ -2,13 +2,13 @@
 
 _Bool dispatch_overlap_check(struct dispatch_overlap const *d,
                              void *buf, int l, int t, int r, int b) {
-    if (d->n >= DISPATCH_OVERLAP_CAP) {
+    if (d->writes >= DISPATCH_OVERLAP_CAP) {
         return 1;
     }
-    for (int j = 0; j < d->n; j++) {
-        if (buf == d->writes[j].buf
-                && l < d->writes[j].r && d->writes[j].l < r
-                && t < d->writes[j].b && d->writes[j].t < b) {
+    for (int j = 0; j < d->writes; j++) {
+        if (buf == d->write[j].buf
+                && l < d->write[j].r && d->write[j].l < r
+                && t < d->write[j].b && d->write[j].t < b) {
             return 1;
         }
     }
@@ -17,13 +17,13 @@ _Bool dispatch_overlap_check(struct dispatch_overlap const *d,
 
 void dispatch_overlap_record(struct dispatch_overlap *d,
                              void *buf, int l, int t, int r, int b) {
-    if (d->n < DISPATCH_OVERLAP_CAP) {
-        d->writes[d->n++] = (struct dispatch_write){
+    if (d->writes < DISPATCH_OVERLAP_CAP) {
+        d->write[d->writes++] = (struct dispatch_write){
             .buf = buf, .l = l, .t = t, .r = r, .b = b,
         };
     }
 }
 
 void dispatch_overlap_reset(struct dispatch_overlap *d) {
-    d->n = 0;
+    d->writes = 0;
 }

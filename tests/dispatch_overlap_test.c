@@ -52,10 +52,10 @@ TEST(test_dispatch_overlap_reset_clears) {
     int buf_a = 1;
 
     dispatch_overlap_record(&d, &buf_a, 0, 0, 100, 100);
-    d.n == 1 here;
+    d.writes == 1 here;
 
     dispatch_overlap_reset(&d);
-    d.n == 0 here;
+    d.writes == 0 here;
 
     !dispatch_overlap_check(&d, &buf_a, 0, 0, 100, 100) here;
 }
@@ -77,7 +77,7 @@ TEST(test_dispatch_overlap_swatch_pattern) {
         !dispatch_overlap_check(&d, &buf_dst, l, t, r, b) here;
         dispatch_overlap_record(&d, &buf_dst, l, t, r, b);
     }
-    d.n == COLS * ROWS here;
+    d.writes == COLS * ROWS here;
 }
 
 TEST(test_dispatch_overlap_slug_accumulator_pattern) {
@@ -130,7 +130,7 @@ TEST(test_dispatch_overlap_cap_forces_conflict) {
     for (int i = 0; i < DISPATCH_OVERLAP_CAP; i++) {
         dispatch_overlap_record(&d, &buf_a, i, 0, i + 1, 1);
     }
-    d.n == DISPATCH_OVERLAP_CAP here;
+    d.writes == DISPATCH_OVERLAP_CAP here;
 
     int buf_b = 2;
     dispatch_overlap_check(&d, &buf_b, 999, 999, 1000, 1000) here;
@@ -143,5 +143,5 @@ TEST(test_dispatch_overlap_record_past_cap_is_silent) {
     for (int i = 0; i < DISPATCH_OVERLAP_CAP + 5; i++) {
         dispatch_overlap_record(&d, &buf_a, i, 0, i + 1, 1);
     }
-    d.n == DISPATCH_OVERLAP_CAP here;
+    d.writes == DISPATCH_OVERLAP_CAP here;
 }
