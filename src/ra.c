@@ -127,13 +127,6 @@ void ra_reset_pool(struct ra *ra) {
 static _Bool can_remat(struct ra const *ra, int val);
 
 void ra_spill_dispatch(struct ra *ra, int *sl, int *ns) {
-    // Free every dispatch-tier value's register, spilling first if its data
-    // needs to outlive the dispatch tier and isn't rematerializable.  After
-    // this, slot[V].reg == -1 for all V < dispatch_end — the post-row-tier
-    // ra_begin_loop will capture loop_reg[V] = -1 for them, matching the
-    // ra_reset_pool state at every row transition.  Any subsequent use
-    // (in row tier or body) goes through ra_ensure, which fills from
-    // sl[V] or remats deterministically.
     for (int V = 0; V < ra->dispatch_end; V++) {
         int8_t const r = ra->slot[V].reg;
         if (r >= 0) {
@@ -143,12 +136,6 @@ void ra_spill_dispatch(struct ra *ra, int *sl, int *ns) {
             }
             ra_free_reg(ra, V);
         }
-    }
-}
-
-void ra_clear_preamble(struct ra *ra) {
-    for (int V = 0; V < ra->preamble; V++) {
-        ra_free_reg(ra, V);
     }
 }
 

@@ -362,6 +362,11 @@ struct jit_program* jit_program(struct jit_backend *be,
     cmp_rr(&c, XCOL_X86, RDI);                       // xi >= row_end?
     int const br_row_done = jcc(&c, 0x0d);     // JGE row_done
 
+    // TODO: tail still re-emits the full preamble (dispatch + row) per
+    // iteration because the baked tail body has no end-of-iter restore;
+    // the per-iter preamble re-emit serves as the implicit restore.  A
+    // tier-aware tail would skip dispatch tier here too — bounded saving
+    // (≤K-1 iters per row) but worth picking up if it shows on a profile.
     ra_reset_pool(ra);
     for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
 

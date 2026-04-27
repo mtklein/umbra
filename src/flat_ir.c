@@ -340,11 +340,12 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     }
 
     // Scope propagation.  An op inside a loop or if region keeps its
-    // data-flow scope — there is no region cap.  Pure ops with all-uniform
-    // inputs hoist out of regions into the batch preamble; only ops that
-    // truly depend on per-iteration / per-lane state (loads, vars, lane
-    // index) end up in the body.  Stores stay at their textual position
-    // because op_is_store excludes them from preamble extraction below.
+    // data-flow scope — there is no region cap.  Pure ops with broader
+    // input scopes hoist out of regions into the appropriate preamble tier
+    // (dispatch or row); only ops that truly depend on per-iteration /
+    // per-lane state (loads, vars, lane index) end up in the body.
+    // Stores stay at their textual position because op_is_store excludes
+    // them from preamble extraction below.
     for (int i = 0; i < n; i++) {
         enum scope s = intrinsic_scope(b->inst[i].op);
         s = narrow(s, (enum scope)b->inst[b->inst[i].x.id].scope);

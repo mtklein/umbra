@@ -28,16 +28,17 @@ typedef union {
 //
 //   SCOPE_COMPILE  — fixed at IR build (literals).
 //   SCOPE_DISPATCH — fixed for one queue() call (uniform_32 reads).
-//   SCOPE_ROW      — fixed across one output row (umbra_y).
-//   SCOPE_BATCH    — fixed across one K-lane column step (current "preamble" tier).
+//   SCOPE_ROW      — fixed across one output row (umbra_y, gathers).
+//   SCOPE_BATCH    — fixed across one K-lane column step.
 //   SCOPE_ITER     — fixed within one loop iteration.
 //   SCOPE_LANE     — varies per SIMD lane (umbra_x, all loads/stores).
 //
 // Scope is computed from each op's intrinsic scope and the scopes of its
-// operands.  Codegen partitions on `scope >= SCOPE_BATCH` (preamble vs body);
-// finer-grained intrinsics (SCOPE_ROW for op_y, SCOPE_DISPATCH for
-// op_uniform_32) come in a later step once any optimization wants to split
-// the preamble tier.
+// operands.  The scheduler partitions the IR into three tiers based on
+// scope: dispatch tier (SCOPE_COMPILE, SCOPE_DISPATCH) emitted once per
+// queue() call, row tier (SCOPE_ROW) emitted at each row's entry, and the
+// per-batch body (SCOPE_BATCH and narrower).  See dispatch_end / preamble
+// in struct umbra_flat_ir.
 enum scope {
     SCOPE_COMPILE  = 0,
     SCOPE_DISPATCH = 1,
