@@ -6,12 +6,12 @@
 
 struct fake_be {
     size_t default_cap;
-    int    n_create, n_destroy;
+    int    creates, destroys;
 };
 
 static struct uniform_ring_chunk fake_new(size_t min_bytes, void *ctx) {
     struct fake_be *be = ctx;
-    be->n_create++;
+    be->creates++;
     size_t cap = min_bytes > be->default_cap ? min_bytes : be->default_cap;
     void *mapped = calloc(1, cap);
     return (struct uniform_ring_chunk){.handle=mapped, .mapped=mapped, .cap=cap, .used=0};
@@ -19,7 +19,7 @@ static struct uniform_ring_chunk fake_new(size_t min_bytes, void *ctx) {
 
 static void fake_free(void *handle, void *ctx) {
     struct fake_be *be = ctx;
-    be->n_destroy++;
+    be->destroys++;
     free(handle);
 }
 
@@ -40,18 +40,18 @@ TEST(uniform_ring_basic) {
     struct uniform_ring_loc l1 = uniform_ring_alloc(&r, &p1, sizeof p1);
     l1.handle != 0 here;
     l1.offset == 0 here;
-    be.n_create == 1 here;
+    be.creates == 1 here;
     __builtin_memcmp((char*)l1.handle + l1.offset, &p1, sizeof p1) == 0 here;
 
     int p2 = 0x55667788;
     struct uniform_ring_loc l2 = uniform_ring_alloc(&r, &p2, sizeof p2);
     l2.handle == l1.handle here;
     l2.offset == 16 here;
-    be.n_create == 1 here;
+    be.creates == 1 here;
     __builtin_memcmp((char*)l2.handle + l2.offset, &p2, sizeof p2) == 0 here;
 
     uniform_ring_free(&r);
-    be.n_destroy == 1 here;
+    be.destroys == 1 here;
 }
 
 TEST(uniform_ring_reset_reuses_chunks) {
@@ -61,16 +61,16 @@ TEST(uniform_ring_reset_reuses_chunks) {
     unsigned p = 0xAABBCCDDu;
     struct uniform_ring_loc l1 = uniform_ring_alloc(&r, &p, sizeof p);
     void *first_handle = l1.handle;
-    be.n_create == 1 here;
+    be.creates == 1 here;
 
     uniform_ring_reset(&r);
     struct uniform_ring_loc l2 = uniform_ring_alloc(&r, &p, sizeof p);
     l2.handle == first_handle here;
     l2.offset == 0 here;
-    be.n_create == 1 here;
+    be.creates == 1 here;
 
     uniform_ring_free(&r);
-    be.n_destroy == 1 here;
+    be.destroys == 1 here;
 }
 
 TEST(uniform_ring_slug_like) {
@@ -86,7 +86,7 @@ TEST(uniform_ring_slug_like) {
             l.handle != 0 here;
         }
     }
-    be.n_create == 1 here;
+    be.creates == 1 here;
 
     uniform_ring_free(&r);
 }
@@ -101,17 +101,17 @@ TEST(uniform_ring_animation) {
         struct uniform_ring_loc l = uniform_ring_alloc(&r, &payload, sizeof payload);
         l.handle != 0 here;
     }
-    be.n_create == 7 here;
+    be.creates == 7 here;
 
     uniform_ring_reset(&r);
     for (int i = 0; i < 100; i++) {
         payload = i + 1000;
         uniform_ring_alloc(&r, &payload, sizeof payload);
     }
-    be.n_create == 7 here;
+    be.creates == 7 here;
 
     uniform_ring_free(&r);
-    be.n_destroy == 7 here;
+    be.destroys == 7 here;
 }
 
 TEST(uniform_ring_oversized) {
@@ -123,7 +123,7 @@ TEST(uniform_ring_oversized) {
     struct uniform_ring_loc l = uniform_ring_alloc(&r, big, sizeof big);
     l.handle != 0 here;
     l.offset == 0 here;
-    be.n_create == 1 here;
+    be.creates == 1 here;
     __builtin_memcmp((char*)l.handle + l.offset, big, sizeof big) == 0 here;
 
     uniform_ring_free(&r);
@@ -136,14 +136,14 @@ TEST(uniform_ring_small_then_big) {
     int small = 0x12345678;
     struct uniform_ring_loc l1 = uniform_ring_alloc(&r, &small, sizeof small);
     l1.offset == 0 here;
-    be.n_create == 1 here;
+    be.creates == 1 here;
 
     char big[2048];
     __builtin_memset(big, 0xCD, sizeof big);
     struct uniform_ring_loc l2 = uniform_ring_alloc(&r, big, sizeof big);
     l2.handle != l1.handle here;
     l2.offset == 0 here;
-    be.n_create == 2 here;
+    be.creates == 2 here;
     __builtin_memcmp((char*)l2.handle, big, sizeof big) == 0 here;
 
     uniform_ring_free(&r);
@@ -161,11 +161,11 @@ TEST(uniform_ring_large_payloads) {
         __builtin_memcmp((char*)l.handle + l.offset, block, sizeof block) == 0 here;
     }
     // 16 4-KiB blocks fit per 64-KiB chunk, so 20 blocks need 2 chunks.
-    be.n_create == 2 here;
+    be.creates == 2 here;
     uniform_ring_used(&r) == 20 * 4096 here;
 
     uniform_ring_free(&r);
-    be.n_destroy == 2 here;
+    be.destroys == 2 here;
 }
 
 TEST(uniform_ring_huge_single_payload) {
@@ -180,12 +180,12 @@ TEST(uniform_ring_huge_single_payload) {
     struct uniform_ring_loc l = uniform_ring_alloc(&r, big, big_bytes);
     l.handle != 0 here;
     l.offset == 0 here;
-    be.n_create == 1 here;
+    be.creates == 1 here;
     __builtin_memcmp((char*)l.handle + l.offset, big, big_bytes) == 0 here;
 
     free(big);
     uniform_ring_free(&r);
-    be.n_destroy == 1 here;
+    be.destroys == 1 here;
 }
 
 TEST(uniform_ring_null_bytes_reserves_only) {
@@ -194,7 +194,7 @@ TEST(uniform_ring_null_bytes_reserves_only) {
 
     struct uniform_ring_loc l = uniform_ring_alloc(&r, 0, 64);
     l.offset == 0 here;
-    be.n_create == 1 here;
+    be.creates == 1 here;
 
     char zeros[64] = {0};
     __builtin_memcmp((char*)l.handle, zeros, 64) == 0 here;
@@ -349,18 +349,18 @@ TEST(uniform_ring_pool_drain_all_releases_chunks) {
         uniform_ring_pool_alloc(&p, &payload, sizeof payload);
     }
     p.cur = 0;
-    be.n_create  == 3 here;
-    be.n_destroy == 0 here;
+    be.creates  == 3 here;
+    be.destroys == 0 here;
 
     uniform_ring_pool_drain_all(&p);
-    be.n_destroy == 0 here;
+    be.destroys == 0 here;
 
     // Ring retains chunks after drain — next alloc reuses them.
     uniform_ring_pool_alloc(&p, &payload, sizeof payload);
-    be.n_create == 3 here;
+    be.creates == 3 here;
 
     uniform_ring_pool_free(&p);
-    be.n_destroy == 3 here;
+    be.destroys == 3 here;
 }
 
 TEST(uniform_ring_used_tracks_high_water) {
@@ -379,7 +379,7 @@ TEST(uniform_ring_used_tracks_high_water) {
     for (int i = 0; i < 30; i++) {
         uniform_ring_alloc(&r, &payload, sizeof payload);
     }
-    be.n_create == 2 here;
+    be.creates == 2 here;
     uniform_ring_used(&r) == 32 * 16 here;
 
     uniform_ring_reset(&r);
