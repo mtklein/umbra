@@ -5341,6 +5341,380 @@ TEST(test_if_uniform_32) {
     test_backends_free(&B);
 }
 
+TEST(test_if_uniform_cond_skip) {
+    // CPU backends lower a uniform-cond if as a real branch over the body.
+    // When the condition is false the body must be skipped entirely.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const u    = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+    umbra_val32 const cond = umbra_eq_i32(b, u, umbra_imm_i32(b, 1));
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0xCAFE));
+
+    umbra_if(b, cond); {
+        umbra_store_var32(b, v, umbra_imm_i32(b, 99));
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // cond uniformly false: every lane keeps the var's init.
+        int32_t  uni[1] = {0};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0xCAFE here;
+            dst[7] == 0xCAFE here;
+        }
+    }
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // cond uniformly true: every lane sees 99.
+        int32_t  uni[1] = {1};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 99 here;
+            dst[7] == 99 here;
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_if_uniform_cond_in_loop) {
+    // SDF tile-cov shape: a uniform-cond gate inside a loop.  When uniform
+    // false, the body is skipped per iteration; when true, the body runs and
+    // accumulates K times into the var.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const k    = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+    umbra_val32 const gate = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 1);
+    umbra_val32 const cond = umbra_eq_i32(b, gate, umbra_imm_i32(b, 1));
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_loop(b, k); {
+        umbra_if(b, cond); {
+            umbra_store_var32(b, v,
+                umbra_add_i32(b, umbra_load_var32(b, v), umbra_imm_i32(b, 5)));
+        } umbra_end_if(b);
+    } umbra_end_loop(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // Gate false across all iterations: var stays at 0.
+        int32_t  uni[2] = {3, 0};
+        uint32_t dst[8] = {0xDEADBEEF};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 2},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0u here;
+            dst[7] == 0u here;
+        }
+    }
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // Gate true: 4 loop iterations accumulate +5 each lane → 20.
+        int32_t  uni[2] = {4, 1};
+        uint32_t dst[8] = {0xDEADBEEF};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 2},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 20u here;
+            dst[7] == 20u here;
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_if_uniform_inside_varying_outer) {
+    // Uniform-cond inner inside a non-uniform (per-lane) outer mask.  The
+    // inner branch must skip the body when uniform-cond is false; when true,
+    // the body runs and the outer per-lane mask still gates the store.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const u    = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+    umbra_val32 const outer_cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_val32 const inner_cond = umbra_eq_i32(b, u, umbra_imm_i32(b, 1));
+    umbra_var32 const v          = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_if(b, outer_cond); {
+        umbra_if(b, inner_cond); {
+            umbra_store_var32(b, v, umbra_imm_i32(b, 7));
+        } umbra_end_if(b);
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // inner uniform false: nothing stored.
+        int32_t  uni[1] = {0};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0u here;
+            dst[3] == 0u here;
+            dst[4] == 0u here;
+            dst[7] == 0u here;
+        }
+    }
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // inner uniform true: outer per-lane mask gates lanes 0..3 only.
+        int32_t  uni[1] = {1};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 7u here;
+            dst[3] == 7u here;
+            dst[4] == 0u here;
+            dst[7] == 0u here;
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_if_uniform_cond_spill_pressure) {
+    // Heavy body so ra must spill, exercising the path where body emit
+    // mutates ra state between if_begin's evict and if_end's evict.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const u    = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+    umbra_val32 const cond = umbra_eq_i32(b, u, umbra_imm_i32(b, 1));
+    umbra_val32 const x    = umbra_x(b);
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_if(b, cond); {
+        umbra_val32 a[32];
+        for (int k = 0; k < 32; k++) {
+            a[k] = umbra_add_f32(b, umbra_f32_from_i32(b, x),
+                                    umbra_imm_f32(b, (float)(k + 1)));
+        }
+        umbra_val32 sum = a[0];
+        for (int k = 1; k < 32; k++) { sum = umbra_add_f32(b, sum, a[k]); }
+        umbra_store_var32(b, v, umbra_round_i32(b, sum));
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // false: skip everything, var keeps 0.
+        int32_t  uni[1] = {0};
+        uint32_t dst[8] = {0xDEADBEEF};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0u here;
+            dst[7] == 0u here;
+        }
+    }
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // true: sum 1..32 + 32*lane = 528 + 32*lane.
+        int32_t  uni[1] = {1};
+        uint32_t dst[8] = {0xDEADBEEF};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 528u here;
+            dst[7] == 528u + 7u * 32u here;
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_if_varying_inside_uniform_outer) {
+    // Per-lane (varying) inner inside uniform outer.  When outer skips,
+    // body+inner skip too; when outer runs, inner masks per-lane and the
+    // store reflects the inner cond's lane pattern.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const u    = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+    umbra_val32 const outer_cond = umbra_eq_i32(b, u, umbra_imm_i32(b, 1));
+    umbra_val32 const inner_cond = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_var32 const v          = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_if(b, outer_cond); {
+        umbra_if(b, inner_cond); {
+            umbra_store_var32(b, v, umbra_imm_i32(b, 9));
+        } umbra_end_if(b);
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // outer false: outer-branch skips body, var keeps init.
+        int32_t  uni[1] = {0};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0u here;
+            dst[3] == 0u here;
+            dst[4] == 0u here;
+            dst[7] == 0u here;
+        }
+    }
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // outer true: body runs, inner per-lane mask gates lanes 0..3.
+        int32_t  uni[1] = {1};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 9u here;
+            dst[3] == 9u here;
+            dst[4] == 0u here;
+            dst[7] == 0u here;
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_if_uniform_inside_uniform_outer) {
+    // Two nested uniform-cond ifs — both lower as real branches.  Walk all
+    // four (outer, inner) combinations to confirm independent skip paths
+    // and a clean fall-through when both are true.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const uo   = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+    umbra_val32 const ui   = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 1);
+    umbra_val32 const oc   = umbra_eq_i32(b, uo, umbra_imm_i32(b, 1));
+    umbra_val32 const ic   = umbra_eq_i32(b, ui, umbra_imm_i32(b, 1));
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_if(b, oc); {
+        umbra_if(b, ic); {
+            umbra_store_var32(b, v, umbra_imm_i32(b, 42));
+        } umbra_end_if(b);
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    static int32_t const cases[4][2] = {{0,0},{0,1},{1,0},{1,1}};
+    static uint32_t const expect[4]  = {0, 0, 0, 42};
+    for (int c = 0; c < 4; c++) {
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t  uni[2] = {cases[c][0], cases[c][1]};
+            uint32_t dst[8] = {0};
+            if (run(&B, bi, 8, 1, slot, 2,
+            (struct umbra_buf[]){{.ptr = uni, .count = 2},
+                                 {.ptr = dst, .count = 8, .stride = 8}})) {
+                dst[0] == expect[c] here;
+                dst[7] == expect[c] here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_if_triple_nest_mixed) {
+    // Three-deep mix: uniform outer, varying middle, uniform inner.  The
+    // outer branch gates the whole region; the middle masked-AND wraps the
+    // inner; the inner is a uniform branch sitting under an active mask.
+    // Lanes only write when (outer=T) AND (middle per-lane=T) AND (inner=T).
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const uo   = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+    umbra_val32 const ui   = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 1);
+    umbra_val32 const oc   = umbra_eq_i32(b, uo, umbra_imm_i32(b, 1));
+    umbra_val32 const mc   = umbra_lt_s32(b, x, umbra_imm_i32(b, 4));
+    umbra_val32 const ic   = umbra_eq_i32(b, ui, umbra_imm_i32(b, 1));
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_if(b, oc); {
+        umbra_if(b, mc); {
+            umbra_if(b, ic); {
+                umbra_store_var32(b, v, umbra_imm_i32(b, 13));
+            } umbra_end_if(b);
+        } umbra_end_if(b);
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    // (outer, inner) ∈ {0,1}² — only (1,1) produces writes, and only on
+    // lanes where x<4.
+    static int32_t const cases[4][2] = {{0,0},{0,1},{1,0},{1,1}};
+    for (int c = 0; c < 4; c++) {
+        _Bool const will_write = cases[c][0] == 1 && cases[c][1] == 1;
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t  uni[2] = {cases[c][0], cases[c][1]};
+            uint32_t dst[8] = {0};
+            if (run(&B, bi, 8, 1, slot, 2,
+            (struct umbra_buf[]){{.ptr = uni, .count = 2},
+                                 {.ptr = dst, .count = 8, .stride = 8}})) {
+                dst[0] == (will_write ? 13u : 0u) here;
+                dst[3] == (will_write ? 13u : 0u) here;
+                dst[4] == 0u here;
+                dst[7] == 0u here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_if_triple_nest_varying_uniform_varying) {
+    // Inverse mix: varying outer, uniform middle, varying inner.  The
+    // middle uniform branch sits inside an outer mask, and itself wraps an
+    // inner masked-AND.  Tests that ra_evict_live_before / branch-skip do
+    // not corrupt the outer mask or the middle's "no push" non-effect on
+    // the if_cond_val stack.
+    struct umbra_buf slot[20] = {0};
+    struct umbra_builder *b = umbra_builder();
+
+    umbra_val32 const x    = umbra_x(b);
+    umbra_val32 const u    = umbra_uniform_32(b, umbra_bind_buf(b, &slot[0]), 0);
+    umbra_val32 const oc   = umbra_lt_s32(b, x, umbra_imm_i32(b, 6));
+    umbra_val32 const mc   = umbra_eq_i32(b, u, umbra_imm_i32(b, 1));
+    umbra_val32 const ic   = umbra_lt_s32(b, umbra_imm_i32(b, 0), x);
+    umbra_var32 const v    = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+
+    umbra_if(b, oc); {
+        umbra_if(b, mc); {
+            umbra_if(b, ic); {
+                umbra_store_var32(b, v, umbra_imm_i32(b, 5));
+            } umbra_end_if(b);
+        } umbra_end_if(b);
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, v));
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // middle uniform false: skip the body entirely.
+        int32_t  uni[1] = {0};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            for (int i = 0; i < 8; i++) { dst[i] == 0u here; }
+        }
+    }
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        // middle uniform true: writes happen iff outer (x<6) AND inner (0<x).
+        int32_t  uni[1] = {1};
+        uint32_t dst[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr = uni, .count = 1},
+                             {.ptr = dst, .count = 8, .stride = 8}})) {
+            dst[0] == 0u here;  // x=0: inner false
+            dst[1] == 5u here;  // x=1: outer T, inner T
+            dst[5] == 5u here;  // x=5: outer T, inner T
+            dst[6] == 0u here;  // x=6: outer false
+            dst[7] == 0u here;
+        }
+    }
+    test_backends_free(&B);
+}
+
 TEST(test_store_32_per_channel) {
     // Regression: store_32 in the JITs called ra_ensure(inst->y.id) and
     // ignored inst->y.chan, so storing the G/B/A channel of load_8x4 read

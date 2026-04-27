@@ -180,14 +180,6 @@ void        umbra_end_loop(struct umbra_builder*);
 
 void        umbra_if    (struct umbra_builder*, umbra_val32 cond);
 void        umbra_end_if(struct umbra_builder*);
-// TODO: when the condition is uniform across the lane batch, CPU backends
-//       could lower umbra_if as a real branch over the whole body instead
-//       of executing it under a mask.  The IR already tracks per-instruction
-//       uniformness; if_begin can branch on it to pick the cheap path
-//       (whole-body skip when the uniform cond is false) over the masked
-//       lowering.  Performance feature, not a correctness fix; matters most
-//       for the SDF tile-cov gate where the condition is uniform per batch
-//       (tile size T >> lane batch K).
 
 typedef struct { int id; } umbra_var32;
 umbra_var32 umbra_declare_var32(struct umbra_builder*, umbra_val32 init);

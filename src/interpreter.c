@@ -133,6 +133,13 @@ static _Bool is_commutative(enum op op) { return !!(binary_flags[op] & OP_COMMUT
 enum {
     SW_DONE = op_i16_from_i32 + 1,
 
+    // Internal ops for uniform-cond ifs: op_if_begin_uniform branches
+    // over the body when cond[lane 0] is zero, landing on the matching
+    // op_if_end_uniform (a no-op).  Emitted instead of op_if_begin /
+    // op_if_end when ir->inst[cond].uniform is set.
+    op_if_begin_uniform,
+    op_if_end_uniform,
+
 #define BINARY_ENUM(name, ...) op_r_##name##_mm, op_r_##name##_rm, op_m_##name##_rm,
     BINARY_OPS(BINARY_ENUM)
 #undef BINARY_ENUM
@@ -197,6 +204,9 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
 
     int n = 0;
     int loop_begin_sw_n = -1;
+    int   if_begin_sw_n[8];
+    _Bool if_begin_uniform[8];
+    int   if_sp = 0;
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
 #define RESOLVE_PTR(inst) ((inst)->ptr.bits)
     // Three passes: dispatch tier (run once per queue()), row tier (run at
@@ -249,10 +259,26 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
                      .z = inst->imm);
                 break;
             case op_if_begin:
-                emit(.tag = op_if_begin, .x = X, .y = 0);
+                if (ir->inst[inst->x.id].uniform) {
+                    emit(.tag = op_if_begin_uniform, .x = X, .y = 0);
+                    if_begin_sw_n  [if_sp] = n;
+                    if_begin_uniform[if_sp] = 1;
+                    if_sp++;
+                } else {
+                    emit(.tag = op_if_begin, .x = X, .y = 0);
+                    if_begin_sw_n  [if_sp] = n;
+                    if_begin_uniform[if_sp] = 0;
+                    if_sp++;
+                }
                 break;
             case op_if_end:
-                emit(.tag = op_if_end);
+                --if_sp;
+                if (if_begin_uniform[if_sp]) {
+                    p->inst[if_begin_sw_n[if_sp]].y = n - if_begin_sw_n[if_sp];
+                    emit(.tag = op_if_end_uniform);
+                } else {
+                    emit(.tag = op_if_end);
+                }
                 break;
             case op_load_var:  emit(.tag = op_load_var,  .x = inst->imm); break;
             case op_store_var: emit(.tag = op_store_var, .x = Y, .y = inst->imm); break;
@@ -492,6 +518,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_gather_16] = &&L_op_gather_16, [op_gather_32] = &&L_op_gather_32,
                 [op_loop_begin] = &&L_op_loop_begin, [op_loop_end] = &&L_op_loop_end,
                 [op_if_begin] = &&L_op_if_begin, [op_if_end] = &&L_op_if_end,
+                [op_if_begin_uniform] = &&L_op_if_begin_uniform,
+                [op_if_end_uniform]   = &&L_op_if_end_uniform,
                 [op_load_var] = &&L_op_load_var, [op_store_var] = &&L_op_store_var,
                 [op_f32_from_f16] = &&L_op_f32_from_f16, [op_f16_from_f32] = &&L_op_f16_from_f32,
                 [op_i32_from_s16] = &&L_op_i32_from_s16,
@@ -984,6 +1012,14 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_if_end) {
                     if_depth--;
                 } NEXT;
+                CASE(op_if_begin_uniform) {
+                    if (v[ip->x].i32[0] == 0) {
+                        int const skip = ip->y;
+                        ip += skip;
+                        v  += skip;
+                    }
+                } NEXT;
+                CASE(op_if_end_uniform) {} NEXT;
                 CASE(op_load_var)  v->i32 = var[ip->x].i32; NEXT;
                 CASE(op_store_var) {
                     if (if_depth > 0) {

@@ -216,8 +216,9 @@ struct jit_ctx {
     struct umbra_flat_ir const *ir;
     struct pool                     pool;
     int                             vars, loop_top, loop_br_skip;
-    int                             if_depth;
+    int                             if_depth, if_branch_sp; int :32;
     int                             if_cond_val[8];
+    int                             if_branch_patch[8];
 };
 
 static void arm64_spill(int reg, int slot, void *ctx) {
@@ -1195,23 +1196,50 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
 
         case op_if_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
-            if (jc->if_depth > 0) {
-                // Nested if: AND the inner condition with the outer mask in
-                // place so the mask val in the register is the full chain,
-                // matching the interpreter's if_mask_stack AND accumulation.
-                // Overwrite cond's register content; ra will spill the AND'd
-                // result on eviction and ra_ensure will refill it correctly.
-                int8_t outer = ra_ensure(ra, sl, ns, jc->if_cond_val[jc->if_depth - 1]);
-                put(c, AND_16b(lo(rx), lo(rx), lo(outer)));
-                if (!scalar) { put(c, AND_16b(hi(rx), hi(rx), hi(outer))); }
+            if (ir->inst[inst->x.id].uniform) {
+                // Uniform condition: extract lane 0 to a GPR and skip the
+                // body via a real branch when zero.  The body and post-body
+                // converge through ra_evict_live_before at if_begin (and
+                // again at if_end) so both control-flow paths reach if_end
+                // with the same "all live values spilled" ra state.
+                put(c, UMOV_ws(XT, lo(rx)));
+                ra_free_chan(ra, inst->x, i);
+                ra_evict_live_before(ra, sl, ns, i);
+                put(c, SUBS_xi(31, XT, 0));
+                jc->if_branch_patch[jc->if_branch_sp++] = c->words;
+                put(c, Bcond(0x0, 0));
+            } else {
+                if (jc->if_depth > 0) {
+                    // Nested if: AND the inner condition with the outer mask
+                    // in place so the mask val in the register is the full
+                    // chain, matching the interpreter's if_mask_stack AND
+                    // accumulation.  Overwrite cond's register content; ra
+                    // will spill the AND'd result on eviction and ra_ensure
+                    // will refill it correctly.
+                    int8_t outer = ra_ensure(ra, sl, ns,
+                                             jc->if_cond_val[jc->if_depth - 1]);
+                    put(c, AND_16b(lo(rx), lo(rx), lo(outer)));
+                    if (!scalar) { put(c, AND_16b(hi(rx), hi(rx), hi(outer))); }
+                }
+                jc->if_cond_val[jc->if_depth++] = inst->x.id;
             }
-            jc->if_cond_val[jc->if_depth++] = inst->x.id;
         } break;
         case op_if_end: {
-            --jc->if_depth;
-            // Cond val's last_use was extended to this instruction by ra_create
-            // so the mask val survives the body; free it here.
-            ra_free_chan(ra, ir->inst[inst->x.id].x, i);
+            int const ib      = inst->x.id;
+            int const cond_id = ir->inst[ib].x.id;
+            if (ir->inst[cond_id].uniform) {
+                // Match the body's ra_evict_live_before so the fall-through
+                // and skip paths converge to identical ra state, then patch
+                // the conditional branch from if_begin to land here.
+                ra_evict_live_before(ra, sl, ns, i);
+                int const patch = jc->if_branch_patch[--jc->if_branch_sp];
+                c->word[patch] = Bcond(0x0, c->words - patch);
+            } else {
+                --jc->if_depth;
+                // Cond val's last_use was extended to this instruction by
+                // ra_create so the mask val survives the body; free it here.
+                ra_free_chan(ra, ir->inst[inst->x.id].x, i);
+            }
         } break;
 
         case op_loop_begin: {

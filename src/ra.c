@@ -88,15 +88,20 @@ struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg
         ra->slot[inst->w.id].last_use                          = i;
         ra->slot[inst->w.id].chan_last_use[(int)inst->w.chan]  = i;
     }
-    // Extend each if_begin's condition val through its matching if_end so
-    // the mask register is not evicted from under the body's store_vars.
-    // flat_ir populates if_end.x.id with the matching if_begin's inst id.
+    // Extend each masked-path if_begin's condition val through its matching
+    // if_end so the mask register is not evicted from under the body's
+    // store_vars.  flat_ir populates if_end.x.id with the matching if_begin's
+    // inst id.  Uniform-cond if_begins lower as a real branch: the cond is
+    // consumed at if_begin (one element extracted to a GPR) and never read
+    // inside the body, so no extension is needed.
     for (int i = 0; i < n; i++) {
         if (ir->inst[i].op == op_if_end) {
             int const ib      = ir->inst[i].x.id;
             int const cond_id = ir->inst[ib].x.id;
-            ra->slot[cond_id].last_use                                   = i;
-            ra->slot[cond_id].chan_last_use[(int)ir->inst[ib].x.chan]    = i;
+            if (!ir->inst[cond_id].uniform) {
+                ra->slot[cond_id].last_use                                = i;
+                ra->slot[cond_id].chan_last_use[(int)ir->inst[ib].x.chan] = i;
+            }
         }
     }
     for (int i = 0; i < ir->row_end; i++) {
