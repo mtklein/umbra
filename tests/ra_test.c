@@ -9,17 +9,17 @@ struct spill_record {
 };
 
 struct records {
-    struct spill_record spills[256], fills[256];
-    int                 nspills, nfills;
+    struct spill_record spill[256], fill[256];
+    int                 spills, fills;
 };
 
 static void test_spill(int reg, int slot, void *ctx) {
     struct records *r = ctx;
-    r->spills[r->nspills++] = (struct spill_record){reg, slot};
+    r->spill[r->spills++] = (struct spill_record){reg, slot};
 }
 static void test_fill(int reg, int slot, void *ctx) {
     struct records *r = ctx;
-    r->fills[r->nfills++] = (struct spill_record){reg, slot};
+    r->fill[r->fills++] = (struct spill_record){reg, slot};
 }
 
 static struct umbra_flat_ir* make_ir(int n, int pre) {
@@ -72,13 +72,13 @@ TEST(test_basic_alloc_free) {
     r0 == 10 here;
     r1 == 11 here;
     r2 == 12 here;
-    rec.nspills == 0 here;
+    rec.spills == 0 here;
 
     ra_assign(ra, 1, r1);
     ra_free_reg(ra, 1);
     int8_t r3 = ra_alloc(ra, sl, &ns);
     r3 == r1 here;
-    rec.nspills == 0 here;
+    rec.spills == 0 here;
 
     ra_destroy(ra);
     free_ir(ir);
@@ -111,8 +111,8 @@ TEST(test_eviction_belady) {
 
     // evicts value 0 (farthest last_use=4)
     int8_t r2 = ra_alloc(ra, sl, &ns);
-    rec.nspills == 1 here;
-    rec.spills[0].reg == r0 here;
+    rec.spills == 1 here;
+    rec.spill[0].reg == r0 here;
     r2 == r0 here;
     ra_reg(ra, 0) == -1 here;
     sl[0] >= 0 here;
@@ -148,8 +148,8 @@ TEST(test_dead_value_evicted_first) {
     ra_assign(ra, 1, r1);
 
     int8_t r2 = ra_alloc(ra, sl, &ns);
-    rec.nspills == 1 here;
-    rec.spills[0].reg == r0 here;
+    rec.spills == 1 here;
+    rec.spill[0].reg == r0 here;
     r2 == r0 here;
     ra_reg(ra, 1) == r1 here;
 
@@ -185,17 +185,17 @@ TEST(test_ensure_and_fill) {
 
     int8_t r2 = ra_alloc(ra, sl, &ns);
     ra_assign(ra, 2, r2);
-    rec.nspills == 1 here;
+    rec.spills == 1 here;
 
     int8_t r0b = ra_ensure(ra, sl, &ns, 0);
-    rec.nfills == 1 here;
-    rec.fills[0].slot == sl[0] here;
+    rec.fills == 1 here;
+    rec.fill[0].slot == sl[0] here;
     r0b >= 0 here;
     ra_reg(ra, 0) == r0b here;
 
     int8_t r0c = ra_ensure(ra, sl, &ns, 0);
     r0c == r0b here;
-    rec.nfills == 1 here;
+    rec.fills == 1 here;
 
     ra_destroy(ra);
     free_ir(ir);
@@ -225,7 +225,7 @@ TEST(test_claim) {
     r1 == r0 here;
     ra_reg(ra, 0) == -1 here;
     ra_reg(ra, 1) == r0 here;
-    rec.nspills == 0 here;
+    rec.spills == 0 here;
 
     ra_destroy(ra);
     free_ir(ir);
@@ -280,7 +280,7 @@ TEST(test_many_values_stress) {
         ra_assign(ra, i, r);
     }
 
-    rec.nspills == 17 here;
+    rec.spills == 17 here;
 
     int in_reg = 0;
     for (int i = 0; i < n; i++) {
@@ -291,7 +291,7 @@ TEST(test_many_values_stress) {
     // ensure all: 17 spilled trigger fills
     rec = (struct records){0};
     for (int i = 0; i < n; i++) { ra_ensure(ra, sl, &ns, i); }
-    rec.nfills > 0 here;
+    rec.fills > 0 here;
 
     ra_destroy(ra);
     free(sl);
@@ -323,7 +323,7 @@ TEST(test_step_alloc) {
     s1.rd >= 0 here;
     s1.rd != s0.rd here;
     ra_reg(ra, 1) == s1.rd here;
-    rec.nspills == 0 here;
+    rec.spills == 0 here;
 
     ra_destroy(ra);
     free_ir(ir);
@@ -365,7 +365,7 @@ TEST(test_step_unary) {
     s.rd == r0 here;
     ra_reg(ra, 1) == s.rd here;
     ra_reg(ra, 0) == -1 here;
-    rec.nspills == 0 here;
+    rec.spills == 0 here;
 
     ra_destroy(ra);
     free(ir->inst);
@@ -506,7 +506,7 @@ TEST(test_step_alu_square_add_x_dies_y_lives) {
     s.rd == r0 here;           // claimed x's register
     ra_reg(ra, 2) == r0 here;
     ra_reg(ra, 1) == r1 here;  // y still in place
-    rec.nspills == 0 here;
+    rec.spills == 0 here;
 
     ra_destroy(ra);
     free(ir->inst);
@@ -556,7 +556,7 @@ TEST(test_step_alu_square_add_both_live) {
     ra_reg(ra, 0) == r0 here;  // both operands retained
     ra_reg(ra, 1) == r1 here;
     ra_reg(ra, 2) == s.rd here;
-    rec.nspills == 0 here;
+    rec.spills == 0 here;
 
     ra_destroy(ra);
     free(ir->inst);
@@ -728,8 +728,8 @@ TEST(test_sparse_pool_eviction) {
     ra_set_last_use(ra, 2, 3);
 
     int8_t r3 = ra_alloc(ra, sl, &ns);
-    rec.nspills == 1 here;
-    rec.spills[0].reg == 4 here;
+    rec.spills == 1 here;
+    rec.spill[0].reg == 4 here;
     r3 == 4 here;
     ra_reg(ra, 1) == -1 here;
     sl[1] >= 0 here;
@@ -774,7 +774,7 @@ TEST(test_evict_live_before_loop) {
 
     ra_reg(ra, 2) == -1 here;
     sl[2] >= 0 here;
-    rec.nspills >= 1 here;
+    rec.spills >= 1 here;
 
     ra_destroy(ra);
     free_ir(ir);
