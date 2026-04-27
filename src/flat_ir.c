@@ -281,13 +281,17 @@ static _Bool is_cf(enum op op) {
 }
 
 // Per-op intrinsic scope.  Source ops introduce scope; everything else is
-// SCOPE_COMPILE intrinsically and inherits from operands via narrow().  Today
-// we mirror op_is_varying exactly: varying-source ops get SCOPE_LANE,
-// everything else gets SCOPE_COMPILE.  Finer-grained intrinsics (SCOPE_ROW
-// for op_y, SCOPE_DISPATCH for op_uniform_32) come later when an
-// optimization wants to split the preamble tier.
+// SCOPE_COMPILE intrinsically and inherits from operands via narrow().
+// Control-flow ops (loop/if begin/end) have an intrinsic floor of
+// SCOPE_BATCH so they always live in the body — their structural placement
+// delineates regions that must execute per-batch regardless of operand
+// scope.  Finer-grained intrinsics (SCOPE_ROW for op_y, SCOPE_DISPATCH for
+// op_uniform_32) come later when an optimization wants to split the
+// preamble tier.
 static enum scope intrinsic_scope(enum op op) {
-    return op_is_varying(op) ? SCOPE_LANE : SCOPE_COMPILE;
+    if (is_cf(op))         { return SCOPE_BATCH; }
+    if (op_is_varying(op)) { return SCOPE_LANE;  }
+    return SCOPE_COMPILE;
 }
 static enum scope narrow(enum scope a, enum scope b) {
     return a > b ? a : b;
@@ -315,6 +319,12 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         }
     }
 
+    // Scope propagation.  An op inside a loop or if region keeps its
+    // data-flow scope — there is no region cap.  Pure ops with all-uniform
+    // inputs hoist out of regions into the batch preamble; only ops that
+    // truly depend on per-iteration / per-lane state (loads, vars, lane
+    // index) end up in the body.  Stores stay at their textual position
+    // because op_is_store excludes them from preamble extraction below.
     for (int i = 0; i < n; i++) {
         enum scope s = intrinsic_scope(b->inst[i].op);
         s = narrow(s, (enum scope)b->inst[b->inst[i].x.id].scope);
@@ -322,26 +332,6 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         s = narrow(s, (enum scope)b->inst[b->inst[i].z.id].scope);
         s = narrow(s, (enum scope)b->inst[b->inst[i].w.id].scope);
         b->inst[i].scope = (int8_t)s;
-    }
-    {
-        // Ops inside a loop or if region execute per-iteration / per-lane, so
-        // their values and scopes must stay inside that region.  op_imm_32 and
-        // op_uniform_32 are exceptions: literals and reads of read-only
-        // uniforms are loop-invariant.  CSE may reuse a single such node from
-        // both inside and outside the enclosing region (e.g. an immediate
-        // shift count shared by loop-body and post-loop code), and that only
-        // works if the node lives in the preamble.
-        int depth = 0;
-        for (int i = 0; i < n; i++) {
-            if (b->inst[i].op == op_loop_begin || b->inst[i].op == op_if_begin) { depth++; }
-            if (depth > 0
-                    && b->inst[i].op != op_imm_32
-                    && b->inst[i].op != op_uniform_32
-                    && b->inst[i].scope < SCOPE_BATCH) {
-                b->inst[i].scope = SCOPE_BATCH;
-            }
-            if (b->inst[i].op == op_loop_end || b->inst[i].op == op_if_end) { depth--; }
-        }
     }
 
     struct ir_inst *out = malloc((size_t)live * sizeof *out);

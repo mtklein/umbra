@@ -5693,3 +5693,34 @@ TEST(test_scope_partition) {
         umbra_builder_free(b);
     }
 }
+
+// LICM: a pure expression with all-uniform inputs textually inside a loop
+// should land in the preamble (scope < SCOPE_BATCH), not the body.  Before
+// scope-driven scheduling the depth-counter cap forced everything inside a
+// region to varying, so this shape produced an in-body add_f32 every
+// iteration.
+TEST(test_scope_licm_in_loop) {
+    struct umbra_buf slot[4] = {0};
+    struct umbra_builder *b = umbra_builder();
+    umbra_ptr const   u    = umbra_bind_uniforms(b, NULL, 4);
+    umbra_val32 const trip = umbra_uniform_32(b, u, 0);
+    umbra_var32 const acc  = umbra_declare_var32(b, umbra_imm_f32(b, 0));
+    umbra_loop(b, trip); {
+        umbra_val32 const a   = umbra_uniform_32(b, u, 1),
+                          c   = umbra_uniform_32(b, u, 2),
+                          sum = umbra_add_f32(b, a, c);
+        umbra_store_var32(b, acc, umbra_add_f32(b, umbra_load_var32(b, acc), sum));
+    } umbra_end_loop(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[0]), umbra_load_var32(b, acc));
+
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    int hoisted_add = 0;
+    for (int i = 0; i < ir->insts; i++) {
+        if (ir->inst[i].op == op_add_f32 && ir->inst[i].scope < SCOPE_BATCH) {
+            hoisted_add = 1;
+        }
+    }
+    hoisted_add here;
+    umbra_flat_ir_free(ir);
+    umbra_builder_free(b);
+}
