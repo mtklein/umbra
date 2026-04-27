@@ -158,7 +158,7 @@ struct sw_inst {
 struct interp_program {
     struct umbra_program base;
     struct sw_inst *inst;
-    int             dispatch_end, preamble;  // sw_inst-array indices
+    int             dispatch_end, row_end;  // sw_inst-array indices
     int             ptrs, bindings, vars, v_slots;
     struct buffer_binding *binding;
 };
@@ -206,10 +206,10 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     for (int pass = 0; pass < 3; pass++) {
         int lo, hi;
         if      (pass == 0) { lo = 0;                hi = ir->dispatch_end; }
-        else if (pass == 1) { lo = ir->dispatch_end; hi = ir->preamble; }
-        else                { lo = ir->preamble;     hi = ir->insts; }
+        else if (pass == 1) { lo = ir->dispatch_end; hi = ir->row_end; }
+        else                { lo = ir->row_end;      hi = ir->insts; }
         if (pass == 1) { p->dispatch_end = n; }
-        if (pass == 2) { p->preamble     = n; }
+        if (pass == 2) { p->row_end      = n; }
         for (int i = lo; i < hi; i++) {
             struct ir_inst const *inst = &ir->inst[i];
             int const X = id[inst->x.id] + (int)inst->x.chan - n;
@@ -362,7 +362,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
         _Bool prev_r = 0;  // did the previous instruction output to register?
         for (int i = 0; i < n; i++) {
             struct sw_inst *s = &p->inst[i];
-            if (i == p->dispatch_end || i == p->preamble) { prev_r = 0; }
+            if (i == p->dispatch_end || i == p->row_end) { prev_r = 0; }
             _Bool x_r = prev_r && s->x == -1;
             _Bool y_r = prev_r && s->y == -1;
             _Bool z_r = prev_r && s->z == -1; (void)z_r;
@@ -374,7 +374,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             _Bool out_r = 0;
             if (last_use[i] == i + 1
                     && i + 1 != p->dispatch_end
-                    && i + 1 != p->preamble) {
+                    && i + 1 != p->row_end) {
                 int const next_tag = p->inst[i + 1].tag;
 #define CHECK_BINARY(name, ...) || (next_tag == op_##name                            \
                     && p->inst[i + 1].x != p->inst[i + 1].y                            \
@@ -449,7 +449,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
     ival *const var    = scratch + p->v_slots;
 
     int const      D   = p->dispatch_end;
-    int const      P   = p->preamble;
+    int const      R   = p->row_end;
     I32                   if_mask_stack[8];
     int                   if_depth = 0;
 
@@ -460,8 +460,8 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
             // First batch of first row: run everything (dispatch + row + body).
             // First batch of subsequent rows: skip dispatch tier (results
             // cached in v[0..D] from the very first batch).  Subsequent
-            // batches in the same row: skip both tiers.
-            int const              start = (col != l)            ? P
+            // batches in the same row: skip both tiers (body only).
+            int const              start = (col != l)            ? R
                                           : (row == t)           ? 0
                                                                  : D;
             struct sw_inst const  *ip  = p->inst + start;

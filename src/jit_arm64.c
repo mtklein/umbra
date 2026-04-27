@@ -304,18 +304,19 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, NOP());
 
     // Entry: x0=l, x1=t, x2=r, x3=b, x4=buf.
-    // Set XY to the current row before the preamble so op_y (SCOPE_ROW)
-    // broadcasts the right value when it lands in the per-row preamble.
-    // XM can't hold b across the preamble because load_count (used by
-    // gather ops in the preamble) clobbers it; stash b in XCOL instead
-    // (op_x is SCOPE_LANE so the preamble never reads XCOL).
+    // Set XY to the current row before the dispatch / row-tier emit so
+    // op_y (SCOPE_ROW) broadcasts the right value when it lands in the
+    // row tier.  XM can't hold b across the dispatch tier because
+    // load_count (used by gather ops in the dispatch tier) clobbers it;
+    // stash b in XCOL instead (op_x is SCOPE_LANE so the dispatch and row
+    // tiers never read XCOL).
     put(&c, ADD_xi(XH, 0, 0));        // XH = l
     put(&c, ADD_xi(XY, 1, 0));        // XY = t (current row)
     put(&c, ADD_xi(XW, 2, 0));        // XW = r = col_end
-    put(&c, ADD_xi(XCOL, 3, 0));      // XCOL = b (temp; will be l after preamble)
+    put(&c, ADD_xi(XCOL, 3, 0));      // XCOL = b (temp; will be l after row tier)
     put(&c, ADD_xi(XBUF, 4, 0));      // XBUF = buf
 
-    int const preamble_off = c.words * 4;
+    int const dispatch_off = c.words * 4;
 
     // Dispatch tier: emit once per queue() call, then force-spill every
     // dispatch value alive past dispatch_end.  After this point, dispatch
@@ -328,13 +329,14 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     // Row tier: emit at row entry; outputs refresh per row.  This first
     // emit covers row #1; subsequent rows re-emit at next_row_off below.
-    emit_ops(&c, ir, ir->dispatch_end, ir->preamble, sl, &ns, ra, 0, &jc);
+    int const row_tier_off = c.words * 4;
+    emit_ops(&c, ir, ir->dispatch_end, ir->row_end, sl, &ns, ra, 0, &jc);
 
-    // Snapshot sl[] after the first row-tier emit so the per-row re-emit
-    // restores the same slot assignments the SIMD body's already-emitted
-    // fills reference.
-    int *sl_preamble = malloc((size_t)ir->preamble * sizeof(int));
-    for (int i = 0; i < ir->preamble; i++) { sl_preamble[i] = sl[i]; }
+    // Snapshot sl[] at the SIMD-loop top so the per-row re-emit restores
+    // the same slot assignments the SIMD body's already-emitted fills
+    // reference.
+    int *sl_loop_top = malloc((size_t)ir->row_end * sizeof(int));
+    for (int i = 0; i < ir->row_end; i++) { sl_loop_top[i] = sl[i]; }
 
     ra_begin_loop(ra);
 
@@ -355,7 +357,7 @@ struct jit_program* jit_program(struct jit_backend *be,
     put(&c, Bcond(0xb, 0));
 
     int const simd_body_off = c.words * 4;
-    emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 0,
+    emit_ops(&c, ir, ir->row_end, ir->insts, sl, &ns, ra, 0,
              &jc);
 
     ra_end_loop(ra, sl);
@@ -373,17 +375,17 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     // Tier-aware tail: skip the dispatch-tier re-emit, just like the row
     // transition.  Each tail iteration's row-tier re-emit overwrites the
-    // preamble registers freshly (op_y broadcast etc.), and body's
-    // ra_ensure fills dispatch values from their sl_preamble slots when
-    // consumed.  Body slots (V >= preamble) get fresh ns-allocated slots
-    // — these are tail-local and don't collide with the SIMD body's
+    // dispatch- and row-tier registers freshly (op_y broadcast etc.), and
+    // body's ra_ensure fills dispatch values from their sl_loop_top slots
+    // when consumed.  Body slots (V >= row_end) get fresh ns-allocated
+    // slots — these are tail-local and don't collide with the SIMD body's
     // already-emitted slot references.
     ra_reset_pool(ra);
-    for (int i = 0; i < ir->preamble; i++)         { sl[i] = sl_preamble[i]; }
-    for (int i = ir->preamble; i < ir->insts; i++) { sl[i] = -1; }
+    for (int i = 0; i < ir->row_end; i++)         { sl[i] = sl_loop_top[i]; }
+    for (int i = ir->row_end; i < ir->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, ir, ir->dispatch_end, ir->preamble, sl, &ns, ra, 0, &jc);
-    emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 1, &jc);
+    emit_ops(&c, ir, ir->dispatch_end, ir->row_end, sl, &ns, ra, 0, &jc);
+    emit_ops(&c, ir, ir->row_end, ir->insts, sl, &ns, ra, 1, &jc);
 
     put(&c, ADD_xi(XCOL, XCOL, 1));
     put(&c, B(tail_top - c.words));
@@ -401,18 +403,18 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     // Row transition: only re-emit the row tier.  The dispatch tier was
     // emitted once at function entry and its values live in their
-    // sl_preamble slots from then on (force-spilled by ra_spill_dispatch).
+    // sl_loop_top slots from then on (force-spilled by ra_spill_dispatch).
     //
     // ra_reset_pool clears all RA bookkeeping, matching the post-dispatch-
     // spill state from function entry (free_set = pool_mask, all slots
-    // unbound).  sl[] is restored from the row-tier snapshot so the
+    // unbound).  sl[] is restored from the SIMD-loop-top snapshot so the
     // re-emit's spills land back in their original slots, which the SIMD
     // body's baked-in fills reference.  Same starting state + same emit
     // order + ra_alloc determinism = same allocations.
     int const next_row_off = c.words * 4;
     ra_reset_pool(ra);
-    for (int i = 0; i < ir->preamble; i++) { sl[i] = sl_preamble[i]; }
-    emit_ops(&c, ir, ir->dispatch_end, ir->preamble, sl, &ns, ra, 0, &jc);
+    for (int i = 0; i < ir->row_end; i++) { sl[i] = sl_loop_top[i]; }
+    emit_ops(&c, ir, ir->dispatch_end, ir->row_end, sl, &ns, ra, 0, &jc);
     ra_assert_loop_invariant(ra);
     put(&c, B(loop_top - c.words));
 
@@ -464,7 +466,7 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     ra_destroy(ra);
     free(sl);
-    free(sl_preamble);
+    free(sl_loop_top);
 
     size_t const code_sz = (size_t)c.words * 4,
                  alloc   = (code_sz + pg - 1) & ~(pg - 1);
@@ -480,7 +482,8 @@ struct jit_program* jit_program(struct jit_backend *be,
     j->code_size = c.mmap_size;
     j->code_bytes = pool_start * 4;
     j->labels = 0;
-    j->label[j->labels++] = (struct jit_label){.name = "preamble",  .byte_off = preamble_off};
+    j->label[j->labels++] = (struct jit_label){.name = "dispatch",  .byte_off = dispatch_off};
+    j->label[j->labels++] = (struct jit_label){.name = "row_tier",  .byte_off = row_tier_off};
     j->label[j->labels++] = (struct jit_label){.name = "loop_top",  .byte_off = loop_top * 4};
     j->label[j->labels++] = (struct jit_label){.name = "simd_body", .byte_off = simd_body_off};
     j->label[j->labels++] = (struct jit_label){.name = "tail_top",  .byte_off = tail_top * 4};

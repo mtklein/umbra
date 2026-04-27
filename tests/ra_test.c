@@ -26,7 +26,7 @@ static struct umbra_flat_ir* make_ir(int n, int pre) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc((size_t)n, sizeof *ir->inst);
     ir->insts = n;
-    ir->preamble = pre;
+    ir->row_end = pre;
     ir->loop_begin = -1;
     ir->loop_end   = -1;
     ir->vars       = 0;
@@ -344,7 +344,7 @@ TEST(test_step_unary) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(2, sizeof *ir->inst);
     ir->insts = 2;
-    ir->preamble = 0;
+    ir->row_end = 0;
 
     ir->inst[0].op = op_imm_32;
     ir->inst[0].imm = 42;
@@ -387,7 +387,7 @@ TEST(test_step_unary_alive) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
     ir->insts = 3;
-    ir->preamble = 0;
+    ir->row_end = 0;
 
     ir->inst[0].op = op_imm_32;
     ir->inst[0].imm = 42;
@@ -432,7 +432,7 @@ TEST(test_step_alu) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
     ir->insts = 3;
-    ir->preamble = 0;
+    ir->row_end = 0;
 
     ir->inst[0].op = op_imm_32;
     ir->inst[0].imm = 1;
@@ -479,7 +479,7 @@ TEST(test_step_alu_square_add_x_dies_y_lives) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
     ir->insts = 3;
-    ir->preamble = 0;
+    ir->row_end = 0;
 
     ir->inst[0].op  = op_imm_32;
     ir->inst[0].imm = 1;
@@ -526,7 +526,7 @@ TEST(test_step_alu_square_add_both_live) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
     ir->insts = 3;
-    ir->preamble = 0;
+    ir->row_end = 0;
 
     ir->inst[0].op  = op_imm_32;
     ir->inst[0].imm = 1;
@@ -590,7 +590,7 @@ TEST(test_step_alu_scratch_does_not_evict_dest) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(4, sizeof *ir->inst);
     ir->insts = 4;
-    ir->preamble = 0;
+    ir->row_end = 0;
 
     ir->inst[0].op = op_imm_32;
     ir->inst[0].imm = 16;
@@ -656,7 +656,7 @@ TEST(test_step_alu_scratch) {
     struct umbra_flat_ir *ir = malloc(sizeof *ir);
     ir->inst = calloc(3, sizeof *ir->inst);
     ir->insts = 3;
-    ir->preamble = 0;
+    ir->row_end = 0;
 
     ir->inst[0].op = op_imm_32;
     ir->inst[0].imm = 1;

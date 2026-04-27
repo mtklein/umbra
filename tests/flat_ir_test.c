@@ -5683,8 +5683,8 @@ TEST(test_scope_intrinsics) {
 }
 
 // The finalized IR is a clean tier partition: [0..dispatch_end) holds ops
-// with scope ≤ SCOPE_DISPATCH, [dispatch_end..preamble) holds scope == ROW
-// ops, and [preamble..insts) is the per-batch body (scope ≥ BATCH).  This
+// with scope ≤ SCOPE_DISPATCH, [dispatch_end..row_end) holds scope == ROW
+// ops, and [row_end..insts) is the per-batch body (scope ≥ BATCH).  This
 // is the contract the JIT relies on to emit the dispatch tier once at
 // function entry and only re-emit the row tier per row.
 TEST(test_scope_tier_partition) {
@@ -5701,17 +5701,17 @@ TEST(test_scope_tier_partition) {
             umbra_add_f32(b, yf, umbra_add_f32(b, c0, c1))));
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
 
-    (ir->dispatch_end > 0)            here;
-    (ir->dispatch_end <  ir->preamble) here;
-    (ir->preamble     <  ir->insts)    here;
+    (ir->dispatch_end > 0)           here;
+    (ir->dispatch_end <  ir->row_end) here;
+    (ir->row_end      <  ir->insts)   here;
 
     for (int i = 0; i < ir->dispatch_end; i++) {
         (ir->inst[i].scope <= SCOPE_DISPATCH) here;
     }
-    for (int i = ir->dispatch_end; i < ir->preamble; i++) {
+    for (int i = ir->dispatch_end; i < ir->row_end; i++) {
         ir->inst[i].scope == SCOPE_ROW here;
     }
-    for (int i = ir->preamble; i < ir->insts; i++) {
+    for (int i = ir->row_end; i < ir->insts; i++) {
         (ir->inst[i].scope >= SCOPE_BATCH) here;
     }
 

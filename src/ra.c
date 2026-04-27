@@ -24,14 +24,14 @@ struct ra {
     struct ra_slot       *slot;       // n entries (one per ir_inst)
     int                  *owner;      // max_reg entries (val owning physical reg, -1 if free)
     int8_t               *pool_inv;   // max_reg entries (reg id -> pool bit, or -1)
-    int8_t               *loop_reg;   // preamble entries (snapshot of slot[i].reg at loop top)
+    int8_t               *loop_reg;   // row_end entries (snapshot of slot[i].reg at SIMD-loop top)
     struct ir_inst const *inst;
     struct ra_config      cfg;
     uint32_t              pool_mask;  // (1 << nregs) - 1
     uint32_t              free_set;   // bit i set => cfg.pool[i] is free
     uint32_t              pinned_set; // bit i set => cfg.pool[i] is pinned
     int                   dispatch_end;
-    int                   preamble;
+    int                   row_end;
     int                   insts;
 };
 
@@ -99,8 +99,8 @@ struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg
             ra->slot[cond_id].chan_last_use[(int)ir->inst[ib].x.chan]    = i;
         }
     }
-    for (int i = 0; i < ir->preamble; i++) {
-        if (ra->slot[i].last_use >= ir->preamble) {
+    for (int i = 0; i < ir->row_end; i++) {
+        if (ra->slot[i].last_use >= ir->row_end) {
             ra->slot[i].last_use = n;
         }
     }
@@ -108,8 +108,8 @@ struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg
     ra->inst = ir->inst;
     ra->insts = n;
     ra->dispatch_end = ir->dispatch_end;
-    ra->preamble = ir->preamble;
-    ra->loop_reg = malloc((size_t)ir->preamble * sizeof *ra->loop_reg);
+    ra->row_end = ir->row_end;
+    ra->loop_reg = malloc((size_t)ir->row_end * sizeof *ra->loop_reg);
 
     ra->free_set   = ra->pool_mask;
     ra->pinned_set = 0;
@@ -148,7 +148,7 @@ void ra_destroy(struct ra *ra) {
 }
 
 void ra_begin_loop(struct ra *ra) {
-    for (int i = 0; i < ra->preamble; i++) {
+    for (int i = 0; i < ra->row_end; i++) {
         ra->loop_reg[i] = ra->slot[i].reg;
     }
 }
@@ -158,21 +158,22 @@ static _Bool can_remat(struct ra const *ra, int val) {
 }
 
 void ra_assert_loop_invariant(struct ra const *ra) {
-    for (int i = 0; i < ra->preamble; i++) {
+    for (int i = 0; i < ra->row_end; i++) {
         assume(ra->slot[i].reg == ra->loop_reg[i]);
     }
 }
 
 void ra_end_loop(struct ra *ra, int *sl) {
-    for (int i = 0; i < ra->preamble; i++) {
+    for (int i = 0; i < ra->row_end; i++) {
         int8_t const target = ra->loop_reg[i];
         if (ra->slot[i].reg != target) {
             if (target < 0) {
-                // Val i had no register at loop top (evicted during preamble,
-                // its data lives in sl[i]).  Body emit may have ra_ensure'd it
-                // back into some register; release that so next iteration's
-                // first read performs the same fill as this iteration did.
-                // No emitted instruction needed -- the data is already in sl[i].
+                // Val i had no register at SIMD-loop top (evicted during the
+                // dispatch or row tier emit, its data lives in sl[i]).  Body
+                // emit may have ra_ensure'd it back into some register;
+                // release that so next iteration's first read performs the
+                // same fill as this iteration did.  No emitted instruction
+                // needed — the data is already in sl[i].
                 int8_t const old_r = ra->slot[i].reg;
                 if (old_r >= 0 && ra->owner[(int)old_r] == i) {
                     ra->owner[(int)old_r] = -1;

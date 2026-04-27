@@ -287,11 +287,11 @@ static _Bool is_cf(enum op op) {
 // operand scope.
 //
 // op_y is SCOPE_ROW: constant within a row, varies per row.  The JITs set
-// up XY (the row-state register) before emitting the preamble so op_y
-// broadcasts the right row, and the per-row preamble re-emit at row
-// transitions refreshes the broadcast for each subsequent row.  Anything
-// purely derived from op_y + uniforms therefore hoists out of the per-batch
-// body into the per-row preamble.
+// up XY (the row-state register) before emitting the row tier so op_y
+// broadcasts the right row, and the row-tier re-emit at each row
+// transition refreshes the broadcast for the new row.  Anything purely
+// derived from op_y + uniforms therefore hoists out of the per-batch
+// body into the row tier.
 static enum scope intrinsic_scope(enum op op) {
     if (is_cf(op))                  { return SCOPE_BATCH; }
     if (op == op_imm_32)            { return SCOPE_COMPILE; }
@@ -341,11 +341,11 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
 
     // Scope propagation.  An op inside a loop or if region keeps its
     // data-flow scope — there is no region cap.  Pure ops with broader
-    // input scopes hoist out of regions into the appropriate preamble tier
-    // (dispatch or row); only ops that truly depend on per-iteration /
-    // per-lane state (loads, vars, lane index) end up in the body.
-    // Stores stay at their textual position because op_is_store excludes
-    // them from preamble extraction below.
+    // input scopes hoist out of regions into the dispatch tier or row
+    // tier; only ops that truly depend on per-iteration / per-lane state
+    // (loads, vars, lane index) end up in the body.  Stores stay at their
+    // textual position because op_is_store excludes them from tier
+    // extraction below.
     for (int i = 0; i < n; i++) {
         enum scope s = intrinsic_scope(b->inst[i].op);
         s = narrow(s, (enum scope)b->inst[b->inst[i].x.id].scope);
@@ -355,11 +355,11 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         b->inst[i].scope = (int8_t)s;
     }
 
-    // Two-pass preamble extraction so the result is a clean tier partition:
+    // Two-pass tier extraction so the result is a clean partition:
     // out[0..dispatch_end) holds scope ≤ SCOPE_DISPATCH ops (the dispatch
-    // tier — emit once per queue() call), out[dispatch_end..preamble) holds
+    // tier — emit once per queue() call), out[dispatch_end..row_end) holds
     // scope == SCOPE_ROW ops (the row tier — emit at each row's entry),
-    // and out[preamble..insts) is the per-batch body.  Within each tier we
+    // and out[row_end..insts) is the per-batch body.  Within each tier we
     // preserve textual order, so dependency ordering is intact.
     struct ir_inst *out = malloc((size_t)live * sizeof *out);
     int dispatch_end = 0;
@@ -370,12 +370,12 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
             out[dispatch_end++] = b->inst[i];
         }
     }
-    int preamble = dispatch_end;
+    int row_end = dispatch_end;
     for (int i = 0; i < n; i++) {
         if (b->inst[i].live && b->inst[i].scope == SCOPE_ROW
                 && !op_is_store(b->inst[i].op)) {
-            b->inst[i].final_id = preamble;
-            out[preamble++] = b->inst[i];
+            b->inst[i].final_id = row_end;
+            out[row_end++] = b->inst[i];
         }
     }
 
@@ -387,7 +387,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
         }
     }
 
-    int j = preamble;
+    int j = row_end;
     int region_lo = 0;
     for (int ci = 0; ci < cfs; ci++) {
         schedule(b->inst, n, out, j, live, region_lo, cf[ci]);
@@ -413,7 +413,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     result->inst         = out;
     result->insts        = live;
     result->dispatch_end = dispatch_end;
-    result->preamble     = preamble;
+    result->row_end      = row_end;
     result->vars   = b->vars;
     result->loop_begin = -1;
     result->loop_end   = -1;

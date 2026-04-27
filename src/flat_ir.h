@@ -37,7 +37,7 @@ typedef union {
 // operands.  The scheduler partitions the IR into three tiers based on
 // scope: dispatch tier (SCOPE_COMPILE, SCOPE_DISPATCH) emitted once per
 // queue() call, row tier (SCOPE_ROW) emitted at each row's entry, and the
-// per-batch body (SCOPE_BATCH and narrower).  See dispatch_end / preamble
+// per-batch body (SCOPE_BATCH and narrower).  See dispatch_end / row_end
 // in struct umbra_flat_ir.
 enum scope {
     SCOPE_COMPILE  = 0,
@@ -135,8 +135,8 @@ struct umbra_flat_ir {
 
     int insts,         // Total instruction count.
         dispatch_end,  // inst[0..dispatch_end) have scope ≤ SCOPE_DISPATCH.
-        preamble;      // inst[dispatch_end..preamble) have scope == SCOPE_ROW.
-                       // inst[preamble..insts) is the per-batch body.
+        row_end;       // inst[dispatch_end..row_end) have scope == SCOPE_ROW.
+                       // inst[row_end..insts) is the per-batch body.
     int loop_begin,    // Instruction index of op_loop_begin, or -1.
         loop_end;      // Instruction index of op_loop_end,   or -1.
     int vars, bindings;
