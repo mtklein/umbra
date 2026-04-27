@@ -306,14 +306,23 @@ struct jit_program* jit_program(struct jit_backend *be,
                                      // the per-row preamble broadcasts row t).
 
     int const preamble_off = (int)c.size;
-    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
 
-    // Snapshot sl[] after the first preamble emit.  The row-transition
-    // re-emit (after each row's tail clears sl[]) needs to land its spills
-    // in the *same* slots the SIMD body's already-emitted fills read from,
-    // since with row-scope preamble values (op_y) the slot contents change
-    // per row.  Without this, body fills would read stale data spilled by
-    // a prior row's preamble.
+    // Dispatch tier: emit once per queue() call, then force-spill every
+    // dispatch value alive past dispatch_end.  After this point, dispatch
+    // values live exclusively in spill slots — both function entry and
+    // every row-transition then start from the same state, allowing the
+    // row-tier emit to be cleanly re-run per row without re-emitting the
+    // dispatch tier.
+    emit_ops(&c, ir, 0, ir->dispatch_end, sl, &ns, ra, 0, &jc);
+    ra_spill_dispatch(ra, sl, &ns);
+
+    // Row tier: emit at row entry; outputs refresh per row.  This first
+    // emit covers row #1; subsequent rows re-emit at next_row_off below.
+    emit_ops(&c, ir, ir->dispatch_end, ir->preamble, sl, &ns, ra, 0, &jc);
+
+    // Snapshot sl[] after the first row-tier emit so the per-row re-emit
+    // restores the same slot assignments the SIMD body's already-emitted
+    // fills reference.
     int *sl_preamble = malloc((size_t)ir->preamble * sizeof(int));
     for (int i = 0; i < ir->preamble; i++) { sl_preamble[i] = sl[i]; }
 
@@ -375,19 +384,20 @@ struct jit_program* jit_program(struct jit_backend *be,
     cmp_rr(&c, XY, XH_X86);
     int const br_done_all = jcc(&c, 0x0d);    // JGE -> done_all (no more rows)
 
-    // Re-emit preamble so the next row's SIMD iter starts with uniforms in
-    // the registers it expects: the tail body clobbers them, and the SIMD
-    // body's end-of-loop fills are skipped when we enter the tail.
+    // Row transition: only re-emit the row tier.  The dispatch tier was
+    // emitted once at function entry and its values live in their
+    // sl_preamble slots from then on (force-spilled by ra_spill_dispatch).
     //
-    // Restore sl[] from the snapshot taken after the first preamble emit so
-    // that any preamble value that was spilled originally lands back in the
-    // *same* slot.  The SIMD body's already-emitted fills reference those
-    // original slot numbers, and with row-scope preamble values the slot
-    // contents change per row.
+    // ra_reset_pool clears all RA bookkeeping, matching the post-dispatch-
+    // spill state from function entry (free_set = pool_mask, all slots
+    // unbound).  sl[] is restored from the row-tier snapshot so the
+    // re-emit's spills land back in their original slots, which the SIMD
+    // body's baked-in fills reference.  Same starting state + same emit
+    // order + ra_alloc determinism = same allocations.
     int const next_row_off = (int)c.size;
     ra_reset_pool(ra);
     for (int i = 0; i < ir->preamble; i++) { sl[i] = sl_preamble[i]; }
-    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
+    emit_ops(&c, ir, ir->dispatch_end, ir->preamble, sl, &ns, ra, 0, &jc);
     ra_assert_loop_invariant(ra);
     {
         int     const j   = jmp(&c);

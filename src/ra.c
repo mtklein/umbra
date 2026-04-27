@@ -30,9 +30,9 @@ struct ra {
     uint32_t              pool_mask;  // (1 << nregs) - 1
     uint32_t              free_set;   // bit i set => cfg.pool[i] is free
     uint32_t              pinned_set; // bit i set => cfg.pool[i] is pinned
+    int                   dispatch_end;
     int                   preamble;
     int                   insts;
-    int                   :32;
 };
 
 int8_t ra_reg(struct ra const *ra, int val) { return ra->slot[val].reg; }
@@ -107,6 +107,7 @@ struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg
 
     ra->inst = ir->inst;
     ra->insts = n;
+    ra->dispatch_end = ir->dispatch_end;
     ra->preamble = ir->preamble;
     ra->loop_reg = malloc((size_t)ir->preamble * sizeof *ra->loop_reg);
 
@@ -121,6 +122,34 @@ void ra_reset_pool(struct ra *ra) {
     ra->pinned_set = 0;
     for (int i = 0; i < ra->cfg.max_reg; i++) { ra->owner[i] = -1; }
     for (int i = 0; i < ra->insts; i++) { ra->slot[i].reg = -1; }
+}
+
+static _Bool can_remat(struct ra const *ra, int val);
+
+void ra_spill_dispatch(struct ra *ra, int *sl, int *ns) {
+    // Free every dispatch-tier value's register, spilling first if its data
+    // needs to outlive the dispatch tier and isn't rematerializable.  After
+    // this, slot[V].reg == -1 for all V < dispatch_end — the post-row-tier
+    // ra_begin_loop will capture loop_reg[V] = -1 for them, matching the
+    // ra_reset_pool state at every row transition.  Any subsequent use
+    // (in row tier or body) goes through ra_ensure, which fills from
+    // sl[V] or remats deterministically.
+    for (int V = 0; V < ra->dispatch_end; V++) {
+        int8_t const r = ra->slot[V].reg;
+        if (r >= 0) {
+            if (!can_remat(ra, V) && ra->slot[V].last_use >= ra->dispatch_end) {
+                if (sl[V] < 0) { sl[V] = (*ns)++; }
+                ra->cfg.spill(r, sl[V], ra->cfg.ctx);
+            }
+            ra_free_reg(ra, V);
+        }
+    }
+}
+
+void ra_clear_preamble(struct ra *ra) {
+    for (int V = 0; V < ra->preamble; V++) {
+        ra_free_reg(ra, V);
+    }
 }
 
 void ra_destroy(struct ra *ra) {

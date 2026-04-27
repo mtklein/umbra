@@ -20,6 +20,25 @@ struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg
 void       ra_destroy(struct ra *ra);
 void       ra_reset_pool(struct ra *ra);
 
+// Force-spill every dispatch-tier value (i < dispatch_end) that is alive past
+// the dispatch tier (last_use >= dispatch_end) and currently in a register,
+// freeing the register.  After this call:
+//   - dispatch tier values are at slot[i].reg = -1, sl[i] >= 0 (valid slot).
+//   - their data is stored at sl[i].
+// Used at the end of the function-entry dispatch emit so the row tier emit
+// starts from a state where all dispatch values are spilled, matching the
+// state after a row transition.
+void ra_spill_dispatch(struct ra *ra, int *sl, int *ns);
+
+// Clear bookkeeping for all preamble values (i < preamble) that are
+// currently in registers — slot[i].reg = -1, owner[r] = -1, free_set
+// updated.  Does NOT emit any spill; assumes the caller has already
+// preserved any data that needs preserving (dispatch tier via
+// ra_spill_dispatch at function entry; row tier values are recomputed by
+// the row-tier re-emit).  Used at row_done to put the RA back into the
+// "post dispatch-spill" state from which the row tier can be re-emitted.
+void ra_clear_preamble(struct ra *ra);
+
 void   ra_free_chan(struct ra *ra, val operand, int i);
 void   ra_free_reg(struct ra *ra, int val);
 int8_t ra_alloc(struct ra *ra, int *sl, int *ns);

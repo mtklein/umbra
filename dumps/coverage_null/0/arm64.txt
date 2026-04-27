@@ -4,7 +4,7 @@ stp	q8, q9, [sp, #-0x80]!
 stp	q10, q11, [sp, #0x20]
 stp	q12, q13, [sp, #0x40]
 stp	q14, q15, [sp, #0x60]
-nop
+sub	sp, sp, #0xa0
 mov	x15, sp
 add	x11, x0, #0x0
 add	x14, x1, #0x0
@@ -34,6 +34,16 @@ fmov.4s	v22, #1.00000000
 mov.16b	v23, v22
 fsub.4s	v22, v22, v20
 fsub.4s	v23, v23, v21
+str	q6, [x15]
+str	q7, [x15, #0x10]
+str	q16, [x15, #0x20]
+str	q17, [x15, #0x30]
+str	q18, [x15, #0x40]
+str	q19, [x15, #0x50]
+str	q20, [x15, #0x60]
+str	q21, [x15, #0x70]
+str	q22, [x15, #0x80]
+str	q23, [x15, #0x90]
 add	x13, x9, #0x0
 add	x0, x12, #0x0
 add	x1, x11, #0x0
@@ -42,7 +52,7 @@ stp	x13, x15, [sp, #-0x10]!
 # loop_top:
 sub	x10, x0, x9
 cmp	x10, #0x8
-b.lt	0x1cc <ltmp0+0x1cc>
+b.lt	0x21c <ltmp0+0x21c>
 # simd_body:
 ldr	x8, [x2]
 ldr	w10, [x2, #0xc]
@@ -51,74 +61,84 @@ madd	x8, x14, x10, x8
 lsl	x10, x9, #3
 add	x10, x8, x10
 ld4.4h	{ v0, v1, v2, v3 }, [x10]
-mov.16b	v24, v0
-mov.16b	v26, v1
-mov.16b	v28, v2
-mov.16b	v30, v3
+mov.16b	v4, v0
+mov.16b	v6, v1
+mov.16b	v16, v2
+mov.16b	v18, v3
 add	x10, x10, #0x20
 ld4.4h	{ v0, v1, v2, v3 }, [x10]
-mov.16b	v25, v0
-mov.16b	v27, v1
-mov.16b	v29, v2
-mov.16b	v31, v3
-fcvtl	v8.4s, v24.4h
-fcvtl	v9.4s, v25.4h
-mov.16b	v10, v6
-fmla.4s	v10, v8, v22
-mov.16b	v8, v10
-mov.16b	v11, v7
-fmla.4s	v11, v9, v23
-mov.16b	v9, v11
-fcvtl	v10.4s, v26.4h
-fcvtl	v11.4s, v27.4h
-mov.16b	v26, v16
-fmla.4s	v26, v10, v22
-mov.16b	v10, v26
-mov.16b	v27, v17
-fmla.4s	v27, v11, v23
-mov.16b	v11, v27
-fcvtl	v26.4s, v28.4h
-fcvtl	v27.4s, v29.4h
-mov.16b	v28, v18
+mov.16b	v5, v0
+mov.16b	v7, v1
+mov.16b	v17, v2
+mov.16b	v19, v3
+fcvtl	v20.4s, v4.4h
+fcvtl	v21.4s, v5.4h
+ldr	q22, [x15, #0x80]
+ldr	q23, [x15, #0x90]
+ldr	q24, [x15]
+ldr	q25, [x15, #0x10]
+mov.16b	v26, v24
+fmla.4s	v26, v20, v22
+mov.16b	v20, v26
+mov.16b	v27, v25
+fmla.4s	v27, v21, v23
+mov.16b	v21, v27
+fcvtl	v26.4s, v6.4h
+fcvtl	v27.4s, v7.4h
+ldr	q6, [x15, #0x20]
+ldr	q7, [x15, #0x30]
+mov.16b	v28, v6
 fmla.4s	v28, v26, v22
 mov.16b	v26, v28
-mov.16b	v29, v19
+mov.16b	v29, v7
 fmla.4s	v29, v27, v23
 mov.16b	v27, v29
-fcvtl	v28.4s, v30.4h
-fcvtl	v29.4s, v31.4h
-mov.16b	v30, v20
+fcvtl	v28.4s, v16.4h
+fcvtl	v29.4s, v17.4h
+ldr	q16, [x15, #0x40]
+ldr	q17, [x15, #0x50]
+mov.16b	v30, v16
 fmla.4s	v30, v28, v22
 mov.16b	v28, v30
-mov.16b	v31, v21
+mov.16b	v31, v17
 fmla.4s	v31, v29, v23
 mov.16b	v29, v31
+fcvtl	v30.4s, v18.4h
+fcvtl	v31.4s, v19.4h
+ldr	q18, [x15, #0x60]
+ldr	q19, [x15, #0x70]
+mov.16b	v8, v18
+fmla.4s	v8, v30, v22
+mov.16b	v30, v8
+mov.16b	v9, v19
+fmla.4s	v9, v31, v23
+mov.16b	v31, v9
+fcvtn	v30.4h, v30.4s
+fcvtn	v31.4h, v31.4s
 fcvtn	v28.4h, v28.4s
 fcvtn	v29.4h, v29.4s
 fcvtn	v26.4h, v26.4s
 fcvtn	v27.4h, v27.4s
-fcvtn	v10.4h, v10.4s
-fcvtn	v11.4h, v11.4s
-fcvtn	v8.4h, v8.4s
-fcvtn	v9.4h, v9.4s
-mov.16b	v0, v8
-mov.16b	v1, v10
-mov.16b	v2, v26
-mov.16b	v3, v28
+fcvtn	v20.4h, v20.4s
+fcvtn	v21.4h, v21.4s
+mov.16b	v0, v20
+mov.16b	v1, v26
+mov.16b	v2, v28
+mov.16b	v3, v30
 lsl	x10, x9, #3
 add	x10, x8, x10
 st4.4h	{ v0, v1, v2, v3 }, [x10]
-mov.16b	v0, v9
-mov.16b	v1, v11
-mov.16b	v2, v27
-mov.16b	v3, v29
+mov.16b	v0, v21
+mov.16b	v1, v27
+mov.16b	v2, v29
+mov.16b	v3, v31
 add	x10, x10, #0x20
 st4.4h	{ v0, v1, v2, v3 }, [x10]
 add	x9, x9, #0x8
-b	0xa0 <ltmp0+0xa0>
+b	0xc8 <ltmp0+0xc8>
 # tail_top:
 cmp	x9, x0
-b.ge	0x2c4 <ltmp0+0x2c4>
+b.ge	0x314 <ltmp0+0x314>
 movi.4s	v4, #0x0
 mov.16b	v5, v4
 ldr	x8, [x2, #0x10]
@@ -178,37 +198,15 @@ lsl	x10, x9, #3
 add	x10, x8, x10
 str	d14, [x10]
 add	x9, x9, #0x1
-b	0x1cc <ltmp0+0x1cc>
+b	0x21c <ltmp0+0x21c>
 # row_done:
 add	x14, x14, #0x1
 add	x9, x1, #0x0
 ldr	x10, [sp]
 cmp	x14, x10
-b.ge	0x334 <ltmp0+0x334>
+b.ge	0x32c <ltmp0+0x32c>
 # next_row:
-movi.4s	v4, #0x0
-mov.16b	v5, v4
-ldr	x8, [x2, #0x10]
-ldr	w10, [x2, #0x1c]
-lsl	x10, x10, #2
-madd	x8, x14, x10, x8
-ldr	s6, [x8]
-dup.4s	v6, v6[0]
-mov.16b	v7, v6
-ldr	s16, [x8, #0x4]
-dup.4s	v16, v16[0]
-mov.16b	v17, v16
-ldr	s18, [x8, #0x8]
-dup.4s	v18, v18[0]
-mov.16b	v19, v18
-ldr	s20, [x8, #0xc]
-dup.4s	v20, v20[0]
-mov.16b	v21, v20
-fmov.4s	v22, #1.00000000
-mov.16b	v23, v22
-fsub.4s	v22, v22, v20
-fsub.4s	v23, v23, v21
-b	0xa0 <ltmp0+0xa0>
+b	0xc8 <ltmp0+0xc8>
 # done_all:
 ldp	x0, x15, [sp], #0x10
 mov	sp, x29
@@ -218,6 +216,4 @@ ldp	q12, q13, [sp, #-0x40]
 ldp	q14, q15, [sp, #-0x20]
 ldp	x29, x30, [sp], #0x10
 ret
-nop
-nop
 nop
