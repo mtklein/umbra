@@ -280,6 +280,21 @@ static _Bool is_cf(enum op op) {
         || op == op_if_begin   || op == op_if_end;
 }
 
+// Per-op intrinsic scope.  Source ops introduce scope; everything else is
+// SCOPE_COMPILE intrinsically and inherits from operands via narrow().  For
+// step 1 of the migration we mirror op_is_varying exactly: varying-source ops
+// get SCOPE_LANE, non-varying ops get SCOPE_COMPILE.  That keeps the
+// (scope >= SCOPE_BATCH) == varying invariant true by construction so the
+// later switch-flip lands with zero codegen diff.  Finer-grained intrinsics
+// (SCOPE_ROW for op_y, SCOPE_DISPATCH for op_uniform_32) come in a later
+// step once the partition becomes scope-driven.
+static enum scope intrinsic_scope(enum op op) {
+    return op_is_varying(op) ? SCOPE_LANE : SCOPE_COMPILE;
+}
+static enum scope narrow(enum scope a, enum scope b) {
+    return a > b ? a : b;
+}
+
 static void compute_buf_meta(struct umbra_flat_ir *ir);
 
 struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
@@ -308,6 +323,12 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
                           || b->inst[b->inst[i].y.id].varying
                           || b->inst[b->inst[i].z.id].varying
                           || b->inst[b->inst[i].w.id].varying;
+        enum scope s = intrinsic_scope(b->inst[i].op);
+        s = narrow(s, (enum scope)b->inst[b->inst[i].x.id].scope);
+        s = narrow(s, (enum scope)b->inst[b->inst[i].y.id].scope);
+        s = narrow(s, (enum scope)b->inst[b->inst[i].z.id].scope);
+        s = narrow(s, (enum scope)b->inst[b->inst[i].w.id].scope);
+        b->inst[i].scope = (int8_t)s;
     }
     {
         // Ops inside a loop or if region execute per-iteration / per-lane, so
@@ -324,8 +345,18 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
                     && b->inst[i].op != op_imm_32
                     && b->inst[i].op != op_uniform_32) {
                 b->inst[i].varying = 1;
+                if (b->inst[i].scope < SCOPE_BATCH) {
+                    b->inst[i].scope = SCOPE_BATCH;
+                }
             }
             if (b->inst[i].op == op_loop_end || b->inst[i].op == op_if_end) { depth--; }
+        }
+    }
+    // Migration invariant: scope and varying must agree on the BATCH split so
+    // we can flip authority from varying → scope with zero codegen diff.
+    for (int i = 0; i < n; i++) {
+        if (b->inst[i].live) {
+            assume((b->inst[i].scope >= SCOPE_BATCH) == b->inst[i].varying);
         }
     }
 

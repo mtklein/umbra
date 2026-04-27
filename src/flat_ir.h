@@ -23,6 +23,29 @@ typedef union {
     struct { int ix; };
 } ptr;
 
+// Value scope: the broadest frame across which a value is invariant.  Frames
+// nest from broadest to narrowest:
+//
+//   SCOPE_COMPILE  — fixed at IR build (literals).
+//   SCOPE_DISPATCH — fixed for one queue() call (uniform_32 reads).
+//   SCOPE_ROW      — fixed across one output row (umbra_y).
+//   SCOPE_BATCH    — fixed across one K-lane column step (current "preamble" tier).
+//   SCOPE_ITER     — fixed within one loop iteration.
+//   SCOPE_LANE     — varies per SIMD lane (umbra_x, all loads/stores).
+//
+// Scope is computed from each op's intrinsic scope and the scopes of its
+// operands.  Today we still partition codegen by the binary `varying` flag;
+// scope is populated alongside as a richer, forward-compatible name for the
+// same partition: `(scope >= SCOPE_BATCH) == varying` for every live op.
+enum scope {
+    SCOPE_COMPILE  = 0,
+    SCOPE_DISPATCH = 1,
+    SCOPE_ROW      = 2,
+    SCOPE_BATCH    = 3,
+    SCOPE_ITER     = 4,
+    SCOPE_LANE     = 5,
+};
+
 struct ir_inst {
     enum op op;
     val     x, y, z, w;
@@ -30,8 +53,9 @@ struct ir_inst {
     int     imm;
 
     // Bookkeeping metadata, doesn't need to be hashed.
-    _Bool live, uniform, varying; int :8;
-    int   final_id;
+    _Bool  live, uniform, varying;
+    int8_t scope;
+    int    final_id;
 };
 
 // A buf registration pinned to a specific ptr handle (.ix).  The resolver
