@@ -5720,10 +5720,10 @@ TEST(test_scope_tier_partition) {
 }
 
 // LICM: a pure expression with all-uniform inputs textually inside a loop
-// should land in the preamble (scope < SCOPE_BATCH), not the body.  Before
-// scope-driven scheduling the depth-counter cap forced everything inside a
-// region to varying, so this shape produced an in-body add_f32 every
-// iteration.
+// should land in the dispatch tier (scope < SCOPE_BATCH), not the body.
+// Before scope-driven scheduling the depth-counter cap forced everything
+// inside a region to varying, so this shape produced an in-body add_f32
+// every iteration.
 TEST(test_scope_licm_in_loop) {
     struct umbra_buf slot[4] = {0};
     struct umbra_builder *b = umbra_builder();
