@@ -362,15 +362,18 @@ struct jit_program* jit_program(struct jit_backend *be,
     cmp_rr(&c, XCOL_X86, RDI);                       // xi >= row_end?
     int const br_row_done = jcc(&c, 0x0d);     // JGE row_done
 
-    // TODO: tail still re-emits the full preamble (dispatch + row) per
-    // iteration because the baked tail body has no end-of-iter restore;
-    // the per-iter preamble re-emit serves as the implicit restore.  A
-    // tier-aware tail would skip dispatch tier here too — bounded saving
-    // (≤K-1 iters per row) but worth picking up if it shows on a profile.
+    // Tier-aware tail: skip the dispatch-tier re-emit, just like the row
+    // transition.  Each tail iteration's row-tier re-emit overwrites the
+    // preamble registers freshly (op_y broadcast etc.), and body's
+    // ra_ensure fills dispatch values from their sl_preamble slots when
+    // consumed.  Body slots (V >= preamble) get fresh ns-allocated slots
+    // — these are tail-local and don't collide with the SIMD body's
+    // already-emitted slot references.
     ra_reset_pool(ra);
-    for (int i = 0; i < ir->insts; i++) { sl[i] = -1; }
+    for (int i = 0; i < ir->preamble; i++)         { sl[i] = sl_preamble[i]; }
+    for (int i = ir->preamble; i < ir->insts; i++) { sl[i] = -1; }
 
-    emit_ops(&c, ir, 0, ir->preamble, sl, &ns, ra, 0, &jc);
+    emit_ops(&c, ir, ir->dispatch_end, ir->preamble, sl, &ns, ra, 0, &jc);
     emit_ops(&c, ir, ir->preamble, ir->insts, sl, &ns, ra, 1, &jc);
 
     add_ri(&c, XCOL_X86, 1);
