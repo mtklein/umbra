@@ -452,7 +452,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
 
     _Bool pinned[32] = {0};
     for (int k = 0; k < p->bindings; k++) {
-        if (binding_is_uniform(p->binding[k].kind)) { pinned[p->binding[k].ix] = 1; }
+        if (p->binding[k].kind == BIND_UNIFORMS) { pinned[p->binding[k].ix] = 1; }
     }
 
     for (int i = 0; i <= p->max_ptr; i++) {

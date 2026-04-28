@@ -53,7 +53,6 @@ enum binding_kind {
     BIND_SEALED,
     BIND_UNIFORMS,
 };
-_Bool binding_is_uniform(enum binding_kind);  // TODO: this seems silly
 
 enum { BUF_READ = 1, BUF_WRITTEN = 2, BUF_SEALED = 4 };
 

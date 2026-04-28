@@ -6,10 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-_Bool binding_is_uniform(enum binding_kind k) {
-    return k == BIND_UNIFORMS;
-}
-
 static _Bool kind_is_buf(enum binding_kind k) {
     return k == BIND_BUF || k == BIND_SEALED;
 }
@@ -460,7 +456,7 @@ static void compute_buf_meta(struct umbra_flat_ir *ir) {
     for (int i = 0; i < ir->bindings; i++) {
         int const p = ir->binding[i].ix;
         if (0 <= p && p < total) {
-            if (binding_is_uniform(ir->binding[i].kind)) {
+            if (ir->binding[i].kind == BIND_UNIFORMS) {
                 ir->buf[p].is_uniform    = 1;
                 ir->buf[p].uniform_slots = ir->binding[i].uniforms.count;
             }

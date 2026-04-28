@@ -281,7 +281,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     _Bool pinned[32] = {0};
     for (int k = 0; k < vp->bindings; k++) {
-        if (binding_is_uniform(vp->binding[k].kind)) { pinned[vp->binding[k].ix] = 1; }
+        if (vp->binding[k].kind == BIND_UNIFORMS) { pinned[vp->binding[k].ix] = 1; }
     }
 
     for (int i = 0; i <= vp->max_ptr; i++) {

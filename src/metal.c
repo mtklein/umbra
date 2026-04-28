@@ -974,7 +974,7 @@ static void encode_dispatch(struct metal_program *p,
 
     _Bool pinned[32] = {0};
     for (int i = 0; i < p->bindings; i++) {
-        pinned[p->binding[i].ix] = binding_is_uniform(p->binding[i].kind);
+        pinned[p->binding[i].ix] = p->binding[i].kind == BIND_UNIFORMS;
     }
 
     void   *bind_handle[32] = {0};
