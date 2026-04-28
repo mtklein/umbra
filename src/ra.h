@@ -36,6 +36,17 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns);
 int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val);
 int8_t ra_ensure_chan(struct ra *ra, int *sl, int *ns, int val, int chan);
 int8_t ra_claim(struct ra *ra, int old_val, int new_val);
+
+// Release any holds accumulated by prior ra_ensure / ra_ensure_chan
+// calls.  Backends call this once at the top of each iteration of
+// their per-instruction emit loop: any val ra_ensure'd between two
+// ra_step calls is held safe — ra_alloc won't pick its register,
+// even if Belady would otherwise prefer to evict it (e.g. its last_use
+// is the current instruction, so eviction looks "free" but would
+// alias the just-freed register onto a register the backend is about
+// to read).  Everything else (ra_ensure auto-holds, ra_alloc respects
+// holds) is automatic.
+void ra_step(struct ra *ra);
 void   ra_begin_loop(struct ra *ra);
 void   ra_end_loop(struct ra *ra, int *sl);
 void   ra_evict_live_before(struct ra *ra, int *sl, int *ns, int before);

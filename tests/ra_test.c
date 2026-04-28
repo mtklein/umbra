@@ -288,9 +288,17 @@ TEST(test_many_values_stress) {
     }
     in_reg == 3 here;
 
-    // ensure all: 17 spilled trigger fills
+    // ensure all: 17 spilled trigger fills.  ra_step() between iterations
+    // releases the auto-hold from the prior ra_ensure — without it, the
+    // pool would saturate on the 4th iteration (every prior ensure auto-
+    // held its val into the pool's only 3 bits).  In real JIT use the
+    // emit loop calls ra_step() at the top of every per-instruction
+    // iteration, so each ra_ensure is its own "step" too.
     rec = (struct records){0};
-    for (int i = 0; i < n; i++) { ra_ensure(ra, sl, &ns, i); }
+    for (int i = 0; i < n; i++) {
+        ra_step(ra);
+        ra_ensure(ra, sl, &ns, i);
+    }
     rec.fills > 0 here;
 
     ra_destroy(ra);

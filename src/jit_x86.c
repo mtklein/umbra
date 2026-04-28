@@ -521,6 +521,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
     int last_ptr = -1;
 
     for (int i = from; i < to; i++) {
+        ra_step(ra);
         struct ir_inst const *inst = &ir->inst[i];
         switch (inst->op) {
         case op_x: {

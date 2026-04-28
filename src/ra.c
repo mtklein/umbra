@@ -29,7 +29,7 @@ struct ra {
     struct ra_config      cfg;
     uint32_t              pool_mask;  // (1 << nregs) - 1
     uint32_t              free_set;   // bit i set => cfg.pool[i] is free
-    uint32_t              pinned_set; // bit i set => cfg.pool[i] is pinned
+    uint32_t              pinned_set; // bit i set => cfg.pool[i] is held this step
     int                   dispatch_end;
     int                   row_end;
     int                   insts;
@@ -294,7 +294,24 @@ int8_t ra_alloc(struct ra *ra, int *sl, int *ns) {
     return r;
 }
 
+// Pin the pool bit currently holding val so the eviction scan in
+// ra_alloc / ra_ensure can't pick it. A val whose slot[].reg is -1
+// (chan-only or not yet materialized) has nothing to pin in the main
+// pool, matching the old "owner[r]==pinned_val never matched" no-op.
+static void pin_val(struct ra *ra, int val) {
+    int8_t const r = ra->slot[val].reg;
+    if (r >= 0) {
+        int8_t const bit = ra->pool_inv[(int)r];
+        if (bit >= 0) { ra->pinned_set |= (uint32_t)1 << bit; }
+    }
+}
+
+void ra_step(struct ra *ra) { ra->pinned_set = 0; }
+
 int8_t ra_ensure_chan(struct ra *ra, int *sl, int *ns, int val, int chan) {
+    // chan != 0 returns chan_reg directly: those registers always have
+    // ra->owner[reg] = -1 (ra_set_chan_reg doesn't claim ownership), so
+    // ra_alloc's Belady scan already skips them and no hold is needed.
     if (chan != 0) { return ra->slot[val].chan_reg[chan]; }
     return ra_ensure(ra, sl, ns, val);
 }
@@ -309,6 +326,11 @@ int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val) {
         ra->slot[val].reg = r;
         ra->owner[(int)r] = val;
     }
+    // Auto-hold: the caller obviously needs val's register on the
+    // current instruction (otherwise why ensure?), so subsequent
+    // ra_alloc calls in the same step must not evict it.  Released by
+    // the next ra_step() call.
+    pin_val(ra, val);
     return ra->slot[val].reg;
 }
 
@@ -318,18 +340,6 @@ int8_t ra_claim(struct ra *ra, int old_val, int new_val) {
     ra->slot[new_val].reg = r;
     ra->owner[(int)r] = new_val;
     return r;
-}
-
-// Pin the pool bit currently holding val so the eviction scan in
-// ra_alloc / ra_ensure can't pick it. A val whose slot[].reg is -1
-// (chan-only or not yet materialized) has nothing to pin in the main
-// pool, matching the old "owner[r]==pinned_val never matched" no-op.
-static void pin_val(struct ra *ra, int val) {
-    int8_t const r = ra->slot[val].reg;
-    if (r >= 0) {
-        int8_t const bit = ra->pool_inv[(int)r];
-        if (bit >= 0) { ra->pinned_set |= (uint32_t)1 << bit; }
-    }
 }
 
 // Free a per-channel register if its last use has expired.
