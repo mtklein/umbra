@@ -132,7 +132,7 @@ umbra_ptr umbra_bind_buf(builder *b, struct umbra_buf const *buf) {
 umbra_ptr umbra_bind_sealed(builder *b, struct umbra_buf const *buf) {
     int const ix = reserve_binding(b);
     b->binding[ix] = (struct buffer_binding){
-        .kind = BIND_SEALED_BUF,
+        .kind = BIND_SEALED,
         .buf  = buf,
         .ix   = ix,
     };

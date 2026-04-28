@@ -20,42 +20,25 @@ struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg
 void       ra_destroy(struct ra *ra);
 void       ra_reset_pool(struct ra *ra);
 
-// Free every dispatch-tier register, spilling first if the value is alive
-// past dispatch_end and isn't rematerializable.  After this call all
-// dispatch values are at slot[i].reg = -1, with sl[i] >= 0 for any value
-// that needs re-filling later.  Called at the end of the function-entry
-// dispatch emit so the row-tier emit starts from the same "all dispatch
-// spilled" state the per-row re-emit will see (after ra_reset_pool +
-// sl[] restore).  That symmetry is what lets the JIT skip the dispatch
-// tier on every row transition while keeping ra_alloc deterministic.
 void ra_spill_dispatch(struct ra *ra, int *sl, int *ns);
 
 void   ra_free_chan(struct ra *ra, val operand, int i);
 void   ra_free_reg(struct ra *ra, int val);
 int8_t ra_alloc(struct ra *ra, int *sl, int *ns);
+
 int8_t ra_ensure(struct ra *ra, int *sl, int *ns, int val);
 int8_t ra_ensure_chan(struct ra *ra, int *sl, int *ns, int val, int chan);
 int8_t ra_claim(struct ra *ra, int old_val, int new_val);
 
-// Release any holds accumulated by prior ra_ensure / ra_ensure_chan
-// calls.  Backends call this once at the top of each iteration of
-// their per-instruction emit loop: any val ra_ensure'd between two
-// ra_step calls is held safe — ra_alloc won't pick its register,
-// even if Belady would otherwise prefer to evict it (e.g. its last_use
-// is the current instruction, so eviction looks "free" but would
-// alias the just-freed register onto a register the backend is about
-// to read).  Everything else (ra_ensure auto-holds, ra_alloc respects
-// holds) is automatic.
+// Release any holds accumulated by prior ra_ensure / ra_ensure_chan calls.
 void ra_step(struct ra *ra);
-void   ra_begin_loop(struct ra *ra);
-void   ra_end_loop(struct ra *ra, int *sl);
-void   ra_evict_live_before(struct ra *ra, int *sl, int *ns, int before);
 
-// Assert that every dispatch- and row-tier value is back in the register that ra_begin_loop
-// captured for it.  Call at compile-time on each edge that branches to the
-// start of the SIMD body -- if it ever fires, the emitted code will compare
-// x against whatever garbage the previous edge left in that register.
-void   ra_assert_loop_invariant(struct ra const *ra);
+void ra_begin_loop(struct ra *ra);
+void ra_end_loop(struct ra *ra, int *sl);
+void ra_evict_live_before(struct ra *ra, int *sl, int *ns, int before);
+
+// Assert every dispatch- and row-tier value is in the register ra_begin_loop captured for it.
+void ra_assert_loop_invariant(struct ra const *ra);
 
 int8_t ra_reg(struct ra const *ra, int val);
 int8_t ra_chan_reg(struct ra const *ra, int val, int chan);
@@ -80,8 +63,6 @@ struct ra_step ra_step_alloc(struct ra *ra, int *sl, int *ns, int i);
 struct ra_step ra_step_unary(struct ra *ra, int *sl, int *ns, struct ir_inst const *inst,
                              int i);
 
-// Full ALU: ensure x/y/z, dead analysis, claim/alloc rd,
-// alloc scratch if needed, free dead inputs.
-// FMA accumulator targeting and sel mask claiming are handled internally.
+// Ensure x/y/z, dead analysis, claim/alloc rd, alloc scratch if needed, free dead inputs.
 struct ra_step ra_step_alu(struct ra *ra, int *sl, int *ns, struct ir_inst const *inst,
                            int i, int nscratch);

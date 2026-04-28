@@ -8,22 +8,17 @@ enum {
     SpvGenerator       = 0,
     SpvSchema          = 0,
 
-    // Capabilities
     SpvCapabilityShader                      = 1,
     SpvCapabilityFloat16                     = 9,
     SpvCapabilityStorageBuffer16BitAccess    = 4433,
 
-    // Addressing / Memory models
     SpvAddressingModelLogical    = 0,
     SpvMemoryModelGLSL450        = 1,
 
-    // Execution models
     SpvExecutionModelGLCompute = 5,
 
-    // Execution modes
     SpvExecutionModeLocalSize                = 17,
 
-    // Storage classes
     SpvStorageClassUniformConstant = 0,
     SpvStorageClassInput           = 1,
     SpvStorageClassUniform         = 2,
@@ -31,7 +26,6 @@ enum {
     SpvStorageClassFunction        = 7,
     SpvStorageClassPushConstant    = 9,
 
-    // Decorations
     SpvDecorationBlock            = 2,
     SpvDecorationBufferBlock      = 3,
     SpvDecorationArrayStride      = 6,
@@ -42,10 +36,8 @@ enum {
     SpvDecorationNonWritable      = 24,
     SpvDecorationNonReadable      = 25,
 
-    // Built-ins
     SpvBuiltInGlobalInvocationId = 28,
 
-    // Opcodes (shifted left by 16 gives the high half)
     SpvOpNop                  = 0,
     SpvOpExtInstImport        = 11,
     SpvOpExtInst              = 12,
@@ -137,7 +129,6 @@ enum {
     SpvOpFunctionCall         = 57,
     SpvOpKill                 = 252,
 
-    // GLSL.std.450 extended instructions
     GLSLstd450Round = 1,
     GLSLstd450RoundEven = 2,
     GLSLstd450Trunc = 3,
@@ -292,7 +283,6 @@ static uint32_t spv_const_f32(SpvBuilder *b, float value) {
     return spv_const(b, b->t_f32, bits);
 }
 
-// Emit a bitcast: result = bitcast<dst_type>(src).
 static uint32_t spv_bitcast(SpvBuilder *b, uint32_t dst_type, uint32_t src) {
     uint32_t id = spv_id(b);
     spv_op(&b->func, SpvOpBitcast, 4);
@@ -329,9 +319,7 @@ static void spv_store(SpvBuilder *b, uint32_t ptr, uint32_t value) {
     spv_word(&b->func, value);
 }
 
-// Binary arithmetic/logic ops (result = op(x, y))
-static uint32_t spv_binop(SpvBuilder *b, int opcode, uint32_t type,
-                           uint32_t x, uint32_t y) {
+static uint32_t spv_binop(SpvBuilder *b, int opcode, uint32_t type, uint32_t x, uint32_t y) {
     uint32_t id = spv_id(b);
     spv_op(&b->func, opcode, 5);
     spv_word(&b->func, type);
@@ -341,7 +329,6 @@ static uint32_t spv_binop(SpvBuilder *b, int opcode, uint32_t type,
     return id;
 }
 
-// Unary op (e.g. negate)
 static uint32_t spv_unop(SpvBuilder *b, int opcode, uint32_t type, uint32_t x) {
     uint32_t id = spv_id(b);
     spv_op(&b->func, opcode, 4);
@@ -351,7 +338,6 @@ static uint32_t spv_unop(SpvBuilder *b, int opcode, uint32_t type, uint32_t x) {
     return id;
 }
 
-// GLSL.std.450 extended instruction (1 operand).
 static uint32_t spv_glsl_1(SpvBuilder *b, uint32_t type, uint32_t ext_op, uint32_t x) {
     uint32_t id = spv_id(b);
     spv_op(&b->func, SpvOpExtInst, 6);
@@ -363,7 +349,6 @@ static uint32_t spv_glsl_1(SpvBuilder *b, uint32_t type, uint32_t ext_op, uint32
     return id;
 }
 
-// GLSL.std.450 extended instruction (2 operands).
 static uint32_t spv_glsl_2(SpvBuilder *b, uint32_t type, uint32_t ext_op,
                             uint32_t x, uint32_t y) {
     uint32_t id = spv_id(b);
@@ -377,7 +362,6 @@ static uint32_t spv_glsl_2(SpvBuilder *b, uint32_t type, uint32_t ext_op,
     return id;
 }
 
-// OpCompositeExtract: extract a scalar from a composite.
 static uint32_t spv_composite_extract(SpvBuilder *b, uint32_t type,
                                        uint32_t composite, uint32_t index) {
     uint32_t id = spv_id(b);
@@ -389,7 +373,6 @@ static uint32_t spv_composite_extract(SpvBuilder *b, uint32_t type,
     return id;
 }
 
-// OpCompositeConstruct: build a 2-element composite.
 static uint32_t spv_composite_construct_2(SpvBuilder *b, uint32_t type,
                                            uint32_t a, uint32_t c_b) {
     uint32_t id = spv_id(b);
@@ -401,7 +384,6 @@ static uint32_t spv_composite_construct_2(SpvBuilder *b, uint32_t type,
     return id;
 }
 
-// GLSL.std.450 extended instruction (3 operands).
 static uint32_t spv_glsl_3(SpvBuilder *b, uint32_t type, uint32_t ext_op,
                             uint32_t x, uint32_t y, uint32_t z) {
     uint32_t id = spv_id(b);
@@ -416,9 +398,8 @@ static uint32_t spv_glsl_3(SpvBuilder *b, uint32_t type, uint32_t ext_op,
     return id;
 }
 
-// Wrap unfused add/sub/mul in fma() so the shader compiler can't reassociate
-// them into different roundings.  Mirrors src/metal.c's hand-written emission,
-// keeping all backends bit-exact even under fast math.
+// Wrap add/sub/mul in fma() so the shader compiler can't reassociate them into
+// different roundings.  Mirrored in metal.c.
 static uint32_t spv_fadd(SpvBuilder *b, uint32_t xf, uint32_t yf) {
     return spv_glsl_3(b, b->t_f32, GLSLstd450Fma, spv_const_f32(b, 1.0f), xf, yf);
 }
@@ -429,7 +410,6 @@ static uint32_t spv_fmul(SpvBuilder *b, uint32_t xf, uint32_t yf) {
     return spv_glsl_3(b, b->t_f32, GLSLstd450Fma, xf, yf, spv_const_f32(b, 0.0f));
 }
 
-// OpSelect: result = cond ? a : b
 static uint32_t spv_select(SpvBuilder *b, uint32_t type,
                             uint32_t cond, uint32_t a, uint32_t val_b) {
     uint32_t id = spv_id(b);

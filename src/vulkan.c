@@ -614,7 +614,7 @@ static struct umbra_backend_stats vk_stats(struct umbra_backend const *be) {
 static void vk_free(struct umbra_backend *be) {
     vk_flush(be);
     struct vk_backend *v = (struct vk_backend *)be;
-    uniform_ring_pool_free(&v->uni_pool);
+    uniform_ring_pool_purge(&v->uni_pool);
     for (int i = 0; i < VK_N_FRAMES; i++) {
         vkDestroyFence(v->device, v->frame_fences[i], 0);
     }

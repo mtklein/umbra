@@ -43,8 +43,10 @@ void uniform_ring_free(struct uniform_ring *r) {
     r->n = r->cap = r->cur = 0;
 }
 
-void uniform_ring_pool_free(struct uniform_ring_pool *p) {
-    for (int i = 0; i < p->n; i++) { uniform_ring_free(&p->rings[i]); }
+void uniform_ring_pool_purge(struct uniform_ring_pool *p) {
+    for (int i = 0; i < p->n; i++) {
+        uniform_ring_free(&p->rings[i]);
+    }
 }
 
 struct uniform_ring_loc uniform_ring_pool_alloc(struct uniform_ring_pool *p,

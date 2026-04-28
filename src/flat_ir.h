@@ -4,11 +4,11 @@
 #include "op.h"
 #include <stdint.h>
 
-// TODO: explore replacing flat_ir with a graph representation.
-//       now that we have complicated control flow like if/endif and a loop.
-//       It is starting to feel error prone optimizing and code generating with
-//       control flow ops present, and it would also be nice to generalize loop
-//       support to multiple and nested loops, maybe even loops over varyings?
+// TODO: support arbitrary uniform looping, including nested uniform loops
+// TODO: replace flat_ir with something less flat?
+//
+// We now have complicated control flow.  Is there some representation
+// for our programs that would be less error-prone than a flat op array?
 
 typedef union {
     int         bits;
@@ -23,29 +23,14 @@ typedef union {
     struct { int ix; };
 } ptr;
 
-// Value scope: the broadest frame across which a value is invariant.  Frames
-// nest from broadest to narrowest:
-//
-//   SCOPE_COMPILE  — fixed at IR build (literals).
-//   SCOPE_DISPATCH — fixed for one queue() call (uniform_32 reads).
-//   SCOPE_ROW      — fixed across one output row (umbra_y, gathers).
-//   SCOPE_BATCH    — fixed across one K-lane column step.
-//   SCOPE_ITER     — fixed within one loop iteration.
-//   SCOPE_LANE     — varies per SIMD lane (umbra_x, all loads/stores).
-//
-// Scope is computed from each op's intrinsic scope and the scopes of its
-// operands.  The scheduler partitions the IR into three tiers based on
-// scope: dispatch tier (SCOPE_COMPILE, SCOPE_DISPATCH) emitted once per
-// queue() call, row tier (SCOPE_ROW) emitted at each row's entry, and the
-// per-batch body (SCOPE_BATCH and narrower).  See dispatch_end / row_end
-// in struct umbra_flat_ir.
+// Broadest scope within which a value is invariant, broadest to narrowest:
 enum scope {
-    SCOPE_COMPILE  = 0,
-    SCOPE_DISPATCH = 1,
-    SCOPE_ROW      = 2,
-    SCOPE_BATCH    = 3,
-    SCOPE_ITER     = 4,
-    SCOPE_LANE     = 5,
+    SCOPE_COMPILE  = 0,  // compile-time immediates
+    SCOPE_DISPATCH = 1,  // per queue() call (e.g. uniforms)
+    SCOPE_ROW      = 2,  // fixed per-row    (e.g. umbra_y)
+    SCOPE_BATCH    = 3,  // fixed across one K-lane step
+    SCOPE_ITER     = 4,  // fixed within a loop iteration
+    SCOPE_LANE     = 5,  // varies per lane
 };
 
 struct ir_inst {
@@ -60,46 +45,34 @@ struct ir_inst {
     int    final_id;
 };
 
-// A buf registration pinned to a specific ptr handle (.ix).  The resolver
-// populates buf[.ix] at dispatch time by (optionally) reading the early
-// default stored here, then letting any matching umbra_late_binding win.
-//
-//   BIND_BUF        `.buf` is a caller-owned umbra_buf* (or NULL) dereferenced
-//                   on every dispatch.
-//   BIND_SEALED_BUF Same storage as BIND_BUF, but the caller has sealed it:
-//                   the host bytes don't change after binding, so the cache
-//                   may skip fingerprinting and re-uploads.
-//   BIND_UNIFORMS   `.uniforms` carries the slot count; `.uniforms.ptr` is the
-//                   optional early-default pointer (or NULL).
+
+// TODO: all this BIND_SEALED vs BUF_SEALED vs uint8_t sealed needs some clean up
+
 enum binding_kind {
     BIND_BUF,
-    BIND_SEALED_BUF,
+    BIND_SEALED,
     BIND_UNIFORMS,
 };
+_Bool binding_is_uniform(enum binding_kind);  // TODO: this seems silly
 
-// The cache reads BUF_SEALED alongside BUF_READ/BUF_WRITTEN to decide
-// whether to skip fingerprinting and re-uploads for an entry.
 enum { BUF_READ = 1, BUF_WRITTEN = 2, BUF_SEALED = 4 };
 
 struct buffer_binding {
     enum binding_kind kind;
     int               ix;
     union {
-        struct umbra_buf const *buf;       // BIND_BUF: live ptr, may be NULL.
-        struct umbra_buf        uniforms;  // BIND_UNIFORMS: .ptr optional, .count = slots.
+        struct umbra_buf const *buf;
+        struct umbra_buf        uniforms;  // when kind=BIND_UNIFORMS, .count = slots.
     };
 };
 
-// Per-ptr metadata gathered by a single IR walk; indexed by ptr.bits.
 struct buffer_metadata {
     uint8_t shift;            // op_elem_shift of any op on this ptr
     uint8_t rw;               // BUF_READ | BUF_WRITTEN flags
     uint8_t is_uniform;       // 1 if the binding's kind is a uniform kind
-    uint8_t sealed;           // 1 if the binding is BIND_SEALED_BUF
-    int     uniform_slots;    // u32 slot count for uniform bindings, else 0
+    uint8_t sealed;           // 1 if the binding is BIND_SEALED
+    int     uniform_slots;    // slot count if uniform bindings
 };
-
-_Bool binding_is_uniform(enum binding_kind);
 
 void resolve_bindings(struct umbra_buf *out,
                       struct buffer_binding const *binding, int bindings,

@@ -241,7 +241,7 @@ TEST(uniform_ring_pool_basic_alloc) {
     p.rotations == 0 here;
     __builtin_memcmp((char*)l.handle + l.offset, &x, sizeof x) == 0 here;
 
-    uniform_ring_pool_free(&p);
+    uniform_ring_pool_purge(&p);
 }
 
 TEST(uniform_ring_pool_should_rotate_threshold) {
@@ -255,7 +255,7 @@ TEST(uniform_ring_pool_should_rotate_threshold) {
     uniform_ring_pool_alloc(&p, &payload, sizeof payload);
     uniform_ring_pool_should_rotate(&p) here;
 
-    uniform_ring_pool_free(&p);
+    uniform_ring_pool_purge(&p);
 }
 
 TEST(uniform_ring_pool_rotate_increments_and_waits) {
@@ -282,7 +282,7 @@ TEST(uniform_ring_pool_rotate_increments_and_waits) {
     w.n == 2 here;
     w.frames[1] == 0 here;
 
-    uniform_ring_pool_free(&p);
+    uniform_ring_pool_purge(&p);
 }
 
 TEST(uniform_ring_pool_rotate_resets_new_cur_ring) {
@@ -307,7 +307,7 @@ TEST(uniform_ring_pool_rotate_resets_new_cur_ring) {
     p.cur == 1 here;
     uniform_ring_used(&p.rings[1]) == 0 here;
 
-    uniform_ring_pool_free(&p);
+    uniform_ring_pool_purge(&p);
 }
 
 TEST(uniform_ring_pool_drain_all_visits_every_frame) {
@@ -332,7 +332,7 @@ TEST(uniform_ring_pool_drain_all_visits_every_frame) {
     w.frames[2] == 2 here;
     for (int i = 0; i < 3; i++) { uniform_ring_used(&p.rings[i]) == 0 here; }
 
-    uniform_ring_pool_free(&p);
+    uniform_ring_pool_purge(&p);
 }
 
 TEST(uniform_ring_pool_drain_all_releases_chunks) {
@@ -359,7 +359,7 @@ TEST(uniform_ring_pool_drain_all_releases_chunks) {
     uniform_ring_pool_alloc(&p, &payload, sizeof payload);
     be.creates == 3 here;
 
-    uniform_ring_pool_free(&p);
+    uniform_ring_pool_purge(&p);
     be.destroys == 3 here;
 }
 

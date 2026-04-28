@@ -10,35 +10,6 @@
 
 #if !defined(__APPLE__) || !defined(__aarch64__) || defined(__wasm__)
 
-// TODO: add a second wasm build config (e.g. build/wasm_browser.ninja) that
-// builds browser-hosted test, bench, and demo running the interp and webgpu
-// backends.  The current wasm config targets wasi-sdk/wasmtime, which has no
-// WebGPU and no DOM — only the interp backend runs, and only headlessly,
-// which is why umbra_backend_wgpu() is stubbed out below on __wasm__.
-//
-// Sketch:
-//   - Use Emscripten (emcc) instead of clang+wasi-sdk.  Emscripten ships a
-//     navigator.gpu-backed webgpu.h whose C API closely tracks wgpu-native,
-//     so this file should port with minimal glue (-sUSE_WEBGPU=1, and the
-//     -sASYNCIFY path for the async adapter/device requests).  Metal/Vulkan
-//     backends stay stubbed out.
-//   - Each tool gets an emcc link step producing .js + .wasm + an HTML shell:
-//       test   -> headless run, forward stdout to console; exit code via
-//                 emscripten_force_exit or postMessage to a harness.
-//       bench  -> needs emscripten_get_now() instead of clock_gettime for
-//                 wall time; otherwise tools/bench.c should be portable.
-//       demo   -> SDL3 path: Emscripten has SDL3 support, but the main loop
-//                 must yield (emscripten_set_main_loop or -sASYNCIFY) since
-//                 the browser won't tolerate a blocking while-loop.
-//   - Tests currently shard via --shards/--shard; in the browser that
-//     becomes query-string args parsed in the HTML shell.
-//   - CI/run story: headless Chrome via puppeteer or `chrome --headless`
-//     with --enable-unsafe-webgpu; wasmtime lane stays as-is for the
-//     interp-only smoke test.
-//
-// This note lives here rather than in build/wasm.ninja because configure.py
-// regenerates that file from scratch and strips free-form comments.
-
 struct umbra_backend* umbra_backend_wgpu(void) { return 0; }
 
 #else
@@ -584,11 +555,6 @@ static void wgpu_program_queue(struct umbra_program *prog,
         memcpy(p->cached[ring_ix].sz,   bind_size,   (size_t)n * sizeof bind_size[0]);
     }
 
-    // No explicit barriers between dispatches: the WebGPU spec guarantees that
-    // each dispatch is its own synchronization scope, with serial memory
-    // semantics.  The runtime inserts any necessary barriers automatically.
-    // https://github.com/gpuweb/gpuweb/discussions/4434
-
     uint32_t dyn_offset[33];
     int dyn_offsets = 0;
     if (p->dynamic_offset_bindings) {
@@ -664,8 +630,8 @@ static struct umbra_backend_stats wgpu_stats(struct umbra_backend const *be) {
 static void wgpu_free(struct umbra_backend *base) {
     wgpu_flush(base);
     struct wgpu_backend *be = (struct wgpu_backend *)base;
-    uniform_ring_pool_free(&be->uni_pool);
-    uniform_ring_pool_free(&be->uni_pool_uniform);
+    uniform_ring_pool_purge(&be->uni_pool);
+    uniform_ring_pool_purge(&be->uni_pool_uniform);
     gpu_buf_cache_free(&be->cache);
     wgpuQuerySetRelease(be->ts_query);
     wgpuBufferRelease(be->ts_resolve);

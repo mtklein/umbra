@@ -23,13 +23,7 @@ typedef struct { NSUInteger width, height, depth; } MTLSize;
 extern void* MTLCreateSystemDefaultDevice(void);
 extern void* objc_autoreleasePoolPush(void);
 extern void  objc_autoreleasePoolPop(void*);
-// Typed declarations of objc_msgSend, one per distinct calling convention
-// used in this file.  __asm__ labels alias them all to _objc_msgSend so the
-// linker sees one symbol.  This avoids casting through incompatible function
-// pointers (which GCC 15 warns about and can't be suppressed), and it avoids
-// passing arguments through variadics (which uses a different ABI on arm64
-// and crashes at runtime).
-//
+
 extern id      msg       (id, SEL)                                     __asm__("_objc_msgSend");
 extern double  msg_f64   (id, SEL)                                     __asm__("_objc_msgSend");
 extern id      msg_s     (id, SEL, char const*)                        __asm__("_objc_msgSend");
@@ -60,7 +54,6 @@ static id nsstr(char const *s) {
     return msg_s((id)objc_getClass("NSString"), sel("stringWithUTF8String:"), s);
 }
 
-// Selectors hit every dispatch / batch / submit; cache them on the backend.
 struct metal_sel {
     SEL set_pipeline,
         set_bytes,
@@ -93,9 +86,9 @@ struct metal_backend {
     struct umbra_backend base;
     void *device;
     void *queue;
-    void *batch_cmdbuf;     // currently-encoding cmdbuf for uni_pool.cur, or NULL
-    void *batch_enc;        // serial compute encoder on batch_cmdbuf, or NULL
-    void *batch_pipeline;   // last pipeline set on batch_enc, or NULL
+    void *batch_cmdbuf;                     // currently-encoding cmdbuf for uni_pool.cur, or NULL
+    void *batch_enc;                        // serial compute encoder on batch_cmdbuf, or NULL
+    void *batch_pipeline;                   // last pipeline set on batch_enc, or NULL
     void *frame_committed[METAL_N_FRAMES];  // last committed cmdbuf per frame, or NULL
     struct gpu_buf_cache cache;
     struct uniform_ring_pool uni_pool;
@@ -389,10 +382,8 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      uv(_ux, vx, xid, is_f));
                 break;
 
-            // Wrap unfused add/sub/mul in fma() so Metal's compiler can't
-            // reassociate them into different roundings.  Matches what
-            // SPIRV-Cross emits via spv_fadd/spv_fsub/spv_fmul, keeping all
-            // backends bit-exact even under fast math.
+            // Wrap add/sub/mul in fma() so Metal's compiler can't reassociate
+            // them into different roundings.  Mirrored in spirv.c.
             case op_add_f32:
                 emit(b, "%sfloat v%d = fma(1.0f, %s, %s);\n",
                      pad, i,
@@ -411,6 +402,7 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                      fv(_fx, vx, xid, is_f),
                      fv(_fy, vy, yid, is_f));
                 break;
+
             case op_min_f32:
                 emit(b, "%sfloat v%d ="
                         " min(%s, %s);\n",
@@ -814,7 +806,7 @@ static struct metal_backend* metal_backend_create(void) {
 
 static void metal_backend_free(struct metal_backend *be) {
     if (be) {
-        uniform_ring_pool_free(&be->uni_pool);
+        uniform_ring_pool_purge(&be->uni_pool);
         void *pool = objc_autoreleasePoolPush();
         gpu_buf_cache_free(&be->cache);
         release(be->device);

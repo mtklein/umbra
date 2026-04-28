@@ -1,9 +1,5 @@
 #pragma once
 
-// Op metadata flags.
-//   OTHER_OPS:  X(name, flags) where flags combine OP_STORE, OP_PTR, OP_VARYING.
-//   BINARY_OPS: X(name, flags) where flags may include OP_COMMUTATIVE.
-//   UNARY_OPS:  X(name, flags) — no flags defined yet, always 0.
 enum {
     OP_STORE       = 1 << 0,
     OP_PTR         = 1 << 1,
@@ -11,7 +7,6 @@ enum {
     OP_COMMUTATIVE = 1 << 3,
 };
 
-// Ops not covered by BINARY_OPS or UNARY_OPS.
 #define OTHER_OPS(X)                                                                       \
     X(x,                                    OP_VARYING)                                    \
     X(y,                                    OP_VARYING)                                    \
@@ -42,23 +37,22 @@ enum {
     X(load_var,                             OP_VARYING)                                    \
     X(store_var,                            OP_STORE|OP_VARYING)
 
-// Ops that get register variants in the interpreter.
 #define BINARY_OPS(X)                                                                      \
-    X(add_f32, OP_COMMUTATIVE) X(sub_f32, 0) X(mul_f32, OP_COMMUTATIVE)                   \
-    X(min_f32, OP_COMMUTATIVE) X(max_f32, OP_COMMUTATIVE)                                 \
-    X(add_i32, OP_COMMUTATIVE) X(sub_i32, 0) X(mul_i32, OP_COMMUTATIVE)                   \
-    X(shl_i32, 0) X(shr_u32, 0) X(shr_s32, 0)                                            \
-    X(and_32,  OP_COMMUTATIVE) X(or_32, OP_COMMUTATIVE) X(xor_32, OP_COMMUTATIVE)         \
-    X(eq_f32,  OP_COMMUTATIVE) X(lt_f32, 0) X(le_f32, 0)                                  \
-    X(eq_i32,  OP_COMMUTATIVE) X(lt_s32, 0) X(le_s32, 0)                                  \
+    X(add_f32, OP_COMMUTATIVE) X(sub_f32, 0) X(mul_f32, OP_COMMUTATIVE)                    \
+    X(min_f32, OP_COMMUTATIVE) X(max_f32, OP_COMMUTATIVE)                                  \
+    X(add_i32, OP_COMMUTATIVE) X(sub_i32, 0) X(mul_i32, OP_COMMUTATIVE)                    \
+    X(shl_i32, 0) X(shr_u32, 0) X(shr_s32, 0)                                              \
+    X(and_32,  OP_COMMUTATIVE) X(or_32, OP_COMMUTATIVE) X(xor_32, OP_COMMUTATIVE)          \
+    X(eq_f32,  OP_COMMUTATIVE) X(lt_f32, 0) X(le_f32, 0)                                   \
+    X(eq_i32,  OP_COMMUTATIVE) X(lt_s32, 0) X(le_s32, 0)                                   \
     X(lt_u32,  0) X(le_u32, 0)
 
 #define UNARY_OPS(X)                                                                       \
-    X(abs_f32, 0) X(square_f32, 0)                                                        \
-    X(round_f32, 0) X(floor_f32, 0) X(ceil_f32, 0)                                        \
-    X(round_i32, 0) X(floor_i32, 0) X(ceil_i32, 0)                                        \
-    X(f32_from_i32, 0) X(i32_from_f32, 0)                                                 \
-    X(f32_from_f16, 0) X(f16_from_f32, 0)                                                 \
+    X(abs_f32, 0) X(square_f32, 0)                                                         \
+    X(round_f32, 0) X(floor_f32, 0) X(ceil_f32, 0)                                         \
+    X(round_i32, 0) X(floor_i32, 0) X(ceil_i32, 0)                                         \
+    X(f32_from_i32, 0) X(i32_from_f32, 0)                                                  \
+    X(f32_from_f16, 0) X(f16_from_f32, 0)                                                  \
     X(i32_from_s16, 0) X(i32_from_u16, 0) X(i16_from_i32, 0)
 
 enum op {

@@ -7,6 +7,8 @@ building.  The generated files are checked in alongside this script — a
 fresh clone builds without needing to run configure.py.
 """
 
+# TODO: add a wasm config that runs in the browser
+
 import glob
 import os
 import shutil
