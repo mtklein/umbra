@@ -88,6 +88,19 @@ static void resolve_ptr(Buf *c, ptr p, int *last_ptr, int elem_shift) {
     load_ptr(c, p.bits, last_ptr, elem_shift);
 }
 
+// Flat load: XP = base only, no Y*stride row offset.  Used by gather ops,
+// where the ptr-relative index is supplied per-lane (or compile-time) and
+// addresses cov[idx] regardless of dispatch row.  Matches interp / metal /
+// vulkan / wgpu, which all treat gathers as 1D over the buffer.
+//
+// Invalidates the load_ptr cache: the next sequential load_ptr() call must
+// re-emit the row-strided XP setup.
+static void load_ptr_flat(Buf *c, ptr p, int *last_ptr) {
+    int const disp_ptr = p.bits * (int)sizeof(struct umbra_buf);
+    put(c, LDR_xi(XP, XBUF, disp_ptr / 8));
+    *last_ptr = -1;
+}
+
 static void load_count(Buf *c, ptr p) {
     int const disp = p.bits * (int)sizeof(struct umbra_buf)
                           + (int)__builtin_offsetof(struct umbra_buf, count);
@@ -574,7 +587,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, 2);
+            load_ptr_flat(c, p, &last_ptr);
             load_count(c, p);
             put(c, UMOV_ws(XT, lo(rx)));
             put(c, MOVI_4s(lo(s.rd), 0, 0));
@@ -592,7 +605,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, 2);
+            load_ptr_flat(c, p, &last_ptr);
             load_count(c, p);
             if (scalar) {
                 put(c, MOVI_4s(lo(s.rd), 0, 0));
@@ -627,7 +640,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ra_free_chan(ra, inst->x, i);
             ptr p = inst->ptr;
-            resolve_ptr(c, p, &last_ptr, 1);
+            load_ptr_flat(c, p, &last_ptr);
             load_count(c, p);
             if (scalar) {
                 put(c, MOVI_4s(lo(s.rd), 0, 0));

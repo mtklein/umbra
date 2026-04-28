@@ -298,17 +298,15 @@ static enum scope intrinsic_scope(enum op op) {
     // op_uniform_32 reads a uniform-bound buffer at a compile-time index;
     // by API contract that buffer's stride is zero, so the read is purely
     // dispatch-scope.  Gathers (uniform_32, _32, _16 variants) take any
-    // ptr — including BIND_BUF buffers with stride>0 — so the load
-    // becomes row-dependent (XP = base + XY*stride + idx), giving a
-    // row-scope intrinsic.  The variants differ only in index uniformity:
-    // the builder picks _uniform_32 when the index is constant across
-    // lanes, leaving lane-varying indexes for _32/_16.  Index scope
-    // narrows the result the rest of the way (uniform index keeps ROW;
-    // lane-varying narrows to LANE).
-    if (op == op_uniform_32)               { return SCOPE_DISPATCH; }
-    if (op == op_gather_uniform_32
+    // ptr — including BIND_BUF buffers with stride>0 — but address them
+    // flat (base + idx*elem_size, ignoring Y*stride), so they intrinsically
+    // sit at dispatch scope too.  Index scope narrows the result the rest
+    // of the way: uniform index keeps DISPATCH; lane-varying narrows to
+    // LANE.
+    if (op == op_uniform_32
+            || op == op_gather_uniform_32
             || op == op_gather_32
-            || op == op_gather_16)         { return SCOPE_ROW; }
+            || op == op_gather_16)         { return SCOPE_DISPATCH; }
     if (op == op_y)                        { return SCOPE_ROW; }
     if (op_is_varying(op))                 { return SCOPE_LANE; }
     return SCOPE_COMPILE;

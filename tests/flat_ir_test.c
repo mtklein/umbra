@@ -1492,6 +1492,90 @@ TEST(test_dispatch_pair_alias) {
     test_backends_free(&B);
 }
 
+TEST(test_gather_ignores_stride) {
+    // Regression: JIT (arm64 + x86) shared resolve_ptr between load_* and
+    // gather_*, baking `Y * stride * elem_size` into the base pointer.  For
+    // load_* that's correct (load_16 reads cov[Y * stride + X]), but gather_*
+    // on every other backend (interp, metal, vulkan, wgpu) is flat — it
+    // reads cov[idx] regardless of the dispatch row.  A multi-row dispatch
+    // gathering from a stride>0 buffer therefore diverged on JIT only.
+    //
+    // Fix: gather_uniform_32 / gather_32 / gather_16 now route through
+    // load_ptr_flat (arm64) / load_ptr_x86_flat (x86), which loads only the
+    // base pointer and invalidates the load_ptr cache so subsequent loads
+    // re-emit the row-strided setup.
+    struct umbra_buf slot[20] = {0};
+    {
+        // gather_16: src has 8 elements [1..8], stride=8.  Dispatch over
+        // (W=4, H=4) gathering at idx = umbra_x() (== column).  Every row
+        // should produce the same result; with the bug, JIT row Y reads
+        // src[Y*8 + idx] = OOB → 0.
+        struct umbra_builder *b = umbra_builder();
+        umbra_val32 const idx = umbra_x(b);
+        umbra_val32 const v   = umbra_i32_from_u16(b,
+            umbra_gather_16(b, umbra_bind_buf(b, &slot[0]), idx));
+        umbra_store_32(b, umbra_bind_buf(b, &slot[1]), v);
+        struct test_backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            uint16_t src[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+            uint32_t dst[4 * 4] = {0};
+            if (run(&B, bi, 4, 4, slot, 2,
+        (struct umbra_buf[]){{.ptr=src, .count=8, .stride=8},
+                             {.ptr=dst, .count=4*4, .stride=4}})) {
+                for (int row = 0; row < 4; row++) {
+                    dst[row*4 + 0] == 1 here;
+                    dst[row*4 + 1] == 2 here;
+                    dst[row*4 + 2] == 3 here;
+                    dst[row*4 + 3] == 4 here;
+                }
+            }
+        }
+        test_backends_free(&B);
+    }
+    {
+        // gather_32: same shape as above.
+        struct umbra_builder *b = umbra_builder();
+        umbra_val32 const idx = umbra_x(b);
+        umbra_val32 const v   = umbra_gather_32(b, umbra_bind_buf(b, &slot[0]), idx);
+        umbra_store_32(b, umbra_bind_buf(b, &slot[1]), v);
+        struct test_backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t  src[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+            int32_t  dst[4 * 4] = {0};
+            if (run(&B, bi, 4, 4, slot, 2,
+        (struct umbra_buf[]){{.ptr=src, .count=8, .stride=8},
+                             {.ptr=dst, .count=4*4, .stride=4}})) {
+                for (int row = 0; row < 4; row++) {
+                    dst[row*4 + 0] == 10 here;
+                    dst[row*4 + 1] == 20 here;
+                    dst[row*4 + 2] == 30 here;
+                    dst[row*4 + 3] == 40 here;
+                }
+            }
+        }
+        test_backends_free(&B);
+    }
+    {
+        // gather_uniform_32: index is uniform (an imm), so backend picks
+        // op_gather_uniform_32 which broadcasts a single load.
+        struct umbra_builder *b = umbra_builder();
+        umbra_val32 const v = umbra_gather_32(b, umbra_bind_buf(b, &slot[0]),
+                                              umbra_imm_i32(b, 2));
+        umbra_store_32(b, umbra_bind_buf(b, &slot[1]), v);
+        struct test_backends B = make(b);
+        for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+            int32_t src[8] = {10, 20, 30, 40, 50, 60, 70, 80};
+            int32_t dst[4 * 4] = {0};
+            if (run(&B, bi, 4, 4, slot, 2,
+        (struct umbra_buf[]){{.ptr=src, .count=8, .stride=8},
+                             {.ptr=dst, .count=4*4, .stride=4}})) {
+                for (int i = 0; i < 4*4; i++) { dst[i] == 30 here; }
+            }
+        }
+        test_backends_free(&B);
+    }
+}
+
 TEST(test_gather_clamp) {
     struct umbra_buf slot[20] = {0};
     {
@@ -6030,9 +6114,10 @@ TEST(test_scope_intrinsics) {
         umbra_builder_free(b);
     }
 
-    // umbra_gather_32 with a uniform index → op_gather_uniform_32, which
-    // narrows from intrinsic ROW + DISPATCH index = ROW.  With a lane-
-    // varying index → op_gather_32, narrowing to LANE.
+    // Gathers address flat (base + idx*elem), no Y*stride row dependency.
+    // Intrinsic scope is DISPATCH; the index narrows the result.  Uniform
+    // index → op_gather_uniform_32 stays at DISPATCH; op_y index narrows
+    // to ROW; op_x index narrows to LANE.
     {
         struct umbra_builder *b = umbra_builder();
         umbra_ptr const u   = umbra_bind_uniforms(b, NULL, 4);
@@ -6040,7 +6125,17 @@ TEST(test_scope_intrinsics) {
         umbra_val32 const v = umbra_gather_32(b, buf, umbra_uniform_32(b, u, 0));
         umbra_store_32(b, umbra_bind_buf(b, &slot[0]), v);
         struct umbra_flat_ir *ir = umbra_flat_ir(b);
-        scope_of(ir, op_gather_uniform_32, SCOPE_ROW);
+        scope_of(ir, op_gather_uniform_32, SCOPE_DISPATCH);
+        umbra_flat_ir_free(ir);
+        umbra_builder_free(b);
+    }
+    {
+        struct umbra_builder *b = umbra_builder();
+        umbra_ptr const buf = umbra_bind_buf(b, &slot[1]);
+        umbra_val32 const v = umbra_gather_32(b, buf, umbra_y(b));
+        umbra_store_32(b, umbra_bind_buf(b, &slot[0]), v);
+        struct umbra_flat_ir *ir = umbra_flat_ir(b);
+        scope_of(ir, op_gather_32, SCOPE_ROW);
         umbra_flat_ir_free(ir);
         umbra_builder_free(b);
     }

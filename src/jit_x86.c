@@ -84,6 +84,19 @@ static int load_ptr_x86(Buf *c, ptr p, int *last_ptr, int elem_shift) {
     return R11;
 }
 
+// Flat load: R11 = base only, no Y*stride row offset.  Used by gather ops,
+// where the ptr-relative index is supplied per-lane (or compile-time) and
+// addresses cov[idx] regardless of dispatch row.  Matches interp / metal /
+// vulkan / wgpu, which all treat gathers as 1D over the buffer.
+//
+// Invalidates the load_ptr_x86 cache: the next sequential load_ptr_x86()
+// call must re-emit the row-strided base setup.
+static int load_ptr_x86_flat(Buf *c, ptr p, int *last_ptr) {
+    mov_load(c, R11, XBUF, p.bits * (int)sizeof(struct umbra_buf));
+    *last_ptr = -1;
+    return R11;
+}
+
 static int8_t const ra_pool_x86[] = {0, 1, 2,  3,  4,  5,  6,  7,
                                      8, 9, 10, 11, 12, 13, 14, 15};
 
@@ -929,7 +942,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, 2);
+            int            base = load_ptr_x86_flat(c, p, &last_ptr);
             vmovd_to_gpr(c, RAX, rx);
             ra_free_chan(ra, inst->x, i);
             load_count_x86(c, p);
@@ -947,7 +960,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, 2);
+            int            base = load_ptr_x86_flat(c, p, &last_ptr);
             if (scalar) {
                 vmovd_to_gpr(c, RAX, rx);
                 ra_free_chan(ra, inst->x, i);
@@ -982,7 +995,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             struct ra_step s = ra_step_alloc(ra, sl, ns, i);
             int8_t         rx = ra_ensure(ra, sl, ns, inst->x.id);
             ptr            p = inst->ptr;
-            int            base = resolve_ptr_x86(c, p, &last_ptr, 1);
+            int            base = load_ptr_x86_flat(c, p, &last_ptr);
             load_count_x86(c, p);
             if (scalar) {
                 vmovd_to_gpr(c, RAX, rx);
