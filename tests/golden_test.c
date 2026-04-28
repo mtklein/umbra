@@ -148,7 +148,7 @@ TEST(test_perspective_text) {
     umbra_build_draw(b, dst_ptr, umbra_fmt_8888, p.x, p.y,
                      coverage_bitmap2d,   &sampler,
                      umbra_shader_color,  &color,
-                     umbra_blend_srcover, NULL);
+                     umbra_blend_srcover);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     struct umbra_program *interp = be->compile(be, ir);
@@ -188,7 +188,7 @@ TEST(test_perspective_text) {
     umbra_build_draw(b, dst_ptr2, umbra_fmt_8888, p2.x, p2.y,
                      coverage_bitmap2d,   &sampler2,
                      umbra_shader_color,  &hc2,
-                     umbra_blend_srcover, NULL);
+                     umbra_blend_srcover);
     ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     interp = be->compile(be, ir);

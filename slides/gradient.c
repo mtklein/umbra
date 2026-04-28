@@ -211,7 +211,7 @@ static void grad_build_draw(struct slide *s, struct umbra_builder *b,
     umbra_build_draw(b, dst_ptr, fmt, x, y,
                      NULL, NULL,
                      st->shader_fn, st->shader_ctx,
-                     NULL, NULL);
+                     NULL);
 }
 
 static void grad_free(struct slide *s) {

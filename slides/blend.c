@@ -37,7 +37,7 @@ static void blend_build_draw(struct slide *s, struct umbra_builder *b,
     umbra_build_draw(b, dst_ptr, fmt, x, y,
                      umbra_coverage_rect, &st->rect,
                      umbra_shader_color,  &st->color,
-                     st->blend_fn,        NULL);
+                     st->blend_fn);
 }
 
 static void blend_animate(struct slide *s, double secs) {

@@ -71,7 +71,7 @@ static void swatch_build_draw(struct slide *s, struct umbra_builder *b,
     umbra_build_draw(b, dst_ptr, fmt, x, y,
                      NULL,           NULL,
                      shader_swatch,  &st->ctx,
-                     NULL,           NULL);
+                     NULL);
 }
 
 static void swatch_free(struct slide *s) { free(s); }

@@ -162,7 +162,7 @@ static void overview_prepare(struct slide *s, struct umbra_backend *be, struct u
     umbra_build_draw(ob, ob_dst, fmt, ob_x, ob_y,
                      coverage_bitmap,     &st->overlay_buf,
                      umbra_shader_color,  &st->overlay_color,
-                     umbra_blend_srcover, NULL);
+                     umbra_blend_srcover);
     struct umbra_flat_ir *oir = umbra_flat_ir(ob);
     umbra_builder_free(ob);
     st->overlay_prog = be->compile(be, oir);

@@ -50,7 +50,7 @@ static void sdf_common_build_draw(struct slide *s,
     umbra_build_sdf_draw(b, dst_ptr, fmt, x, y,
                          fn, ctx,
                          umbra_shader_color,  &c->color,
-                         umbra_blend_srcover, NULL);
+                         umbra_blend_srcover);
 }
 
 static void sdf_common_build_draw_full(struct slide *s,
@@ -61,7 +61,7 @@ static void sdf_common_build_draw_full(struct slide *s,
     umbra_build_draw(b, dst_ptr, fmt, x, y,
                      NULL,                NULL,
                      umbra_shader_color,  &c->color,
-                     umbra_blend_srcover, NULL);
+                     umbra_blend_srcover);
 }
 
 static void sdf_common_free(struct slide *s) { free(s); }

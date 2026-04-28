@@ -127,7 +127,7 @@ void umbra_build_draw(struct umbra_builder *b,
                       umbra_val32 x, umbra_val32 y,
                       umbra_coverage coverage_fn, void *coverage_ctx,
                       umbra_shader   shader_fn,   void *shader_ctx,
-                      umbra_blend    blend_fn,    void *blend_ctx) {
+                      umbra_blend    blend_fn) {
     umbra_val32 coverage = {0};
     if (coverage_fn) { coverage = coverage_fn(coverage_ctx, b, x, y); }
 
@@ -138,7 +138,7 @@ void umbra_build_draw(struct umbra_builder *b,
     umbra_color_val32 dst = {zero, zero, zero, zero};
     if (blend_fn || coverage_fn) { dst = fmt.load(b, dst_ptr); }
 
-    umbra_color_val32 out = blend_fn ? blend_fn(blend_ctx, b, src, dst) : src;
+    umbra_color_val32 out = blend_fn ? blend_fn(b, src, dst) : src;
 
     if (coverage_fn) {
         out.r = umbra_fma_f32(b, umbra_sub_f32(b, out.r, dst.r), coverage, dst.r);
@@ -238,7 +238,7 @@ void umbra_build_sdf_draw(struct umbra_builder *b,
                           umbra_val32 x, umbra_val32 y,
                           umbra_sdf sdf_fn, void *sdf_ctx,
                           umbra_shader shader_fn, void *shader_ctx,
-                          umbra_blend  blend_fn,  void *blend_ctx) {
+                          umbra_blend  blend_fn) {
     struct coverage_from_sdf cov = {
         .sdf_fn  = sdf_fn,
         .sdf_ctx = sdf_ctx,
@@ -246,7 +246,7 @@ void umbra_build_sdf_draw(struct umbra_builder *b,
     umbra_build_draw(b, dst_ptr, dst_fmt, x, y,
                      coverage_from_sdf, &cov,
                      shader_fn, shader_ctx,
-                     blend_fn,  blend_ctx);
+                     blend_fn);
 }
 
 enum umbra_sdf_tile {
@@ -516,17 +516,15 @@ umbra_val32 umbra_coverage_rect(void *ctx, struct umbra_builder *b,
     return umbra_sel_32(b, inside, one, zero);
 }
 
-umbra_color_val32 umbra_blend_src(void *ctx, struct umbra_builder *b,
+umbra_color_val32 umbra_blend_src(struct umbra_builder *b,
                                   umbra_color_val32 src, umbra_color_val32 dst) {
-    (void)ctx;
     (void)b;
     (void)dst;
     return src;
 }
 
-umbra_color_val32 umbra_blend_srcover(void *ctx, struct umbra_builder *b,
+umbra_color_val32 umbra_blend_srcover(struct umbra_builder *b,
                                       umbra_color_val32 src, umbra_color_val32 dst) {
-    (void)ctx;
     umbra_val32 const one   = umbra_imm_f32(b, 1.0f),
                       inv_a = umbra_sub_f32(b, one, src.a);
     return (umbra_color_val32){
@@ -537,9 +535,8 @@ umbra_color_val32 umbra_blend_srcover(void *ctx, struct umbra_builder *b,
     };
 }
 
-umbra_color_val32 umbra_blend_dstover(void *ctx, struct umbra_builder *b,
+umbra_color_val32 umbra_blend_dstover(struct umbra_builder *b,
                                       umbra_color_val32 src, umbra_color_val32 dst) {
-    (void)ctx;
     umbra_val32 const one   = umbra_imm_f32(b, 1.0f),
                       inv_a = umbra_sub_f32(b, one, dst.a);
     return (umbra_color_val32){
@@ -550,9 +547,8 @@ umbra_color_val32 umbra_blend_dstover(void *ctx, struct umbra_builder *b,
     };
 }
 
-umbra_color_val32 umbra_blend_multiply(void *ctx, struct umbra_builder *b,
+umbra_color_val32 umbra_blend_multiply(struct umbra_builder *b,
                                        umbra_color_val32 src, umbra_color_val32 dst) {
-    (void)ctx;
     umbra_val32 const one    = umbra_imm_f32(b, 1.0f),
                       inv_sa = umbra_sub_f32(b, one, src.a),
                       inv_da = umbra_sub_f32(b, one, dst.a);

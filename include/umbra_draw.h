@@ -72,10 +72,8 @@ struct umbra_supersample {
 };
 umbra_shader umbra_shader_supersample;
 
-// TODO: remove unused blend *ctx
-typedef umbra_color_val32 umbra_blend(void *ctx, struct umbra_builder*,
-                                      umbra_color_val32 src,
-                                      umbra_color_val32 dst);
+typedef umbra_color_val32 umbra_blend(struct umbra_builder*,
+                                      umbra_color_val32 src, umbra_color_val32 dst);
 umbra_blend umbra_blend_src,
             umbra_blend_srcover,
             umbra_blend_dstover,
@@ -93,7 +91,7 @@ void umbra_build_draw(struct umbra_builder*,
                       umbra_val32 x, umbra_val32 y,
                       umbra_coverage, void *coverage_ctx,
                       umbra_shader  , void *shader_ctx,
-                      umbra_blend   , void *blend_ctx);
+                      umbra_blend);
 
 // SDF where f(x,y)<0 -> inside, defined over intervals.
 typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
@@ -115,7 +113,7 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_val32 x, umbra_val32 y,
                           umbra_sdf   , void *sdf_ctx,
                           umbra_shader, void *shader_ctx,
-                          umbra_blend , void *blend_ctx);
+                          umbra_blend);
 
 struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder*,
                                                           struct umbra_affine const *transform,

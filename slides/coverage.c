@@ -214,7 +214,7 @@ static void text_build_draw(struct slide *s, struct umbra_builder *b,
     umbra_build_draw(b, dst_ptr, fmt, x, y,
                      st->coverage_fn,     &st->bmp,
                      umbra_shader_color,  &st->color,
-                     umbra_blend_srcover, NULL);
+                     umbra_blend_srcover);
 }
 
 static void text_free(struct slide *s) {
@@ -237,7 +237,7 @@ static void cov_null_build_draw(struct slide *s, struct umbra_builder *b,
     umbra_build_draw(b, dst_ptr, fmt, x, y,
                      NULL,                NULL,
                      umbra_shader_color,  &st->color,
-                     umbra_blend_srcover, NULL);
+                     umbra_blend_srcover);
 }
 
 static void cov_null_free(struct slide *s) { free(s); }
@@ -314,7 +314,7 @@ static void persp_build_draw(struct slide *s, struct umbra_builder *b,
     umbra_build_draw(b, dst_ptr, fmt, p.x, p.y,
                      coverage_bitmap2d,   &st->bmp,
                      umbra_shader_color,  &st->color,
-                     umbra_blend_srcover, NULL);
+                     umbra_blend_srcover);
 }
 
 static void persp_animate(struct slide *s, double secs) {

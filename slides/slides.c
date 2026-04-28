@@ -119,7 +119,7 @@ struct slide_bg* slide_bg(struct umbra_backend *be, struct umbra_fmt fmt) {
     umbra_build_draw(b, dst, fmt, x, y,
                      NULL,               NULL,
                      umbra_shader_color, &bg->color,
-                     NULL,               NULL);
+                     NULL);
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     umbra_builder_free(b);
     bg->prog = be->compile(be, ir);

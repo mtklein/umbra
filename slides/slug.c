@@ -309,7 +309,7 @@ static void slug_build_draw(struct slide *s, struct umbra_builder *b,
     umbra_build_draw(b, dst_ptr, fmt, p.x, p.y,
                      coverage_slug_winding, &st->cov_ctx,
                      umbra_shader_color,    &st->color,
-                     umbra_blend_srcover,   NULL);
+                     umbra_blend_srcover);
 }
 
 static void slug_animate(struct slide *s, double secs) {
