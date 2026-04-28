@@ -354,6 +354,58 @@ void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
     }
 }
 
+// TODO: move SDF bounds-eval onto the caller's draw backend and collapse
+//       umbra_sdf_dispatch to a single submit per frame on GPU.  Today the
+//       bounds program is hardcoded to JIT and the host reads cov[] back to
+//       choose draw_partial / draw_full / skip per tile; profiling SDF Text
+//       Analytic on metal shows ~all main-thread CPU is that JIT bounds
+//       eval.  All-on-GPU should reclaim it.
+//
+//   Plan (all one commit, since the API only makes sense end-to-end):
+//
+//   1. Bounds compiles on draw_partial->backend instead of always JIT.
+//      cov[] stays a normal umbra_bind_buf — backends already stage host
+//      buffers across queue boundaries.
+//
+//   2. draw_partial / draw_full grow a per-tile early-exit at the top
+//      (`if cov[tile_idx] matches my kind`).  GPU dispatches both over
+//      (l, t, r, b) once; the in-shader gate filters NONE / wrong-kind
+//      tiles.  No mid-frame flush, no readback.  dispatch_overlap_check
+//      already inserts the cov RAW barrier on vulkan; metal/wgpu spec
+//      it implicitly.
+//
+//   3. CPU dispatch (program_queue_is_cheap=true on jit/interp) keeps
+//      today's per-tile path: bounds runs synchronously on the same
+//      backend, host reads cov, host queues per tile.  No regression.
+//
+//   API constraint: keep the cov-gate machinery internal to this file.
+//   Don't expose enums for tile kinds, gate-builder helpers, or "draw
+//   bundled with cov ptrs" structs in umbra_draw.h — that's just the
+//   inside of umbra_sdf_dispatch leaking out.  umbra_build_sdf_draw and
+//   umbra_sdf_dispatch keep their current shapes; whatever extra plumbing
+//   the gate needs (likely two ptrs returned via out-params from
+//   umbra_build_sdf_draw, then handed back to umbra_sdf_dispatch as
+//   bare umbra_ptr args) lives here and nowhere else.
+//
+//   Two JIT bugs landed first that this work surfaced (both already on
+//   main):
+//     - jit: gather_* uses flat addressing, not Y*stride row offset.
+//     - ra: ra_ensure auto-holds; ra_step releases at instruction
+//       boundary.
+//   With those in place, draw bodies with masked stores wrapped in
+//   umbra_if(varying_cond) work correctly on JIT — which is what the
+//   shader-side cov-check on CPU backends would need.
+//
+//   Earlier dead-end (commit 8f1910cf, reverted in 507742b6): compile
+//   bounds on the caller-supplied backend, queue+flush mid-dispatch,
+//   then read cov[] back to drive per-tile draws on the host.  Big win
+//   for heavy bounds (SDF Text Analytic on metal: 2.53 -> 1.81 ns/px @
+//   40% -> 5% CPU), but the per-frame GPU sync tanked simple SDFs
+//   (Union: .22 -> .11 ns/px but 72% CPU; wgpu went .22 -> 2.82 ns/px @
+//   99% CPU — no zero-copy means a full staging round-trip per frame
+//   for the cov download).  The mid-dispatch flush is the cost; readback
+//   is the second cost on backends without zero-copy.  Both vanish
+//   under the shader-side-cull plan above.
 void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
