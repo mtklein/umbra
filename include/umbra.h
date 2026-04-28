@@ -24,8 +24,8 @@ struct umbra_backend {
     void                       (*flush  )(struct umbra_backend*);
     void                       (*free   )(struct umbra_backend*);
     struct umbra_backend_stats (*stats  )(struct umbra_backend const*);
-    _Bool program_queue_is_cheap;   // cheap to do many small program->queue() calls
-    _Bool program_switch_is_cheap;  // cheap to alternate program between queue() calls
+    _Bool program_queue_is_cheap;
+    _Bool program_switch_is_cheap;
     int :16, :32;
 };
 struct umbra_backend* umbra_backend_interp(void);
@@ -35,38 +35,30 @@ struct umbra_backend* umbra_backend_vulkan(void);
 struct umbra_backend* umbra_backend_wgpu  (void);
 void   umbra_backend_free(struct umbra_backend*);
 
-typedef struct { int ix; } umbra_ptr;
+typedef struct {
+    int ix;
+} umbra_ptr;
+
 struct umbra_buf {
     void *ptr;
     int   count;
     int   stride;
 };
-// Bind a storage buffer.  Pass a non-NULL `buf` to provide an early default
-// that's dereferenced on every dispatch; pass NULL if the buffer will only
-// ever arrive via umbra_late_binding.  Either way the returned umbra_ptr can
-// be overridden per-queue() call via umbra_late_binding.
-umbra_ptr umbra_bind_buf(struct umbra_builder*, struct umbra_buf const *buf);
 
-// Like umbra_bind_buf, but the caller has sealed the buffer: from binding
-// onward the host won't mutate the bytes, so umbra owns write authority for
-// what flows through this ptr (the GPU may still write through it -- the
-// "seal" is on host writes, not GPU writes).  Memory ownership is unchanged;
-// umbra never frees a sealed buffer.  The cache skips all fingerprint hashing
-// and re-upload for these entries -- a one-time seed, then the GPU buffer is
-// authoritative forever.  Useful for stable inputs like rasterized glyph
-// masks, and for write-once destinations like the SDF tile cov[].
-umbra_ptr umbra_bind_sealed_buf(struct umbra_builder*, struct umbra_buf const *buf);
-
-// Bind a uniform block of `slots` 32-bit words.  Pass a non-NULL `slot_32bit`
-// to provide an early default pointer, or NULL for purely-late uniforms.
-// Either way the returned umbra_ptr can be overridden per-queue() call.
+// Bind user storage to an umbra_ptr for use with load/store ops.
+//   umbra_bind_buf()      - flexible, safe to use for anything;
+//   umbra_bind_sealed()   - assumes the user will not modify contents of the buffer;
+//   umbra_bind_uniforms() - optimized for a fixed number of 32-bit slots that change often.
+umbra_ptr umbra_bind_buf     (struct umbra_builder*, struct umbra_buf const*);
+umbra_ptr umbra_bind_sealed  (struct umbra_builder*, struct umbra_buf const*);
 umbra_ptr umbra_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
 
+// Any umbra_ptr may rebind per queue() call, overriding original umbra_bind_foo() parameters.
 struct umbra_late_binding {
     umbra_ptr ptr; int :32;
     union {
-        struct umbra_buf  buf;       // when overriding an umbra_bind_buf ptr
-        void const       *uniforms;  // when overriding an umbra_bind_uniforms ptr
+        struct umbra_buf buf;
+        void const      *uniforms;
     };
 };
 
@@ -132,9 +124,7 @@ umbra_val32 umbra_div_f32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_min_f32(struct umbra_builder*, umbra_val32, umbra_val32);
 umbra_val32 umbra_max_f32(struct umbra_builder*, umbra_val32, umbra_val32);
 
-// Single-rounded x*y + z and z - x*y.  Not strictly IEEE -- one fused rounding
-// rather than two -- but uniformly applied across backends (FP contraction is
-// disabled below umbra, so nothing else fuses underneath).
+// z ± x*y
 umbra_val32 umbra_fma_f32(struct umbra_builder*, umbra_val32 x, umbra_val32 y, umbra_val32 z);
 umbra_val32 umbra_fms_f32(struct umbra_builder*, umbra_val32 x, umbra_val32 y, umbra_val32 z);
 

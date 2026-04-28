@@ -49,27 +49,22 @@ extern struct umbra_fmt const umbra_fmt_8888,
                               umbra_fmt_fp16,
                               umbra_fmt_fp16_planar;
 
-// 3x3 matrix transform with perspective divide.
 umbra_point_val32 umbra_transform_perspective(struct umbra_matrix const*,
                                               struct umbra_builder*,
                                               umbra_val32 x, umbra_val32 y);
 
-// 2x3 affine transform: no perspective divide.
 umbra_point_val32 umbra_transform_affine(struct umbra_affine const*,
                                          struct umbra_builder*,
                                          umbra_val32 x, umbra_val32 y);
 
 typedef umbra_val32 umbra_coverage(void *ctx, struct umbra_builder*,
                                    umbra_val32 x, umbra_val32 y);
-// Cover a rectangle; ctx is umbra_rect*.
-umbra_coverage umbra_coverage_rect;
+umbra_coverage umbra_coverage_rect;  // ctx is umbra_rect*
 
 typedef umbra_color_val32 umbra_shader(void *ctx, struct umbra_builder*,
                                        umbra_val32 x, umbra_val32 y);
-// Shade a single color; ctx is umbra_color*.
-umbra_shader umbra_shader_color;
+umbra_shader umbra_shader_color;  // ctx is umbra_color*
 
-// Supersample a wrapped shader; ctx is struct umbra_supersample*.
 struct umbra_supersample {
     umbra_shader *inner_fn;
     void         *inner_ctx;
@@ -77,10 +72,10 @@ struct umbra_supersample {
 };
 umbra_shader umbra_shader_supersample;
 
+// TODO: remove unused blend *ctx
 typedef umbra_color_val32 umbra_blend(void *ctx, struct umbra_builder*,
                                       umbra_color_val32 src,
                                       umbra_color_val32 dst);
-// ctx=NULL for all these blends.
 umbra_blend umbra_blend_src,
             umbra_blend_srcover,
             umbra_blend_dstover,
@@ -93,7 +88,6 @@ umbra_blend umbra_blend_src,
 //   out = blend(src,dst)
 //   fmt.store(lerp(cov, dst,out))
 // NULL effects provide default behavior: coverage=1, shader={0,0,0,0}, blend=src.
-// dst_ptr must already be bound on the builder (early or late).
 void umbra_build_draw(struct umbra_builder*,
                       umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                       umbra_val32 x, umbra_val32 y,
@@ -105,8 +99,8 @@ void umbra_build_draw(struct umbra_builder*,
 typedef umbra_interval umbra_sdf(void *ctx, struct umbra_builder*,
                                  umbra_interval x, umbra_interval y);
 
-// Wrap an SDF with |sdf| - width, stroking the zero crossing of the inner
-// SDF with total thickness 2*width.  Apply twice to stroke a stroke.
+// Wrap an SDF with |sdf| - width, stroking the zero crossing of the inner SDF
+// with total thickness 2*width.
 struct umbra_sdf_stroke {
     umbra_sdf *inner_fn;
     void      *inner_ctx;
@@ -115,10 +109,7 @@ struct umbra_sdf_stroke {
 };
 umbra_sdf umbra_sdf_stroke;
 
-// Like umbra_build_draw() but using an SDF for coverage.  Coverage is the
-// fraction of the pixel-box interval [x,x+1]x[y,y+1] that the SDF reports
-// as inside: cov = -lo / (hi - lo), with the fully-inside (hi <= 0) and
-// fully-outside (lo >= 0) cases routed around the division.
+// Like umbra_build_draw() but using an SDF for coverage.
 void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_ptr dst_ptr, struct umbra_fmt dst_fmt,
                           umbra_val32 x, umbra_val32 y,
@@ -126,19 +117,10 @@ void umbra_build_sdf_draw(struct umbra_builder*,
                           umbra_shader, void *shader_ctx,
                           umbra_blend , void *blend_ctx);
 
-// Use an SDF bounds program to intelligently dispatch draw->queue() calls for a
-// draw program built by umbra_build_sdf_draw() from the same SDF, skipping
-// uncovered rectangles.  Optional affine coordinate transform.
 struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder*,
                                                           struct umbra_affine const *transform,
                                                           umbra_sdf, void *sdf_ctx);
 void   umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program*);
-// `draw_partial` runs on tiles the bounds classifier marks as containing the
-// shape edge; `draw_full` runs on tiles entirely inside the shape, where
-// coverage=1 is known and the SDF eval can be skipped.  Passing the same
-// program for both is legal, just forfeits the FULL-tile speedup.
-// Late bindings are forwarded to each internal draw->queue() call; typically a
-// single {dst_ptr, dst} binding so callers can supply per-dispatch dsts.
 void   umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
                           struct umbra_program            *draw_partial,
                           struct umbra_program            *draw_full,
