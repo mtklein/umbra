@@ -34,7 +34,8 @@ struct gpu_buf_cache {
     size_t                  upload_bytes;
 };
 
-int  gpu_buf_cache_get      (struct gpu_buf_cache *, void *host, size_t bytes, uint8_t rw);
+int  gpu_buf_cache_get      (struct gpu_buf_cache *, void *host, size_t bytes,
+                             uint8_t rw, _Bool sealed);
 void gpu_buf_cache_copyback (struct gpu_buf_cache *);
 void gpu_buf_cache_end_batch(struct gpu_buf_cache *);
 void gpu_buf_cache_free     (struct gpu_buf_cache *);

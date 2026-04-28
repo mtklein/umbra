@@ -46,15 +46,11 @@ struct ir_inst {
 };
 
 
-// TODO: all this BIND_SEALED vs BUF_SEALED vs uint8_t sealed needs some clean up
-
 enum binding_kind {
     BIND_BUF,
     BIND_SEALED,
     BIND_UNIFORMS,
 };
-
-enum { BUF_READ = 1, BUF_WRITTEN = 2, BUF_SEALED = 4 };
 
 struct buffer_binding {
     enum binding_kind kind;
@@ -65,12 +61,14 @@ struct buffer_binding {
     };
 };
 
+enum { BUF_READ = 1, BUF_WRITTEN = 2 };
+
 struct buffer_metadata {
-    uint8_t shift;            // op_elem_shift of any op on this ptr
-    uint8_t rw;               // BUF_READ | BUF_WRITTEN flags
-    uint8_t is_uniform;       // 1 if the binding's kind is a uniform kind
-    uint8_t sealed;           // 1 if the binding is BIND_SEALED
-    int     uniform_slots;    // slot count if uniform bindings
+    uint8_t           shift;          // op_elem_shift of any op on this ptr
+    uint8_t           rw;             // BUF_READ | BUF_WRITTEN flags
+    int               :16;
+    enum binding_kind binding_kind;
+    int               uniform_slots;  // slot count when binding_kind == BIND_UNIFORMS
 };
 
 void resolve_bindings(struct umbra_buf *out,

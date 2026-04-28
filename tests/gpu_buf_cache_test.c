@@ -46,13 +46,13 @@ TEST(test_gpu_buf_cache_miss_then_hit) {
     char data[64];
     memset(data, 0x42, sizeof data);
 
-    int i0 = gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    int i0 = gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     i0 == 0 here;
     m.allocs  == 1 here;
     m.uploads == 1 here;
 
     // Second get: same host pointer → hit, uploaded=1, skip.
-    int i1 = gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    int i1 = gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     i1 == 0 here;
     m.uploads == 1 here; // no re-upload
 
@@ -67,20 +67,20 @@ TEST(test_gpu_buf_cache_end_batch_resets_uploaded) {
     char data[64];
     memset(data, 0x42, sizeof data);
 
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     m.uploads == 1 here;
 
     // End batch resets uploaded flag.
     gpu_buf_cache_end_batch(&c);
 
     // Next get re-checks fingerprint.  Data unchanged → skip upload.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     m.uploads == 1 here; // fingerprint matched, no re-upload
 
     // Modify data → fingerprint changes → re-upload.
     data[0] = 0x7F;
     gpu_buf_cache_end_batch(&c);
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     m.uploads == 2 here;
 
     gpu_buf_cache_free(&c);
@@ -94,12 +94,12 @@ TEST(test_gpu_buf_cache_writable_skip_reupload) {
     memset(data, 0x42, sizeof data);
 
     // First access: seed upload.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN, 0);
     m.uploads == 1 here;
     c.entry[0].copy_tracked here;
 
     // Within batch: no re-upload, no re-hash (uploaded flag skips block).
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN, 0);
     m.uploads == 1 here;
 
     // Simulate a flush: GPU wrote new bytes, copyback brings them to host and
@@ -111,13 +111,13 @@ TEST(test_gpu_buf_cache_writable_skip_reupload) {
     gpu_buf_cache_end_batch(&c);
 
     // Next batch: host unchanged since copyback → hash matches → skip upload.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN, 0);
     m.uploads == 1 here;
 
     // If user modifies host between flushes, hash mismatches → re-upload.
     data[0] = 0x7F;
     gpu_buf_cache_end_batch(&c);
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN, 0);
     m.uploads == 2 here;
 
     gpu_buf_cache_free(&c);
@@ -128,7 +128,7 @@ TEST(test_gpu_buf_cache_null_host) {
     struct gpu_buf_cache c = make_cache(&m);
 
     // Dummy buffer for unbound slots.
-    int i = gpu_buf_cache_get(&c, NULL, 0, BUF_READ);
+    int i = gpu_buf_cache_get(&c, NULL, 0, BUF_READ, 0);
     i == 0 here;
     m.allocs == 1 here;
     m.uploads == 0 here; // no data to upload
@@ -144,15 +144,15 @@ TEST(test_gpu_buf_cache_multiple_buffers) {
     memset(a, 1, sizeof a);
     memset(b, 2, sizeof b);
 
-    int ia = gpu_buf_cache_get(&c, a, sizeof a, BUF_READ);
-    int ib = gpu_buf_cache_get(&c, b, sizeof b, BUF_WRITTEN);
+    int ia = gpu_buf_cache_get(&c, a, sizeof a, BUF_READ, 0);
+    int ib = gpu_buf_cache_get(&c, b, sizeof b, BUF_WRITTEN, 0);
     ia == 0 here;
     ib == 1 here;
     c.entries == 2 here;
 
     // Hits on both.
-    gpu_buf_cache_get(&c, a, sizeof a, BUF_READ) == 0 here;
-    gpu_buf_cache_get(&c, b, sizeof b, BUF_WRITTEN) == 1 here;
+    gpu_buf_cache_get(&c, a, sizeof a, BUF_READ, 0) == 0 here;
+    gpu_buf_cache_get(&c, b, sizeof b, BUF_WRITTEN, 0) == 1 here;
     m.uploads == 2 here; // only the initial seeds
 
     gpu_buf_cache_free(&c);
@@ -166,18 +166,18 @@ TEST(test_gpu_buf_cache_sealed_skips_hash_and_reupload) {
     memset(data, 0x42, sizeof data);
 
     // First access: one seed upload.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 1);
     m.uploads == 1 here;
     c.entry[0].sealed here;
 
     // Subsequent accesses within batch: skip.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 1);
     m.uploads == 1 here;
 
     // Even if data changes, sealed entries don't re-upload.
     data[0] = 0x7F;
     gpu_buf_cache_end_batch(&c);
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ | BUF_SEALED);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 1);
     m.uploads == 1 here;
 
     gpu_buf_cache_free(&c);
@@ -191,7 +191,7 @@ TEST(test_gpu_buf_cache_read_modified_within_batch) {
     memset(data, 0x42, sizeof data);
 
     // First get: allocate + upload.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     m.uploads == 1 here;
     memcmp(c.entry[0].buf.ptr, data, sizeof data) == 0 here;
 
@@ -199,7 +199,7 @@ TEST(test_gpu_buf_cache_read_modified_within_batch) {
     data[0] = 0x7F;
 
     // Second get within the same batch must notice the change and re-upload.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     m.uploads == 2 here;
     memcmp(c.entry[0].buf.ptr, data, sizeof data) == 0 here;
 
@@ -227,7 +227,7 @@ TEST(test_gpu_buf_cache_import_nocopy) {
     memset(data, 0x42, sizeof data);
 
     // Successful import: no alloc, no upload.
-    int i = gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    int i = gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     i == 0 here;
     m.imports == 1 here;
     m.allocs  == 0 here;
@@ -237,7 +237,7 @@ TEST(test_gpu_buf_cache_import_nocopy) {
     c.entry[0].buf.ptr == data here;
 
     // Cache hit within batch: still no upload.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     m.uploads == 0 here;
 
     gpu_buf_cache_free(&c);
@@ -264,7 +264,7 @@ TEST(test_gpu_buf_cache_copyback_respects_requested_size) {
     char data[6];   // not a multiple of 4
     memset(data, 0x42, sizeof data);
 
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN | BUF_SEALED);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN, 1);
     c.entry[0].buf.size == 8 here;
 
     // Pretend the GPU wrote across the rounded buffer.
@@ -290,7 +290,7 @@ TEST(test_gpu_buf_cache_import_nocopy_writable) {
     char data[64];
     memset(data, 0x42, sizeof data);
 
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_WRITTEN, 0);
     m.allocs  == 0 here;
     m.uploads == 0 here;
     c.entry[0].nocopy       here;
@@ -308,13 +308,13 @@ TEST(test_gpu_buf_cache_copyback) {
     memset(data, 0x42, sizeof data);
 
     // Read-only buffer: copyback should skip it.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     gpu_buf_cache_copyback(&c);
     m.downloads == 0 here;
 
     // Writable buffer: copyback should download.
     char dst[64] = {0};
-    gpu_buf_cache_get(&c, dst, sizeof dst, BUF_WRITTEN);
+    gpu_buf_cache_get(&c, dst, sizeof dst, BUF_WRITTEN, 0);
 
     // Simulate GPU writing to the buffer.
     memset(c.entry[1].buf.ptr, 0xAB, sizeof dst);
@@ -333,17 +333,17 @@ TEST(test_gpu_buf_cache_upload_bytes_tracked) {
     char data[100];
     memset(data, 0x42, sizeof data);
 
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     c.upload_bytes == 100 here;
 
     // Hit within batch: no additional upload.
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     c.upload_bytes == 100 here;
 
     // After end_batch + data change: new upload.
     data[0] = 0x7F;
     gpu_buf_cache_end_batch(&c);
-    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ);
+    gpu_buf_cache_get(&c, data, sizeof data, BUF_READ, 0);
     c.upload_bytes == 200 here;
 
     gpu_buf_cache_free(&c);

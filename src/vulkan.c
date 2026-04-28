@@ -287,19 +287,20 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
     for (int i = 0; i <= vp->max_ptr; i++) {
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << vp->buf[i].shift;
-            uint8_t const rw = (uint8_t)(vp->buf[i].rw
-                             | (vp->buf[i].sealed ? BUF_SEALED : 0));
+            _Bool const is_uniform = vp->buf[i].binding_kind == BIND_UNIFORMS,
+                        sealed     = vp->buf[i].binding_kind == BIND_SEALED;
+            uint8_t const rw = vp->buf[i].rw;
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
                 struct vk_ring_chunk *chunk = loc.handle;
-                size_t const range = vp->buf[i].is_uniform ? ((bytes + 15) & ~(size_t)15)
-                                                           : bytes;
+                size_t const range = is_uniform ? ((bytes + 15) & ~(size_t)15)
+                                                : bytes;
                 bind_buffer[i] = chunk->buf;
                 bind_offset[i] = (VkDeviceSize)loc.offset;
                 bind_range [i] = (VkDeviceSize)range;
             } else {
-                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw);
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw, sealed);
                 struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
                 bind_buffer[i] = bh->buf;
                 bind_range [i] = VK_WHOLE_SIZE;
@@ -319,7 +320,7 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
 
     for (int i = 0; i < n; i++) {
         if (bind_buffer[i] == VK_NULL_HANDLE) {
-            int idx = gpu_buf_cache_get(&be->cache, 0, 0, 0);
+            int idx = gpu_buf_cache_get(&be->cache, 0, 0, 0, 0);
             struct vk_buf_handle *bh = be->cache.entry[idx].buf.ptr;
             bind_buffer[i] = bh->buf;
             bind_range [i] = VK_WHOLE_SIZE;
@@ -340,8 +341,9 @@ static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b
             .sType=VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
             .dstBinding=(uint32_t)i,
             .descriptorCount=1,
-            .descriptorType=vp->buf[i].is_uniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-                                                  : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorType=vp->buf[i].binding_kind == BIND_UNIFORMS
+                          ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                          : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .pBufferInfo=&buf_infos[i],
         };
     }
@@ -460,8 +462,9 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
     for (int i = 0; i < descs; i++) {
         bindings[i] = (VkDescriptorSetLayoutBinding){
             .binding = (uint32_t)i,
-            .descriptorType = sr.buf[i].is_uniform ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
-                                                   : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+            .descriptorType = sr.buf[i].binding_kind == BIND_UNIFORMS
+                            ? VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER
+                            : VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
             .descriptorCount = 1,
             .stageFlags = VK_SHADER_STAGE_COMPUTE_BIT,
         };

@@ -342,8 +342,8 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     int ro_storages = 0, ro_uniforms = 0;
     for (int i = 0; i < descs - 1; i++) {
         if (!(sr.buf[i].rw & BUF_WRITTEN)) {
-            if (sr.buf[i].is_uniform) { ro_uniforms++; }
-            else                      { ro_storages++; }
+            if (sr.buf[i].binding_kind == BIND_UNIFORMS) { ro_uniforms++; }
+            else                                         { ro_storages++; }
         }
     }
     _Bool const dynamic_offset_bindings =
@@ -356,8 +356,9 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
             .binding    = (uint32_t)i,
             .visibility = WGPUShaderStage_Compute,
             .buffer = {
-                .type             = sr.buf[i].is_uniform ? WGPUBufferBindingType_Uniform
-                                                         : WGPUBufferBindingType_Storage,
+                .type             = sr.buf[i].binding_kind == BIND_UNIFORMS
+                                  ? WGPUBufferBindingType_Uniform
+                                  : WGPUBufferBindingType_Storage,
                 .hasDynamicOffset = is_ring,
             },
         };
@@ -458,24 +459,25 @@ static void wgpu_program_queue(struct umbra_program *prog,
     for (int i = 0; i <= p->max_ptr; i++) {
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << p->buf[i].shift;
-            uint8_t const rw = (uint8_t)(p->buf[i].rw
-                             | (p->buf[i].sealed ? BUF_SEALED : 0));
+            _Bool const is_uniform = p->buf[i].binding_kind == BIND_UNIFORMS,
+                        sealed     = p->buf[i].binding_kind == BIND_SEALED;
+            uint8_t const rw = p->buf[i].rw;
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 // Ring alloc copies data into chunk buffer; bulk-uploaded at submit.
                 // Uniform-class bindings come from a dedicated pool whose chunks
                 // carry only the Uniform usage; mixing usage classes within a
                 // single dispatch on the same WGPU buffer is a validation error.
-                struct uniform_ring_pool *pool = p->buf[i].is_uniform ? &be->uni_pool_uniform
-                                                                      : &be->uni_pool;
+                struct uniform_ring_pool *pool = is_uniform ? &be->uni_pool_uniform
+                                                            : &be->uni_pool;
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(pool, buf[i].ptr, bytes);
                 struct wgpu_ring_chunk *chunk = loc.handle;
-                size_t const align = p->buf[i].is_uniform ? (size_t)16 : (size_t)4;
+                size_t const align = is_uniform ? (size_t)16 : (size_t)4;
                 bind_buf   [i] = chunk->buf;
                 bind_offset[i] = loc.offset;
                 bind_size  [i] = (bytes + align - 1) & ~(align - 1);
             } else {
-                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw);
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw, sealed);
                 bind_buf [i] = be->cache.entry[idx].buf.ptr;
                 bind_size[i] = be->cache.entry[idx].buf.size;
             }
@@ -494,7 +496,7 @@ static void wgpu_program_queue(struct umbra_program *prog,
     // Fill unbound slots with dummy buffers.
     for (int i = 0; i < n; i++) {
         if (!bind_buf[i]) {
-            int idx = gpu_buf_cache_get(&be->cache, 0, 0, BUF_READ);
+            int idx = gpu_buf_cache_get(&be->cache, 0, 0, BUF_READ, 0);
             bind_buf [i] = be->cache.entry[idx].buf.ptr;
             bind_size[i] = be->cache.entry[idx].buf.size;
         }

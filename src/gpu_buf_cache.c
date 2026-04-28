@@ -2,9 +2,8 @@
 #include <stdlib.h>
 
 int gpu_buf_cache_get(struct gpu_buf_cache *c, void *host, size_t bytes,
-                      uint8_t rw) {
-    _Bool const writable = rw & BUF_WRITTEN,
-                sealed   = rw & BUF_SEALED;
+                      uint8_t rw, _Bool sealed) {
+    _Bool const writable = rw & BUF_WRITTEN;
     for (int i = 0; i < c->entries; i++) {
         struct gpu_cache_entry *ce = &c->entry[i];
         if (ce->host == host && ce->buf.size >= bytes) {

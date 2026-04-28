@@ -982,15 +982,15 @@ static void encode_dispatch(struct metal_program *p,
     for (int i = 0; i < tb; i++) {
         if (buf[i].ptr && buf[i].count) {
             size_t const bytes = (size_t)buf[i].count << p->buf[i].shift;
-            uint8_t const rw = (uint8_t)(p->buf[i].rw
-                             | (p->buf[i].sealed ? BUF_SEALED : 0));
+            _Bool const sealed = p->buf[i].binding_kind == BIND_SEALED;
+            uint8_t const rw = p->buf[i].rw;
             if (!(rw & BUF_WRITTEN) && pinned[i]) {
                 struct uniform_ring_loc loc =
                     uniform_ring_pool_alloc(&be->uni_pool, buf[i].ptr, bytes);
                 bind_handle[i] = loc.handle;
                 bind_offset[i] = loc.offset;
             } else {
-                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw);
+                int idx = gpu_buf_cache_get(&be->cache, buf[i].ptr, bytes, rw, sealed);
                 bind_handle[i] = be->cache.entry[idx].buf.ptr;
             }
         }
