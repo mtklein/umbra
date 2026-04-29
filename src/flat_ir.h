@@ -26,7 +26,7 @@ typedef union {
 // Broadest scope within which a value is invariant, broadest to narrowest:
 enum scope {
     SCOPE_COMPILE  = 0,  // compile-time immediates
-    SCOPE_DISPATCH = 1,  // per queue() call (e.g. uniforms)
+    SCOPE_DISPATCH = 1,  // per dispatch() call (e.g. uniforms)
     SCOPE_ROW      = 2,  // fixed per-row    (e.g. umbra_y)
     SCOPE_SUBGROUP = 3,  // fixed within one K-lane subgroup
     SCOPE_LANE     = 4,  // varies per lane
@@ -75,7 +75,7 @@ void resolve_bindings(struct umbra_buf *out,
                       struct umbra_late_binding const *late, int lates);
 
 // True iff the IR stores to any buffer that has an early default.  Such a
-// buffer is a shared piece of state across concurrent queue() calls, so the
+// buffer is a shared piece of state across concurrent dispatch() calls, so the
 // backend can't tag the compiled program as thread-safe.
 _Bool flat_ir_has_early_writes(struct umbra_flat_ir const*);
 

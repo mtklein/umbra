@@ -209,7 +209,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
     int   if_sp = 0;
 #define emit(...) p->inst[n] = (struct sw_inst){ __VA_ARGS__ }
 #define RESOLVE_PTR(inst) ((inst)->ptr.bits)
-    // Three passes: dispatch tier (run once per queue()), row tier (run at
+    // Three passes: dispatch tier (run once per dispatch()), row tier (run at
     // first batch of each row), body (run every batch).  Same partition the
     // JIT uses; here it lets the interpreter skip the dispatch tier on
     // subsequent rows and the row tier on subsequent batches.
@@ -1311,11 +1311,11 @@ static struct umbra_program* compile_interp(struct umbra_backend *be,
                                              struct umbra_flat_ir const *ir) {
     struct interp_program *p = interp_program(ir);
     p->base = (struct umbra_program){
-        .queue      = run_interp,
+        .dispatch   = run_interp,
         .dump       = 0,
         .free       = free_interp,
         .backend    = be,
-        .queue_is_threadsafe = !flat_ir_has_early_writes(ir),
+        .dispatch_is_threadsafe = !flat_ir_has_early_writes(ir),
     };
     return &p->base;
 }
@@ -1332,7 +1332,7 @@ struct umbra_backend* umbra_backend_interp(void) {
         .flush   = flush_be_noop,
         .free    = free_be_interp,
         .stats   = stats_zero,
-        .program_queue_is_cheap  = 1,
+        .program_dispatch_is_cheap  = 1,
         .program_switch_is_cheap = 1,
     };
     return be;

@@ -195,7 +195,7 @@ TEST(test_gpu_buf_cache_read_modified_within_batch) {
     m.uploads == 1 here;
     memcmp(c.entry[0].buf.ptr, data, sizeof data) == 0 here;
 
-    // User modifies the buffer (e.g. updates uniforms) between queue() calls.
+    // User modifies the buffer (e.g. updates uniforms) between dispatch() calls.
     data[0] = 0x7F;
 
     // Second get within the same batch must notice the change and re-upload.

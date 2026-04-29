@@ -98,7 +98,7 @@ void   slide_runtime_free   (struct slide_runtime*);
 // Build a fresh draw-side builder for a slide, without compiling.  Returns
 // NULL for slides that don't draw anything (no build_draw / build_sdf_draw).
 // The dst is late-bound; `out_dst_ptr` (nullable) receives the handle the
-// caller needs to supply at queue() time.
+// caller needs to supply at dispatch() time.
 struct umbra_builder* slide_draw_builder(struct slide*,
                                          umbra_ptr *out_dst_ptr,
                                          struct umbra_fmt,

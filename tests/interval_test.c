@@ -37,7 +37,7 @@ static iv eval_binary(umbra_interval (*op)(struct umbra_builder*,
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+    prog->dispatch(prog, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -67,7 +67,7 @@ static iv eval_unary(umbra_interval (*op)(struct umbra_builder*, umbra_interval)
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+    prog->dispatch(prog, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -102,7 +102,7 @@ static iv eval_ternary(umbra_interval (*op)(struct umbra_builder*,
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+    prog->dispatch(prog, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -208,7 +208,7 @@ static iv eval_square(iv a) {
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+    prog->dispatch(prog, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -249,7 +249,7 @@ static iv eval_exact_binary(umbra_interval (*op)(struct umbra_builder*,
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+    prog->dispatch(prog, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -279,7 +279,7 @@ static iv eval_exact_unary(umbra_interval (*op)(struct umbra_builder*, umbra_int
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+    prog->dispatch(prog, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
     umbra_program_free(prog);
     umbra_backend_free(be);
@@ -363,7 +363,7 @@ TEST(interval_loop) {
     struct umbra_program *prog = be->compile(be, ir);
     umbra_flat_ir_free(ir);
 
-    prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+    prog->dispatch(prog, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
 
     equiv(lo_out, -2.0f) here;

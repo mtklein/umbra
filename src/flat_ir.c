@@ -358,7 +358,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
 
     // Two-pass tier extraction so the result is a clean partition:
     // out[0..dispatch_end) holds scope ≤ SCOPE_DISPATCH ops (the dispatch
-    // tier — emit once per queue() call), out[dispatch_end..row_end) holds
+    // tier — emit once per dispatch() call), out[dispatch_end..row_end) holds
     // scope == SCOPE_ROW ops (the row tier — emit at each row's entry),
     // and out[row_end..insts) is the per-subgroup body.  Within each tier we
     // preserve textual order, so dependency ordering is intact.

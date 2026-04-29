@@ -332,7 +332,7 @@ struct jit_program* jit_program(struct jit_backend *be,
 
     int const dispatch_off = c.words * 4;
 
-    // Dispatch tier: emit once per queue() call, then force-spill every
+    // Dispatch tier: emit once per dispatch() call, then force-spill every
     // dispatch value alive past dispatch_end.  After this point, dispatch
     // values live exclusively in spill slots — both function entry and
     // every row-transition then start from the same state, allowing the

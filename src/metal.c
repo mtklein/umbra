@@ -1029,7 +1029,7 @@ static void encode_dispatch(struct metal_program *p,
 
 static void metal_submit_cmdbuf(struct metal_backend *be);
 
-static void metal_program_queue(struct metal_program *p, int l, int t, int r, int b,
+static void metal_program_dispatch(struct metal_program *p, int l, int t, int r, int b,
                                 struct umbra_late_binding const *late, int lates) {
     int w = r - l, h = b - t;
     if (w <= 0 || h <= 0) { return; }
@@ -1106,7 +1106,7 @@ static void metal_program_dump(
 
 static void run_metal(struct umbra_program *prog, int l, int t, int r, int b,
                       struct umbra_late_binding const *late, int lates) {
-    metal_program_queue((struct metal_program*)prog, l, t, r, b, late, lates);
+    metal_program_dispatch((struct metal_program*)prog, l, t, r, b, late, lates);
 }
 static void dump_metal(struct umbra_program const *prog, FILE *f) {
     metal_program_dump((struct metal_program const*)prog, f);
@@ -1118,7 +1118,7 @@ static struct umbra_program* compile_metal(struct umbra_backend *be, IR const *i
     struct metal_program *p = metal_program((struct metal_backend*)be, ir);
     if (p) {
         p->base = (struct umbra_program){
-            .queue   = run_metal,
+            .dispatch = run_metal,
             .dump    = dump_metal,
             .free    = free_metal,
             .backend = be,

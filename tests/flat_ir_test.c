@@ -1485,7 +1485,7 @@ TEST(test_dispatch_pair_alias) {
             float ref[16];
             slot[0] = (struct umbra_buf){.ptr=in,  .count=16};
             slot[1] = (struct umbra_buf){.ptr=ref, .count=16};
-            B.p[0]->queue(B.p[0], 0, 0, 16, 1, NULL, 0);
+            B.p[0]->dispatch(B.p[0], 0, 0, 16, 1, NULL, 0);
             for (int i = 0; i < 16; i++) { equiv(out[i], ref[i]) here; }
         }
     }
@@ -2548,8 +2548,8 @@ TEST(test_jit_xs_init) {
 }
 
 TEST(test_program_threadsafe) {
-    // Early-bound store: two threads calling queue() share the bound buf, so
-    // queue_is_threadsafe must be false on every backend regardless of whether
+    // Early-bound store: two threads calling dispatch() share the bound buf, so
+    // dispatch_is_threadsafe must be false on every backend regardless of whether
     // the backend itself is threadsafe.
     struct umbra_buf slot = {0};
     struct umbra_builder *eb = umbra_builder();
@@ -2557,7 +2557,7 @@ TEST(test_program_threadsafe) {
     struct umbra_flat_ir *early_ir = umbra_flat_ir(eb);
     umbra_builder_free(eb);
 
-    // Late-bound store: dst is supplied per queue() call, so two threads can
+    // Late-bound store: dst is supplied per dispatch() call, so two threads can
     // each pass their own buf.  Threadsafe iff the backend is.
     struct umbra_builder *lb = umbra_builder();
     umbra_store_32(lb, umbra_bind_buf(lb, NULL), umbra_x(lb));
@@ -2580,11 +2580,11 @@ TEST(test_program_threadsafe) {
         _Bool const want_tsafe = cases[i].backend_threadsafe;
 
         struct umbra_program *p_early = be->compile(be, early_ir);
-        p_early->queue_is_threadsafe == 0 here;
+        p_early->dispatch_is_threadsafe == 0 here;
         umbra_program_free(p_early);
 
         struct umbra_program *p_late  = be->compile(be, late_ir);
-        p_late->queue_is_threadsafe == want_tsafe here;
+        p_late->dispatch_is_threadsafe == want_tsafe here;
         umbra_program_free(p_late);
 
         umbra_backend_free(be);
@@ -2596,7 +2596,7 @@ TEST(test_program_threadsafe) {
 
 static void run_umbra_uniforms_test(struct umbra_backend *be) {
     // umbra_bind_uniforms() captures only the pointer at IR-build time; the bytes
-    // can be filled (and later mutated) any time before a queue() call.
+    // can be filled (and later mutated) any time before a dispatch() call.
     uint32_t u[4] = {0};
     struct umbra_buf slot[1] = {0};
 
@@ -2611,12 +2611,12 @@ static void run_umbra_uniforms_test(struct umbra_backend *be) {
     u[0] = 42; u[1] = 100; u[2] = 200; u[3] = 300;
     int32_t dst[1] = {0};
     slot[0] = (struct umbra_buf){.ptr=dst, .count=1};
-    p->queue(p, 0, 0, 1, 1, NULL, 0);
+    p->dispatch(p, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
     dst[0] == 200 here;
 
     u[2] = 999;
-    p->queue(p, 0, 0, 1, 1, NULL, 0);
+    p->dispatch(p, 0, 0, 1, 1, NULL, 0);
     be->flush(be);
     dst[0] == 999 here;
 
@@ -2678,11 +2678,11 @@ TEST(test_program_null_guards) {
     // dump on interpreter (no dump fn)
     if (p->dump) { p->dump(p, stdout); }
 
-    // queue with w=0 and h=0
+    // dispatch with w=0 and h=0
     int32_t buf[1] = {0};
     slot[0] = (struct umbra_buf){.ptr=buf, .count=1};
-    p->queue(p, 0, 0, 0, 1, NULL, 0);
-    p->queue(p, 0, 0, 1, 0, NULL, 0);
+    p->dispatch(p, 0, 0, 0, 1, NULL, 0);
+    p->dispatch(p, 0, 0, 1, 0, NULL, 0);
 
     umbra_program_free(p);
     umbra_backend_free(be);
@@ -3932,7 +3932,7 @@ TEST(test_strided_2d_dispatch) {
         __builtin_memset(buf, 0xff, sizeof buf);
         if (B.p[bi]) {
             slot[0] = (struct umbra_buf){.ptr=buf, .count=count(buf), .stride=S};
-            B.p[bi]->queue(B.p[bi], L, T, R, BT, NULL, 0);
+            B.p[bi]->dispatch(B.p[bi], L, T, R, BT, NULL, 0);
             B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -3968,7 +3968,7 @@ TEST(test_strided_load_arbitrary_tile) {
         if (B.p[bi]) {
             slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=S};
             slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=S};
-            B.p[bi]->queue(B.p[bi], L, T, R, BT, NULL, 0);
+            B.p[bi]->dispatch(B.p[bi], L, T, R, BT, NULL, 0);
             B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -4005,7 +4005,7 @@ TEST(test_two_buffers_different_row_bytes) {
         if (B.p[bi]) {
             slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=SW};
             slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=DW};
-            B.p[bi]->queue(B.p[bi], L, T, R, BT, NULL, 0);
+            B.p[bi]->dispatch(B.p[bi], L, T, R, BT, NULL, 0);
             B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -4038,7 +4038,7 @@ TEST(test_deref_row_bytes_l_gt_0) {
         __builtin_memset(dst_px, 0, sizeof dst_px);
         if (B.p[bi]) {
             slot[0] = (struct umbra_buf){.ptr=dst_px, .count=count(dst_px), .stride=S};
-            B.p[bi]->queue(B.p[bi], L, T, R, BT, NULL, 0);
+            B.p[bi]->dispatch(B.p[bi], L, T, R, BT, NULL, 0);
             B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -4081,7 +4081,7 @@ TEST(test_deref_16bit_row_bytes_l_gt_0) {
         __builtin_memset(dst_px, 0, sizeof dst_px);
         if (B.p[bi]) {
             slot[0] = (struct umbra_buf){.ptr=dst_px, .count=count(dst_px), .stride=S};
-            B.p[bi]->queue(B.p[bi], L, T, R, BT, NULL, 0);
+            B.p[bi]->dispatch(B.p[bi], L, T, R, BT, NULL, 0);
             B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -4177,7 +4177,7 @@ TEST(test_tail_to_vector_row_transition) {
         if (B.p[bi]) {
             slot[0] = (struct umbra_buf){.ptr=src, .count=count(src), .stride=S};
             slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst), .stride=S};
-            B.p[bi]->queue(B.p[bi], L, T, R, BT, NULL, 0);
+            B.p[bi]->dispatch(B.p[bi], L, T, R, BT, NULL, 0);
             B.be[bi]->flush(B.be[bi]);
             for (int row = T; row < BT; row++) {
                 for (int col = L; col < R; col++) {
@@ -4206,7 +4206,7 @@ TEST(test_gather_partial_oob) {
         if (B.p[bi]) {
             slot[0] = (struct umbra_buf){.ptr=src, .count=count(src)};
             slot[1] = (struct umbra_buf){.ptr=dst, .count=count(dst)};
-            B.p[bi]->queue(B.p[bi], 0, 0, 16, 1, NULL, 0);
+            B.p[bi]->dispatch(B.p[bi], 0, 0, 16, 1, NULL, 0);
             B.be[bi]->flush(B.be[bi]);
             for (int col = 0; col < 6; col++) { dst[col] == src[col] here; }
             for (int col = 6; col < 16; col++) { dst[col] == 0 here; }

@@ -190,13 +190,13 @@ static void update_title(SDL_Window *w, struct slide *s, int bi, int fi, double 
 static void readback_row(void *dst, void *src, int n) {
     readback_pipe.src_buf = (struct umbra_buf){.ptr=src, .count=n};
     readback_pipe.dst_buf = (struct umbra_buf){.ptr=dst, .count=n};
-    readback_pipe.program->queue(readback_pipe.program, 0, 0, n, 1, NULL, 0);
+    readback_pipe.program->dispatch(readback_pipe.program, 0, 0, n, 1, NULL, 0);
 }
 
 static void to_hdr_row(__fp16 *dst, void *src, int n) {
     hdr_pipe.src_buf = (struct umbra_buf){.ptr=src, .count=n};
     hdr_pipe.dst_buf = (struct umbra_buf){.ptr=dst, .count=n};
-    hdr_pipe.program->queue(hdr_pipe.program, 0, 0, n, 1, NULL, 0);
+    hdr_pipe.program->dispatch(hdr_pipe.program, 0, 0, n, 1, NULL, 0);
 }
 
 struct tile_work {
@@ -392,7 +392,7 @@ int main(void) {
                 int y1 = y0 + sh > H ? H : y0 + sh;
                 work[t] = (struct tile_work){s, secs, 0, y0, W, y1, pix_dst};
             }
-            if (nt <= 1 || !extra_progs[1]->queue_is_threadsafe) {
+            if (nt <= 1 || !extra_progs[1]->dispatch_is_threadsafe) {
                 for (int t = 0; t < nt; t++) { tile_fn(&work[t]); }
             } else {
                 struct work_group wg = {.pool = pool};
@@ -420,7 +420,7 @@ int main(void) {
                 readback_pipe.dst_buf = (struct umbra_buf){
                     .ptr = rows + y * tex_pitch, .count = W,
                 };
-                readback_pipe.program->queue(readback_pipe.program, 0, y, W, y + 1, NULL, 0);
+                readback_pipe.program->dispatch(readback_pipe.program, 0, y, W, y + 1, NULL, 0);
             }
         } else {
             for (int y = 0; y < H; y++) {
@@ -439,7 +439,7 @@ int main(void) {
                     hdr_pipe.dst_buf = (struct umbra_buf){
                         .ptr = hdata + y * W * 4, .count = W,
                     };
-                    hdr_pipe.program->queue(hdr_pipe.program, 0, y, W, y + 1, NULL, 0);
+                    hdr_pipe.program->dispatch(hdr_pipe.program, 0, y, W, y + 1, NULL, 0);
                 }
             } else {
                 for (int y = 0; y < H; y++) {

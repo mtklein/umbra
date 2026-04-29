@@ -24,7 +24,7 @@ struct umbra_backend {
     void                       (*flush  )(struct umbra_backend*);
     void                       (*free   )(struct umbra_backend*);
     struct umbra_backend_stats (*stats  )(struct umbra_backend const*);
-    _Bool program_queue_is_cheap;
+    _Bool program_dispatch_is_cheap;
     _Bool program_switch_is_cheap;
     int :16, :32;
 };
@@ -53,7 +53,7 @@ umbra_ptr umbra_bind_buf     (struct umbra_builder*, struct umbra_buf const*);
 umbra_ptr umbra_bind_sealed  (struct umbra_builder*, struct umbra_buf const*);
 umbra_ptr umbra_bind_uniforms(struct umbra_builder*, void const *slot_32bit, int slots);
 
-// Any umbra_ptr may rebind per queue() call, overriding original umbra_bind_foo() parameters.
+// Any umbra_ptr may rebind per dispatch() call, overriding original umbra_bind_foo() parameters.
 struct umbra_late_binding {
     umbra_ptr ptr; int :32;
     union {
@@ -63,12 +63,12 @@ struct umbra_late_binding {
 };
 
 struct umbra_program {
-    void (*queue)(struct umbra_program*, int l, int t, int r, int b,
-                  struct umbra_late_binding const[], int late_bindings);
+    void (*dispatch)(struct umbra_program*, int l, int t, int r, int b,
+                     struct umbra_late_binding const[], int late_bindings);
     void (*dump )(struct umbra_program const*, FILE*);
     void (*free )(struct umbra_program*);
     struct umbra_backend *backend;
-    _Bool                 queue_is_threadsafe; int :24,:32;
+    _Bool                 dispatch_is_threadsafe; int :24,:32;
 };
 void umbra_program_free(struct umbra_program*);
 

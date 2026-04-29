@@ -1700,7 +1700,7 @@ TEST(test_sdf_draw_tiling) {
     umbra_sdf_draw(bounds, tiled, tiled, 0, 0, W, H, NULL, 0);
 
     flat_dst_slot = (struct umbra_buf){.ptr = flat_buf, .count = W * H, .stride = W};
-    flat->queue(flat, 0, 0, W, H, NULL, 0);
+    flat->dispatch(flat, 0, 0, W, H, NULL, 0);
 
     be->flush(be);
 
@@ -1757,7 +1757,7 @@ TEST(test_sdf_stroke_ring) {
 }
 
 // Concurrent-draw regression tests.  The driving concern is that CPU-backend
-// programs (interp, jit) advertise queue_is_threadsafe=1; TSAN should see a
+// programs (interp, jit) advertise dispatch_is_threadsafe=1; TSAN should see a
 // clean run even with N threads dispatching against shared programs.  We pair
 // each run with an equivalent serial baseline and assert every pixel matches.
 
@@ -1877,7 +1877,7 @@ struct strip_fire_ctx {
 };
 static void strip_fire(void *v) {
     struct strip_fire_ctx *c = v;
-    c->p->queue(c->p, c->l, c->t, c->r, c->b, NULL, 0);
+    c->p->dispatch(c->p, c->l, c->t, c->r, c->b, NULL, 0);
 }
 
 static void draw_thread_safety_for(struct umbra_backend *be) {
@@ -1905,7 +1905,7 @@ static void draw_thread_safety_for(struct umbra_backend *be) {
 
     uint32_t *baseline = calloc(W * H, sizeof *baseline);
     dst_slot.ptr = baseline;
-    p->queue(p, 0, 0, W, H, NULL, 0);
+    p->dispatch(p, 0, 0, W, H, NULL, 0);
     be->flush(be);
 
     // N threads, disjoint y-strips, all dispatching against the shared
@@ -1991,7 +1991,7 @@ TEST(test_metal_loop_gather) {
         if (bes[bi]) {
             struct umbra_program *prog = bes[bi]->compile(bes[bi], ir);
             out = 0;
-            prog->queue(prog, 0, 0, 1, 1, NULL, 0);
+            prog->dispatch(prog, 0, 0, 1, 1, NULL, 0);
             bes[bi]->flush(bes[bi]);
             equiv(out, 60.0f) here;
             umbra_program_free(prog);

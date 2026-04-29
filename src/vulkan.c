@@ -249,7 +249,7 @@ static void vk_cache_release(gpu_buf buf, void *ctx) {
 static void vk_flush(struct umbra_backend *be);
 static void vk_submit_cmdbuf(struct vk_backend *be);
 
-static void vk_program_queue(struct umbra_program *p, int l, int t, int r, int b,
+static void vk_program_dispatch(struct umbra_program *p, int l, int t, int r, int b,
                              struct umbra_late_binding const *late, int lates) {
     struct vk_program *vp = (struct vk_program *)p;
     struct vk_backend *be = vp->be;
@@ -535,7 +535,7 @@ static struct umbra_program* vk_compile(struct umbra_backend *be,
         __builtin_memcpy(p->binding, ir->binding, sz);
     }
 
-    p->base.queue   = vk_program_queue;
+    p->base.dispatch = vk_program_dispatch;
     p->base.dump    = vk_program_dump;
     p->base.free    = vk_program_free;
     p->base.backend = be;

@@ -359,10 +359,10 @@ void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
 // Profiling `out/host/bench --backend metal --match "SDF Text Analytic"`
 // shows its high cpu% is almost all spent on run_jit() evaluating bounds.
 //
-// Let's move this work to the backend so each umbra_sdf_draw() becomes just 2-3 queue() calls:
-//    bounds->queue(cov)
-//    draw_partial->queue(cov)   // wrapped in if (tile_cov == PARTIAL)
-//    draw_full->queue(cov)      // wrapped in if (tile_cov == FULL)
+// Let's move this work to the backend so each umbra_sdf_draw() becomes just 2-3 dispatch() calls:
+//    bounds->dispatch(cov)
+//    draw_partial->dispatch(cov)   // wrapped in if (tile_cov == PARTIAL)
+//    draw_full->dispatch(cov)      // wrapped in if (tile_cov == FULL)
 void umbra_sdf_draw(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
@@ -375,7 +375,7 @@ void umbra_sdf_draw(struct umbra_sdf_bounds_program *bounds,
                                                                                   : draw_partial,
     };
 
-    int const T = draw_partial->backend->program_queue_is_cheap ? 8 : 64,
+    int const T = draw_partial->backend->program_dispatch_is_cheap ? 8 : 64,
               x_tiles = (r - l + T - 1) / T,
               y_tiles = (b - t + T - 1) / T,
               tiles = x_tiles * y_tiles;
@@ -387,7 +387,7 @@ void umbra_sdf_draw(struct umbra_sdf_bounds_program *bounds,
         {.ptr = bounds->cov_ptr    , .buf = {.ptr = cov, .count = tiles, .stride = x_tiles}},
         {.ptr = bounds->uniform_ptr, .uniforms = uniforms},
     };
-    bounds->prog->queue(bounds->prog, 0, 0, x_tiles, y_tiles, bounds_late, count(bounds_late));
+    bounds->prog->dispatch(bounds->prog, 0, 0, x_tiles, y_tiles, bounds_late, count(bounds_late));
 
     // Coalesce horizontally adjacent tiles with the same program to amortize dispatch overhead.
     for (int ty = 0; ty < y_tiles; ty++) {
@@ -399,14 +399,14 @@ void umbra_sdf_draw(struct umbra_sdf_bounds_program *bounds,
             struct umbra_program *prog = prog_for_cov[ cov[ty*x_tiles + tx] ];
             if (prog != run_prog) {
                 if (run_prog) {
-                    run_prog->queue(run_prog, l + run_start*T, tt, l + tx*T, tb, late, lates);
+                    run_prog->dispatch(run_prog, l + run_start*T, tt, l + tx*T, tb, late, lates);
                 }
                 run_prog  = prog;
                 run_start = tx;
             }
         }
         if (run_prog) {
-            run_prog->queue(run_prog, l + run_start*T, tt, r, tb, late, lates);
+            run_prog->dispatch(run_prog, l + run_start*T, tt, r, tb, late, lates);
         }
     }
     free(cov);

@@ -425,7 +425,7 @@ static struct umbra_program* wgpu_compile(struct umbra_backend *base,
     return &p->base;
 }
 
-static void wgpu_program_queue(struct umbra_program *prog,
+static void wgpu_program_dispatch(struct umbra_program *prog,
                                int l, int t, int r, int b,
                                struct umbra_late_binding const *late, int lates) {
     struct wgpu_program *p  = (struct wgpu_program *)prog;
@@ -649,7 +649,7 @@ static void wgpu_free(struct umbra_backend *base) {
 static struct umbra_program* wgpu_compile_fn(struct umbra_backend *be,
                                               struct umbra_flat_ir const *ir) {
     struct umbra_program *p = wgpu_compile(be, ir);
-    p->queue   = wgpu_program_queue;
+    p->dispatch = wgpu_program_dispatch;
     p->dump    = wgpu_program_dump;
     p->free    = wgpu_program_free;
     p->backend = be;
