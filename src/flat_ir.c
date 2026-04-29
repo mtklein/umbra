@@ -124,7 +124,7 @@ static int sched_score(struct ir_inst const *in, struct sched const *meta,
 }
 
 static _Bool is_body(struct ir_inst const *inst) {
-    return inst->live && inst->scope >= SCOPE_BATCH;
+    return inst->live && inst->scope >= SCOPE_SUBGROUP;
 }
 
 static void schedule(struct ir_inst *in, int n, struct ir_inst *out, int at, int live,
@@ -282,19 +282,19 @@ static _Bool is_reduction(enum op op) {
 
 // Per-op intrinsic scope.  Source ops introduce scope; everything else is
 // SCOPE_COMPILE intrinsically and inherits from operands via narrow().
-// Control-flow ops have an intrinsic floor of SCOPE_BATCH — their structural
-// placement delineates regions that must execute per-batch regardless of
+// Control-flow ops have an intrinsic floor of SCOPE_SUBGROUP — their structural
+// placement delineates regions that must execute per-subgroup regardless of
 // operand scope.
 //
 // op_y is SCOPE_ROW: constant within a row, varies per row.  The JITs set
 // up XY (the row-state register) before emitting the row tier so op_y
 // broadcasts the right row, and the row-tier re-emit at each row
 // transition refreshes the broadcast for the new row.  Anything purely
-// derived from op_y + uniforms therefore hoists out of the per-batch
+// derived from op_y + uniforms therefore hoists out of the per-subgroup
 // body into the row tier.
 static enum scope intrinsic_scope(enum op op) {
-    if (is_cf(op))                  { return SCOPE_BATCH; }
-    if (is_reduction(op))           { return SCOPE_BATCH; }
+    if (is_cf(op))                  { return SCOPE_SUBGROUP; }
+    if (is_reduction(op))           { return SCOPE_SUBGROUP; }
     if (op == op_imm_32)            { return SCOPE_COMPILE; }
     // op_uniform_32 reads a uniform-bound buffer at a compile-time index;
     // by API contract that buffer's stride is zero, so the read is purely
@@ -360,7 +360,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     // out[0..dispatch_end) holds scope ≤ SCOPE_DISPATCH ops (the dispatch
     // tier — emit once per queue() call), out[dispatch_end..row_end) holds
     // scope == SCOPE_ROW ops (the row tier — emit at each row's entry),
-    // and out[row_end..insts) is the per-batch body.  Within each tier we
+    // and out[row_end..insts) is the per-subgroup body.  Within each tier we
     // preserve textual order, so dependency ordering is intact.
     struct ir_inst *out = malloc((size_t)live * sizeof *out);
     int dispatch_end = 0;
@@ -383,7 +383,7 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     int *cf = malloc((size_t)n * sizeof *cf);
     int cfs = 0;
     for (int i = 0; i < n; i++) {
-        if (b->inst[i].live && b->inst[i].scope >= SCOPE_BATCH && is_cf(b->inst[i].op)) {
+        if (b->inst[i].live && b->inst[i].scope >= SCOPE_SUBGROUP && is_cf(b->inst[i].op)) {
             cf[cfs++] = i;
         }
     }
@@ -485,7 +485,7 @@ static char scope_letter(int8_t scope) {
         case SCOPE_COMPILE:  return 'C';
         case SCOPE_DISPATCH: return 'D';
         case SCOPE_ROW:      return 'R';
-        case SCOPE_BATCH:    return 'B';
+        case SCOPE_SUBGROUP: return 'S';
         case SCOPE_LANE:     return 'L';
     }
     return '?';

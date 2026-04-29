@@ -28,7 +28,7 @@ enum scope {
     SCOPE_COMPILE  = 0,  // compile-time immediates
     SCOPE_DISPATCH = 1,  // per queue() call (e.g. uniforms)
     SCOPE_ROW      = 2,  // fixed per-row    (e.g. umbra_y)
-    SCOPE_BATCH    = 3,  // fixed across one K-lane step
+    SCOPE_SUBGROUP = 3,  // fixed within one K-lane subgroup
     SCOPE_LANE     = 4,  // varies per lane
 };
 
@@ -105,7 +105,7 @@ struct umbra_flat_ir {
     int insts,         // Total instruction count.
         dispatch_end,  // inst[0..dispatch_end) have scope ≤ SCOPE_DISPATCH.
         row_end;       // inst[dispatch_end..row_end) have scope == SCOPE_ROW.
-                       // inst[row_end..insts) is the per-batch body.
+                       // inst[row_end..insts) is the per-subgroup body.
     int loop_begin,    // Instruction index of op_loop_begin, or -1.
         loop_end;      // Instruction index of op_loop_end,   or -1.
     int vars, bindings;

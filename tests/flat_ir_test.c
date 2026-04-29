@@ -6153,7 +6153,7 @@ TEST(test_scope_intrinsics) {
 
 // The finalized IR is a clean tier partition: [0..dispatch_end) holds ops
 // with scope ≤ SCOPE_DISPATCH, [dispatch_end..row_end) holds scope == ROW
-// ops, and [row_end..insts) is the per-batch body (scope ≥ BATCH).  This
+// ops, and [row_end..insts) is the per-subgroup body (scope ≥ SUBGROUP).  This
 // is the contract the JIT relies on to emit the dispatch tier once at
 // function entry and only re-emit the row tier per row.
 TEST(test_scope_tier_partition) {
@@ -6181,7 +6181,7 @@ TEST(test_scope_tier_partition) {
         ir->inst[i].scope == SCOPE_ROW here;
     }
     for (int i = ir->row_end; i < ir->insts; i++) {
-        ir->inst[i].scope >= SCOPE_BATCH here;
+        ir->inst[i].scope >= SCOPE_SUBGROUP here;
     }
 
     umbra_flat_ir_free(ir);
@@ -6189,7 +6189,7 @@ TEST(test_scope_tier_partition) {
 }
 
 // LICM: a pure expression with all-uniform inputs textually inside a loop
-// should land in the dispatch tier (scope < SCOPE_BATCH), not the body.
+// should land in the dispatch tier (scope < SCOPE_SUBGROUP), not the body.
 // Before scope-driven scheduling the depth-counter cap forced everything
 // inside a region to varying, so this shape produced an in-body add_f32
 // every iteration.
@@ -6210,7 +6210,7 @@ TEST(test_scope_licm_in_loop) {
     struct umbra_flat_ir *ir = umbra_flat_ir(b);
     int hoisted_add = 0;
     for (int i = 0; i < ir->insts; i++) {
-        if (ir->inst[i].op == op_add_f32 && ir->inst[i].scope < SCOPE_BATCH) {
+        if (ir->inst[i].op == op_add_f32 && ir->inst[i].scope < SCOPE_SUBGROUP) {
             hoisted_add = 1;
         }
     }
@@ -6256,7 +6256,7 @@ TEST(test_all_32_marks_uniform) {
     umbra_builder_free(b);
 }
 
-TEST(test_all_32_scope_is_batch) {
+TEST(test_all_32_scope_is_subgroup) {
     struct umbra_buf slot[4] = {0};
     struct umbra_builder *b = umbra_builder();
     umbra_val32 const x = umbra_x(b);
@@ -6266,7 +6266,7 @@ TEST(test_all_32_scope_is_batch) {
     int n_reductions = 0;
     for (int i = 0; i < ir->insts; i++) {
         if (ir->inst[i].op == op_all_32 || ir->inst[i].op == op_any_32) {
-            ir->inst[i].scope == SCOPE_BATCH here;
+            ir->inst[i].scope == SCOPE_SUBGROUP here;
             ir->inst[i].uniform == 1 here;
             n_reductions++;
         }

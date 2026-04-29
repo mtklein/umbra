@@ -43,7 +43,7 @@ static _Bool dedup_match(int id, void *ctx) {
 
 static val push_(builder *b, struct ir_inst inst) {
     {
-        // TODO: drop inst.uniform; consumers should test flat_ir scope ≤ SCOPE_BATCH instead (catches op_y).
+        // TODO: drop inst.uniform; consumers should test flat_ir scope ≤ SCOPE_SUBGROUP instead (catches op_y).
         enum op const op = inst.op;
         if (op == op_imm_32 || op == op_uniform_32) {
             inst.uniform = 1;
