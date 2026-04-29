@@ -29,8 +29,7 @@ enum scope {
     SCOPE_DISPATCH = 1,  // per queue() call (e.g. uniforms)
     SCOPE_ROW      = 2,  // fixed per-row    (e.g. umbra_y)
     SCOPE_BATCH    = 3,  // fixed across one K-lane step
-    SCOPE_ITER     = 4,  // fixed within a loop iteration
-    SCOPE_LANE     = 5,  // varies per lane
+    SCOPE_LANE     = 4,  // varies per lane
 };
 
 struct ir_inst {

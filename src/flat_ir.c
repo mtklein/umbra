@@ -486,7 +486,6 @@ static char scope_letter(int8_t scope) {
         case SCOPE_DISPATCH: return 'D';
         case SCOPE_ROW:      return 'R';
         case SCOPE_BATCH:    return 'B';
-        case SCOPE_ITER:     return 'I';
         case SCOPE_LANE:     return 'L';
     }
     return '?';
