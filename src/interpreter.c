@@ -136,7 +136,7 @@ enum {
     // Internal ops for uniform-cond ifs: op_if_begin_uniform branches
     // over the body when cond[lane 0] is zero, landing on the matching
     // op_if_end_uniform (a no-op).  Emitted instead of op_if_begin /
-    // op_if_end when ir->inst[cond].uniform is set.
+    // op_if_end when ir->inst[cond].scope ≤ SCOPE_SUBGROUP.
     op_if_begin_uniform,
     op_if_end_uniform,
 
@@ -259,7 +259,7 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
                      .z = inst->imm);
                 break;
             case op_if_begin:
-                if (ir->inst[inst->x.id].uniform) {
+                if (ir->inst[inst->x.id].scope <= SCOPE_SUBGROUP) {
                     emit(.tag = op_if_begin_uniform, .x = X, .y = 0);
                     if_begin_sw_n  [if_sp] = n;
                     if_begin_uniform[if_sp] = 1;

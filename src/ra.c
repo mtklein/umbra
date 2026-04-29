@@ -98,7 +98,7 @@ struct ra* ra_create(struct umbra_flat_ir const *ir, struct ra_config const *cfg
         if (ir->inst[i].op == op_if_end) {
             int const ib      = ir->inst[i].x.id;
             int const cond_id = ir->inst[ib].x.id;
-            if (!ir->inst[cond_id].uniform) {
+            if (ir->inst[cond_id].scope > SCOPE_SUBGROUP) {
                 ra->slot[cond_id].last_use                                = i;
                 ra->slot[cond_id].chan_last_use[(int)ir->inst[ib].x.chan] = i;
             }

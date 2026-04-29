@@ -1210,7 +1210,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
 
         case op_if_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
-            if (ir->inst[inst->x.id].uniform) {
+            if (ir->inst[inst->x.id].scope <= SCOPE_SUBGROUP) {
                 // Uniform condition: extract lane 0 to a GPR and skip the
                 // body via a real branch when zero.  The body and post-body
                 // converge through ra_evict_live_before at if_begin (and
@@ -1241,7 +1241,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_if_end: {
             int const ib      = inst->x.id;
             int const cond_id = ir->inst[ib].x.id;
-            if (ir->inst[cond_id].uniform) {
+            if (ir->inst[cond_id].scope <= SCOPE_SUBGROUP) {
                 // Match the body's ra_evict_live_before so the fall-through
                 // and skip paths converge to identical ra state, then patch
                 // the conditional branch from if_begin to land here.

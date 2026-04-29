@@ -1145,7 +1145,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
 
         case op_if_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
-            if (ir->inst[inst->x.id].uniform) {
+            if (ir->inst[inst->x.id].scope <= SCOPE_SUBGROUP) {
                 // Uniform condition: extract lane 0 and skip the body via a
                 // real branch when zero.  ra_evict_live_before at if_begin
                 // (and if_end) keeps the fall-through and skip paths in the
@@ -1173,7 +1173,7 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
         case op_if_end: {
             int const ib      = inst->x.id;
             int const cond_id = ir->inst[ib].x.id;
-            if (ir->inst[cond_id].uniform) {
+            if (ir->inst[cond_id].scope <= SCOPE_SUBGROUP) {
                 ra_evict_live_before(ra, sl, ns, i);
                 patch_jcc(c, jc->if_branch_patch[--jc->if_branch_sp]);
             } else {
