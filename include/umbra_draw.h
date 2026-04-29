@@ -119,7 +119,7 @@ struct umbra_sdf_bounds_program* umbra_sdf_bounds_program(struct umbra_builder*,
                                                           struct umbra_affine const *transform,
                                                           umbra_sdf, void *sdf_ctx);
 void   umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program*);
-void   umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
+void   umbra_sdf_draw(struct umbra_sdf_bounds_program *bounds,
                           struct umbra_program            *draw_partial,
                           struct umbra_program            *draw_full,
                           int l, int t, int r, int b,

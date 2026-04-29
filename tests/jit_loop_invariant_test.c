@@ -43,7 +43,7 @@ static umbra_interval two_circle_union(void *ctx, struct umbra_builder *b,
 }
 
 // Compile the CSG bounds IR with an affine transform composed in -- this is
-// what umbra_sdf_dispatch/overview would produce per cell.  Under xsan the
+// what umbra_sdf_draw/overview would produce per cell.  Under xsan the
 // ARM64 JIT aborts at ra_assert_loop_invariant for this IR today.
 TEST(test_jit_compiles_sdf_bounds_with_affine_transform) {
     struct umbra_backend *be = umbra_backend_jit();

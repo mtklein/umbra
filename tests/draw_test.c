@@ -1556,7 +1556,7 @@ static umbra_interval test_rect_fn(void *ctx, struct umbra_builder *b,
                                                               umbra_interval_sub_f32(b, y, bo)));
 }
 
-TEST(test_sdf_dispatch_rect) {
+TEST(test_sdf_draw_rect) {
     enum { W = 8, H = 8 };
     umbra_color color = {1, 0, 0, 1};
     // Rect edges sit at pixel centers (x.5), so pixel boxes at x in {2,5} or
@@ -1596,7 +1596,7 @@ TEST(test_sdf_dispatch_rect) {
             uint32_t dst[W * H];
             __builtin_memset(dst, 0, sizeof dst);
             dst_slot = (struct umbra_buf){.ptr = dst, .count = W * H, .stride = W};
-            umbra_sdf_dispatch(bounds, draw, draw, 0, 0, W, H, NULL, 0);
+            umbra_sdf_draw(bounds, draw, draw, 0, 0, W, H, NULL, 0);
             bes[bi]->flush(bes[bi]);
 
             for (int y = 0; y < H; y++) {
@@ -1647,7 +1647,7 @@ static umbra_interval test_circle_fn(void *ctx, struct umbra_builder *b,
     return umbra_interval_sub_f32(b, d, r);
 }
 
-TEST(test_sdf_dispatch_tiling) {
+TEST(test_sdf_draw_tiling) {
     // Canvas larger than the SDF tile size so the grid has multiple tiles.
     enum { W = 1024, H = 768 };
 
@@ -1697,7 +1697,7 @@ TEST(test_sdf_dispatch_tiling) {
     uint32_t *flat_buf  = calloc(W * H, sizeof *flat_buf);
 
     tiled_dst_slot = (struct umbra_buf){.ptr = tiled_buf, .count = W * H, .stride = W};
-    umbra_sdf_dispatch(bounds, tiled, tiled, 0, 0, W, H, NULL, 0);
+    umbra_sdf_draw(bounds, tiled, tiled, 0, 0, W, H, NULL, 0);
 
     flat_dst_slot = (struct umbra_buf){.ptr = flat_buf, .count = W * H, .stride = W};
     flat->queue(flat, 0, 0, W, H, NULL, 0);
@@ -1791,7 +1791,7 @@ struct sdf_fire_ctx {
 static void sdf_fire(void *v) {
     struct sdf_fire_ctx *c = v;
     *c->dst_slot = (struct umbra_buf){.ptr = c->dst, .count = c->W * c->H, .stride = c->W};
-    umbra_sdf_dispatch(c->bounds, c->draw, c->draw, 0, 0, c->W, c->H, NULL, 0);
+    umbra_sdf_draw(c->bounds, c->draw, c->draw, 0, 0, c->W, c->H, NULL, 0);
 }
 
 static void sdf_thread_safety_for(struct umbra_backend *be) {
@@ -1863,8 +1863,8 @@ static void sdf_thread_safety_for(struct umbra_backend *be) {
     umbra_backend_free(be);
 }
 
-TEST(test_sdf_dispatch_thread_safety_interp) { sdf_thread_safety_for(umbra_backend_interp()); }
-TEST(test_sdf_dispatch_thread_safety_jit)    { sdf_thread_safety_for(umbra_backend_jit()); }
+TEST(test_sdf_draw_thread_safety_interp) { sdf_thread_safety_for(umbra_backend_interp()); }
+TEST(test_sdf_draw_thread_safety_jit)    { sdf_thread_safety_for(umbra_backend_jit()); }
 
 // Non-SDF: one shared program, each thread dispatches its own disjoint
 // y-strip of the canvas.  Exercises concurrent access to the program's

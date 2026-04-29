@@ -224,7 +224,7 @@ void slide_runtime_draw(struct slide_runtime *rt, struct umbra_buf dst,
         {.ptr = rt->dst_ptr, .buf = dst},
     };
     if (rt->bounds) {
-        umbra_sdf_dispatch(rt->bounds, rt->draw, rt->draw_full, l, t, r, b,
+        umbra_sdf_draw(rt->bounds, rt->draw, rt->draw_full, l, t, r, b,
                            lates, count(lates));
     } else {
         rt->draw->queue(rt->draw, l, t, r, b, lates, count(lates));

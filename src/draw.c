@@ -263,7 +263,7 @@ struct umbra_sdf_bounds_program {
 };
 
 // Produce (ix, iy) covering the tile at (umbra_x(), umbra_y()), sourced from
-// a 4-slot uniform block supplied per dispatch by umbra_sdf_dispatch.
+// a 4-slot uniform block supplied per dispatch by umbra_sdf_draw.
 static void sdf_tile_intervals(struct umbra_builder *bb,
                                struct umbra_sdf_bounds_program *bounds,
                                umbra_interval *ix, umbra_interval *iy) {
@@ -359,11 +359,11 @@ void umbra_sdf_bounds_program_free(struct umbra_sdf_bounds_program *b) {
 // Profiling `out/host/bench --backend metal --match "SDF Text Analytic"`
 // shows its high cpu% is almost all spent on run_jit() evaluating bounds.
 //
-// Let's move this work to the backend so each dispatch() becomes just 2-3 queue() calls:
+// Let's move this work to the backend so each umbra_sdf_draw() becomes just 2-3 queue() calls:
 //    bounds->queue(cov)
 //    draw_partial->queue(cov)   // wrapped in if (tile_cov == PARTIAL)
 //    draw_full->queue(cov)      // wrapped in if (tile_cov == FULL)
-void umbra_sdf_dispatch(struct umbra_sdf_bounds_program *bounds,
+void umbra_sdf_draw(struct umbra_sdf_bounds_program *bounds,
                         struct umbra_program            *draw_partial,
                         struct umbra_program            *draw_full,
                         int l, int t, int r, int b,
