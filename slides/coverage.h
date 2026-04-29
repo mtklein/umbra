@@ -1,8 +1,8 @@
 #pragma once
 #include "../include/umbra_draw.h"
 
-// 8-bit and SDF bitmap coverage, ctx is an umbra_buf*.  Samples at the
-// dispatch pixel (x, y), 1:1 mapping between pixels and bitmap cells.
+// 8-bit and SDF bitmap coverage, ctx is an umbra_buf*.  Samples at pixel
+// (x, y), 1:1 mapping between pixels and bitmap cells.
 umbra_val32 coverage_bitmap(void *umbra_buf, struct umbra_builder*,
                             umbra_val32 x, umbra_val32 y);
 umbra_val32 coverage_sdf   (void *umbra_buf, struct umbra_builder*,

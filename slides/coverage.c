@@ -184,7 +184,7 @@ void text_cov_free(struct text_cov *tc) {
 // Coverage (8-bit bitmap) and Coverage (SDF bitmap): sample a glyph-mask
 // through coverage_bitmap2d / coverage_sdf2d so the slide composes under an
 // outer transform (e.g. the overview's cell matrix).  When the slide stands
-// alone the dispatch (x, y) equals the bitmap (x, y), so the gather-based
+// alone the pixel (x, y) equals the bitmap (x, y), so the gather-based
 // samplers reproduce the linear-load coverage_bitmap / coverage_sdf output.
 struct text_slide {
     struct slide base;
