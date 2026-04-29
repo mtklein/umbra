@@ -669,11 +669,9 @@ void umbra_if(builder *b, umbra_val32 cond) {
 }
 
 umbra_val32 umbra_all_32(builder *b, umbra_val32 mask) {
-    if (b->inst[mask.id].uniform) { return mask; }
     return push32(b, op_all_32, VX(mask));
 }
 umbra_val32 umbra_any_32(builder *b, umbra_val32 mask) {
-    if (b->inst[mask.id].uniform) { return mask; }
     return push32(b, op_any_32, VX(mask));
 }
 

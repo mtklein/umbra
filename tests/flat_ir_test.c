@@ -6225,8 +6225,6 @@ TEST(test_all_any_32_uniform_input) {
     umbra_val32 const c    = umbra_imm_i32(b, (int)0xcafe1234),
                       all  = umbra_all_32(b, c),
                       any  = umbra_any_32(b, c);
-    val_eq(all, c) here;
-    val_eq(any, c) here;
     umbra_store_32(b, umbra_bind_buf(b, &slot[0]), all);
     umbra_store_32(b, umbra_bind_buf(b, &slot[1]), any);
 
