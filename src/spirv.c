@@ -1731,6 +1731,12 @@ struct spirv_result build_spirv(struct umbra_flat_ir const *ir,
                     spv_store(&B, v_vars[inst->imm],
                               as_u32(&B, get_val(&B, inst->y), yid));
                     break;
+
+                // TODO: workgroup reduction; current passthrough is only correct for workgroup-uniform input.
+                case op_all_32:
+                case op_any_32:
+                    B.val[i] = as_u32(&B, get_val(&B, inst->x), xid);
+                    break;
             }
         }
 

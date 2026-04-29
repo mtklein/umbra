@@ -43,6 +43,7 @@ static _Bool dedup_match(int id, void *ctx) {
 
 static val push_(builder *b, struct ir_inst inst) {
     {
+        // TODO: drop inst.uniform; consumers should test flat_ir scope ≤ SCOPE_BATCH instead (catches op_y).
         enum op const op = inst.op;
         if (op == op_imm_32 || op == op_uniform_32) {
             inst.uniform = 1;
@@ -51,6 +52,8 @@ static val push_(builder *b, struct ir_inst inst) {
         } else if (op == op_store_var) {
             inst.uniform = 0;
             b->var_uniform[inst.imm] = b->inst[inst.y.id].uniform;
+        } else if (op == op_all_32 || op == op_any_32) {
+            inst.uniform = 1;
         } else if (op_is_varying(op)
                    || op == op_gather_32
                    || op == op_gather_16) {
@@ -663,6 +666,15 @@ void umbra_store_var32(builder *b, umbra_var32 var, umbra_val32 x) {
 void umbra_if(builder *b, umbra_val32 cond) {
     push(b, op_if_begin, VX(cond));
     b->if_depth++;
+}
+
+umbra_val32 umbra_all_32(builder *b, umbra_val32 mask) {
+    if (b->inst[mask.id].uniform) { return mask; }
+    return push32(b, op_all_32, VX(mask));
+}
+umbra_val32 umbra_any_32(builder *b, umbra_val32 mask) {
+    if (b->inst[mask.id].uniform) { return mask; }
+    return push32(b, op_any_32, VX(mask));
 }
 
 void umbra_end_if(builder *b) {

@@ -364,6 +364,11 @@ static struct interp_program* interp_program(struct umbra_flat_ir const *ir) {
             case op_le_u32:
                 emit(.tag = inst->op, .x = X, .y = Y, .z = Z);
                 break;
+
+            case op_all_32:
+            case op_any_32:
+                emit(.tag = inst->op, .x = X);
+                break;
             }
             id[i] = n++;
         }
@@ -550,6 +555,7 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 [op_eq_i32] = &&L_op_eq_i32, [op_lt_s32] = &&L_op_lt_s32,
                 [op_le_s32] = &&L_op_le_s32,
                 [op_lt_u32] = &&L_op_lt_u32, [op_le_u32] = &&L_op_le_u32,
+                [op_all_32] = &&L_op_all_32, [op_any_32] = &&L_op_any_32,
                 [SW_DONE] = &&L_SW_DONE,
 
 #define BINARY_LABELS(name, ...) \
@@ -1121,6 +1127,18 @@ static void interp_program_run(struct interp_program *p, int l, int t, int r, in
                 CASE(op_le_s32) v->i32 = (I32)(v[ip->x].i32 <= v[ip->y].i32); NEXT;
                 CASE(op_lt_u32) v->i32 = (I32)(v[ip->x].u32 <  v[ip->y].u32); NEXT;
                 CASE(op_le_u32) v->i32 = (I32)(v[ip->x].u32 <= v[ip->y].u32); NEXT;
+
+                // TODO: use __builtin_reduce_and() / __builtin_reduce_or()
+                CASE(op_all_32) {
+                    int32_t reduction = -1;
+                    for (int ll = 0; ll < K; ll++) { reduction &= v[ip->x].i32[ll]; }
+                    v->i32 = (I32){0} + reduction;
+                } NEXT;
+                CASE(op_any_32) {
+                    int32_t reduction = 0;
+                    for (int ll = 0; ll < K; ll++) { reduction |= v[ip->x].i32[ll]; }
+                    v->i32 = (I32){0} + reduction;
+                } NEXT;
 
                 // Binary acc variants: r_mm (start), r_rm (continue), m_rm (end).
 #define BIN3(name, dst, OP, x_t, y_t)                                                  \

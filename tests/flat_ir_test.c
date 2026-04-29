@@ -6218,3 +6218,133 @@ TEST(test_scope_licm_in_loop) {
     umbra_flat_ir_free(ir);
     umbra_builder_free(b);
 }
+
+TEST(test_all_any_32_uniform_input) {
+    struct umbra_buf slot[4] = {0};
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const c    = umbra_imm_i32(b, (int)0xcafe1234),
+                      all  = umbra_all_32(b, c),
+                      any  = umbra_any_32(b, c);
+    val_eq(all, c) here;
+    val_eq(any, c) here;
+    umbra_store_32(b, umbra_bind_buf(b, &slot[0]), all);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), any);
+
+    struct test_backends B = make(b);
+    for (int bi = 0; bi < NUM_BACKENDS; bi++) {
+        uint32_t a[8] = {0}, o[8] = {0};
+        if (run(&B, bi, 8, 1, slot, 2,
+        (struct umbra_buf[]){{.ptr=a, .count=8, .stride=8},
+                             {.ptr=o, .count=8, .stride=8}})) {
+            for (int k = 0; k < 8; k++) {
+                a[k] == 0xcafe1234u here;
+                o[k] == 0xcafe1234u here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_all_32_marks_uniform) {
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const x = umbra_x(b);
+    b->inst[x.id].uniform == 0 here;
+    umbra_val32 const all = umbra_all_32(b, x),
+                      any = umbra_any_32(b, x);
+    b->inst[all.id].uniform == 1 here;
+    b->inst[any.id].uniform == 1 here;
+    umbra_builder_free(b);
+}
+
+TEST(test_all_32_scope_is_batch) {
+    struct umbra_buf slot[4] = {0};
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const x = umbra_x(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[0]), umbra_all_32(b, x));
+
+    struct umbra_flat_ir *ir = umbra_flat_ir(b);
+    int n_reductions = 0;
+    for (int i = 0; i < ir->insts; i++) {
+        if (ir->inst[i].op == op_all_32 || ir->inst[i].op == op_any_32) {
+            ir->inst[i].scope == SCOPE_BATCH here;
+            ir->inst[i].uniform == 1 here;
+            n_reductions++;
+        }
+    }
+    n_reductions == 1 here;
+    umbra_flat_ir_free(ir);
+    umbra_builder_free(b);
+}
+
+TEST(test_all_any_32_varying_cpu) {
+    struct umbra_buf slot[4] = {0};
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const v   = umbra_load_32(b, umbra_bind_buf(b, &slot[0])),
+                      all = umbra_all_32(b, v),
+                      any = umbra_any_32(b, v);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), all);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[2]), any);
+
+    struct test_backends B = make(b);
+    enum { N = 16 };
+    for (int bi = 0; bi < 2; bi++) {
+        uint32_t in [N] = {0xf0, 0x0f, 0x33, 0xcc, 0xaa, 0x55, 0x42, 0x18,
+                           0xf0, 0x0f, 0x33, 0xcc, 0xaa, 0x55, 0x42, 0x18},
+                 a  [N] = {0},
+                 o  [N] = {0};
+        if (run(&B, bi, N, 1, slot, 3,
+        (struct umbra_buf[]){{.ptr=in, .count=N, .stride=N},
+                             {.ptr=a , .count=N, .stride=N},
+                             {.ptr=o , .count=N, .stride=N}})) {
+            uint32_t exp_and_8 = 0xffffffffu, exp_or_8 = 0;
+            for (int k = 0; k < 8; k++) { exp_and_8 &= in[k]; exp_or_8 |= in[k]; }
+            uint32_t exp_and_16 = exp_and_8, exp_or_16 = exp_or_8;
+            for (int k = 8; k < 16; k++) { exp_and_16 &= in[k]; exp_or_16 |= in[k]; }
+            uint32_t const exp_and = (bi == 0) ? exp_and_16 : exp_and_8,
+                           exp_or  = (bi == 0) ? exp_or_16  : exp_or_8;
+            for (int k = 0; k < N; k++) {
+                a[k] == exp_and here;
+                o[k] == exp_or  here;
+            }
+        }
+    }
+    test_backends_free(&B);
+}
+
+TEST(test_all_32_drives_uniform_if) {
+    struct umbra_buf slot[4] = {0};
+    struct umbra_builder *b = umbra_builder();
+    umbra_val32 const v    = umbra_load_32(b, umbra_bind_buf(b, &slot[0])),
+                      all  = umbra_all_32(b, v);
+    umbra_var32 const out  = umbra_declare_var32(b, umbra_imm_i32(b, 0));
+    umbra_if(b, all); {
+        umbra_store_var32(b, out, umbra_imm_i32(b, 7));
+    } umbra_end_if(b);
+    umbra_store_32(b, umbra_bind_buf(b, &slot[1]), umbra_load_var32(b, out));
+
+    struct test_backends B = make(b);
+    enum { N = 16 };
+    for (int bi = 0; bi < 2; bi++) {
+        {
+            uint32_t in[N] = {0}, dst[N] = {0};
+            for (int k = 0; k < N; k++) { in[k] = 0xff; }
+            if (run(&B, bi, N, 1, slot, 2,
+            (struct umbra_buf[]){{.ptr=in , .count=N, .stride=N},
+                                 {.ptr=dst, .count=N, .stride=N}})) {
+                for (int k = 0; k < N; k++) { dst[k] == 7 here; }
+            }
+        }
+        {
+            uint32_t in[N] = {0}, dst[N] = {0};
+            for (int k = 0; k < N; k++) {
+                in[k] = (k == 3 || k == 11) ? 0 : 0xff;
+            }
+            if (run(&B, bi, N, 1, slot, 2,
+            (struct umbra_buf[]){{.ptr=in , .count=N, .stride=N},
+                                 {.ptr=dst, .count=N, .stride=N}})) {
+                for (int k = 0; k < N; k++) { dst[k] == 0 here; }
+            }
+        }
+    }
+    test_backends_free(&B);
+}

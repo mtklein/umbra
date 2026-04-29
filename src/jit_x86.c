@@ -1184,6 +1184,29 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             }
         } break;
 
+        // TODO: switch to vpmovmskb-based reduction; matches AND/OR for -1/0 masks.
+        case op_all_32:
+        case op_any_32: {
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
+            void (*combine)(Buf*, int, int, int, int) =
+                inst->op == op_all_32 ? vpand : vpor;
+            if (scalar) {
+                if (s.rd != s.rx) {
+                    vmovaps(c, s.rd, s.rx);
+                }
+            } else {
+                int8_t tmp = ra_alloc(ra, sl, ns);
+                vextracti128(c, tmp, s.rx, 1);
+                combine(c, 0, s.rd, s.rx, tmp);
+                vpsrldq(c, tmp, s.rd, 8);
+                combine(c, 0, s.rd, s.rd, tmp);
+                vpsrldq(c, tmp, s.rd, 4);
+                combine(c, 0, s.rd, s.rd, tmp);
+                vbroadcastss(c, s.rd, s.rd);
+                ra_return_reg(ra, tmp);
+            }
+        } break;
+
         case op_loop_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
             vmovd_to_gpr(c, R11, rx);

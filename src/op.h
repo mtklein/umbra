@@ -35,7 +35,9 @@ enum {
     X(if_begin,                             0)                                             \
     X(if_end,                               0)                                             \
     X(load_var,                             OP_VARYING)                                    \
-    X(store_var,                            OP_STORE|OP_VARYING)
+    X(store_var,                            OP_STORE|OP_VARYING)                           \
+    X(all_32,                               0)                                             \
+    X(any_32,                               0)
 
 #define BINARY_OPS(X)                                                                      \
     X(add_f32, OP_COMMUTATIVE) X(sub_f32, 0) X(mul_f32, OP_COMMUTATIVE)                    \

@@ -671,6 +671,12 @@ static void emit_ops(SrcBuf *b, IR const *ir,
                 emit(b, "%svar%d = %s;\n",
                      pad, inst->imm, uv(_uy, vy, yid, is_f));
                 break;
+            // TODO: threadgroup reduction; current passthrough is only correct for threadgroup-uniform input.
+            case op_all_32:
+            case op_any_32:
+                emit(b, "%suint v%d = %s;\n",
+                     pad, i, uv(_ux, vx, xid, is_f));
+                break;
         }
 
         if (op_is_store(inst->op) && i+1 < hi) {

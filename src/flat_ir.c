@@ -276,6 +276,10 @@ static _Bool is_cf(enum op op) {
         || op == op_if_begin   || op == op_if_end;
 }
 
+static _Bool is_reduction(enum op op) {
+    return op == op_all_32 || op == op_any_32;
+}
+
 // Per-op intrinsic scope.  Source ops introduce scope; everything else is
 // SCOPE_COMPILE intrinsically and inherits from operands via narrow().
 // Control-flow ops have an intrinsic floor of SCOPE_BATCH — their structural
@@ -290,6 +294,7 @@ static _Bool is_cf(enum op op) {
 // body into the row tier.
 static enum scope intrinsic_scope(enum op op) {
     if (is_cf(op))                  { return SCOPE_BATCH; }
+    if (is_reduction(op))           { return SCOPE_BATCH; }
     if (op == op_imm_32)            { return SCOPE_COMPILE; }
     // op_uniform_32 reads a uniform-bound buffer at a compile-time index;
     // by API contract that buffer's stride is zero, so the read is purely
@@ -342,10 +347,12 @@ struct umbra_flat_ir* umbra_flat_ir(struct umbra_builder *b) {
     // extraction below.
     for (int i = 0; i < n; i++) {
         enum scope s = intrinsic_scope(b->inst[i].op);
-        s = narrow(s, (enum scope)b->inst[b->inst[i].x.id].scope);
-        s = narrow(s, (enum scope)b->inst[b->inst[i].y.id].scope);
-        s = narrow(s, (enum scope)b->inst[b->inst[i].z.id].scope);
-        s = narrow(s, (enum scope)b->inst[b->inst[i].w.id].scope);
+        if (!is_reduction(b->inst[i].op)) {
+            s = narrow(s, (enum scope)b->inst[b->inst[i].x.id].scope);
+            s = narrow(s, (enum scope)b->inst[b->inst[i].y.id].scope);
+            s = narrow(s, (enum scope)b->inst[b->inst[i].z.id].scope);
+            s = narrow(s, (enum scope)b->inst[b->inst[i].w.id].scope);
+        }
         b->inst[i].scope = (int8_t)s;
     }
 
@@ -554,7 +561,9 @@ static void dump_insts(struct ir_inst const *inst, int insts, FILE *f) {
         case op_i32_from_u16:
         case op_i16_from_i32:
         case op_f32_from_f16:
-        case op_f16_from_f32: fprintf(f, " v%d", ip->x.id); break;
+        case op_f16_from_f32:
+        case op_all_32:
+        case op_any_32: fprintf(f, " v%d", ip->x.id); break;
 
         case op_add_f32:
         case op_sub_f32:

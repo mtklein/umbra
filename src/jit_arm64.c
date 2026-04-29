@@ -1256,6 +1256,25 @@ static void emit_ops(Buf *c, struct umbra_flat_ir const *ir, int from, int to,
             }
         } break;
 
+        // TODO: switch to UMINV/UMAXV — single-instruction cross-lane reduce; matches AND/OR for -1/0 masks.
+        case op_all_32:
+        case op_any_32: {
+            struct ra_step s = ra_step_unary(ra, sl, ns, inst, i);
+            uint32_t (*combine)(int, int, int) =
+                inst->op == op_all_32 ? AND_16b : ORR_16b;
+            if (scalar) {
+                put(c, combine(lo(s.rd), lo(s.rx), lo(s.rx)));
+            } else {
+                put(c, combine(lo(s.rd), lo(s.rx), hi(s.rx)));
+                put(c, EXT_16b(hi(s.rd), lo(s.rd), lo(s.rd), 8));
+                put(c, combine(lo(s.rd), lo(s.rd), hi(s.rd)));
+                put(c, EXT_16b(hi(s.rd), lo(s.rd), lo(s.rd), 4));
+                put(c, combine(lo(s.rd), lo(s.rd), hi(s.rd)));
+                put(c, DUP_4s_lane(lo(s.rd), lo(s.rd), 0));
+                put(c, ORR_16b(hi(s.rd), lo(s.rd), lo(s.rd)));
+            }
+        } break;
+
         case op_loop_begin: {
             int8_t rx = ra_ensure(ra, sl, ns, inst->x.id);
             put(c, UMOV_ws(XT, lo(rx)));
