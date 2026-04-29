@@ -1,6 +1,9 @@
+The user has the last word in design and policy.
+
 Never write comments except to use // TODO to track bugs and follow-ups.
 
 Indent with 4 spaces, wrap to 100 columns, and always use {}.
+
 Begin a new line after {, even for short expressions, but prefer to align
 conceptually parallel constructs vertically:
 
@@ -20,8 +23,7 @@ Group and align declarations of the same type:
     float const not_int = ...;
 
 Use East `const`, and liberally, especially to distinguish locals that name an
-immutable value from locals that act as storage locations to hold a updating
-value:
+immutable value from locals that act as storage locations for updating values:
 
     double const start_time = now();
     double elapsed = 0;  // we can tell `elapsed` will change at a glance
@@ -42,13 +44,13 @@ of unnamed parameters, or with a function's return type:
     int *foo;
     char const* bar(int *x, int*);
 
-Keep headers tidy, with minimal #includes and only inline functions if
-technically unavoidable, e.g. when embedding a macro like `__LINE__`.
+Keep headers tidy, with minimal #includes and inline functions only when
+technically unavoidable, e.g. embedding a macro like `__LINE__`.
 
-Public APIs go in include/ and get an `umbra_` prefix; no `umbra_` prefix for
-anything else. Don't typedef public type names for enums, or for large struct
-or union types that are meant to be handled by reference, but do use typedef
-for small struct or union value types:
+Public APIs belong in include/ and get an `umbra_` prefix; nothing else should
+have an `umbra_` prefix.  Don't typedef public type names for enums, or for
+large struct or union types that are meant to be handled by reference, but do
+use typedef for small struct or union value types:
 
     enum umbra_foo {
         ...
@@ -59,21 +61,21 @@ for small struct or union value types:
         ...
     };
     typedef union {
-        int x;
-        float y;
+        int   i;
+        float f;
     } umbra_value_type;
 
-A type's constructor should be named the type name, and its other methods
-should be prefixed with that type name.  Let constructors' return types serve
-as declarations for opaque types.
+A type's constructor should have the same name as the type, and its other
+methods should be prefixed with that type name.  Let the constructor's return
+type serve as the declaration for opaque types.  Opaque types should always
+have a free method that completely cleans up the object and permits NULL.
 
     struct foo* foo(...);
+    void   foo_free  (struct foo*);  // NULL must be safe
     _Bool  foo_is_bar(struct foo const*);
     void   foo_quux  (struct foo*, int x);
-    void   foo_free  (struct foo*);
 
-Avoid returning early from functions or short-circuiting loops.  Instead, write
-positive condition tests and let control flow nest naturally:
+Favor positive condition tests and let control flow nest naturally:
 
     if (can_foo) {
         foo(...);
