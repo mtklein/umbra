@@ -23,7 +23,7 @@ write a design doc.
 
 ## While working — hypothesis-first
 
-Move slowly.  Before claiming a cause or committing to a fix:
+Move deliberately.  Before claiming a cause or committing to a fix:
 
   1. State the hypothesis and what measurement would confirm or refute it.
   2. Take the measurement.
@@ -33,20 +33,15 @@ Move slowly.  Before claiming a cause or committing to a fix:
 Confirm you are working on the right problem before optimizing.  Profile first,
 then change code — not the other way around.  State a hypothesis about where
 the time is going before changing code.  Take the measurement.  If the change
-does not produce the expected improvement, revert it.
+does not produce the expected improvement, investigate why.
 
 Hypothesis-driven changes that produce no measurable improvement are a signal
 you have the wrong model of the hot path — stop and gather data before trying
-the next fix.  For **performance** work, revert speculative changes that did
-not produce the expected effect before moving on, so the tree stays clean
-and the next measurement is not confounded.
+the next fix.  Don't commit changes that did not produce the expected effect.
 
-For **feature or correctness** work, the opposite rule: don't revert.  Code
-that runs but fails a test you haven't figured out is load-bearing progress,
-not noise.  Keep it in the tree (WIP branch or just uncommitted), describe
-the symptom, list the hypotheses you've tried, and hand it to the user.  They
-can look at screenshots, read the diff, and frequently have ideas you don't
-— denying them that by silently reverting is worse than a messy tree.
+If you run into an unexpected test failure, that's extremely valuable.
+Immediately note it with a // TODO, stash your work, and check in with the
+user about what to do.
 
 **Running out of ideas is not proof.**  If you have tried several hypotheses
 and none worked, gather more data, or say "I'm stuck" and ask for help.  Do not
@@ -58,23 +53,19 @@ saying you're stuck — the user cannot help with code they cannot see.
 to what you are doing, read its source.  Clone MoltenVK, wgpu-native, or
 SPIRV-Cross locally and grep for the specific function or API path you care
 about.  Do not guess from API names, blog posts, or prior knowledge — the
-actual code is the only ground truth.  If you catch yourself writing "I
-believe library X does Y", stop and verify.
+actual code is the only ground truth.
 
 ### Important tools
 
-- `lldb` — step through a failing test or inspect state at a crash.  Prefer
-  it over printf-debugging.
+- `lldb` — step through a failing test or inspect state at a crash.
 - `dumps/` — regenerate with the right tool and diff against golden files to
   see how backends differ.  A shader that works on one backend but not
   another is a backend bug, not a reason to reject the shader — all backends
   must produce bit-exact identical output for the same IR.
 
 - `out/host/bench --backend <name> --match <substr>` — run benchmarks.
-- `--target-ms 1000 --samples 1` — hold the workload open long enough for a
-  profiler to sample it.
 - Run benchmarks one at a time, serially, with bounded wall time (≤30s).
-  Warmup variance is accepted.
+  Warmup variance seems unavoidable for now.
 - Never run `time prog` or `until` polls without a timeout cap.
 
 - `sample <pid> <seconds> -mayDie -file <out>` — macOS call-tree profiler.
